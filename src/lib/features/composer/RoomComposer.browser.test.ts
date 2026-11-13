@@ -694,3 +694,27 @@ test('a touch hold schedules only after the full delay and swallows its click', 
   send().dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   expect(sent).toHaveLength(0);
 });
+
+test.for([true, false])(
+  'each typed line follows its own direction (rich: %s)',
+  async (richText) => {
+    await page.viewport(1280, 900);
+    const { composer, editor } = await mount(richText);
+    await userEvent.click(composer);
+    await userEvent.keyboard(`سلام دنیا${NEWLINE}hello world`);
+    const side = (text: string) => {
+      const walker = document.createTreeWalker(editor(), NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.textContent !== text) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const line = range.getBoundingClientRect();
+        const box = editor().getBoundingClientRect();
+        return line.left - box.left > box.right - line.right ? 'right' : 'left';
+      }
+      return null;
+    };
+    await expect.poll(() => side('سلام دنیا')).toBe('right');
+    expect(side('hello world')).toBe('left');
+  }
+);

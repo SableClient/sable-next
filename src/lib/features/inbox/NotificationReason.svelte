@@ -20,7 +20,7 @@
   <p class={['reason', className]}>
     {#if reply}
       <span
-        ><ArrowBendUpLeftIcon aria-hidden="true" />{i18n.t(
+        ><ArrowBendUpLeftIcon class="mirror-rtl" aria-hidden="true" />{i18n.t(
           item.highlight ? 'inbox.repliedToYou' : 'inbox.reply'
         )}</span
       >

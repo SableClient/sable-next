@@ -72,6 +72,7 @@
     border-radius: var(--radii-pill);
     content: '';
     height: 0.25rem;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     position: absolute;
     top: 50%;

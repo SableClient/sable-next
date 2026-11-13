@@ -12,6 +12,7 @@
   import UserQuickTools from '#lib/features/sidebar/UserQuickTools.svelte';
   import { providePageMeta } from '#lib/core/page-meta.js';
   import { HorizontalSwipe } from '#lib/ui/horizontal-swipe.svelte.js';
+  import { currentDirection } from '#lib/language.svelte.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import {
     backToRoomList,
@@ -31,6 +32,7 @@
 
   let position = $state<number | undefined>();
   const swipe = new HorizontalSwipe();
+  let sign = $derived(currentDirection() === 'rtl' ? -1 : 1);
   let swipeWidth = 0;
   let cancelSettle: (() => void) | undefined;
   let cancelRoute: (() => void) | undefined;
@@ -157,11 +159,11 @@
     const width = target.clientWidth;
     if (width === 0 || pinnedClosed) return;
 
-    if (swipe.start(event, open ? 0 : -width)) swipeWidth = width;
+    if (swipe.start(event, open ? 0 : -width * sign)) swipeWidth = width;
   }
 
   function handleTouchMove(event: TouchEvent) {
-    const next = swipe.move(event, (x) => clamp(x, -swipeWidth, 0));
+    const next = swipe.move(event, (x) => sign * clamp(sign * x, -swipeWidth, 0));
     if (next !== undefined) position = next;
   }
 
@@ -175,11 +177,11 @@
 
     if (result.handled) {
       if (result.direction === 'right') {
-        setOpen(true);
+        setOpen(sign > 0);
       } else if (result.direction === 'left') {
-        setOpen(false);
+        setOpen(sign < 0);
       } else {
-        setOpen(currentPosition > -swipeWidth / 2);
+        setOpen(sign * currentPosition > -swipeWidth / 2);
       }
     }
 
@@ -208,12 +210,9 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'ArrowLeft') {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       event.preventDefault();
-      setOpen(false);
-    } else if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      setOpen(true);
+      setOpen((event.key === 'ArrowRight') === sign > 0);
     }
   }
 </script>
@@ -283,7 +282,7 @@
               label={i18n.t('timeline.back')}
               onclick={backToRoomList}
             >
-              <BackIcon />
+              <BackIcon class="mirror-rtl" />
             </PanelHeaderButton>
           {/snippet}
         </PanelHeader>
@@ -318,7 +317,7 @@
   .drawer-track {
     display: flex;
     height: 100%;
-    transform: translateX(-50%);
+    transform: translateX(calc(-50% * var(--inline-sign)));
     width: 200%;
     will-change: transform;
   }
@@ -405,7 +404,9 @@
     }
 
     .drawer-viewport {
-      margin-left: calc(var(--navigation-rail-width) + var(--room-nav-width) + var(--safe-left));
+      margin-inline-start: calc(
+        var(--navigation-rail-width) + var(--room-nav-width) + var(--safe-left)
+      );
     }
 
     .screen-reader-only,
@@ -425,7 +426,7 @@
       --edge-inset-bottom: 0px;
 
       flex-basis: 100%;
-      padding-left: 0;
+      padding-inline-start: 0;
       width: 100%;
     }
   }

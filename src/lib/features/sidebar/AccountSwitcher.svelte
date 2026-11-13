@@ -285,9 +285,9 @@
   }
 
   :global(.quick-tool > .account-presence) {
+    inset-inline-end: -0.125rem;
     bottom: -0.125rem;
     position: absolute;
-    right: -0.125rem;
   }
 
   .logout-dialog {

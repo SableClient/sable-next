@@ -39,7 +39,7 @@
       <span class="action-card-title">{title}</span>
       {#if description}<span class="action-card-description">{description}</span>{/if}
     </span>
-    <span class="action-card-arrow" aria-hidden="true"><ArrowRightIcon /></span>
+    <span class="action-card-arrow" aria-hidden="true"><ArrowRightIcon class="mirror-rtl" /></span>
   </a>
   <!-- eslint-enable svelte/no-navigation-without-resolve -->
 {:else}
@@ -54,7 +54,7 @@
       <span class="action-card-title">{title}</span>
       {#if description}<span class="action-card-description">{description}</span>{/if}
     </span>
-    <span class="action-card-arrow" aria-hidden="true"><ArrowRightIcon /></span>
+    <span class="action-card-arrow" aria-hidden="true"><ArrowRightIcon class="mirror-rtl" /></span>
   </button>
 {/if}
 
@@ -75,7 +75,7 @@
     min-width: 0;
     padding: var(--space-400);
     position: relative;
-    text-align: left;
+    text-align: start;
     text-decoration: none;
     width: 100%;
   }
@@ -119,7 +119,7 @@
     flex-direction: column;
     gap: var(--space-200);
     min-width: 0;
-    padding-right: var(--space-400);
+    padding-inline-end: var(--space-400);
   }
 
   .action-card-title {
@@ -138,9 +138,9 @@
     color: var(--primary-main);
     display: inline-flex;
     height: var(--icon-size-small);
+    inset-inline-end: var(--space-400);
     justify-content: center;
     position: absolute;
-    right: var(--space-400);
     width: var(--icon-size-small);
   }
 

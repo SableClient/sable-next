@@ -47,8 +47,9 @@
     aria-label={title}
   >
     <span class="youtube-preview-site">{preview.site_name ?? 'YouTube'}</span>
-    <span class="youtube-preview-title">{title}</span>
-    {#if preview.description}<span class="youtube-preview-description">{preview.description}</span
+    <span class="youtube-preview-title" dir="auto">{title}</span>
+    {#if preview.description}<span class="youtube-preview-description" dir="auto"
+        >{preview.description}</span
       >{/if}
   </a>
 </div>
@@ -92,6 +93,7 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     display: flex;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     padding: var(--space-200);
     pointer-events: none;

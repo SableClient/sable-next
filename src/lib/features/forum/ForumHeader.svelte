@@ -23,7 +23,7 @@
 <PanelHeader class="forum-header" title={roomName} titleSize="h1">
   {#snippet prefix()}
     <PanelHeaderButton class="back-button" label={i18n.t('timeline.back')} onclick={onBack}>
-      <BackIcon />
+      <BackIcon class="mirror-rtl" />
     </PanelHeaderButton>
     <Avatar class="forum-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
   {/snippet}

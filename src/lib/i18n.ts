@@ -24,9 +24,11 @@ async function ensureBundle(code: string): Promise<void> {
 
 function applyLanguage(code: string): void {
   const language = availableLocales.includes(code) ? code : 'en';
-  setCurrentLanguage(language);
+  const dir = i18next.dir(language);
+  setCurrentLanguage(language, dir);
   if (typeof document === 'undefined') return;
   document.documentElement.lang = language;
+  document.documentElement.dir = dir;
 }
 
 const initialLanguage = chosenLanguage();

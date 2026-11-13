@@ -93,7 +93,7 @@
   line-height: var(--line-height-small);
   min-height: var(--menu-item-height);
   padding: 0 var(--menu-item-padding);
-  text-align: left;
+  text-align: start;
   user-select: none;
   width: 100%;
 }

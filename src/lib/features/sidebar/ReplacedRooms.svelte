@@ -169,7 +169,7 @@
     height: var(--control-height-medium);
     opacity: var(--opacity-p300);
     padding: 0 var(--space-200);
-    text-align: left;
+    text-align: start;
     width: 100%;
   }
 

@@ -127,7 +127,7 @@
     font-size: var(--font-size-label);
     gap: var(--space-300);
     min-width: 0;
-    text-align: left;
+    text-align: start;
     width: 100%;
   }
 
@@ -157,9 +157,9 @@
   }
 
   .member-identity-avatar :global(.member-identity-presence) {
+    inset-inline-end: -0.125rem;
     bottom: -0.125rem;
     position: absolute;
-    right: -0.125rem;
   }
 
   .member-identity-main {
@@ -186,7 +186,7 @@
   }
 
   .member-identity-status-emoji {
-    margin-right: var(--space-050);
+    margin-inline-end: var(--space-050);
   }
 
   .member-identity-trailing {
@@ -196,6 +196,6 @@
     flex: none;
     font-size: var(--font-size-small);
     gap: var(--space-200);
-    margin-left: auto;
+    margin-inline-start: auto;
   }
 </style>

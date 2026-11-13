@@ -89,7 +89,9 @@
     >
       <span class="icon" aria-hidden="true"><Icon weight={active ? 'fill' : 'regular'} /></span>
       <span class="label">{entry.label}</span>
-      {#if showChevron}<span class="chevron" aria-hidden="true"><CaretRightIcon /></span>{/if}
+      {#if showChevron}<span class="chevron" aria-hidden="true"
+          ><CaretRightIcon class="mirror-rtl" /></span
+        >{/if}
     </a>
     <!-- eslint-enable svelte/no-navigation-without-resolve -->
   {:else}
@@ -159,7 +161,7 @@
     line-height: var(--line-height-small);
     min-height: var(--control-height-medium);
     padding: 0 var(--space-300);
-    text-align: left;
+    text-align: start;
     text-decoration: none;
     width: 100%;
   }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inlineKey } from '#lib/language.svelte.js';
   import { clamp } from '#lib/clamp.js';
   import { MediaQuery } from 'svelte/reactivity';
   import { innerWidth } from 'svelte/reactivity/window';
@@ -522,7 +523,7 @@
     count: number
   ): void {
     const from = activeCell.section === id ? activeCell.index : 0;
-    const target = targetCell(event.key, from, count - 1);
+    const target = targetCell(inlineKey(event.key), from, count - 1);
     if (target === null) return;
 
     event.preventDefault();
@@ -572,7 +573,7 @@
       if (event.key === 'Enter') submitQuery(event);
       return;
     }
-    if (moveSelection(event.key)) {
+    if (moveSelection(inlineKey(event.key))) {
       event.preventDefault();
       return;
     }
@@ -1049,7 +1050,7 @@
   /* Fixed, or a long pack name widens the rail and squeezes the grid. */
   .rail {
     align-items: center;
-    border-left: var(--border-width) solid var(--surface-container-line);
+    border-inline-start: var(--border-width) solid var(--surface-container-line);
     display: flex;
     flex: 0 0 3.25rem;
     flex-direction: column;
@@ -1216,7 +1217,7 @@
     margin: var(--space-200);
     overflow: hidden;
     padding: var(--space-150) var(--space-200);
-    text-align: left;
+    text-align: start;
     text-overflow: ellipsis;
     white-space: nowrap;
     width: 98%;

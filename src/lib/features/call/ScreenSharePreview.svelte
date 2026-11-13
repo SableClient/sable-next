@@ -267,12 +267,12 @@
 
   .top-left,
   .bottom-left {
-    left: max(var(--space-400), var(--safe-left));
+    inset-inline-start: max(var(--space-400), var(--safe-inline-start));
   }
 
   .top-right,
   .bottom-right {
-    right: max(var(--space-400), var(--safe-right));
+    inset-inline-end: max(var(--space-400), var(--safe-inline-end));
   }
 
   .stage {

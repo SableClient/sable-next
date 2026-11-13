@@ -150,6 +150,7 @@
     border-radius: var(--radii-200);
     bottom: calc(-1 * var(--space-100));
     height: var(--space-050);
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     opacity: 0.35;
     position: absolute;

@@ -68,19 +68,19 @@
 }
 
 .nav-tab .unread-badge-dot {
-  left: -0.25rem;
+  inset-inline-start: -0.25rem;
   top: -0.25rem;
 }
 
 .nav-tab .unread-badge-count {
-  left: -0.375rem;
+  inset-inline-start: -0.375rem;
   top: -0.375rem;
 }
 
 .nav-tab-side::before {
   border-radius: 0 var(--radii-300) var(--radii-300) 0;
   height: 1.5rem;
-  left: -13.5px;
+  inset-inline-start: -13.5px;
   transform: scaleY(0.67);
   transform-origin: center left;
   width: 5px;
@@ -149,20 +149,20 @@
     }
 
     html:not([data-reduced-motion='on']) .nav-tab-side:hover {
-      transform: translateX(0.125rem);
+      transform: translateX(calc(0.125rem * var(--inline-sign)));
     }
 
     html:not([data-reduced-motion='on']) .nav-tab-side:hover > .nav-tab-hit-area {
-      transform: translateX(-0.125rem);
+      transform: translateX(calc(-0.125rem * var(--inline-sign)));
     }
 
     html:not([data-reduced-motion='on']) .nav-tab-side:hover::before {
-      transform: translateX(-0.125rem) scaleY(0.67);
+      transform: translateX(calc(-0.125rem * var(--inline-sign))) scaleY(0.67);
     }
 
     html:not([data-reduced-motion='on']) .nav-tab-side[aria-current='page']:hover::before,
     html:not([data-reduced-motion='on']) .nav-tab-side[data-current='true']:hover::before {
-      transform: translateX(-0.125rem) scaleX(1.4) scaleY(1);
+      transform: translateX(calc(-0.125rem * var(--inline-sign))) scaleX(1.4) scaleY(1);
     }
 
     html:not([data-reduced-motion='on']) .nav-tab-bottom:hover {

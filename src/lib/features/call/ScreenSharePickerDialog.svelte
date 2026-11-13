@@ -129,7 +129,7 @@
     display: grid;
     gap: var(--space-100);
     padding: var(--space-200);
-    text-align: left;
+    text-align: start;
   }
 
   :global(.screen-picker-source:hover) {

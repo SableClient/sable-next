@@ -393,7 +393,7 @@
     font: inherit;
     gap: var(--space-300);
     padding: var(--space-200) var(--space-300);
-    text-align: left;
+    text-align: start;
     width: 100%;
   }
 

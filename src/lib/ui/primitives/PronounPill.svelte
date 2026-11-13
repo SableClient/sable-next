@@ -156,12 +156,12 @@
   }
 
   .pronoun-pill-row > :first-child {
-    border-bottom-left-radius: var(--radii-pill);
-    border-top-left-radius: var(--radii-pill);
+    border-end-start-radius: var(--radii-pill);
+    border-start-start-radius: var(--radii-pill);
   }
 
   .pronoun-pill-row > :last-child {
-    border-bottom-right-radius: var(--radii-pill);
-    border-top-right-radius: var(--radii-pill);
+    border-end-end-radius: var(--radii-pill);
+    border-start-end-radius: var(--radii-pill);
   }
 </style>

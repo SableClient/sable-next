@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import { Select as BitsSelect } from 'bits-ui';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
@@ -152,6 +153,7 @@
     </BitsSelect.Trigger>
     <BitsSelect.Portal>
       <BitsSelect.Content
+        dir={currentDirection()}
         sideOffset={4}
         collisionPadding={collisionPadding()}
         class="menu-surface select-content"
@@ -189,7 +191,7 @@
     justify-content: space-between;
     min-height: var(--control-height-400);
     position: relative;
-    text-align: left;
+    text-align: start;
     width: 100%;
   }
 

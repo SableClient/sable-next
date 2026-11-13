@@ -40,6 +40,7 @@
   {#if onMention}
     <button
       class={[nameClass, 'name-button', 'sender-identity-name', { tinted: colors.tinted }]}
+      dir="auto"
       style:color={colors.tinted ? undefined : colors.nameColor}
       style:--name-color-on-light={colors.nameColorLight ?? undefined}
       style:--name-color-on-dark={colors.nameColorDark ?? undefined}
@@ -50,6 +51,7 @@
   {:else if onProfile}
     <button
       class={[nameClass, 'name-button', 'sender-identity-name', { tinted: colors.tinted }]}
+      dir="auto"
       style:color={colors.tinted ? undefined : colors.nameColor}
       style:--name-color-on-light={colors.nameColorLight ?? undefined}
       style:--name-color-on-dark={colors.nameColorDark ?? undefined}
@@ -62,6 +64,7 @@
   {:else}
     <span
       class={[nameClass, 'sender-identity-name', { tinted: colors.tinted }]}
+      dir="auto"
       style:color={colors.tinted ? undefined : colors.nameColor}
       style:--name-color-on-light={colors.nameColorLight ?? undefined}
       style:--name-color-on-dark={colors.nameColorDark ?? undefined}

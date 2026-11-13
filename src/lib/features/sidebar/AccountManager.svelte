@@ -631,7 +631,7 @@
     align-items: center;
     display: flex;
     min-width: 0;
-    padding-right: var(--space-100);
+    padding-inline-end: var(--space-100);
   }
 
   .account-row + .account-row {
@@ -692,7 +692,7 @@
   @container (width < 20rem) {
     .account-row {
       display: block;
-      padding-right: 0;
+      padding-inline-end: 0;
       position: relative;
     }
 
@@ -723,8 +723,8 @@
     }
 
     .account-row :global(.selection-open) {
+      inset-inline-end: var(--space-400);
       position: absolute;
-      right: var(--space-400);
       top: var(--space-400);
     }
   }

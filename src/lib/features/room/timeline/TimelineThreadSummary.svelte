@@ -27,7 +27,7 @@
       persona
     )}
     {#if latest}
-      <span class="thread-latest">{latest}</span>
+      <span class="thread-latest"><bdi>{latest}</bdi></span>
     {/if}
   {:else}
     <span class="thread-count">{i18n.t('timeline.thread')}</span>
@@ -48,7 +48,7 @@
     margin-top: var(--space-050);
     max-width: 100%;
     padding: 0;
-    text-align: left;
+    text-align: start;
   }
 
   .thread-count {

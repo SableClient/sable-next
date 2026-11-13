@@ -45,7 +45,7 @@
       label={i18n.t('timeline.reply')}
       onclick={actions.onReply}
     >
-      <ReplyIcon />
+      <ReplyIcon class="mirror-rtl" />
     </IconButton>
   {/if}
   {#if actions.onEdit}
@@ -87,7 +87,7 @@
             destructive={row.destructive}
             onSelect={row.run}
           >
-            <RowIcon />
+            <RowIcon class={row.mirrored ? 'mirror-rtl' : undefined} />
             <span>{i18n.t(row.label)}</span>
           </ActionMenuItem>
         {/each}

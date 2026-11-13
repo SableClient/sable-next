@@ -542,6 +542,9 @@ importers:
       stylelint-plugin-defensive-css:
         specifier: ^2.9.7
         version: 2.9.7(stylelint@17.16.0(supports-color@10.2.2)(typescript@6.0.3))
+      stylelint-use-logical:
+        specifier: 2.1.3
+        version: 2.1.3(stylelint@17.16.0(supports-color@10.2.2)(typescript@6.0.3))
       svelte:
         specifier: ^5.57.2
         version: 5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1)
@@ -6068,6 +6071,12 @@ packages:
     resolution: {integrity: sha512-ugILyMO6wMeSC6dsSVujR0YMjjyNhYvit6sz6/GSfWr0WtJ2t7X7knTLj3YviCX7mbtj1vn4CqQuaFFq8iMjiQ==}
     peerDependencies:
       stylelint: ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
+
+  stylelint-use-logical@2.1.3:
+    resolution: {integrity: sha512-haPkgxKre+eSqr4IZJnHwNT/9/wICykeFZIaz7rZbe4SohTHkw7vBahMOrZJZpdny/EBVHAcPH2IBeoiUcZWWw==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      stylelint: '>= 11 < 18'
 
   stylelint@17.16.0:
     resolution: {integrity: sha512-ejlWnbJ13x1GU32+zZXa6sYQJsKKkwSdv2B4rAdO3OWdEmvhSJKcXi5pOphQYSzyaj1kXpuGJr7pcMBNfDIuPw==}
@@ -12062,6 +12071,10 @@ snapshots:
   stylelint-plugin-defensive-css@2.9.7(stylelint@17.16.0(supports-color@10.2.2)(typescript@6.0.3)):
     dependencies:
       postcss-selector-parser: 7.1.7
+      stylelint: 17.16.0(supports-color@10.2.2)(typescript@6.0.3)
+
+  stylelint-use-logical@2.1.3(stylelint@17.16.0(supports-color@10.2.2)(typescript@6.0.3)):
+    dependencies:
       stylelint: 17.16.0(supports-color@10.2.2)(typescript@6.0.3)
 
   stylelint@17.16.0(supports-color@10.2.2)(typescript@6.0.3):

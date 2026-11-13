@@ -376,7 +376,7 @@
                     onOpen(child);
                   }}
                 >
-                  <ArrowRightIcon />
+                  <ArrowRightIcon class="mirror-rtl" />
                 </IconButton>
               {:else if action}
                 <Button
@@ -541,7 +541,7 @@
     gap: var(--space-300);
     min-width: 0;
     padding: var(--space-200);
-    text-align: left;
+    text-align: start;
   }
 
   :global(.section-toggle:hover) {
@@ -628,7 +628,7 @@
     cursor: grab;
     display: inline-flex;
     flex: none;
-    margin-left: calc(-1 * var(--space-300));
+    margin-inline-start: calc(-1 * var(--space-300));
   }
 
   .room:hover {
@@ -680,7 +680,7 @@
     min-width: 0;
     overflow: hidden;
     padding: 0;
-    text-align: left;
+    text-align: start;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -714,7 +714,7 @@
     display: flex;
     flex: none;
     gap: var(--space-200);
-    margin-left: auto;
+    margin-inline-start: auto;
   }
 
   .section-failed {
@@ -755,7 +755,7 @@
 
   @media (width >= 42rem) {
     .room-actions {
-      margin-left: 0;
+      margin-inline-start: 0;
     }
   }
 </style>

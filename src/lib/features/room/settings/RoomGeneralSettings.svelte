@@ -505,7 +505,7 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    margin-right: auto;
+    margin-inline-end: auto;
   }
 
   .save-bar.pending .save-status:not(.error) {

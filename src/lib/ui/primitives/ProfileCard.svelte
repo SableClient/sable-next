@@ -434,9 +434,9 @@
   :global(.profile-card-presence) {
     --presence-ring: var(--profile-card-ground);
 
+    inset-inline-end: 0;
     bottom: 0;
     position: absolute;
-    right: 0;
     z-index: 1;
   }
 
@@ -452,7 +452,7 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-label);
     line-height: var(--line-height-small);
-    margin-left: var(--space-100);
+    margin-inline-start: var(--space-100);
     margin-top: calc(-1 * var(--space-600));
     min-width: var(--space-700);
     padding: var(--space-200) var(--space-200);
@@ -467,7 +467,7 @@
     border-radius: var(--radius-pill) var(--radius-pill) 0 0;
     content: '';
     height: 0.4rem;
-    left: 0.25rem;
+    inset-inline-start: 0.25rem;
     position: absolute;
     top: calc(-1 * var(--space-150));
     width: 0.8rem;
@@ -480,7 +480,7 @@
     border-radius: var(--radius-pill);
     content: '';
     height: 8px;
-    left: -3px;
+    inset-inline-start: -3px;
     position: absolute;
     top: -12px;
     width: 8px;
@@ -516,7 +516,7 @@
 
   .profile-card-status-emoji {
     font-size: var(--font-size-heading);
-    margin-right: var(--space-150);
+    margin-inline-end: var(--space-150);
   }
 
   .profile-card-identity {
@@ -553,7 +553,7 @@
   }
 
   .profile-card-heading :global(.btn:last-child) {
-    margin-left: auto;
+    margin-inline-start: auto;
   }
 
   .profile-card-name,

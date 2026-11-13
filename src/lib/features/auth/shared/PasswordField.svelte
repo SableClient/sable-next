@@ -77,10 +77,10 @@
     cursor: pointer;
     display: flex;
     height: 100%;
+    inset-inline-end: 0;
     justify-content: center;
     padding: 0;
     position: absolute;
-    right: 0;
     top: 0;
     width: 2.75rem;
   }

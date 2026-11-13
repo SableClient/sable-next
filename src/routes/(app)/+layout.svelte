@@ -1422,7 +1422,7 @@
     clip-path: none;
     color: var(--bg-on-container);
     height: auto;
-    left: calc(var(--space-300) + var(--safe-left));
+    inset-inline-start: calc(var(--space-300) + var(--safe-inline-start));
     overflow: visible;
     padding: var(--space-300) var(--space-400);
     position: fixed;

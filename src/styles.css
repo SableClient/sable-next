@@ -569,10 +569,23 @@ html {
   --safe-right: var(--safe-area-inset-right);
   --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
   --safe-left: var(--safe-area-inset-left);
+  --safe-inline-start: var(--safe-left);
+  --safe-inline-end: var(--safe-right);
+  --inline-sign: 1;
   --keyboard-overlap: var(--keyboard-height, 0px);
   --edge-inset-top: 0px;
   --edge-inset-bottom: 0px;
   --sheet-inset-bottom: 0px;
+}
+
+:root[dir='rtl'] {
+  --safe-inline-start: var(--safe-right);
+  --safe-inline-end: var(--safe-left);
+  --inline-sign: -1;
+}
+
+:root[dir='rtl'] .mirror-rtl {
+  scale: -1 1;
 }
 
 :root,
@@ -756,6 +769,7 @@ body {
 input,
 textarea {
   caret-color: var(--primary-main);
+  unicode-bidi: plaintext;
 }
 
 body.remote-theme {

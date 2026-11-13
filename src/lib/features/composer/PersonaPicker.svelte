@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import { Popover } from 'bits-ui';
   import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 
@@ -205,6 +206,7 @@
     </Tooltip>
     <Popover.Portal>
       <Popover.Content
+        dir={currentDirection()}
         class="persona-picker-popover"
         {...overlayLayer()}
         side="top"

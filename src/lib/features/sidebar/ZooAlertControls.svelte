@@ -81,12 +81,12 @@
   .zoo-controls {
     background: var(--bg-container);
     border: var(--border-width) solid var(--crit-main);
-    border-bottom-left-radius: var(--radius);
-    border-right: none;
-    border-top-left-radius: var(--radius);
+    border-end-start-radius: var(--radius);
+    border-inline-end: none;
+    border-start-start-radius: var(--radius);
+    inset-inline-end: 0;
     padding: var(--space-200);
     position: fixed;
-    right: 0;
     top: 50%;
     transform: translateY(-50%);
   }

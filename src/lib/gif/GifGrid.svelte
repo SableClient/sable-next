@@ -205,9 +205,9 @@
     cursor: pointer;
     display: flex;
     height: var(--star-size);
+    inset-inline-end: 0.25rem;
     justify-content: center;
     position: absolute;
-    right: 0.25rem;
     top: 0.25rem;
     width: var(--star-size);
   }

@@ -1114,7 +1114,7 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
-    padding-left: var(--space-500);
+    padding-inline-start: var(--space-500);
   }
 
   .empty p {

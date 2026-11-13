@@ -125,7 +125,7 @@
         variant="ghost"
         onclick={() => {
           open = false;
-        }}><ArrowLeftIcon /></IconButton
+        }}><ArrowLeftIcon class="mirror-rtl" /></IconButton
       >
       <span class="text-viewer-name">{name}</span>
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->

@@ -1195,10 +1195,10 @@
     border-radius: var(--radii-pill);
     color: var(--success-on-main);
     display: flex;
+    inset-inline-end: -0.25rem;
     justify-content: center;
     padding: var(--space-050);
     position: absolute;
-    right: -0.25rem;
     top: -0.25rem;
     z-index: 1;
   }
@@ -1216,7 +1216,7 @@
 
   .rail {
     background: var(--bg-container);
-    border-right: var(--border-width) solid var(--bg-container-line);
+    border-inline-end: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
     color: var(--bg-on-container);
     display: flex;
@@ -1280,10 +1280,9 @@
     border-radius: var(--radius-pill);
     content: '';
     height: 2px;
-    left: 0;
+    inset-inline: 0;
     pointer-events: none;
     position: absolute;
-    right: 0;
   }
 
   .rail-slot.drop-above::after,

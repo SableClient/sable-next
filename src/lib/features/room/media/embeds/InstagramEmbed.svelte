@@ -127,6 +127,7 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     display: flex;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     padding: var(--space-200);
     position: absolute;

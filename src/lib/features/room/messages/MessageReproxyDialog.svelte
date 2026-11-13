@@ -114,7 +114,7 @@
     gap: var(--space-300);
     min-height: var(--control-height-500);
     padding: var(--space-200) var(--space-300);
-    text-align: left;
+    text-align: start;
     width: 100%;
   }
 

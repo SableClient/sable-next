@@ -430,6 +430,6 @@
   }
 
   .retry-media {
-    margin-left: var(--space-300);
+    margin-inline-start: var(--space-300);
   }
 </style>

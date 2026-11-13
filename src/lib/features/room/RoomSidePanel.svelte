@@ -111,7 +111,7 @@
     --ghost-active: var(--bg-container-active);
 
     background: var(--bg-container);
-    border-left: var(--border-width) solid var(--bg-container-line);
+    border-inline-start: var(--border-width) solid var(--bg-container-line);
     color: var(--bg-on-container);
     display: flex;
     flex: 0 0 auto;
@@ -121,13 +121,13 @@
   }
 
   .side-panel.modal {
-    border-left: none;
+    border-inline-start: none;
     height: 100%;
     width: 100%;
   }
 
   .side-panel :global(.resize-handle) {
-    left: -0.25rem;
+    inset-inline-start: -0.25rem;
     z-index: 1;
   }
 

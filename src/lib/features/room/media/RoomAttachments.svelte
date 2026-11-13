@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inlineKey } from '#lib/language.svelte.js';
   import { goto } from '$app/navigation';
   import { matrixLinkPath } from '#lib/rooms/permalink.js';
   import { onDestroy, type Component } from 'svelte';
@@ -123,9 +124,9 @@
     const index = tabs.findIndex((tab) => tab.id === kind);
     const last = tabs.length - 1;
     const next =
-      event.key === 'ArrowRight'
+      inlineKey(event.key) === 'ArrowRight'
         ? (index + 1) % tabs.length
-        : event.key === 'ArrowLeft'
+        : inlineKey(event.key) === 'ArrowLeft'
           ? (index + last) % tabs.length
           : event.key === 'Home'
             ? 0
@@ -252,9 +253,9 @@
 
   function tileKeydown(event: KeyboardEvent): void {
     const step =
-      event.key === 'ArrowRight'
+      inlineKey(event.key) === 'ArrowRight'
         ? 1
-        : event.key === 'ArrowLeft'
+        : inlineKey(event.key) === 'ArrowLeft'
           ? -1
           : event.key === 'ArrowDown'
             ? GRID_COLUMNS

@@ -38,6 +38,7 @@
     overflow: hidden;
     pointer-events: none;
     position: absolute;
+    /* stylelint-disable-next-line csstools/use-logical -- swipe gestures stay physical */
     right: 0;
     top: 0;
   }

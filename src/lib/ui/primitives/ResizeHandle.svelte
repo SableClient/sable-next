@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
+
   interface Props {
     value: number;
     min: number;
@@ -31,6 +33,7 @@
 
   let dragging = $state(false);
   let vertical = $derived(grow === 'down');
+  let towardLeft = $derived((grow === 'left') !== (currentDirection() === 'rtl' && !vertical));
   let drag: { pointerId: number; start: number; startValue: number } | null = null;
 
   function start(event: PointerEvent & { currentTarget: HTMLButtonElement }): void {
@@ -46,10 +49,9 @@
 
   function move(event: PointerEvent): void {
     if (drag === null || event.pointerId !== drag.pointerId) return;
-    const delta =
-      grow === 'left'
-        ? drag.start - event.clientX
-        : (vertical ? event.clientY : event.clientX) - drag.start;
+    const delta = towardLeft
+      ? drag.start - event.clientX
+      : (vertical ? event.clientY : event.clientX) - drag.start;
     onResize(drag.startValue + fromPixels(delta));
   }
 
@@ -62,7 +64,7 @@
 
   function keydown(event: KeyboardEvent): void {
     const amount = event.shiftKey ? shiftStep : step;
-    const leftward = grow === 'left' ? amount : -amount;
+    const leftward = towardLeft ? amount : -amount;
     if (vertical && event.key === 'ArrowDown') onResize(value + amount);
     else if (vertical && event.key === 'ArrowUp') onResize(value - amount);
     else if (!vertical && event.key === 'ArrowLeft') onResize(value + leftward);
@@ -112,7 +114,7 @@
   .resize-handle.vertical {
     cursor: row-resize;
     height: 0.5rem;
-    left: 0;
+    inset-inline-start: 0;
     top: auto;
     width: 100%;
   }

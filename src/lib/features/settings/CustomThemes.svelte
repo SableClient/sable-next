@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inlineKey } from '#lib/language.svelte.js';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
   import { onDestroy, tick } from 'svelte';
 
@@ -264,7 +265,8 @@
       ...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]'),
     ];
     const from = radios.indexOf(document.activeElement as HTMLElement);
-    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+    const key = inlineKey(event.key);
+    const step = key === 'ArrowRight' || key === 'ArrowDown' ? 1 : -1;
     const to = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : (from + step + 2) % 2;
     if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key))
       return;

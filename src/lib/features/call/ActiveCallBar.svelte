@@ -93,7 +93,7 @@
     --ghost-active: var(--surface-container-active);
 
     background: var(--surface-container);
-    border-right: var(--border-width) solid var(--surface-container-line);
+    border-inline-end: var(--border-width) solid var(--surface-container-line);
     border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     color: var(--surface-on-container);
@@ -113,7 +113,7 @@
     font: inherit;
     grid-template-columns: auto minmax(0, 1fr) auto;
     padding: var(--space-100);
-    text-align: left;
+    text-align: start;
   }
 
   .call-bar.live {
@@ -129,7 +129,7 @@
     --ghost-active: var(--bg-container-active);
 
     background: var(--bg-container);
-    border-right-color: var(--bg-container-line);
+    border-inline-end-color: var(--bg-container-line);
     border-top-color: var(--bg-container-line);
     color: var(--bg-on-container);
   }

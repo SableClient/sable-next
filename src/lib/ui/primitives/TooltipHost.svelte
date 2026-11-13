@@ -26,6 +26,7 @@
 </script>
 
 <script lang="ts">
+  import { currentDirection, inlineSide } from '#lib/language.svelte.js';
   import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
   import './tooltip.css';
@@ -44,8 +45,9 @@
   {#snippet children({ payload })}
     <BitsTooltip.Portal>
       <BitsTooltip.Content
+        dir={currentDirection()}
         class={payload?.multiline ? 'tooltip tooltip-multiline' : 'tooltip'}
-        side={payload?.side ?? 'top'}
+        side={inlineSide(payload?.side ?? 'top')}
         align={payload?.align ?? 'center'}
         sideOffset={8}
         collisionPadding={collisionPadding()}

@@ -173,7 +173,7 @@
     .progress {
       border-radius: calc(var(--radius) - 1px);
       height: 100%;
-      left: 0;
+      inset-inline-start: 0;
       overflow: clip;
       position: absolute;
       top: 0;
@@ -187,7 +187,7 @@
       bottom: 0;
       content: '';
       height: 0%;
-      left: 0;
+      inset-inline-start: 0;
       position: absolute;
     }
 
@@ -297,7 +297,7 @@
     padding: 0;
 
     &.social-distancing {
-      margin-left: var(--space-200);
+      margin-inline-start: var(--space-200);
     }
   }
 </style>

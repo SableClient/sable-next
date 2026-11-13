@@ -73,7 +73,7 @@
     cursor: pointer;
     font: inherit;
     line-height: 0;
-    margin-left: var(--space-200);
+    margin-inline-start: var(--space-200);
     padding: 0;
 
     :global(svg) {

@@ -405,7 +405,7 @@
     content: '';
     display: inline-block;
     height: 0.55rem;
-    margin-right: var(--space-200);
+    margin-inline-end: var(--space-200);
     width: 0.55rem;
   }
 

@@ -92,11 +92,10 @@
     color: var(--surface-on-container);
     display: flex;
     flex-direction: column;
-    left: 0;
+    inset-inline: 0;
     max-height: min(30dvh, calc((100dvh - var(--keyboard-overlap)) / 3));
     overflow: hidden;
     position: absolute;
-    right: 0;
     z-index: var(--layer-overlay);
   }
 

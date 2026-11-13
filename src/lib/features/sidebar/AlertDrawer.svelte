@@ -33,7 +33,7 @@
 
 <style>
   .alert-drawer {
-    border-right: var(--border-width) solid var(--bg-container-line);
+    border-inline-end: var(--border-width) solid var(--bg-container-line);
     bottom: 0;
     position: absolute;
     width: 100%;

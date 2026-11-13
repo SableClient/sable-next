@@ -343,7 +343,8 @@
     color: var(--bg-on-container);
     display: flex;
     flex-direction: column;
-    inset: 0 0 0 auto;
+    inset-block: 0;
+    inset-inline: auto 0;
     max-width: min(22rem, 85%);
     position: absolute;
     width: 100%;
@@ -352,7 +353,7 @@
 
   .members-drawer :global(.resize-handle) {
     display: none;
-    left: 0;
+    inset-inline-start: 0;
     z-index: 3;
   }
 
@@ -460,7 +461,7 @@
   }
 
   :global(.group-icon) {
-    margin-right: var(--space-100);
+    margin-inline-end: var(--space-100);
   }
 
   ul {
@@ -484,7 +485,7 @@
 
   @media (width > 70.25rem) {
     .members-drawer:not(.compact) {
-      border-left: var(--border-width) solid var(--surface-container-line);
+      border-inline-start: var(--border-width) solid var(--surface-container-line);
       box-shadow: none;
       flex: 0 0 auto;
       inset: auto;

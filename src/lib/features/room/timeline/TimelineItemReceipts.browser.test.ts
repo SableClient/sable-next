@@ -334,3 +334,39 @@ test('the text wraps the same for one reader as for many', async () => {
     expect(new Set(widths).size, `length ${String(length)}: ${widths.join(',')}`).toBe(1);
   }
 }, 120_000);
+
+for (const layout of ['modern', 'compact', 'bubble'] as const) {
+  test(`the ${layout} layout keeps the badge off text in either direction`, async () => {
+    await page.viewport(414, 800);
+    for (const [dir, body] of [
+      ['ltr', 'سلام دنیا'],
+      ['ltr', `سلام ${'دنیا و بیشتر '.repeat(10)}`],
+      ['ltr', 'Sable یک کلاینت است'],
+      ['rtl', 'سلام دنیا'],
+      ['rtl', 'hello world'],
+      ['rtl', `hello ${'and more words '.repeat(10)}`],
+    ]) {
+      document.documentElement.dir = dir;
+      const screen = await mountItem(item('rtl', body, { read_by: TWO_READERS }), { layout });
+      const text = document.querySelector('[data-item-id="rtl"] .formatted-body');
+      const badge = document.querySelector('[data-item-id="rtl"] .read-receipt-stack');
+      if (!text || !badge) throw new Error('missing body or badge');
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const badgeBox = badge.getBoundingClientRect();
+      expect(
+        [...range.getClientRects()].some(
+          (rect) =>
+            rect.width > 0 &&
+            rect.right > badgeBox.left + 0.5 &&
+            rect.left < badgeBox.right - 0.5 &&
+            rect.bottom > badgeBox.top + 0.5 &&
+            rect.top < badgeBox.bottom - 0.5
+        ),
+        `${dir}: ${body}`
+      ).toBe(false);
+      await screen.unmount();
+    }
+    document.documentElement.dir = 'ltr';
+  });
+}

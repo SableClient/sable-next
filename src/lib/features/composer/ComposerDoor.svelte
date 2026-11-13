@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import '#lib/ui/primitives/menu.css';
   import { DropdownMenu } from 'bits-ui';
   import CameraIcon from 'phosphor-svelte/lib/CameraIcon';
@@ -73,7 +74,7 @@
   {/each}
 {/if}
 {#if desktop}
-  <DropdownMenu.Root>
+  <DropdownMenu.Root dir={currentDirection()}>
     <Tooltip label={i18n.t('composer.insert')}>
       {#snippet trigger({ props })}
         <DropdownMenu.Trigger
@@ -88,6 +89,7 @@
     </Tooltip>
     <DropdownMenu.Portal>
       <DropdownMenu.Content
+        dir={currentDirection()}
         class="menu-surface composer-menu"
         {...overlayLayer()}
         side="top"

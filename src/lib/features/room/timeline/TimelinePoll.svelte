@@ -64,7 +64,7 @@
 </script>
 
 <div class="poll">
-  <p class="question">
+  <p class="question" dir="auto">
     {poll.question}
     {#if poll.edited}<span class="edited">{i18n.t('timeline.edited')}</span>{/if}
   </p>
@@ -87,7 +87,7 @@
             aria-pressed={answer.selected}
             style:scale={`${String(percent / 100)} 1`}
           ></span>
-          <span class="text">{answer.text}</span>
+          <span class="text" dir="auto">{answer.text}</span>
           {#if answer.selected && answer.votes === null}
             <CheckIcon class="chosen" aria-hidden="true" weight="bold" />
           {/if}

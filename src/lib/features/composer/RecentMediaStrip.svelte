@@ -126,8 +126,8 @@
     color: var(--media-on-scrim);
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
+    inset-inline-end: var(--space-100);
     padding: 0 var(--space-100);
     position: absolute;
-    right: var(--space-100);
   }
 </style>

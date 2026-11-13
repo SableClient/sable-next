@@ -66,7 +66,7 @@
     color: var(--surface-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
-    left: 0;
+    inset-inline-start: 0;
     line-height: 1;
     min-width: 1rem;
     padding: var(--space-050) var(--space-100);

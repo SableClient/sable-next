@@ -4,7 +4,7 @@
   bottom: var(--space-100);
   color: var(--surface-on-container);
   font-size: var(--font-size-small);
+  inset-inline-end: var(--space-100);
   padding: var(--space-050) var(--space-100);
   position: absolute;
-  right: var(--space-100);
 }

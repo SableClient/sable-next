@@ -291,7 +291,7 @@
           type="button"
           tabindex="0"
           onclick={onBack}
-          aria-label={i18n.t('common.back')}><CaretLeftIcon /></button
+          aria-label={i18n.t('common.back')}><CaretLeftIcon class="mirror-rtl" /></button
         >
       {/if}
       {#if canForward}
@@ -300,7 +300,7 @@
           type="button"
           tabindex="0"
           onclick={onForward}
-          aria-label={i18n.t('auth.next')}><CaretRightIcon /></button
+          aria-label={i18n.t('auth.next')}><CaretRightIcon class="mirror-rtl" /></button
         >
       {/if}
     </div>
@@ -349,12 +349,12 @@
   }
 
   .rail-shell::before {
-    left: 0;
+    inset-inline-start: 0;
   }
 
   .rail-shell::after {
     background: linear-gradient(270deg, var(--bg-container), transparent);
-    right: 0;
+    inset-inline-end: 0;
   }
 
   .rail {
@@ -410,15 +410,16 @@
   .rail :global(.auth-card.removing) {
     opacity: 0;
     pointer-events: none;
-    transform: translateX(var(--space-200)) scale(var(--scale-subtle));
+    transform: translateX(calc(var(--space-200) * var(--inline-sign))) scale(var(--scale-subtle));
   }
 
   .rail :global(.auth-card.before) {
-    transform: translateX(calc(var(--space-150) * -1)) scale(var(--scale-subtle));
+    transform: translateX(calc(var(--space-150) * -1 * var(--inline-sign)))
+      scale(var(--scale-subtle));
   }
 
   .rail :global(.auth-card.after) {
-    transform: translateX(var(--space-150)) scale(var(--scale-subtle));
+    transform: translateX(calc(var(--space-150) * var(--inline-sign))) scale(var(--scale-subtle));
   }
 
   .rail :global(.auth-card.active) {
@@ -488,11 +489,11 @@
   }
 
   .panel-nav.previous {
-    left: max(0px, calc(50% - var(--auth-card-width) / 2 - 2.625rem));
+    inset-inline-start: max(0px, calc(50% - var(--auth-card-width) / 2 - 2.625rem));
   }
 
   .panel-nav.next {
-    right: max(0px, calc(50% - var(--auth-card-width) / 2 - 2.625rem));
+    inset-inline-end: max(0px, calc(50% - var(--auth-card-width) / 2 - 2.625rem));
   }
 
   @media (prefers-reduced-motion: reduce) {

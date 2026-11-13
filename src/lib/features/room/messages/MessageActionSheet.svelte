@@ -50,7 +50,7 @@
             run(row.run);
           }}
         >
-          <RowIcon />
+          <RowIcon class={row.mirrored ? 'mirror-rtl' : undefined} />
           <span>{i18n.t(row.label)}</span>
         </button>
       {/each}

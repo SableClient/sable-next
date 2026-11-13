@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import { Popover } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import type { ImageUsageView, PackImageView } from '#src/generated/protocol';
@@ -74,6 +75,7 @@
   {/if}
   <Popover.Portal>
     <Popover.Content
+      dir={currentDirection()}
       class="reaction-picker"
       {...overlayLayer()}
       side="top"

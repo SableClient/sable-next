@@ -144,7 +144,7 @@
       {#if !pages.desktop}
         <div class="settings-title section-bar settings-nav-header">
           <IconButton variant="ghost" size="small" label={backLabel} onclick={pageSwipe.dismiss}
-            ><ArrowLeftIcon /></IconButton
+            ><ArrowLeftIcon class="mirror-rtl" /></IconButton
           >
           <Dialog.Title class="settings-heading">
             {#if outline.entries.length > 1}
@@ -233,7 +233,7 @@
 
   @keyframes page-in {
     from {
-      transform: translateX(100%);
+      transform: translateX(calc(100% * var(--inline-sign)));
     }
   }
 

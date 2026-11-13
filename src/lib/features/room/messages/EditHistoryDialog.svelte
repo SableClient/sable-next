@@ -64,7 +64,7 @@
                     act(version, onReply);
                   }}
                 >
-                  <ReplyIcon />
+                  <ReplyIcon class="mirror-rtl" />
                 </IconButton>
               {/if}
               {#if onThread && index === 0}

@@ -173,7 +173,7 @@
               size="small"
               onclick={() => open(entry.spaceId)}
             >
-              <ArrowRightIcon />
+              <ArrowRightIcon class="mirror-rtl" />
             </IconButton>
           {:else}
             <Button

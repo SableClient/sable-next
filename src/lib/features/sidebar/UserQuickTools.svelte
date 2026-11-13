@@ -237,7 +237,7 @@
   .desktop-tools {
     align-items: center;
     background: var(--surface-container);
-    border-right: var(--border-width) solid var(--surface-container-line);
+    border-inline-end: var(--border-width) solid var(--surface-container-line);
     border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     color: var(--surface-on-container);
@@ -256,7 +256,7 @@
   .compact-tools {
     align-items: center;
     background: var(--bg-container);
-    border-right: var(--border-width) solid var(--bg-container-line);
+    border-inline-end: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
     color: var(--bg-on-container);
     display: flex;
@@ -301,7 +301,7 @@
     border-radius: var(--radius-pill);
     content: '';
     height: var(--control-height-large);
-    left: 0;
+    inset-inline-start: 0;
     opacity: 0;
     pointer-events: none;
     position: absolute;

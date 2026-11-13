@@ -96,7 +96,7 @@
       onJumpToEvent?.(reply.event_id);
     }}
   >
-    <ReplyIcon class="reply-icon" />
+    <ReplyIcon class="mirror-rtl reply-icon" />
     {@render copy()}
   </button>
 {/if}
@@ -170,12 +170,12 @@
   }
 
   .reply-connected::before {
-    border-left: var(--reply-connector-width) solid var(--surface-on-container);
+    border-inline-start: var(--reply-connector-width) solid var(--surface-on-container);
     border-radius: var(--radius) 0 0;
     border-top: var(--reply-connector-width) solid var(--surface-on-container);
     content: '';
     height: calc(var(--space-250) + var(--border-width-300));
-    left: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
+    inset-inline-start: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
     opacity: var(--opacity-placeholder);
     pointer-events: none;
     position: absolute;
@@ -203,7 +203,7 @@
     background: var(--primary-main);
     bottom: 0;
     content: '';
-    left: 0;
+    inset-inline-start: 0;
     pointer-events: none;
     position: absolute;
     top: 0;
@@ -239,7 +239,7 @@
   }
 
   :global(.message.layout-compact) .reply-connected::before {
-    left: calc(var(--space-050) - var(--space-300));
+    inset-inline-start: calc(var(--space-050) - var(--space-300));
     width: calc(var(--space-300) - var(--space-150));
   }
 
@@ -259,10 +259,9 @@
   }
 
   :global(.message.layout-bubble.own.align-own) .reply-connected::before {
-    border-left: 0;
+    border-inline-end: var(--reply-connector-width) solid var(--surface-on-container);
+    border-inline-start: 0;
     border-radius: 0 var(--radius) 0 0;
-    border-right: var(--reply-connector-width) solid var(--surface-on-container);
-    left: auto;
-    right: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
+    inset-inline: auto calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
   }
 </style>

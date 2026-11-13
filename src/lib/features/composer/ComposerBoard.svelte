@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection, inlineKey } from '#lib/language.svelte.js';
   import type { ImageUsageView, PackImageView } from '#src/generated/protocol';
   import { mergeProps, Popover } from 'bits-ui';
   import { tick, type Snippet } from 'svelte';
@@ -217,7 +218,7 @@
 
     const source = selectedForReorder ?? id;
     const index = triggers.indexOf(source);
-    const offset = event.key === 'ArrowLeft' ? -1 : 1;
+    const offset = inlineKey(event.key) === 'ArrowLeft' ? -1 : 1;
     const target = triggers[index + offset];
     if (target === undefined) return;
 
@@ -346,6 +347,7 @@
     {@render boardSlots()}
     <Popover.Portal>
       <Popover.Content
+        dir={currentDirection()}
         class="composer-board"
         {...overlayLayer()}
         side="top"

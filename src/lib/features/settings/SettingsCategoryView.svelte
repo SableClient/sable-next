@@ -95,10 +95,9 @@
     bottom: 100%;
     content: '';
     height: var(--space-500);
-    left: 0;
+    inset-inline: 0;
     pointer-events: none;
     position: absolute;
-    right: 0;
   }
 
   @supports not (color: color-mix(in srgb, black, white)) {

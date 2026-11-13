@@ -92,7 +92,7 @@
   }
 
   .danger-form {
-    border-left: var(--border-width-700) solid var(--crit-main);
+    border-inline-start: var(--border-width-700) solid var(--crit-main);
   }
 
   .form-actions {

@@ -260,7 +260,7 @@
   th,
   td {
     padding: var(--space-100);
-    text-align: left;
+    text-align: start;
   }
 
   .chip {

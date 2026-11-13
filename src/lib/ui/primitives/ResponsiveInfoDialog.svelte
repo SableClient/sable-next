@@ -47,7 +47,7 @@
 
     & > :global(svg) {
       height: var(--icon-size-medium);
-      margin-right: var(--space-200);
+      margin-inline-end: var(--space-200);
       width: var(--icon-size-medium);
     }
 
@@ -56,7 +56,7 @@
     }
 
     :global(.close) {
-      margin-left: auto;
+      margin-inline-start: auto;
     }
   }
 

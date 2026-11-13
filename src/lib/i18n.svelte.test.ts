@@ -5,6 +5,7 @@ import { flushSync } from 'svelte';
 import { expect, test } from 'vitest';
 
 import { i18n, setAppName, t } from './i18n.js';
+import { currentDirection } from './language.svelte.js';
 import { preferences } from './settings/preferences.svelte.js';
 
 test('i18n.t reads re-run when a bundle adds a translation', () => {
@@ -60,4 +61,16 @@ test('translation keys only show while developer tools are on', () => {
     preferences.showTranslationStrings = false;
     preferences.developerTools = false;
   }
+});
+
+test('a right-to-left language mirrors the document', async () => {
+  try {
+    await i18next.changeLanguage('ar');
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(currentDirection()).toBe('rtl');
+  } finally {
+    await i18next.changeLanguage('en');
+  }
+  expect(document.documentElement.dir).toBe('ltr');
+  expect(currentDirection()).toBe('ltr');
 });

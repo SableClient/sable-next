@@ -854,7 +854,7 @@
     display: block;
     height: 100%;
     padding: 0;
-    text-align: left;
+    text-align: start;
     text-decoration: none;
     width: 100%;
   }
@@ -974,6 +974,7 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     display: flex;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     padding: var(--space-200);
     position: absolute;
@@ -1014,7 +1015,7 @@
     background: none;
     border: 0;
     padding: 0;
-    text-align: left;
+    text-align: start;
   }
 
   .media-image.interactive.gif {

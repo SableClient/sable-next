@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import { DropdownMenu } from 'bits-ui';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import type { Snippet } from 'svelte';
@@ -48,7 +49,7 @@
     }}
   >
     {@render trigger()}
-    <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
+    <CaretRightIcon class="mirror-rtl menu-submenu-chevron" aria-hidden="true" />
   </button>
   {#if open}
     <BottomSheet bind:open {label} closeLabel={i18n.t('timeline.closeMenu')}>
@@ -59,10 +60,11 @@
   <DropdownMenu.Sub>
     <DropdownMenu.SubTrigger class="menu-item" {disabled}>
       {@render trigger()}
-      <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
+      <CaretRightIcon class="mirror-rtl menu-submenu-chevron" aria-hidden="true" />
     </DropdownMenu.SubTrigger>
     <DropdownMenu.Portal>
       <DropdownMenu.SubContent
+        dir={currentDirection()}
         class={['menu-surface', surfaceClass]}
         {...overlayLayer()}
         sideOffset={4}

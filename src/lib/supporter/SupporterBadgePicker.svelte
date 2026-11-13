@@ -448,7 +448,7 @@
   }
 
   legend {
-    float: left;
+    float: inline-start;
     font-size: var(--font-size-subheading);
     font-weight: var(--font-weight-600);
     margin-bottom: var(--space-100);

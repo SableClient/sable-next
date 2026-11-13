@@ -170,11 +170,11 @@
         rel="external noopener noreferrer"
         aria-label={title}
       >
-        {#if view.site_name}<span class="link-preview-site">{view.site_name}</span>{/if}
+        {#if view.site_name}<span class="link-preview-site" dir="auto">{view.site_name}</span>{/if}
         {#if view.author_name}<span class="link-preview-author">{view.author_name}</span>{/if}
-        <span class="link-preview-title">{title}</span>
+        <span class="link-preview-title" dir="auto">{title}</span>
         {#if view.description}
-          <span class="link-preview-description">{view.description}</span>
+          <span class="link-preview-description" dir="auto">{view.description}</span>
         {/if}
       </a>
     </div>

@@ -100,14 +100,14 @@
   code {
     font-family: var(--font-family-mono);
     font-variant-ligatures: none;
-    text-align: right;
+    text-align: end;
   }
 
   .categories {
     border-top: var(--border-width) solid var(--surface-container-line);
     list-style: none;
     margin: 0;
-    padding-left: 0;
+    padding-inline-start: 0;
     padding-top: var(--space-300);
   }
 </style>

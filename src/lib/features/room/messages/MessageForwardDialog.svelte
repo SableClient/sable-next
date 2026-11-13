@@ -123,6 +123,6 @@
   .count {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    margin-right: auto;
+    margin-inline-end: auto;
   }
 </style>

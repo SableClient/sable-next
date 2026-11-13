@@ -125,7 +125,9 @@
     onJump?.(eventId);
   }}
 >
-  {#if replyStyle !== 'connected'}<Icon class="target-icon" />{/if}
+  {#if replyStyle !== 'connected'}<Icon
+      class={['target-icon', { 'mirror-rtl': Icon === ReplyIcon }]}
+    />{/if}
   <span class={['target-copy', { wrap: body !== undefined }]}>
     <SenderName displayName={name} {colors} nameClass="target-name" compact />
     {#if body}{@render body()}{:else}<span>{preview?.body ?? ''}</span>{/if}
@@ -203,12 +205,12 @@
   }
 
   .target-connected::before {
-    border-left: var(--target-connector-width) solid var(--surface-on-container);
+    border-inline-start: var(--target-connector-width) solid var(--surface-on-container);
     border-radius: var(--radius) 0 0;
     border-top: var(--target-connector-width) solid var(--surface-on-container);
     content: '';
     height: calc(50% + var(--space-100));
-    left: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
+    inset-inline-start: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
     opacity: var(--opacity-placeholder);
     pointer-events: none;
     position: absolute;
@@ -235,7 +237,7 @@
     background: var(--primary-main);
     bottom: 0;
     content: '';
-    left: 0;
+    inset-inline-start: 0;
     pointer-events: none;
     position: absolute;
     top: 0;

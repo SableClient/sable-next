@@ -1,4 +1,5 @@
 import type { Attachment } from 'svelte/attachments';
+import { inlineKey } from '#lib/language.svelte.js';
 
 const ITEM = 'button, a[href], [role="tab"]';
 const TREE_ITEM = '[role="treeitem"]';
@@ -157,6 +158,7 @@ export function rovingFocus({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (!(event.target instanceof HTMLElement)) return;
+      const key = inlineKey(event.key);
       const all = items();
       const index = all.indexOf(event.target);
       if (index < 0) return;
@@ -164,7 +166,7 @@ export function rovingFocus({
         walk(all, index + direction, direction) ??
         (loop ? walk(all, direction === 1 ? 0 : all.length - 1, direction) : undefined);
       const focused = event.target;
-      if (tree && event.key === 'ArrowRight') {
+      if (tree && key === 'ArrowRight') {
         const expanded = focused.getAttribute('aria-expanded');
         if (expanded === 'false') {
           event.preventDefault();
@@ -178,7 +180,7 @@ export function rovingFocus({
         }
         return;
       }
-      if (tree && event.key === 'ArrowLeft') {
+      if (tree && key === 'ArrowLeft') {
         if (focused.getAttribute('aria-expanded') === 'true') {
           event.preventDefault();
           focused.click();
@@ -194,18 +196,18 @@ export function rovingFocus({
         }
         return;
       }
-      if (tree && event.key === ' ' && focused instanceof HTMLAnchorElement) {
+      if (tree && key === ' ' && focused instanceof HTMLAnchorElement) {
         event.preventDefault();
         focused.click();
         return;
       }
       let distance: number;
-      if (event.key === next || event.key === previous) distance = 1;
-      else if (event.key === 'Home' || event.key === 'End') distance = Infinity;
-      else if (orientation === 'vertical' && (event.key === 'PageUp' || event.key === 'PageDown'))
+      if (key === next || key === previous) distance = 1;
+      else if (key === 'Home' || key === 'End') distance = Infinity;
+      else if (orientation === 'vertical' && (key === 'PageUp' || key === 'PageDown'))
         distance = page;
       else return;
-      const toEnd = event.key === next || event.key === 'End' || event.key === 'PageDown';
+      const toEnd = key === next || key === 'End' || key === 'PageDown';
       const direction = toEnd ? 1 : -1;
       const target =
         distance === 1

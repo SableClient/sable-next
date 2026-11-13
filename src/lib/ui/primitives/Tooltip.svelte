@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection, inlineSide } from '#lib/language.svelte.js';
   import { Tooltip as BitsTooltip } from 'bits-ui';
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
@@ -64,8 +65,9 @@
     {/if}
     <BitsTooltip.Portal>
       <BitsTooltip.Content
+        dir={currentDirection()}
         class={multiline ? 'tooltip tooltip-multiline' : 'tooltip'}
-        {side}
+        side={inlineSide(side)}
         {align}
         sideOffset={8}
         collisionPadding={collisionPadding()}

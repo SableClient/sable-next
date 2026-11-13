@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection, inlineSide } from '#lib/language.svelte.js';
   import { DropdownMenu } from 'bits-ui';
   import type { Snippet } from 'svelte';
 
@@ -74,7 +75,7 @@
     </BottomSheet>
   {/if}
 {:else}
-  <DropdownMenu.Root bind:open {onOpenChange}>
+  <DropdownMenu.Root dir={currentDirection()} bind:open {onOpenChange}>
     {#if trigger}
       <DropdownMenu.Trigger>
         {#snippet child({ props })}{@render trigger({ props })}{/snippet}
@@ -82,11 +83,12 @@
     {/if}
     <DropdownMenu.Portal>
       <DropdownMenu.Content
+        dir={currentDirection()}
         class={['menu-surface', surfaceClass]}
         {...overlayLayer()}
         customAnchor={anchor}
         aria-label={label}
-        {side}
+        side={inlineSide(side)}
         {align}
         {sideOffset}
         collisionPadding={collisionPadding()}

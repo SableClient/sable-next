@@ -670,7 +670,7 @@
           label={i18n.t('timeline.back')}
           onclick={backToRoomList}
         >
-          <BackIcon />
+          <BackIcon class="mirror-rtl" />
         </IconButton>
       </div>
     {/if}
@@ -1019,14 +1019,14 @@
   }
 
   .mobile-back-menu {
-    left: 0;
+    inset-inline-start: 0;
     position: absolute;
     top: var(--space-300);
   }
 
   .hero-menu {
+    inset-inline-end: 0;
     position: absolute;
-    right: 0;
     top: var(--space-300);
   }
 

@@ -46,7 +46,7 @@
   <div class="youtube-embed">
     <a class="youtube-header" href={url} target="_blank" rel="external noopener noreferrer">
       <span class="youtube-site">{details.author ?? 'YouTube'}</span>
-      <span class="youtube-title" title={details.title}>{details.title}</span>
+      <span class="youtube-title" dir="auto" title={details.title}>{details.title}</span>
     </a>
     <div class="youtube-player">
       {#if playing}
@@ -151,6 +151,7 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     display: flex;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     padding: var(--space-200);
     position: absolute;

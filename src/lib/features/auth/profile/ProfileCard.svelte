@@ -249,9 +249,9 @@
     color: var(--primary-on-main);
     display: flex;
     height: 1.75rem;
+    inset-inline-end: calc(var(--space-100) * -1);
     justify-content: center;
     position: absolute;
-    right: calc(var(--space-100) * -1);
     width: 1.75rem;
   }
 

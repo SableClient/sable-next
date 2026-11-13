@@ -52,7 +52,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-200);
-    padding-right: var(--space-300);
+    padding-inline-end: var(--space-300);
   }
 
   li:not(:first-child) {

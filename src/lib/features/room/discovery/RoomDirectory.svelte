@@ -292,7 +292,7 @@
                   void open(room);
                 }}
               >
-                <ArrowRightIcon />
+                <ArrowRightIcon class="mirror-rtl" />
               </IconButton>
             {:else if action}
               <Button

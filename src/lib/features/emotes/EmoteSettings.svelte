@@ -183,7 +183,7 @@
             void backToList();
           }}
         >
-          <ArrowLeftIcon />
+          <ArrowLeftIcon class="mirror-rtl" />
           {i18n.t('common.back')}
         </Button>
       </div>

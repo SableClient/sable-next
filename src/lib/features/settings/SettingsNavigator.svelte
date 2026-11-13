@@ -232,7 +232,7 @@
 
   .search-results a {
     align-items: center;
-    border-left: calc(var(--border-width) * 3) solid transparent;
+    border-inline-start: calc(var(--border-width) * 3) solid transparent;
     color: inherit;
     display: flex;
     font-size: var(--font-size-label);
@@ -286,7 +286,7 @@
   }
 
   :global(.settings-nav-paged) .search-results a {
-    border-left: 0;
+    border-inline-start: 0;
     min-height: var(--control-height-large);
   }
 

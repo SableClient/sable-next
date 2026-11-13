@@ -290,6 +290,7 @@
   :global(.bottom-sheet-grip) {
     display: grid;
     height: var(--control-height-large);
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     place-items: center;
     position: absolute;

@@ -408,7 +408,7 @@
   <PanelHeader title={roomName} titleSize="h1">
     {#snippet prefix()}
       <PanelHeaderButton label={i18n.t('timeline.back')} onclick={backToRoomList}>
-        <BackIcon />
+        <BackIcon class="mirror-rtl" />
       </PanelHeaderButton>
       <Avatar
         id={resolvedRoomId}
@@ -487,7 +487,7 @@
     {#if mode === 'month'}
       <div class="calendar-month-nav">
         <PanelHeaderButton label={i18n.t('calendar.previousMonth')} onclick={() => moveMonth(-1)}>
-          <BackIcon />
+          <BackIcon class="mirror-rtl" />
         </PanelHeaderButton>
         <h2 class="calendar-month-title">
           {new Date(monthStart).toLocaleDateString(currentLocale(), {
@@ -496,7 +496,7 @@
           })}
         </h2>
         <PanelHeaderButton label={i18n.t('calendar.nextMonth')} onclick={() => moveMonth(1)}>
-          <NextIcon />
+          <NextIcon class="mirror-rtl" />
         </PanelHeaderButton>
         <Button size="small" variant="ghost" onclick={goToday}>{i18n.t('common.today')}</Button>
       </div>

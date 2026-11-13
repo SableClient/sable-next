@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import { Slider } from 'bits-ui';
 
   interface Props {
@@ -27,6 +28,7 @@
 </script>
 
 <Slider.Root
+  dir={currentDirection()}
   type="single"
   bind:value
   {min}

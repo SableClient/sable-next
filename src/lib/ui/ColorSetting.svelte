@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import { clamp } from '#lib/clamp.js';
   import { Popover } from 'bits-ui';
   import { convertHsvToRgb, convertRgbToHsv, parseHex, serializeHex } from 'culori/fn';
@@ -87,6 +88,7 @@
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
+          dir={currentDirection()}
           class="color-popover"
           {...overlayLayer()}
           side="bottom"

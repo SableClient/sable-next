@@ -474,7 +474,7 @@
     min-width: 0;
     overflow: hidden;
     padding: 0;
-    text-align: left;
+    text-align: start;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -516,7 +516,7 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     margin-top: var(--space-100);
     padding: var(--space-200);
-    text-align: left;
+    text-align: start;
     width: 100%;
   }
 

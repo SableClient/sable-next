@@ -190,7 +190,7 @@
 
   :global(.presence-selector .menu-item .presence-dot) {
     /* margin: (size of menu item icon - size of medium presence dot) / 2 */
-    margin-right: calc((var(--size-x200) - var(--space-200)) / 2);
+    margin-inline-end: calc((var(--size-x200) - var(--space-200)) / 2);
   }
 
   .account-row {
@@ -221,7 +221,7 @@
     gap: var(--space-200);
     min-width: 0;
     padding: 0;
-    text-align: left;
+    text-align: start;
   }
 
   .account-select:disabled {

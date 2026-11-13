@@ -165,7 +165,7 @@
     grid-template-columns: auto minmax(0, 1fr);
     justify-self: stretch;
     padding: var(--space-100) 0 0;
-    text-align: left;
+    text-align: start;
   }
 
   .thread-summary :global(svg) {

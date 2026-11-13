@@ -1484,13 +1484,15 @@
 
   .history-loading {
     inset-block-start: var(--space-200);
-    inset-inline-start: 50%;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
+    left: 50%;
     transform: translateX(-50%);
   }
 
   .future-loading {
     inset-block-end: var(--space-200);
-    inset-inline-start: 50%;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
+    left: 50%;
     transform: translateX(-50%);
   }
 

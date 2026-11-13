@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inlineKey } from '#lib/language.svelte.js';
   import { Dialog } from 'bits-ui';
   import { untrack } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
@@ -90,8 +91,9 @@
 
   function handleKeydown(event: KeyboardEvent): void {
     if (event.target instanceof HTMLVideoElement) return;
-    if (event.key === 'ArrowLeft') go(-1);
-    else if (event.key === 'ArrowRight') go(1);
+    const key = inlineKey(event.key);
+    if (key === 'ArrowLeft') go(-1);
+    else if (key === 'ArrowRight') go(1);
     else return;
     event.preventDefault();
   }
@@ -193,7 +195,7 @@
               class="staged-viewer-nav staged-viewer-previous"
               label={i18n.t('viewer.previous')}
               size="large"
-              onclick={() => go(-1)}><ArrowLeftIcon /></IconButton
+              onclick={() => go(-1)}><ArrowLeftIcon class="mirror-rtl" /></IconButton
             >
           {/if}
           {#if item.spoiler}
@@ -235,7 +237,7 @@
               class="staged-viewer-nav staged-viewer-next"
               label={i18n.t('viewer.next')}
               size="large"
-              onclick={() => go(1)}><ArrowRightIcon /></IconButton
+              onclick={() => go(1)}><ArrowRightIcon class="mirror-rtl" /></IconButton
             >
           {/if}
         </div>
@@ -369,7 +371,8 @@
     font-size: var(--font-size-small);
     gap: var(--space-100);
     inset-block-start: var(--space-200);
-    inset-inline-start: 50%;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
+    left: 50%;
     padding: var(--space-100) var(--space-250);
     position: absolute;
     translate: -50% 0;

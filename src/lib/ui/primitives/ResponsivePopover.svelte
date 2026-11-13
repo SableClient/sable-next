@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection, inlineSide } from '#lib/language.svelte.js';
   import { Popover } from 'bits-ui';
   import type { Snippet } from 'svelte';
 
@@ -88,10 +89,11 @@
     {/if}
     <Popover.Portal>
       <Popover.Content
+        dir={currentDirection()}
         class={['responsive-popover', popoverClass]}
         {...overlayLayer()}
         customAnchor={trigger ? null : anchor}
-        {side}
+        side={inlineSide(side)}
         {align}
         {sideOffset}
         collisionPadding={insetCollisionPadding(collisionPadding)}

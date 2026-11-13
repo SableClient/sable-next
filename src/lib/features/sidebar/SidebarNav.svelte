@@ -407,8 +407,8 @@
   @media (--app-layout) {
     .sidebar {
       height: 100dvh;
-      left: 0;
-      padding-left: var(--safe-left);
+      inset-inline-start: 0;
+      padding-inline-start: var(--safe-left);
       padding-top: var(--safe-top);
       position: fixed;
       top: 0;
@@ -421,7 +421,7 @@
     }
 
     .desktop-navigation-main :global(.resize-handle) {
-      right: -0.25rem;
+      inset-inline-end: -0.25rem;
     }
   }
 </style>

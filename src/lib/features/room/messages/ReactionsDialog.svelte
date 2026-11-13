@@ -127,7 +127,7 @@
           void reply(reaction.key, sender, onReply);
         }}
       >
-        <ReplyIcon />
+        <ReplyIcon class="mirror-rtl" />
       </IconButton>
     {/if}
     {#if canRemove(sender)}

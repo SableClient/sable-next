@@ -97,6 +97,6 @@
     display: grid;
     gap: var(--space-050);
     margin: 0;
-    padding-left: var(--space-500);
+    padding-inline-start: var(--space-500);
   }
 </style>

@@ -103,15 +103,15 @@
   @keyframes error-in {
     0% {
       opacity: 0;
-      transform: translateX(var(--space-200));
+      transform: translateX(calc(var(--space-200) * var(--inline-sign)));
     }
 
     40% {
-      transform: translateX(calc(var(--space-150) * -1));
+      transform: translateX(calc(var(--space-150) * -1 * var(--inline-sign)));
     }
 
     70% {
-      transform: translateX(var(--space-150));
+      transform: translateX(calc(var(--space-150) * var(--inline-sign)));
     }
 
     100% {

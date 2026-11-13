@@ -52,7 +52,7 @@
   <div class="tiktok-embed">
     <a class="tiktok-header" href={url} target="_blank" rel="external noopener noreferrer">
       <span class="tiktok-site">TikTok</span>
-      <span class="tiktok-title">{title}</span>
+      <span class="tiktok-title" dir="auto">{title}</span>
     </a>
     <div class="tiktok-player">
       {#if playing}
@@ -147,6 +147,7 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     display: flex;
+    /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     padding: var(--space-200);
     position: absolute;

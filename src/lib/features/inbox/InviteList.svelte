@@ -473,7 +473,7 @@
 
   .meta > span + span::before {
     content: '·';
-    padding-right: var(--space-200);
+    padding-inline-end: var(--space-200);
   }
 
   .inviter {

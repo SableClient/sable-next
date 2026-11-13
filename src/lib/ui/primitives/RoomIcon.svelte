@@ -60,12 +60,12 @@
     background: var(--room-icon-plate, var(--bg-container));
     box-sizing: border-box;
     display: flex;
+    inset-inline-end: -4%;
     justify-content: center;
     line-height: 0;
     overflow: visible;
     pointer-events: none;
     position: absolute;
-    right: -4%;
     top: -4%;
     z-index: 1;
   }

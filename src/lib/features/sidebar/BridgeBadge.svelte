@@ -28,7 +28,7 @@
     bottom: calc(-1 * var(--space-050));
     box-shadow: 0 0 0 var(--border-width-400) var(--presence-ring, var(--bg-container));
     display: flex;
-    left: calc(-1 * var(--space-050));
+    inset-inline-start: calc(-1 * var(--space-050));
     position: absolute;
   }
 

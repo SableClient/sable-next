@@ -99,7 +99,7 @@
 <PanelHeader class="room-header" suffixToolbarLabel={i18n.t('room.actionsLabel')}>
   {#snippet prefix()}
     <PanelHeaderButton class="back-button" label={i18n.t('timeline.back')} onclick={onBack}>
-      <BackIcon />
+      <BackIcon class="mirror-rtl" />
     </PanelHeaderButton>
 
     <span class="room-avatar">
@@ -110,13 +110,13 @@
   {#snippet main()}
     <div class={['room-identity', { 'with-topic': topicShown }]}>
       <div class="room-title">
-        <h1 tabindex="-1" data-room-heading>{roomName}</h1>
+        <h1 tabindex="-1" data-room-heading><bdi>{roomName}</bdi></h1>
         {#if presence && presence !== 'offline'}
           <PresenceDot {presence} label={i18n.t(`presence.${presence}`)} size="medium" />
         {/if}
       </div>
       {#if topicShown}
-        <button class="room-topic" type="button" onclick={onTopic}>{topic}</button>
+        <button class="room-topic" type="button" onclick={onTopic}><bdi>{topic}</bdi></button>
       {/if}
     </div>
     {#if isVoice || inVoice.length > 0}
@@ -264,7 +264,7 @@
     margin: 0;
     overflow: hidden;
     padding: 0;
-    text-align: left;
+    text-align: start;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -327,7 +327,7 @@
   }
 
   .voice-faces :global(.avatar-root.voice-face:not(:first-child)) {
-    margin-left: calc(-1 * var(--space-150));
+    margin-inline-start: calc(-1 * var(--space-150));
   }
 
   .voice-count {

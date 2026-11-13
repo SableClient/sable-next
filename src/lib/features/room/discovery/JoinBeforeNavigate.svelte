@@ -191,7 +191,7 @@
           label={i18n.t('timeline.back')}
           onclick={backToRoomList}
         >
-          <BackIcon />
+          <BackIcon class="mirror-rtl" />
         </PanelHeaderButton>
       {/snippet}
     </PanelHeader>
@@ -434,7 +434,7 @@
     content: '';
     height: 100%;
     position: absolute;
-    transform: translateX(calc((var(--space-400) + 3.5px) / 2));
+    transform: translateX(calc((var(--space-400) + 3.5px) / 2 * var(--inline-sign)));
     width: 1px;
   }
 

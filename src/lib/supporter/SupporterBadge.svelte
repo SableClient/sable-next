@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentDirection } from '#lib/language.svelte.js';
   import { Popover } from 'bits-ui';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
   import type { ClassValue } from 'svelte/elements';
@@ -191,6 +192,7 @@
   </Popover.Trigger>
   <Popover.Portal>
     <Popover.Content
+      dir={currentDirection()}
       class="supporter-card"
       data-supporter-variant={variant}
       data-custom-colors={customCardColors || undefined}

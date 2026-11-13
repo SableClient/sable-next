@@ -228,6 +228,6 @@
     font-family: var(--font-family-mono);
     font-variant-ligatures: none;
     overflow-wrap: anywhere;
-    text-align: right;
+    text-align: end;
   }
 </style>

@@ -64,7 +64,8 @@ export type MessageActions = {
 export type MessageMenuRow = {
   key: string;
   label: string;
-  icon: Component;
+  icon: Component<{ class?: string }>;
+  mirrored?: boolean;
   run: () => void;
   destructive?: boolean;
   separated?: boolean;
@@ -82,7 +83,13 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
     });
   }
   if (actions.onReply) {
-    rows.push({ key: 'reply', label: 'timeline.reply', icon: ReplyIcon, run: actions.onReply });
+    rows.push({
+      key: 'reply',
+      label: 'timeline.reply',
+      icon: ReplyIcon,
+      mirrored: true,
+      run: actions.onReply,
+    });
   }
   if (actions.onOpenThread) {
     rows.push({
@@ -156,6 +163,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       key: 'forward',
       label: 'timeline.forwardMessage',
       icon: ForwardIcon,
+      mirrored: true,
       run: actions.onForward,
     });
   }

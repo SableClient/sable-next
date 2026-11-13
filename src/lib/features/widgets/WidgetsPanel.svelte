@@ -179,7 +179,7 @@
     {#snippet prefix()}
       {#if activeWidget}
         <PanelHeaderButton label={i18n.t('widgets.back')} onclick={() => (activeId = null)}>
-          <ArrowLeftIcon />
+          <ArrowLeftIcon class="mirror-rtl" />
         </PanelHeaderButton>
       {:else}
         <GridFourIcon aria-hidden="true" />
@@ -324,12 +324,12 @@
   }
 
   .widgets-panel:not(.modal) {
-    border-left: var(--border-width) solid var(--surface-container-line);
+    border-inline-start: var(--border-width) solid var(--surface-container-line);
     flex: 0 0 auto;
   }
 
   .widgets-panel :global(.resize-handle) {
-    left: -0.25rem;
+    inset-inline-start: -0.25rem;
     z-index: 1;
   }
 

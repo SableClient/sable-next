@@ -55,7 +55,7 @@
 
   .voice-chat {
     background: var(--surface-container);
-    border-left: var(--border-width) solid var(--surface-container-line);
+    border-inline-start: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     display: flex;
     flex: 0 0 auto;
@@ -67,7 +67,7 @@
   }
 
   .voice-chat :global(.resize-handle) {
-    left: -0.25rem;
+    inset-inline-start: -0.25rem;
     z-index: 1;
   }
 </style>

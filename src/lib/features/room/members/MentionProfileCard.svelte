@@ -744,7 +744,7 @@
           disabled={sending}
         >
           {#if hasDraft}
-            <PaperPlaneRightIcon />
+            <PaperPlaneRightIcon class="mirror-rtl" />
           {:else}
             <ChatCircleIcon />
           {/if}
@@ -779,7 +779,7 @@
         {i18n.t('timeline.profileHideMiscData', { count: extra.length })}
       {/if}
     {:else}
-      <CaretRightIcon />
+      <CaretRightIcon class="mirror-rtl" />
       {i18n.t('timeline.profileMiscData', { count: extra.length })}
     {/if}
   </Button>
@@ -1046,7 +1046,7 @@
   }
 
   :global(.profile-card-actions > .pill-icon-only) {
-    margin-left: auto;
+    margin-inline-start: auto;
   }
 
   :global(.profile-power-name) {

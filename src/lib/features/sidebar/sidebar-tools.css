@@ -75,8 +75,8 @@
   width: var(--control-height-large);
 
   .unread-badge {
+    inset-inline-end: 0.125rem;
     position: absolute;
-    right: 0.125rem;
     top: 0.125rem;
   }
 }

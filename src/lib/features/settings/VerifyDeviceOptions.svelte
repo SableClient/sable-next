@@ -66,7 +66,7 @@
         verification.error = null;
       }}
     >
-      <ArrowLeftIcon aria-hidden="true" />
+      <ArrowLeftIcon class="mirror-rtl" aria-hidden="true" />
       {i18n.t('common.back')}
     </Button>
 

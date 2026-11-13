@@ -229,7 +229,7 @@
           : (backLabel ?? i18n.t('timeline.backToConversation'))}
         onclick={onClose}
       >
-        {#if sidePanel}<XIcon />{:else}<BackIcon />{/if}
+        {#if sidePanel}<XIcon />{:else}<BackIcon class="mirror-rtl" />{/if}
       </PanelHeaderButton>
     {/snippet}
     {#snippet suffix()}

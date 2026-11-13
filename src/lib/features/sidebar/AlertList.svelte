@@ -63,14 +63,14 @@
     background: linear-gradient(to right, transparent, var(--surface-container) 50%);
     background-color: var(--primary-container);
     border-bottom: var(--border-width) solid var(--surface-container-line);
-    border-top-left-radius: var(--radius);
-    border-top-right-radius: var(--radius);
+    border-start-end-radius: var(--radius);
+    border-start-start-radius: var(--radius);
     display: flex;
     padding: var(--space-200);
 
     h3 {
       margin: 0;
-      margin-left: var(--space-200);
+      margin-inline-start: var(--space-200);
       z-index: 2;
     }
 

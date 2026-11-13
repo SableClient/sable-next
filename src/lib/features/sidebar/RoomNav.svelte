@@ -615,7 +615,8 @@
             : undefined}
         >
           {#if !full}
-            {#if !collapsed}<span class="room-text"><span class="room-name">{name}</span></span
+            {#if !collapsed}<span class="room-text"
+                ><span class="room-name"><bdi>{name}</bdi></span></span
               >{/if}
           {:else}
             {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(avatarUrl))}
@@ -681,11 +682,11 @@
             {/if}
             {#if !collapsed}
               <span class="room-text">
-                <span class="room-name">{name}</span>
+                <span class="room-name"><bdi>{name}</bdi></span>
                 {#if preview}
-                  <span class="room-topic">{preview}</span>
+                  <span class="room-topic"><bdi>{preview}</bdi></span>
                 {:else if room?.is_direct && room.topic && preferences.showDmTopics}
-                  <span class="room-topic">{room.topic}</span>
+                  <span class="room-topic"><bdi>{room.topic}</bdi></span>
                 {:else if peerStatus}
                   {@const peerStatusLabel = [peerStatus?.emoji, peerStatus?.text]
                     .filter(Boolean)
@@ -878,7 +879,7 @@
             </span>
           {/if}
           {#if !collapsed}
-            <span class="room-text"><span class="room-name">{name}</span></span>
+            <span class="room-text"><span class="room-name"><bdi>{name}</bdi></span></span>
             {#if full}<span class="room-link-icon" aria-hidden="true"><SquaresFourIcon /></span
               >{/if}
           {/if}
@@ -1005,7 +1006,7 @@
                         toggleCategory(item.key);
                       }}
                     >
-                      {#if !collapsed}<span class="category-name">{name}</span>{/if}
+                      {#if !collapsed}<span class="category-name"><bdi>{name}</bdi></span>{/if}
                       <span class={['category-caret', { closed: isClosed }]} aria-hidden="true"
                         ><CaretDownIcon /></span
                       >
@@ -1091,7 +1092,7 @@
 <style>
   .room-nav {
     background: var(--bg-container);
-    border-right: var(--border-width) solid var(--bg-container-line);
+    border-inline-end: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
     color: var(--bg-on-container);
     display: flex;
@@ -1151,7 +1152,7 @@
     margin-inline: var(--space-200);
     opacity: var(--opacity-p300);
     padding: 0 var(--space-200);
-    text-align: left;
+    text-align: start;
     width: calc(100% - var(--space-200) * 2);
   }
 
@@ -1198,7 +1199,7 @@
     align-items: center;
     display: flex;
     flex: none;
-    margin-right: var(--space-100);
+    margin-inline-end: var(--space-100);
   }
 
   .room-status {
@@ -1228,14 +1229,14 @@
         :global(.room-options-trigger[data-state='open'])
       )
       .room-row {
-      padding-right: calc(var(--space-100) + var(--space-600));
+      padding-inline-end: calc(var(--space-100) + var(--space-600));
     }
 
     .room-options-slot {
-      margin-right: var(--space-100);
+      inset-inline-end: 0;
+      margin-inline-end: var(--space-100);
       pointer-events: none;
       position: absolute;
-      right: 0;
       top: 50%;
       translate: 0 -50%;
       z-index: 1;
@@ -1302,7 +1303,7 @@
     border-color: var(--surface-container-line);
     border-style: solid;
     border-width: 0 0 0 var(--border-width-500);
-    left: calc(
+    inset-inline-start: calc(
       var(--space-200) + var(--thread-level) * var(--space-400) + var(--space-400) / 2 -
         var(--border-width-500) / 2
     );
@@ -1323,8 +1324,8 @@
   }
 
   .thread-elbow {
-    border-bottom-left-radius: var(--radii-300);
     border-bottom-width: var(--border-width-500);
+    border-end-start-radius: var(--radii-300);
     bottom: calc(50% - var(--border-width-500) / 2);
     width: calc(var(--space-400) / 2 - var(--space-050));
   }
@@ -1334,7 +1335,7 @@
     display: flex;
     flex: none;
     opacity: var(--opacity-p300);
-    padding-right: var(--space-100);
+    padding-inline-end: var(--space-100);
   }
 
   .room-link-icon :global(svg) {
@@ -1400,9 +1401,9 @@
   }
 
   :global(.room-avatar .room-presence) {
+    inset-inline-end: -0.125rem;
     bottom: -0.125rem;
     position: absolute;
-    right: -0.125rem;
   }
 
   :global(.room-avatar-icon.glyph) {
@@ -1455,7 +1456,7 @@
     min-width: 0;
     opacity: var(--opacity-p300);
     padding: 0 var(--space-100) 0 calc(var(--space-200) + var(--room-depth, 0) * var(--space-400));
-    text-align: left;
+    text-align: start;
   }
 
   .category-caret.closed {
@@ -1488,7 +1489,7 @@
   }
 
   .room-status-emoji {
-    margin-right: var(--space-050);
+    margin-inline-end: var(--space-050);
   }
 
   .room-topic {
@@ -1547,7 +1548,7 @@
   }
 
   .voice-faces :global(.avatar-root.voice-face:not(:first-child)) {
-    margin-left: calc(-1 * var(--space-150));
+    margin-inline-start: calc(-1 * var(--space-150));
   }
 
   .room-list.collapsed {
@@ -1557,7 +1558,7 @@
 
   .room-list.collapsed .room-row-wrap {
     justify-content: center;
-    padding-right: 0;
+    padding-inline-end: 0;
   }
 
   .room-list.collapsed .room-row {
@@ -1583,8 +1584,8 @@
   }
 
   .room-list.collapsed .room-row :global(.room-collapsed-badge) {
+    inset-inline-end: 0.125rem;
     position: absolute;
-    right: 0.125rem;
     top: 0.125rem;
   }
 

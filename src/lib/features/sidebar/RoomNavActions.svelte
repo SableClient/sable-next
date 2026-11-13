@@ -141,7 +141,7 @@
           type="button"
           class="room-nav-trigger"
           aria-label={collapsed ? createRoomLabel : undefined}
-          style="align-items: center; display: flex; gap: var(--space-200); text-align: left"
+          style="align-items: center; display: flex; gap: var(--space-200); text-align: start"
         >
           <span class="room-icon" aria-hidden="true"><PlusIcon /></span>
           {#if !collapsed}<span class="room-text"

@@ -1,6 +1,6 @@
 .settings-nav {
   background: var(--bg-container);
-  border-right: var(--border-width) solid var(--bg-container-line);
+  border-inline-end: var(--border-width) solid var(--bg-container-line);
   box-sizing: border-box;
   color: var(--bg-on-container);
   display: flex;
@@ -13,7 +13,7 @@
 }
 
 .settings-nav-paged {
-  border-right: 0;
+  border-inline-end: 0;
   flex: 1 1 auto;
   width: 100%;
 }

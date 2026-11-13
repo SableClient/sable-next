@@ -99,7 +99,7 @@
 
 {#snippet backButton()}
   <Button class="confirm-device-back" variant="ghost" size="small" onclick={leaveView}>
-    <ArrowLeftIcon aria-hidden="true" />
+    <ArrowLeftIcon class="mirror-rtl" aria-hidden="true" />
     {i18n.t('common.back')}
   </Button>
 {/snippet}

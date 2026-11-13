@@ -59,7 +59,7 @@
     gap: var(--space-300);
     padding: var(--space-300);
     position: relative;
-    text-align: left;
+    text-align: start;
     width: 100%;
   }
 
