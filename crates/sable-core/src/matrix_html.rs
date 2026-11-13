@@ -344,40 +344,6 @@ fn ipv6_url_spans(text: &str) -> Vec<(usize, usize)> {
     spans
 }
 
-fn msc_spans(text: &str) -> Vec<(usize, usize)> {
-    const MAX_DIGITS: usize = 5;
-    let is_word = |character: char| character.is_alphanumeric() || character == '_';
-    let bytes = text.as_bytes();
-    // ASCII-only lowercasing keeps byte offsets aligned with `text`.
-    let lowercase = text.to_ascii_lowercase();
-    let mut spans = Vec::new();
-    let mut search = 0;
-    while let Some(start) = lowercase
-        .get(search..)
-        .and_then(|rest| rest.find("msc"))
-        .map(|offset| search + offset)
-    {
-        let digits_at = start + "msc".len();
-        let digits = bytes.get(digits_at..).map_or(0, |rest| {
-            rest.iter().take_while(|byte| byte.is_ascii_digit()).count()
-        });
-        let end = digits_at + digits;
-        let bounded = text
-            .get(..start)
-            .and_then(|before| before.chars().next_back())
-            .is_none_or(|character| !is_word(character))
-            && text
-                .get(end..)
-                .and_then(|after| after.chars().next())
-                .is_none_or(|character| !is_word(character));
-        if (1..=MAX_DIGITS).contains(&digits) && bounded {
-            spans.push((start, end));
-        }
-        search = end.max(digits_at);
-    }
-    spans
-}
-
 fn anchor(href: &str, text: &str) -> String {
     let allowed = href.split_once(':').is_some_and(|(scheme, _)| {
         URL_SCHEMES
@@ -400,7 +366,6 @@ fn anchor(href: &str, text: &str) -> String {
 enum SpanKind {
     Url,
     Email,
-    Msc,
     RoomMention,
 }
 
@@ -457,11 +422,6 @@ fn render_plain_text(text: &str) -> String {
                 .map(|(start, end)| (start, end, SpanKind::Url)),
         )
         .chain(
-            msc_spans(text)
-                .into_iter()
-                .map(|(start, end)| (start, end, SpanKind::Msc)),
-        )
-        .chain(
             room_mention_spans(text)
                 .into_iter()
                 .map(|(start, end)| (start, end, SpanKind::RoomMention)),
@@ -482,13 +442,6 @@ fn render_plain_text(text: &str) -> String {
         match kind {
             SpanKind::Email => html.push_str(&anchor(&format!("mailto:{link}"), link)),
             SpanKind::Url => html.push_str(&anchor(link, link)),
-            SpanKind::Msc => {
-                let number = link.get("msc".len()..).unwrap_or_default();
-                html.push_str(&anchor(
-                    &format!("https://github.com/matrix-org/matrix-spec-proposals/pull/{number}"),
-                    link,
-                ));
-            }
             SpanKind::RoomMention => html.push_str("<span data-mx-room-mention>@room</span>"),
         }
         offset = end;
@@ -1289,7 +1242,7 @@ mod tests {
 
     #[test]
     fn detects_links_and_mentions_without_interpreting_markdown() {
-        let body = "*test* **bold** `literal` ||bars|| $x$ $[unixtime 0] @room https://example.org alice@example.org matrix:u/alice:example.org MSC4144";
+        let body = "*test* **bold** `literal` ||bars|| $x$ $[unixtime 0] @room https://example.org alice@example.org matrix:u/alice:example.org";
         for formatted in [None, Some(body)] {
             let html = display_html(body, formatted);
             assert!(html.contains("*test* **bold** `literal` ||bars|| $x$ $[unixtime 0]"));
@@ -1297,7 +1250,6 @@ mod tests {
                 "https://example.org",
                 "mailto:alice@example.org",
                 "matrix:u/alice:example.org",
-                "https://github.com/matrix-org/matrix-spec-proposals/pull/4144",
             ] {
                 assert!(html.contains(&format!("href=\"{href}\"")), "{html}");
             }
@@ -1383,27 +1335,6 @@ mod tests {
         assert!(display_html(href, None).contains(&format!("href=\"{escaped}\"")));
         let markup = format!("<a href=\"{escaped}\">settings</a>");
         assert!(display_html("", Some(&markup)).contains(&format!("href=\"{escaped}\"")));
-    }
-
-    #[test]
-    fn linkifies_msc_references_in_plain_and_formatted_bodies() {
-        let pull = "https://github.com/matrix-org/matrix-spec-proposals/pull";
-
-        let plain = display_html("see MSC4144 and msc2545, not xMSC1 or MSC123456", None);
-        assert!(plain.contains(&format!(
-            "<a href=\"{pull}/4144\" rel=\"noreferrer noopener\">MSC4144</a>"
-        )));
-        assert!(plain.contains(&format!("href=\"{pull}/2545\"")));
-        assert!(!plain.contains("/pull/1\""));
-        assert!(!plain.contains("/pull/123456"));
-
-        let formatted = display_html(
-            "",
-            Some("<strong>MSC3391</strong> <code>MSC1</code> <a href=\"https://x.org\">MSC2</a>"),
-        );
-        assert!(formatted.contains(&format!("href=\"{pull}/3391\"")));
-        assert!(!formatted.contains("/pull/1\""));
-        assert!(!formatted.contains("/pull/2\""));
     }
 
     #[test]
