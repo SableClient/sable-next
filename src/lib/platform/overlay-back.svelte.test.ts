@@ -191,3 +191,25 @@ test('staying after a guarded back press takes the history entry again', async (
   await settle();
   expect(onClose).toHaveBeenCalledOnce();
 });
+
+test('an overlay closed before its entry lands leaves the one opened after it open', async () => {
+  const land = fakeHistory.holdNextEntry();
+  const first = render(Harness, { props: { open: true, onClose: vi.fn() } });
+  await tick();
+  await first.rerender({ open: false });
+  const onCloseSecond = vi.fn();
+  render(Harness, { props: { open: true, onClose: onCloseSecond } });
+  await settle();
+
+  land();
+  await settle();
+
+  expect(onCloseSecond).not.toHaveBeenCalled();
+  expect(fakeHistory.pageStub.state.overlay).toBe(2);
+
+  fakeHistory.go(-1);
+  await settle();
+
+  expect(onCloseSecond).toHaveBeenCalledTimes(1);
+  expect(fakeHistory.entries()).toBe(1);
+});

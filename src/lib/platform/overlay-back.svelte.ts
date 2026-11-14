@@ -90,7 +90,12 @@ export function holdOverlayBack(open: () => boolean, close: () => void): void {
         else if (mine) {
           held = taken;
           heldAt = location.href;
-        } else popEntries(1);
+        } else if (taken > pushed) popEntries(1);
+        else {
+          // Closed before its entry landed: an overlay opened since may sit above it.
+          released.push(taken);
+          unwindReleased();
+        }
       });
     };
     acquire();
