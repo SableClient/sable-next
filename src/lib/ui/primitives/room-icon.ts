@@ -7,6 +7,7 @@ import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import QuestionIcon from 'phosphor-svelte/lib/QuestionIcon';
+import GavelIcon from 'phosphor-svelte/lib/GavelIcon';
 
 import type { RoomKind, RoomJoinRuleView } from '#src/generated/protocol';
 
@@ -59,6 +60,8 @@ export function roomIconComponent(room: RoomIconShape): Component {
       return ChatsCircleIcon;
     case 'calendar':
       return CalendarDotsIcon;
+    case 'policy':
+      return GavelIcon;
     default:
       return QuestionIcon;
   }

@@ -29,6 +29,8 @@ use crate::view::FORUM_ROOM_TYPE;
 use crate::{Core, ResultExt, power_levels, view};
 
 const WIDGETS_EVENT_TYPE: &str = "im.vector.modular.widgets";
+const POLICY_ROOM_TYPE: &str = "m.policy";
+const POLICY_ROOM_TYPE_UNSTABLE: &str = "support.feline.policy.lists.msc.v1";
 
 domain! {
     open,
@@ -84,6 +86,8 @@ pub enum RoomKind {
     Forum,
     /// `chat.commet.calendar`
     Calendar,
+    /// `m.policy` / `support.feline.policy.lists.msc.v1`
+    Policy,
 }
 
 impl RoomKind {
@@ -98,6 +102,8 @@ impl RoomKind {
             Some(RoomType::Call) => Some(Self::Voice),
             Some(other) if other.as_str() == FORUM_ROOM_TYPE => Some(Self::Forum),
             Some(other) if other.as_str() == CALENDAR_ROOM_TYPE => Some(Self::Calendar),
+            Some(other) if other.as_str() == POLICY_ROOM_TYPE => Some(Self::Policy),
+            Some(other) if other.as_str() == POLICY_ROOM_TYPE_UNSTABLE => Some(Self::Policy),
             Some(_) => None,
         }
     }
@@ -111,6 +117,7 @@ impl RoomKind {
             Self::Voice => Some(RoomType::Call),
             Self::Forum => Some(RoomType::from(FORUM_ROOM_TYPE)),
             Self::Calendar => Some(RoomType::from(CALENDAR_ROOM_TYPE)),
+            Self::Policy => Some(RoomType::from(POLICY_ROOM_TYPE)),
         }
     }
 }
