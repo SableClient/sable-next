@@ -2,7 +2,7 @@ import { expect, test, SIGNED_OUT } from './fixtures/test';
 
 test.use({ storageState: SIGNED_OUT });
 
-test.beforeEach(async ({ page, app, installRoomCore }) => {
+test.beforeEach(async ({ page, app, timeline, installRoomCore }) => {
   await page.addInitScript(() => {
     (window as unknown as { __e2eProfilePatch: object }).__e2eProfilePatch = {
       status: {
@@ -13,6 +13,9 @@ test.beforeEach(async ({ page, app, installRoomCore }) => {
   });
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
+  // The card is anchored to a message, so the timeline has to stop moving first.
+  await timeline.expectRevealed();
+  await timeline.waitForScrollSettled();
   await page.getByRole('button', { name: 'Open Alice’s profile' }).last().click();
 });
 
