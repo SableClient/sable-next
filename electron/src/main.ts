@@ -576,7 +576,12 @@ ipcMain.on('sable-window-close', (event) => windowOf(event)?.close());
 ipcMain.handle('sable-window-is-maximized', (event) => windowOf(event)?.isMaximized() ?? false);
 
 ipcMain.on('sable-core-connect', (event) => {
-  if (event.ports.length !== 1 || !isAppFrame(event.senderFrame)) return;
+  if (
+    event.ports.length !== 1 ||
+    !isAppFrame(event.senderFrame) ||
+    event.sender !== mainWindow?.webContents
+  )
+    return;
   core ??= startCore();
   core.postMessage('connect', event.ports);
 });
