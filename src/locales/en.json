@@ -2608,6 +2608,7 @@
     "callScreenBitrate": "Screen sharing maximum bitrate",
     "callScreenFramerate": "Screen sharing frame rate",
     "callScreenCodec": "Screen sharing codec",
+    "callAv1Unencryptable": "AV1 cannot be end-to-end encrypted, so this call uses H.264 instead.",
     "callSimulcast": "Use simulcast",
     "callSimulcastHint": "Sends camera and screen video at several quality levels. Uses more bandwidth and processing.",
     "callVideoAutomatic": "Automatic",

@@ -23,7 +23,9 @@ import {
 } from '#lib/platform/screen-audio.js';
 import type { ScreenAudioChoice } from '#lib/platform/screen-audio-stream.js';
 import { electronBridge } from '#lib/platform/electron.js';
+import { i18n } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 
 import type {
   CallConnectionQuality,
@@ -146,11 +148,19 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       ? { resolution: videoResolution(preferences.callCameraResolution) }
       : {}),
   });
+  let av1Reported = false;
+  const videoCodec = (codec: Parameters<typeof resolveVideoCodec>[0]) => {
+    if (options.encryptMedia && codec === 'av1' && !av1Reported) {
+      av1Reported = true;
+      toasts.info(i18n.t('settings.callAv1Unencryptable'));
+    }
+    return resolveVideoCodec(codec, options.encryptMedia);
+  };
   const cameraPublish = async () =>
     videoPublishOptions(
       'camera',
       preferences.callCameraBitrate,
-      await resolveVideoCodec(preferences.callCameraCodec),
+      await videoCodec(preferences.callCameraCodec),
       preferences.callSimulcast
     );
   const screenCapture = (): ScreenShareCaptureOptions =>
@@ -159,7 +169,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     videoPublishOptions(
       'screen',
       preferences.callScreenBitrate,
-      await resolveVideoCodec(preferences.callScreenCodec),
+      await videoCodec(preferences.callScreenCodec),
       preferences.callSimulcast,
       preferences.callScreenFramerate
     );

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { screenCaptureOptions } from './video-quality.js';
 
-async function resolveWith(hardware: string[], codec: 'auto' | 'vp8') {
+async function resolveWith(hardware: string[], codec: 'auto' | 'vp8' | 'av1', encrypted = false) {
   vi.resetModules();
   vi.stubGlobal('navigator', {
     mediaCapabilities: {
@@ -14,7 +14,7 @@ async function resolveWith(hardware: string[], codec: 'auto' | 'vp8') {
     },
   });
   const { resolveVideoCodec } = await import('./video-quality.js');
-  return resolveVideoCodec(codec);
+  return resolveVideoCodec(codec, encrypted);
 }
 
 describe('screenCaptureOptions', () => {
@@ -55,5 +55,11 @@ describe('resolveVideoCodec', () => {
 
   it('keeps an explicit codec', async () => {
     expect(await resolveWith(['h264'], 'vp8')).toBe('vp8');
+    expect(await resolveWith([], 'av1')).toBe('av1');
+  });
+
+  it('skips AV1 for encrypted media', async () => {
+    expect(await resolveWith(['av1'], 'auto', true)).toBe('h264');
+    expect(await resolveWith(['av1'], 'av1', true)).toBe('h264');
   });
 });

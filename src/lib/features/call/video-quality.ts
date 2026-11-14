@@ -47,10 +47,17 @@ export function screenCaptureOptions(
 
 const AUTO_CODECS: readonly ProbedVideoCodec[] = ['h264', 'vp9', 'av1'];
 
-export async function resolveVideoCodec(codec: CallVideoCodec): Promise<VideoCodec> {
-  if (codec !== 'auto') return codec;
+// LiveKit's frame cryptor drops every AV1 frame, so encrypted media never uses it.
+export async function resolveVideoCodec(
+  codec: CallVideoCodec,
+  encrypted = false
+): Promise<VideoCodec> {
+  const usable = (candidate: VideoCodec): boolean => !encrypted || candidate !== 'av1';
+  if (codec !== 'auto') return usable(codec) ? codec : 'h264';
   const hardware = await hardwareVideoEncoders();
-  return AUTO_CODECS.find((candidate) => hardware.includes(candidate)) ?? 'h264';
+  return (
+    AUTO_CODECS.find((candidate) => usable(candidate) && hardware.includes(candidate)) ?? 'h264'
+  );
 }
 
 export function videoPublishOptions(
