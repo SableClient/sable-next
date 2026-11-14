@@ -138,7 +138,7 @@ for (const reading of [false, true]) {
       expect(growth).toBeGreaterThan(0);
       await timeline.waitForScrollSettled();
       if (anchor) {
-        // A short touch viewport drops the room header, which moves the timeline itself.
+        // A short touch viewport switches to the phone layout, which moves the timeline itself.
         const shift = (await viewportTop()) - initialTop;
         await timeline.expectAnchorHeld({ ...anchor, y: anchor.y + shift }, { tolerance: 2 });
         await expect(timeline.jumpToLatest).toBeVisible();

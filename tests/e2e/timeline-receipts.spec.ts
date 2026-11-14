@@ -113,11 +113,11 @@ test('own bubble receipts reach the same edge as everyone else’s on mobile', a
   const subscription = await core.subscription();
   await core.setTimelineItemById(subscription, 'general-19', reacted('general-19', true));
   await core.setTimelineItemById(subscription, 'general-18', reacted('general-18', false));
-  await expect(page.locator('.message-content > .receipt-slot')).toHaveCount(2);
+  await expect(timeline.container.locator('.receipt-slot')).toHaveCount(2);
 
   const edges = await page.evaluate(() =>
     Object.fromEntries(
-      [...document.querySelectorAll('.message-content > .receipt-slot')].map((node) => [
+      [...document.querySelectorAll('.timeline-viewport .receipt-slot')].map((node) => [
         node.closest('.message')?.classList.contains('own') ? 'own' : 'other',
         Math.round(node.getBoundingClientRect().right),
       ])
