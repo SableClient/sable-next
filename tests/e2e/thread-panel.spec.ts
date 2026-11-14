@@ -225,7 +225,7 @@ for (const context of ['desktop', 'mobile'] as const) {
         },
       ]);
       const opener = parent
-        .locator(surface === 'forum' ? '.forum-thread-meta' : '.thread-summary')
+        .locator(surface === 'forum' ? '.forum-thread-open' : '.thread-summary')
         .last();
       await opener.scrollIntoViewIfNeeded();
       await expect(opener).toBeVisible();
@@ -327,7 +327,7 @@ for (const context of ['desktop', 'mobile'] as const) {
           ],
         },
       ]);
-      const opener = parent.locator(surface === 'forum' ? '.forum-thread-meta' : '.thread-summary');
+      const opener = parent.locator(surface === 'forum' ? '.forum-thread-open' : '.thread-summary');
       await expect(opener).toHaveCount(1);
       await opener.click();
       const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });

@@ -38,7 +38,7 @@ for (const [surface, mode, path] of [
       };
       await expect.poll(() => core.subscribeCount()).toBe(1);
       await core.emitTimelineDiff(await core.subscription(), [{ op: 'reset', values: [root] }]);
-      await page.locator(surface === 'forum' ? '.forum-thread-meta' : '.thread-summary').click();
+      await page.locator(surface === 'forum' ? '.forum-thread-open' : '.thread-summary').click();
       const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });
       await expect(thread).toBeVisible();
       await expect.poll(() => core.subscribeCount()).toBe(2);

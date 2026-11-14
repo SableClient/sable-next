@@ -35,7 +35,7 @@ for (const surface of ['room', 'forum'] as const) {
         },
       };
       await core.emitTimelineDiff(await core.subscription(), [{ op: 'reset', values: [root] }]);
-      const opener = parent.locator(surface === 'forum' ? '.forum-thread-meta' : '.thread-summary');
+      const opener = parent.locator(surface === 'forum' ? '.forum-thread-open' : '.thread-summary');
       await expect(opener).toHaveCount(1);
       await opener.click();
       const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });
@@ -111,6 +111,8 @@ for (const surface of ['room', 'forum'] as const) {
       await openActions(thread.locator('[data-item-id="own"] .message'));
       await actions.getByRole(actionRole, { name: en.timeline.editMessage, exact: true }).click();
       await expect(editor).toHaveText('My earlier reply');
+      // The composer takes focus a frame after the edit loads, which would undo fill's selection.
+      await expect(editor).toBeFocused();
       await editor.fill('Edited thread reply');
       await expect(editor).toHaveText('Edited thread reply');
       await editor.press('Enter');
