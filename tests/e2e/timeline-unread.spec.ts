@@ -174,10 +174,12 @@ test('the reveal keeps the unread context while the reader is above the bottom',
   await timeline.expectRevealed();
   await expect(timeline.message('General message 5')).toBeInViewport();
   const subscriptions = await core.subscribeCount();
+  // Stops a screen above the loaded end each time: reaching it would hand over to live.
   for (const body of ['General message 40', 'General message 60']) {
     await expect
       .poll(async () => {
-        await timeline.wheelDown(400);
+        const height = await timeline.viewport.evaluate((node) => node.clientHeight);
+        await timeline.scrollAboveBottomAndNotify(height);
         return timeline.message(body).count();
       })
       .toBeGreaterThan(0);
