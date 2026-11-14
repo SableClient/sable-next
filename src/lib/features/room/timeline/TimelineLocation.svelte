@@ -87,7 +87,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-200);
-    max-width: var(--timeline-media-max);
+    max-width: min(var(--timeline-media-max), 100%);
     padding: var(--space-200) var(--space-300);
   }
 

@@ -160,7 +160,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-150);
-    max-width: var(--timeline-media-max);
+    max-width: min(var(--timeline-media-max), 100%);
     padding: var(--space-300);
   }
 

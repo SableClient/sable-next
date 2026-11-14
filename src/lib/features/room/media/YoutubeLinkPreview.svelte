@@ -63,7 +63,7 @@
     display: flex;
     flex-direction: column;
     margin-top: var(--space-100);
-    max-width: var(--timeline-media-max);
+    max-width: min(var(--timeline-media-max), 100%);
     overflow: hidden;
     text-decoration: none;
   }

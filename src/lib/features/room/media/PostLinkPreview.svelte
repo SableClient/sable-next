@@ -164,7 +164,7 @@
     flex-direction: column;
     gap: var(--space-200);
     margin-top: var(--space-100);
-    max-width: var(--timeline-media-max);
+    max-width: min(var(--timeline-media-max), 100%);
     overflow: hidden;
     padding: var(--space-200) var(--space-250);
   }
