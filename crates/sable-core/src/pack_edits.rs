@@ -280,6 +280,7 @@ impl Core {
         target: PackTargetView,
         draft: &PackDraftView,
     ) -> Result<(), RpcError> {
+        let _guard = self.account_data_lock.lock().await;
         let current = match &target {
             PackTargetView::Room { room_id, state_key } => {
                 let stable = self
@@ -448,7 +449,22 @@ impl Core {
             cache.forget_account_data(IMAGE_PACK_ROOMS);
             cache.forget_account_data(EMOTE_ROOMS);
         }
-        let next = with_subscriptions(&self.pack_subscriptions().await?, added, removed);
+        let client = self.client().await?;
+        let (raw, complete) = self
+            .subscribed_pack_rooms(&client, true)
+            .await
+            .or_failed(self, "set_pack_subscriptions")?;
+        if !complete {
+            return Err(self.failed(
+                "set_pack_subscriptions",
+                "the pack subscriptions on the server could not be read",
+            ));
+        }
+        let current = raw
+            .and_then(|raw| raw.deserialize_as_unchecked::<EmoteRooms>().ok())
+            .map(|rooms| subscription_addresses(&rooms))
+            .unwrap_or_default();
+        let next = with_subscriptions(&current, added, removed);
         self.set_account_data(IMAGE_PACK_ROOMS, &subscriptions_content(&next))
             .await?;
         Ok(next)

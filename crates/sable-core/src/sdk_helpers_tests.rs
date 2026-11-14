@@ -1882,6 +1882,44 @@ async fn scheduled_attachments_keep_the_spoiler_on_the_wire() {
 }
 
 #[tokio::test]
+async fn pack_subscriptions_are_not_rewritten_from_the_store_when_the_server_read_fails() {
+    use crate::api::packs::SetSubscriptionsParams;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_custom_global_account_data(json!({
+                "type": "im.ponies.emote_rooms",
+                "content": { "rooms": { "!stored:example.org": { "pack": {} } } }
+            }));
+        })
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex("/_matrix/client/v3/user/.*/account_data/.*"))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+            "errcode": "M_FORBIDDEN", "error": "unreachable"
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(0)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let params = serde_json::from_value::<SetSubscriptionsParams>(json!({
+        "added": [{ "room_id": "!added:example.org", "state_key": "pack" }],
+        "removed": []
+    }))
+    .unwrap();
+
+    assert!(core.run(params).await.is_err());
+}
+
+#[tokio::test]
 async fn cached_image_packs_return_without_waiting_for_room_state() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
