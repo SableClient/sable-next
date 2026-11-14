@@ -1,0 +1,60 @@
+import { afterEach, expect, test, vi } from 'vitest';
+import { page } from 'vitest/browser';
+import { render } from 'vitest-browser-svelte';
+
+vi.mock('./call-telemetry', () => ({ CallTelemetry: vi.fn() }));
+
+import type { CallSession } from './call-session.svelte.js';
+import { idleTransportState } from './call-transport';
+import CallViewHarness from './CallViewHarness.test.svelte';
+
+afterEach(() => vi.restoreAllMocks());
+
+test('a remote camera stays clear of the controls when they wrap on a phone', async () => {
+  await page.viewport(402, 874);
+  const overlay = { place: vi.fn(() => Promise.resolve()), clear: vi.fn(() => Promise.resolve()) };
+  const track = { id: 'camera', muted: false, subscribed: true };
+  const session = {
+    lifecycle: 'active',
+    mediaReady: true,
+    failure: null,
+    deviceError: null,
+    startedAt: null,
+    layout: { pinned: null, gridForced: false },
+    watchedScreenShareIds: [],
+    views: 0,
+    deafened: false,
+    microphoneEnabled: true,
+    inputMode: 'voice-activity',
+    encryptsMedia: false,
+    canScreenShare: true,
+    canSwitchCamera: true,
+    audioRoutes: { list: () => Promise.resolve([]), select: () => Promise.resolve() },
+    localVideo: overlay,
+    remoteVideo: overlay,
+    rooms: [],
+    members: [],
+    transport: {
+      ...idleTransportState(),
+      connection: 'connected',
+      microphoneEnabled: true,
+      self: { identity: 'me', local: true },
+      participants: [{ identity: 'bob', camera: track, microphone: track }],
+    },
+    roomFor: () => undefined,
+  } as unknown as CallSession;
+  const { container } = await render(CallViewHarness, {
+    session,
+    members: [],
+    onOpenSettings: vi.fn(),
+  });
+  container.style.cssText = 'display:flex;width:402px;height:700px';
+  const controls = container.querySelector<HTMLElement>('.dock .controls');
+  const video = container.querySelector<HTMLElement>('.tile .video');
+  if (!controls || !video) throw new Error('call not rendered');
+
+  await expect.poll(() => video.getBoundingClientRect().height).toBeGreaterThan(0);
+  await expect
+    .poll(() => controls.getBoundingClientRect().top - video.getBoundingClientRect().bottom)
+    .toBeGreaterThanOrEqual(0);
+});
