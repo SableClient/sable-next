@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { app, ipcMain, type WebFrameMain } from 'electron';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
 
@@ -40,6 +40,16 @@ export function supportsAutoUpdate(): boolean {
   );
 }
 
+// electron-builder marks its own deb and rpm; Gentoo and Nix publish after the release feed.
+function distributionPackaged(): boolean {
+  try {
+    const type = readFileSync(join(dirname(app.getAppPath()), 'package-type'), 'utf8').trim();
+    return type !== 'deb' && type !== 'rpm';
+  } catch {
+    return false;
+  }
+}
+
 export function setUpdateChannel(channel: keyof typeof FEEDS): void {
   if (!supportsAutoUpdate()) return;
   autoUpdater.setFeedURL({
@@ -60,6 +70,7 @@ export function registerUpdater(
   const enabled = supportsAutoUpdate();
   // Flathub and the nightly Flatpak repo publish after the release feed.
   let flatpakUpdate = !process.env.FLATPAK_ID;
+  const distribution = distributionPackaged();
   if (!flatpakUpdate && app.isPackaged) {
     watchFlatpak(() => {
       flatpakUpdate = true;
@@ -76,7 +87,8 @@ export function registerUpdater(
   });
 
   ipcMain.handle('sable-update-latest-version', async (event) => {
-    if (enabled || !app.isPackaged || !flatpakUpdate || !isAppFrame(event.senderFrame)) return null;
+    if (enabled || !app.isPackaged || !flatpakUpdate || distribution) return null;
+    if (!isAppFrame(event.senderFrame)) return null;
     const feed = `${FEEDS[builtChannel]}${feedChannel(builtChannel)}-linux.yml`;
     const response = await fetch(feed, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Update feed request failed: ${String(response.status)}`);
