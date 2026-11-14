@@ -24,16 +24,20 @@ internal object PushPayloadDecryptor {
 
     private var loaded: Boolean? = null
 
-    private external fun nativePreviewBody(body: String, formatted: String): String?
+    private external fun nativePreviewBody(content: String): String?
+
+    private val PROFILE_KEYS = listOf("com.beeper.per_message_profile", "m.per_message_profile")
 
     fun previewBody(context: Context, content: JSONObject?): String? {
         val body = (content?.opt("body") as? String)?.takeIf { it.isNotEmpty() } ?: return null
         val formatted = (content.opt("formatted_body") as? String)?.takeIf { it.isNotBlank() }
-        if (content.optString("format") != "org.matrix.custom.html" || formatted == null) return body
+        val rich = content.optString("format") == "org.matrix.custom.html" && formatted != null
+        if (!rich && PROFILE_KEYS.none(content::has)) return body
         if (!available(context)) return null
-        return runCatching { nativePreviewBody(body, formatted) }
+        return runCatching { nativePreviewBody(content.toString()) }
             .onFailure { Log.i(TAG, "Push preview unavailable: ${it.message}") }
             .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
     }
 
     private external fun nativeMaintainPush(storeDir: String, operation: String): String?

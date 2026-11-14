@@ -120,14 +120,19 @@ impl PushSession {
         .await
     }
 
-    pub async fn sender_name(&self, sender: Option<&str>, payload_name: Option<&str>) -> String {
+    pub async fn sender_name(
+        &self,
+        sender: Option<&str>,
+        payload_name: Option<&str>,
+        content: Option<&serde_json::Value>,
+    ) -> String {
         let override_name = match sender {
             Some(sender) => {
                 crate::profile_overrides::notification_name(self.host.client(), sender).await
             }
             None => None,
         };
-        push_sender_name(sender, override_name.as_deref().or(payload_name))
+        push_sender_name(sender, override_name.as_deref().or(payload_name), content)
     }
 
     pub async fn fetch(&self, event_id: &str) -> PushFetchView {
@@ -247,15 +252,15 @@ impl PushSession {
             .map(|room| room.joined_members_count())
     }
 
-    /// `sender` asks for the avatars, `content` for the message's image; leave out
-    /// the content when the notification may not show the message.
+    /// `sender` asks for the avatars, `content` for the message's image and per-message
+    /// profile; leave out the content when the notification may not show the message.
     pub async fn media(
         &self,
         sender: Option<&str>,
         payload_name: Option<&str>,
         content: Option<&serde_json::Value>,
     ) -> PushMedia {
-        let sender_name = self.sender_name(sender, payload_name).await;
+        let sender_name = self.sender_name(sender, payload_name, content).await;
         let client = self.host.client();
         let Some(room) = client.get_room(&self.room_id) else {
             return PushMedia {
@@ -263,16 +268,25 @@ impl PushSession {
                 ..PushMedia::default()
             };
         };
-        let sender_url =
-            match sender.and_then(|sender| matrix_sdk::ruma::UserId::parse(sender).ok()) {
-                Some(sender) => room
+        let profile = sender.and_then(|_| crate::view::per_message_profile(content));
+        let profile_avatar = profile
+            .as_ref()
+            .and_then(|profile| profile.avatar_url.as_deref());
+        let sender_url = match (profile_avatar, sender) {
+            (Some(url), _) => Some(url)
+                .filter(|url| !url.is_empty())
+                .map(matrix_sdk::ruma::OwnedMxcUri::from),
+            (None, Some(sender)) => match matrix_sdk::ruma::UserId::parse(sender) {
+                Ok(sender) => room
                     .get_member_no_sync(&sender)
                     .await
                     .ok()
                     .flatten()
                     .and_then(|member| member.avatar_url().map(ToOwned::to_owned)),
-                None => None,
-            };
+                Err(_) => None,
+            },
+            (None, None) => None,
+        };
         let room_url = match sender {
             Some(_) => crate::view::room_avatar_url(&room)
                 .await
@@ -325,6 +339,7 @@ impl PushSession {
         PushMedia {
             sender_name,
             sender: sender.map(|(path, _)| path),
+            sender_profile: profile.and_then(|profile| profile.id.or(profile.display_name)),
             room: room.map(|(path, _)| path),
             image: image.map(|(path, mimetype)| PushImage { path, mimetype }),
             own_name,
@@ -448,7 +463,7 @@ pub async fn cold_push_media(
     match PushSession::cached(&cold_push_store_dir(data_dir), user_id, device_id, room_id).await {
         Some(session) => session.media(sender, payload_name, content).await,
         None => PushMedia {
-            sender_name: push_sender_name(sender, payload_name),
+            sender_name: push_sender_name(sender, payload_name, content),
             ..PushMedia::default()
         },
     }

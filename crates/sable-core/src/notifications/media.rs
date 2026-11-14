@@ -36,6 +36,7 @@ pub(crate) async fn clear_push_media(store_dir: &std::path::Path) {
 pub struct PushMedia {
     pub sender_name: String,
     pub sender: Option<String>,
+    pub sender_profile: Option<String>,
     pub room: Option<String>,
     pub image: Option<PushImage>,
     pub own_name: Option<String>,
@@ -49,12 +50,42 @@ pub struct PushImage {
     pub mimetype: &'static str,
 }
 
+/// A per-message profile's name wins over the account's, as in the timeline.
 #[must_use]
-pub fn push_sender_name(sender: Option<&str>, name: Option<&str>) -> String {
-    name.and_then(visible_name)
+pub fn push_sender_name(
+    sender: Option<&str>,
+    name: Option<&str>,
+    content: Option<&serde_json::Value>,
+) -> String {
+    crate::view::per_message_profile(content)
+        .and_then(|profile| profile.display_name)
+        .as_deref()
+        .or_else(|| name.and_then(visible_name))
         .or(sender)
         .unwrap_or_default()
         .to_owned()
+}
+
+/// The notification text of a message's content, without a per-message profile's fallback prefix.
+#[must_use]
+pub fn push_preview(content: &serde_json::Value) -> Option<String> {
+    use crate::matrix_html::{
+        preview_body, strip_profile_fallback_body, strip_profile_fallback_html,
+    };
+
+    let body = content.get("body")?.as_str()?;
+    let fallback = crate::view::per_message_profile(Some(content))
+        .filter(|profile| profile.has_fallback)
+        .and_then(|profile| profile.display_name);
+    let body = strip_profile_fallback_body(body, fallback.as_deref());
+    let formatted = content
+        .get("format")
+        .and_then(serde_json::Value::as_str)
+        .filter(|format| *format == "org.matrix.custom.html")
+        .and_then(|_| content.get("formatted_body")?.as_str())
+        .filter(|formatted| !formatted.trim().is_empty())
+        .map(|formatted| strip_profile_fallback_html(formatted, fallback.as_deref()));
+    Some(preview_body(&body, formatted.as_deref()))
 }
 
 #[cfg(not(target_family = "wasm"))]

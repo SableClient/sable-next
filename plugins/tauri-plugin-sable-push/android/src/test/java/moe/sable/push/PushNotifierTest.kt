@@ -1494,7 +1494,31 @@ class PushNotifierTest {
     @Test
     @Config(sdk = [27])
     fun beforeAndroid9AnImageMessageAsksForNoPreview() {
-        assertNull(mediaRequests("!old:example.org").single())
+        assertFalse(mediaRequests("!old:example.org").single()!!.has("msgtype"))
+    }
+
+    @Test
+    fun aMessageSentAsAProfileIsASeparateSpeakerFromItsAccount() {
+        PushPolicy(context).accounts = mapOf("@alice:example.org" to "ALICE")
+        val room = "!profiles:example.org"
+        val push = { event: String, name: String, profile: String? ->
+            val content = JSONObject().put("msgtype", "m.text").put("body", "hi")
+            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns
+                JSONObject().put("sender_name", name).apply { profile?.let { put("sender_profile", it) } }
+            val notification = JSONObject()
+                .put("room_id", room).put("event_id", event).put("user_id", "@alice:example.org")
+                .put("room_name", "Room 1").put("sender", "@bob:example.org").put("type", "m.room.message")
+                .put("content", content)
+            PushNotifier.showFromPush(context, JSONObject().put("notification", notification).toString())
+        }
+
+        push("\$plain", "Bob", null)
+        push("\$cat", "Cat", "cat")
+
+        val posted = shadowNotificationManager().getNotification(null, canonicalId(room))!!
+        val people = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted)!!
+            .messages.map { it.person?.name to it.person?.key }
+        assertEquals(listOf("Bob" to "@bob:example.org", "Cat" to "@bob:example.org|cat"), people)
     }
 
     @Test

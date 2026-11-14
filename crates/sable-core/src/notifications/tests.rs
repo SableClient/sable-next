@@ -1327,6 +1327,92 @@ async fn a_direct_chat_without_a_picture_borrows_the_other_persons() {
 }
 
 #[tokio::test]
+async fn a_message_sent_as_a_profile_shows_the_profile_in_its_notification() {
+    let fixture = ColdFixture::new("media-profile", media_room(None), None).await;
+    let thumbnails = mount_thumbnails(&fixture, 0..=2).await;
+    let content = json!({"msgtype": "m.text", "body": "Cat: hi", "format": "org.matrix.custom.html",
+        "formatted_body": "<strong data-mx-profile-fallback>Cat: </strong>hi",
+        "com.beeper.per_message_profile": {"id": "cat", "displayname": "Cat",
+            "avatar_url": "mxc://example.org/cat", "has_fallback": true}});
+
+    let media = media(&fixture, Some(&content)).await;
+
+    assert_eq!(media.sender_name, "Cat");
+    assert_eq!(media.sender_profile.as_deref(), Some("cat"));
+    assert_eq!(
+        std::fs::read(media.sender.as_deref().unwrap()).unwrap(),
+        thumbnails["cat"]
+    );
+    assert_eq!(
+        std::fs::read(media.room.as_deref().unwrap()).unwrap(),
+        thumbnails["lounge"]
+    );
+    assert_eq!(super::push_preview(&content).as_deref(), Some("hi"));
+
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_profile_without_a_picture_follows_the_timelines_fallback() {
+    let fixture = ColdFixture::new("media-profile-bare", media_room(None), None).await;
+    let thumbnails = mount_thumbnails(&fixture, 0..=2).await;
+    let profile = |avatar: serde_json::Value| {
+        let mut profile = json!({"id": "cat", "displayname": "Cat"});
+        if !avatar.is_null() {
+            profile["avatar_url"] = avatar;
+        }
+        json!({"msgtype": "m.text", "body": "Cat: hi",
+            "com.beeper.per_message_profile": profile})
+    };
+
+    let absent = media(&fixture, Some(&profile(json!(null)))).await;
+    assert_eq!(absent.sender_name, "Cat");
+    assert_eq!(
+        std::fs::read(absent.sender.as_deref().unwrap()).unwrap(),
+        thumbnails["face"]
+    );
+    assert_eq!(
+        super::push_preview(&profile(json!(null))).as_deref(),
+        Some("Cat: hi")
+    );
+
+    let cleared = media(&fixture, Some(&profile(json!("")))).await;
+    assert_eq!(cleared.sender_name, "Cat");
+    assert!(cleared.sender.is_none());
+    assert!(cleared.room.is_some());
+
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_message_without_a_profile_keeps_the_accounts_look() {
+    let fixture = ColdFixture::new("media-no-profile", media_room(None), None).await;
+    let thumbnails = mount_thumbnails(&fixture, 0..=2).await;
+    let content = json!({"msgtype": "m.text", "body": "Cat: hi"});
+
+    let media = super::cold_push_media(
+        &fixture.data_dir,
+        "@alice:example.org",
+        "A",
+        COLD_ROOM,
+        Some("@sender:example.org"),
+        Some("Sender"),
+        Some(&content),
+    )
+    .await;
+
+    assert_eq!(media.sender_name, "Sender");
+    assert!(media.sender_profile.is_none());
+    assert_eq!(
+        std::fs::read(media.sender.as_deref().unwrap()).unwrap(),
+        thumbnails["face"]
+    );
+    assert_eq!(super::push_preview(&content).as_deref(), Some("Cat: hi"));
+
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
 async fn a_room_with_media_previews_off_gets_no_push_image() {
     let off = Raw::from_json_string(
         json!({"type": "m.media_preview_config", "content": {"media_previews": "off"}}).to_string(),
@@ -1526,7 +1612,7 @@ async fn push_sender_names_follow_plain_and_sealed_profile_overrides() {
     assert_eq!(
         session(&fixture)
             .await
-            .sender_name(Some("@sender:example.org"), Some("Payload"))
+            .sender_name(Some("@sender:example.org"), Some("Payload"), None)
             .await,
         "Payload"
     );
@@ -1577,12 +1663,14 @@ async fn push_sender_names_follow_plain_and_sealed_profile_overrides() {
         let session = session(&fixture).await;
         assert_eq!(
             session
-                .sender_name(Some("@sender:example.org"), Some("Payload"))
+                .sender_name(Some("@sender:example.org"), Some("Payload"), None)
                 .await,
             expected
         );
         assert_eq!(
-            session.sender_name(Some("@nobody:example.org"), None).await,
+            session
+                .sender_name(Some("@nobody:example.org"), None, None)
+                .await,
             "@nobody:example.org"
         );
         drop(session);
