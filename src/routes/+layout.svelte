@@ -22,6 +22,7 @@
   import { appName, faviconUrl } from '#lib/deployment/brand.js';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { blockEdgeNavigation } from '#lib/platform/edge-navigation.js';
+  import { lockNativeZoom } from '#lib/platform/viewport-zoom.js';
   import { systemDark } from '#lib/platform/system-theme.js';
   import { hostsServiceWorker, registerServiceWorker } from '#lib/platform/service-worker.js';
   import { notificationPermalink } from '#lib/features/notifications/notification-link.js';
@@ -98,6 +99,7 @@
       const current = boundServerIdentity();
       if (current) identityChannel.postMessage(current);
     }
+    lockNativeZoom();
     const stopTrackingKeyboard = trackKeyboardInset();
     const stopGuardingClicks = guardTouchClicks();
     const stopBlockingEdgeNavigation = blockEdgeNavigation();
