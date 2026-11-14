@@ -132,7 +132,35 @@ impl PushSession {
             }
             None => None,
         };
-        push_sender_name(sender, override_name.as_deref().or(payload_name), content)
+        let name = push_sender_name(sender, override_name.as_deref().or(payload_name), content);
+        let Some(sender) = sender else {
+            return name;
+        };
+        let speaks_as_profile = crate::view::per_message_profile(content)
+            .is_some_and(|profile| profile.display_name.is_some());
+        if override_name.is_none()
+            && !speaks_as_profile
+            && name != sender
+            && self.name_ambiguous(sender).await
+        {
+            format!("{name} ({sender})")
+        } else {
+            name
+        }
+    }
+
+    async fn name_ambiguous(&self, sender: &str) -> bool {
+        let (Some(room), Ok(sender)) = (
+            self.host.client().get_room(&self.room_id),
+            matrix_sdk::ruma::UserId::parse(sender),
+        ) else {
+            return false;
+        };
+        room.get_member_no_sync(&sender)
+            .await
+            .ok()
+            .flatten()
+            .is_some_and(|member| member.name_ambiguous())
     }
 
     pub async fn fetch(&self, event_id: &str) -> PushFetchView {

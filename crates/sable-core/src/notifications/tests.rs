@@ -1588,6 +1588,51 @@ async fn session(fixture: &ColdFixture) -> super::PushSession {
 }
 
 #[tokio::test]
+async fn a_push_sender_sharing_a_name_with_another_member_is_told_apart() {
+    let factory = matrix_sdk_test::event_factory::EventFactory::new()
+        .room(room_id!("!cold:example.org"))
+        .sender(user_id!("@sender:example.org"));
+    let room = JoinedRoomBuilder::new(room_id!("!cold:example.org"))
+        .add_state_event(factory.member(user_id!("@alice:example.org")))
+        .add_state_event(
+            factory
+                .member(user_id!("@sender:example.org"))
+                .display_name("Sam"),
+        )
+        .add_state_event(
+            factory
+                .member(user_id!("@other:example.org"))
+                .display_name("Sam"),
+        )
+        .add_state_event(factory.power_levels());
+    let fixture = ColdFixture::new("ambiguous", room, None).await;
+    let session = session(&fixture).await;
+    let profile = json!({"body": "hi", "com.beeper.per_message_profile": {"id": "cat", "displayname": "Cat"}});
+
+    assert_eq!(
+        session
+            .sender_name(Some("@sender:example.org"), Some("Sam"), None)
+            .await,
+        "Sam (@sender:example.org)"
+    );
+    assert_eq!(
+        session
+            .sender_name(Some("@sender:example.org"), Some("Sam"), Some(&profile))
+            .await,
+        "Cat"
+    );
+    assert_eq!(
+        session
+            .sender_name(Some("@alice:example.org"), Some("Alice"), None)
+            .await,
+        "Alice"
+    );
+
+    drop(session);
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
 async fn push_sender_names_follow_plain_and_sealed_profile_overrides() {
     use crate::sealed_account_data::{AccountDataKey, cache_key};
 
