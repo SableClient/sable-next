@@ -70,6 +70,10 @@ export function setMetadata(
   return staged.map((item) => (item.id === id ? { ...item, metadata } : item));
 }
 
+export function replaceFile(staged: readonly StagedFile[], id: number, file: File): StagedFile[] {
+  return staged.map((item) => (item.id === id ? { ...item, file } : item));
+}
+
 export type PreviewKind = 'image' | 'video';
 
 export function previewKind(file: File): PreviewKind | null {

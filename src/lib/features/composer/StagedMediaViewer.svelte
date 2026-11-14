@@ -4,6 +4,7 @@
   import { untrack } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
+  import CropIcon from 'phosphor-svelte/lib/CropIcon';
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
   import SlidersHorizontalIcon from 'phosphor-svelte/lib/SlidersHorizontalIcon';
@@ -15,6 +16,8 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { type ImageMetadata } from '#lib/settings/definitions.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
+  import { isCroppable } from '#lib/ui/image-crop/croppable.js';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { mediaEvents } from '#lib/ui/media-events.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -36,9 +39,11 @@
     onRemove: (id: number) => void;
     onToggleSpoiler: (id: number) => void;
     onSetMetadata: (id: number, metadata: ImageMetadata) => void;
+    onReplace: (id: number, file: File) => void;
   }
 
-  let { files, selectedId, onClose, onRemove, onToggleSpoiler, onSetMetadata }: Props = $props();
+  let { files, selectedId, onClose, onRemove, onToggleSpoiler, onSetMetadata, onReplace }: Props =
+    $props();
 
   let currentId = $state(untrack(() => selectedId));
   let index = $derived(
@@ -55,6 +60,19 @@
 
   function markFailed(): void {
     if (item) failedId = item.id;
+  }
+
+  let imageFile = $derived(kind === 'image' ? item?.file : undefined);
+  let croppable = $derived(imageFile ? isCroppable(imageFile) : Promise.resolve(false));
+
+  async function crop(): Promise<void> {
+    if (!item) return;
+    const { id, file } = item;
+    const cropped = await requestCrop(file, 'attachment');
+    if (cropped && cropped !== file) {
+      if (failedId === id) failedId = null;
+      onReplace(id, cropped);
+    }
   }
 
   let swipe: {
@@ -255,6 +273,18 @@
             <EyeSlashIcon aria-hidden="true" />
             {i18n.t('composer.spoiler')}
           </Button>
+          {#await croppable then canCrop}
+            {#if canCrop}
+              <Button
+                variant="ghost"
+                aria-label={i18n.t('composer.cropAttachment', { name: item.file.name })}
+                onclick={() => void crop()}
+              >
+                <CropIcon aria-hidden="true" />
+                {i18n.t('composer.crop')}
+              </Button>
+            {/if}
+          {/await}
           {#if kind === 'image' && canStrip(item.file)}
             <StagedImageOptions {item} {onSetMetadata}>
               {#snippet trigger({ props })}

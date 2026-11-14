@@ -3252,6 +3252,8 @@
     "imageOptions": "Options for {{name}}",
     "metadataGroup": "Metadata",
     "options": "Options",
+    "crop": "Crop",
+    "cropAttachment": "Crop {{name}}",
     "previewAttachment": "Preview {{name}}",
     "previewTitle": "Attachment preview",
     "previewUnavailable": "This file can’t be previewed here. It will still be sent.",
@@ -4287,6 +4289,20 @@
     "checkCodeLabel": "Two-digit number",
     "announceCheckCode": "Your number is {{code}}. Enter it on the other device.",
     "announceUserCode": "The other device shows {{code}}. Approve the sign-in there."
+  },
+  "crop": {
+    "titleAvatar": "Crop picture",
+    "titleBanner": "Crop banner",
+    "titleImage": "Crop image",
+    "stage": "Crop area. Drag or use the arrow keys to move the image, plus and minus to zoom, R to rotate.",
+    "zoom": "Zoom",
+    "rotate": "Rotate",
+    "aspect": "Aspect ratio",
+    "original": "Original",
+    "free": "Free",
+    "useOriginal": "Use original",
+    "unreadable": "This image can’t be cropped here.",
+    "failed": "The image couldn’t be cropped. Try again, or cancel."
   },
   "sounds": {
     "notification": "Notification",

@@ -25,6 +25,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { hexColorOrEmpty } from '#lib/ui/hex-color.js';
   import ColorSetting from '#lib/ui/ColorSetting.svelte';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
   import Select from '#lib/ui/primitives/Select.svelte';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
@@ -85,12 +86,13 @@
   async function pickAvatar(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
-    if (!file) return;
+    const cropped = file && (await requestCrop(file, 'avatar'));
+    if (!cropped) return;
 
     saving = true;
     error = null;
     try {
-      const { mime, bytes } = await uprightImageBytes(file);
+      const { mime, bytes } = await uprightImageBytes(cropped);
       avatarUrl = await core.media.uploadMedia(mime, bytes);
     } catch (cause) {
       console.warn('[sable personas] uploading the picture failed', cause);
@@ -131,12 +133,13 @@
   ): Promise<void> {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
-    if (!file) return;
+    const cropped = file && (await requestCrop(file, 'avatar'));
+    if (!cropped) return;
 
     saving = true;
     error = null;
     try {
-      const { mime, bytes } = await uprightImageBytes(file);
+      const { mime, bytes } = await uprightImageBytes(cropped);
       alternateAvatars[index].avatar_url = await core.media.uploadMedia(mime, bytes);
     } catch (cause) {
       console.warn('[sable personas] uploading the picture failed', cause);
@@ -149,12 +152,13 @@
   async function pickBanner(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
-    if (!file) return;
+    const cropped = file && (await requestCrop(file, 'banner'));
+    if (!cropped) return;
 
     saving = true;
     error = null;
     try {
-      const { mime, bytes } = await uprightImageBytes(file);
+      const { mime, bytes } = await uprightImageBytes(cropped);
       banner_url = await core.media.uploadMedia(mime, bytes);
     } catch (cause) {
       console.warn('[sable personas] uploading the picture failed', cause);

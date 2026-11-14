@@ -5,6 +5,7 @@ import { expect, test } from 'vitest';
 import {
   filesFrom,
   previewKind,
+  replaceFile,
   restoreFile,
   stageFiles,
   toggleSpoiler,
@@ -106,4 +107,18 @@ test('an undone removal puts the file back where it was, once', () => {
   const restored = restoreFile(without, removed, 1);
   expect(restored.map((item) => item.file.name)).toEqual(['a.png', 'b.png', 'c.png']);
   expect(restoreFile(restored, removed, 1)).toEqual(restored);
+});
+
+test('a cropped file replaces the staged one and keeps its options', () => {
+  let id = 0;
+  const staged = toggleSpoiler(
+    stageFiles([], [file('a.png'), file('b.png')], () => id++),
+    0
+  );
+  const cropped = file('a-cropped.png');
+
+  const replaced = replaceFile(staged, 0, cropped);
+  expect(replaced[0]).toEqual({ ...staged[0], file: cropped });
+  expect(replaced[1]).toBe(staged[1]);
+  expect(replaceFile(staged, 99, cropped)).toEqual(staged);
 });

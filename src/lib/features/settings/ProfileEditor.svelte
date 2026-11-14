@@ -31,6 +31,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { nativeFilePicker } from '#lib/platform/native-file-picker.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
   import '#lib/ui/primitives/settings-row.css';
   import './profile-editor.css';
@@ -224,10 +225,12 @@
   }
 
   async function stageBanner(file: File): Promise<void> {
+    const cropped = await requestCrop(file, 'banner');
+    if (!cropped) return;
     uploadingBanner = true;
     error = null;
     try {
-      const { mime, bytes } = await uprightImageBytes(file);
+      const { mime, bytes } = await uprightImageBytes(cropped);
       draft.banner = await core.media.uploadMedia(mime, bytes);
     } catch {
       error = t('settings.profileSaveFailed');
@@ -520,10 +523,11 @@
                 use:nativeFilePicker
                 type="file"
                 accept="image/*"
-                onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
+                onchange={async (event: Event & { currentTarget: HTMLInputElement }) => {
                   const file = event.currentTarget.files?.[0];
                   event.currentTarget.value = '';
-                  if (file) stageAvatar(file);
+                  const cropped = file && (await requestCrop(file, 'avatar'));
+                  if (cropped) stageAvatar(cropped);
                 }}
               />
               {i18n.t(hasAvatar ? 'common.changeAvatar' : 'settings.uploadAvatar')}

@@ -24,6 +24,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
   import '#lib/ui/primitives/settings-row.css';
@@ -183,9 +184,11 @@
     event.currentTarget.value = '';
     const target = roomId;
     if (!file || !target || !canEditAvatar) return;
+    const cropped = await requestCrop(file, 'avatar');
+    if (!cropped) return;
 
     await run(async () => {
-      const { mime, bytes } = await uprightImageBytes(file);
+      const { mime, bytes } = await uprightImageBytes(cropped);
       await core.uploadRoomAvatar(target, mime, bytes);
     });
   }
@@ -220,10 +223,12 @@
     event.currentTarget.value = '';
     const target = roomId;
     if (!file || !target || !canEditBanner) return;
+    const cropped = await requestCrop(file, 'banner');
+    if (!cropped) return;
 
     await run(async () => {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const uri = await core.media.uploadMedia(file.type || 'image/*', bytes);
+      const bytes = new Uint8Array(await cropped.arrayBuffer());
+      const uri = await core.media.uploadMedia(cropped.type || 'image/*', bytes);
       await setRoomBanner(core, target, uri);
     });
   }

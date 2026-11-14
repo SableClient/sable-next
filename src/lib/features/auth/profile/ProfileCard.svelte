@@ -7,6 +7,7 @@
   import { nativeFilePicker } from '#lib/platform/native-file-picker.js';
   import { MAX_DISPLAY_NAME_LENGTH, MAX_STATUS_TEXT_BYTES } from '#lib/profile/fields.js';
   import { MAX_PRONOUN_INPUT } from '#lib/profile/pronouns.js';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -95,8 +96,12 @@
             type="file"
             accept="image/*"
             aria-label={i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'settings.uploadAvatar')}
-            onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-              onAvatar(event.currentTarget.files?.[0] ?? null);
+            onchange={async (event: Event & { currentTarget: HTMLInputElement }) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              const cropped = file && (await requestCrop(file, 'avatar'));
+              if (file && !cropped) input.value = '';
+              else onAvatar(cropped ?? null);
             }}
           />
           {i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'settings.uploadAvatar')}
@@ -188,8 +193,12 @@
               type="file"
               accept="image/*"
               aria-label={i18n.t(bannerPreview ? 'common.changeBanner' : 'settings.saveBanner')}
-              onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-                onBanner(event.currentTarget.files?.[0] ?? null);
+              onchange={async (event: Event & { currentTarget: HTMLInputElement }) => {
+                const input = event.currentTarget;
+                const file = input.files?.[0];
+                const cropped = file && (await requestCrop(file, 'banner'));
+                if (file && !cropped) input.value = '';
+                else onBanner(cropped ?? null);
               }}
             />
             {i18n.t(bannerPreview ? 'common.changeBanner' : 'settings.saveBanner')}

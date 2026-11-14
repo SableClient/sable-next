@@ -14,6 +14,7 @@
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   interface Props {
@@ -67,10 +68,11 @@
   }
 
   async function pickAvatar(file: File | undefined): Promise<void> {
-    if (!file) return;
+    const cropped = file && (await requestCrop(file, 'avatar'));
+    if (!cropped) return;
     busy = true;
     try {
-      const upright = await uprightJpeg(file);
+      const upright = await uprightJpeg(cropped);
       if (sealed) {
         const scaled = await downscaledAvatar(upright);
         const { ciphertext, file: encrypted } = await encryptAttachment(

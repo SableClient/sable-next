@@ -27,6 +27,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import TimelineItem from '#lib/features/room/timeline/TimelineItem.svelte';
   import { previewMessage } from '#lib/features/room/timeline/preview-message.js';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
   import ColorSetting from '#lib/ui/ColorSetting.svelte';
   import { hexColorOrEmpty } from '#lib/ui/hex-color.js';
@@ -347,10 +348,11 @@
                 type="file"
                 accept="image/*"
                 disabled={loading}
-                onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
+                onchange={async (event: Event & { currentTarget: HTMLInputElement }) => {
                   const file = event.currentTarget.files?.[0];
                   event.currentTarget.value = '';
-                  if (file) setAvatar(file);
+                  const cropped = file && (await requestCrop(file, 'avatar'));
+                  if (cropped) setAvatar(cropped);
                 }}
               />
               {i18n.t('common.changePicture')}

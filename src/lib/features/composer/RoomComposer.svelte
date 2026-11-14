@@ -83,6 +83,7 @@
     previewKind,
     restoreFile,
     stageFiles,
+    replaceFile,
     setMetadata,
     toggleSpoiler,
     unstageFile,
@@ -1516,6 +1517,9 @@
             }}
             onSetMetadata={(id: number, metadata: ImageMetadata) => {
               staged = setMetadata(staged, id, metadata);
+            }}
+            onReplace={(id: number, file: File) => {
+              staged = replaceFile(staged, id, file);
             }}
           />
         {/if}

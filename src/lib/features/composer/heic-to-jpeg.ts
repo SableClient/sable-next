@@ -1,6 +1,5 @@
 import { imageMime } from '#lib/media-signatures.js';
-
-const MAX_CANVAS_PIXELS = 16_777_216;
+import { MAX_CANVAS_PIXELS } from '#lib/ui/canvas-limits.js';
 
 export async function isHeic(file: Blob): Promise<boolean> {
   const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());

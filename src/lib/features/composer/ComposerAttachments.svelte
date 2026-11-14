@@ -28,9 +28,17 @@
     onRemove: (id: number) => void;
     onToggleSpoiler: (id: number) => void;
     onSetMetadata: (id: number, metadata: ImageMetadata) => void;
+    onReplace: (id: number, file: File) => void;
   }
 
-  let { files, disabled = false, onRemove, onToggleSpoiler, onSetMetadata }: Props = $props();
+  let {
+    files,
+    disabled = false,
+    onRemove,
+    onToggleSpoiler,
+    onSetMetadata,
+    onReplace,
+  }: Props = $props();
 
   let viewing = $state<number | null>(null);
   let media = $derived(files.filter((item) => previewKind(item.file) !== null));
@@ -139,6 +147,7 @@
     {onRemove}
     {onToggleSpoiler}
     {onSetMetadata}
+    {onReplace}
   />
 {/if}
 

@@ -24,6 +24,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
   import { senderDisplayColors } from '../members/members';
@@ -187,12 +188,13 @@
     });
   }
 
-  function uploadAvatar(event: Event & { currentTarget: HTMLInputElement }): void {
+  async function uploadAvatar(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
-    if (!file) return;
+    const cropped = file && (await requestCrop(file, 'avatar'));
+    if (!cropped) return;
     void save('avatar', async (target) => {
-      const { mime, bytes } = await uprightImageBytes(file);
+      const { mime, bytes } = await uprightImageBytes(cropped);
       const uri = await core.media.uploadMedia(mime, bytes);
       await writeMember(target, { avatar_url: field(uri) });
       avatar = uri;

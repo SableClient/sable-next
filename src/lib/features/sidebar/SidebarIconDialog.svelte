@@ -5,6 +5,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
+  import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
 
   export interface IconTarget {
@@ -34,11 +35,12 @@
   }
 
   async function pick(file: File | undefined): Promise<void> {
-    if (!file) return;
+    const cropped = file && (await requestCrop(file, 'avatar'));
+    if (!cropped) return;
     busy = true;
     failed = false;
     try {
-      const { mime, bytes } = await uprightImageBytes(file);
+      const { mime, bytes } = await uprightImageBytes(cropped);
       icon = await core.media.uploadMedia(mime, bytes);
     } catch (error) {
       console.warn('[sable nav] icon upload failed', error);

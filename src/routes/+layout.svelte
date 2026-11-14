@@ -13,6 +13,7 @@
   import { createCoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+  import ImageCropHost from '#lib/ui/image-crop/ImageCropHost.svelte';
   import TitleBar from '#lib/ui/TitleBar.svelte';
   import SessionRestoreError from '#lib/ui/SessionRestoreError.svelte';
   import ModelLoadError from '#lib/ui/ModelLoadError.svelte';
@@ -281,5 +282,6 @@
     {:else}
       {@render children()}
     {/if}
+    <ImageCropHost />
   </TooltipProvider>
 </IconContext>

@@ -1,0 +1,1 @@
+export const MAX_CANVAS_PIXELS = 16_777_216;
