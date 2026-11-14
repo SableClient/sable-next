@@ -2,24 +2,6 @@ import { expect, test, SIGNED_OUT } from './fixtures/test';
 
 test.use({ storageState: SIGNED_OUT });
 
-const SECTIONS = [
-  'account',
-  'emotes',
-  'devices',
-  'privacy',
-  'personas',
-  'appearance',
-  'composer',
-  'keyboard',
-  'media',
-  'timeline',
-  'desktop',
-  'notifications',
-  'calls',
-  'developer',
-  'about',
-];
-
 for (const size of [{}, { pageZoom: 1.5, textScale: 1.5 }]) {
   test(`mobile: every settings section fits 375px without splitting words at ${JSON.stringify(size)}`, async ({
     page,
@@ -38,8 +20,20 @@ for (const size of [{}, { pageZoom: 1.5, textScale: 1.5 }]) {
 
     const escapes: Record<string, string[]> = {};
     const splitWords: Record<string, string[]> = {};
-    for (const section of SECTIONS) {
-      await page.goto(`/settings/${section}`);
+    // A reload per section makes WebKit report the left page's cancelled image loads
+    // as page errors, so this walks the sections a phone offers through the app.
+    await page.goto('/settings');
+    const links = page
+      .getByRole('navigation', { name: 'Settings sections' })
+      .locator('a[href^="/settings/"]');
+    await expect(links.first()).toBeVisible({ timeout: 30_000 });
+    const sections = await links.evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('href')?.split('/').at(-1) ?? '')
+    );
+    expect(sections.length).toBeGreaterThan(10);
+    for (const section of sections) {
+      await links.and(page.locator(`[href$="/settings/${section}"]`)).click();
+      await expect(page).toHaveURL(new RegExp(`/settings/${section}$`));
       await expect(page.locator('.settings-scroll')).toBeVisible({ timeout: 30_000 });
       await page.evaluate(() => document.fonts.ready);
       const found = await page.evaluate(() => {
@@ -73,6 +67,8 @@ for (const size of [{}, { pageZoom: 1.5, textScale: 1.5 }]) {
         })
       );
       if (split.length > 0) splitWords[section] = split;
+      await page.getByRole('button', { name: 'Back', exact: true }).click();
+      await expect(page).toHaveURL(/\/settings$/);
     }
     expect(splitWords).toEqual({});
     expect(escapes).toEqual({});
