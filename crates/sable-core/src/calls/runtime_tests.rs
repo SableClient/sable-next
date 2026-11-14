@@ -858,6 +858,39 @@ async fn refreshing_a_delayed_leave_cancels_the_old_event_and_respects_hangup() 
     assert_eq!(delay.lock().await.id.as_deref(), Some("new"));
 }
 
+#[tokio::test]
+async fn a_screen_share_update_after_hangup_does_not_republish_the_membership() {
+    use wiremock::matchers::{method, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let (server, _core, room) = delayed_leave_fixture().await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/rooms/.*/state/.*call\.member/.*"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({"event_id":"$member"})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let state = Mutex::new(State::new(
+        member(CallMode::Legacy, 1, &["https://focus.example.org"]),
+        Vec::new(),
+        super::StickyMemberships::default(),
+        &room.room_id().to_owned(),
+        false,
+        None,
+        false,
+    ));
+    let delay = super::super::DelayState::shared(None);
+    super::set_screen_sharing(&room, &state, &delay, true)
+        .await
+        .unwrap();
+    delay.lock().await.active = false;
+    super::set_screen_sharing(&room, &state, &delay, false)
+        .await
+        .unwrap();
+}
+
 async fn legacy_move_fixture(
     can_publish: bool,
 ) -> (

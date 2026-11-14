@@ -959,8 +959,14 @@ async fn follow_oldest_focus(
 pub(super) async fn set_screen_sharing(
     room: &Room,
     state: &Mutex<State>,
+    delay: &Mutex<super::DelayState>,
     active: bool,
 ) -> Result<(), matrix_sdk::Error> {
+    // Held across the publish, so a hangup cannot leave between the check and the republish.
+    let delay = delay.lock().await;
+    if !delay.active {
+        return Ok(());
+    }
     let (own, intent) = {
         let mut state = state.lock().await;
         if state.own.screen_sharing == active {

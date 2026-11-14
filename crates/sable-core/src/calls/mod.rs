@@ -979,13 +979,17 @@ impl Core {
         &self,
         SetScreenSharingParams { session, active }: SetScreenSharingParams,
     ) -> Result<(), RpcError> {
-        let (room_id, state) = {
+        let (room_id, state, delay) = {
             let calls = self.call_sessions.lock().await;
             let call = calls.get(&session).ok_or(RpcCode::UnknownCall)?;
-            (call.room_id.clone(), call.state.clone())
+            (
+                call.room_id.clone(),
+                call.state.clone(),
+                call.delay_id.clone(),
+            )
         };
         let room = self.room(&room_id).await?;
-        runtime::set_screen_sharing(&room, &state, active)
+        runtime::set_screen_sharing(&room, &state, &delay, active)
             .await
             .or_failed(self, "set_call_screen_sharing")?;
         Ok(())
