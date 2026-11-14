@@ -6,6 +6,7 @@ import type { NotificationModeView, RoomListItemView } from '#src/generated/prot
 
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { expectNoA11yViolations, ICONS_HIDDEN_BY_LAYOUT } from '#lib/test-support/a11y.js';
+import { visit } from '#lib/test-support/app-state.js';
 import { roomView } from '#lib/test-support/room-views.js';
 
 const roomsFixture = vi.hoisted(() => {
@@ -58,6 +59,7 @@ import { core } from '#lib/core/__mocks__/context.js';
 import RoomNavHarness from './RoomNavHarness.test.svelte';
 
 afterEach(async () => {
+  visit('/');
   roomsFixture.rooms = [];
   await page.viewport(414, 800);
 });
@@ -171,4 +173,146 @@ test('the list options menu renders its checkable items (#1341)', async () => {
     .element(screen.getByRole('menuitemradio', { name: 'Recent activity' }))
     .toBeVisible();
   await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
+});
+
+test('a long room list mounts only the rows near the viewport and follows the scroll', async () => {
+  roomsFixture.rooms = Array.from({ length: 1000 }, (_, index) =>
+    room({ room_id: `!r${index}:example.org`, name: `Room ${index}`, is_direct: true })
+  );
+  await mountNav();
+  const scroller = document.querySelector<HTMLElement>('.room-nav-content');
+  if (!scroller) throw new Error('the room list scroller is not rendered');
+  scroller.closest<HTMLElement>('.room-nav')?.style.setProperty('height', '400px');
+  const rows = () => document.querySelectorAll('.room-list .room-row-wrap');
+
+  await expect.poll(() => rows().length).toBeGreaterThan(0);
+  expect(rows().length).toBeLessThan(100);
+  expect(document.querySelector('[aria-posinset="1"]')?.getAttribute('aria-setsize')).toBe('1000');
+  expect(document.body.textContent).not.toContain('Room 900');
+
+  scroller.scrollTop = scroller.scrollHeight;
+  await expect.poll(() => document.body.textContent).toContain('Room 999');
+  expect(rows().length).toBeLessThan(100);
+  expect(document.body.textContent).not.toContain('Room 5 ');
+});
+
+test('End moves focus to the last room of a windowed list', async () => {
+  roomsFixture.rooms = Array.from({ length: 1000 }, (_, index) =>
+    room({ room_id: `!r${index}:example.org`, name: `Room ${index}`, is_direct: true })
+  );
+  await mountNav();
+  const scroller = document.querySelector<HTMLElement>('.room-nav-content');
+  if (!scroller) throw new Error('the room list scroller is not rendered');
+  scroller.closest<HTMLElement>('.room-nav')?.style.setProperty('height', '400px');
+  await expect.poll(() => document.querySelector('.room-row')).not.toBeNull();
+
+  document.querySelector<HTMLElement>('.room-row')?.focus();
+  await userEvent.keyboard('{End}');
+
+  await expect.poll(() => document.activeElement?.getAttribute('aria-posinset')).toBe('1000');
+});
+
+function directRooms(
+  count: number,
+  overrides: (index: number) => Partial<RoomListItemView> = () => ({})
+) {
+  roomsFixture.rooms = Array.from({ length: count }, (_, index) =>
+    room({
+      room_id: `!r${String(index)}:example.org`,
+      name: `Room ${String(index)}`,
+      is_direct: true,
+      ...overrides(index),
+    })
+  );
+}
+
+async function mountShortNav() {
+  await mountNav();
+  const scroller = document.querySelector<HTMLElement>('.room-nav-content');
+  if (!scroller) throw new Error('the room list scroller is not rendered');
+  scroller.closest<HTMLElement>('.room-nav')?.style.setProperty('height', '400px');
+  await expect.poll(() => document.querySelector('.room-row')).not.toBeNull();
+  return scroller;
+}
+
+const rowTop = (name: string) => {
+  const node = [...document.querySelectorAll<HTMLElement>('.room-row-wrap')].find((candidate) =>
+    candidate.textContent.includes(name)
+  );
+  return node?.getBoundingClientRect().top;
+};
+
+const settle = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+
+test('a tall row leaving the window keeps the scroll height and the rows below in place', async () => {
+  directRooms(1000, (index) =>
+    index === 3
+      ? {
+          room_kind: 'voice',
+          call_participants: Array.from({ length: 8 }, (_, at) => `@p${String(at)}:example.org`),
+        }
+      : {}
+  );
+  const scroller = await mountShortNav();
+  await expect
+    .poll(() => document.querySelector('.call-participants, [class*="participant"]'))
+    .not.toBeNull();
+  await settle();
+  const height = scroller.scrollHeight;
+
+  scroller.scrollTop = 40 * 36;
+  await expect.poll(() => rowTop('Room 3 ')).toBeUndefined();
+  scroller.scrollTop = 0;
+  await expect.poll(() => rowTop('Room 3 ')).toBeDefined();
+  await settle();
+  expect(scroller.scrollHeight).toBe(height);
+
+  scroller.scrollTop = 600;
+  await settle();
+  const before = rowTop('Room 30');
+  const total = scroller.scrollHeight;
+  scroller.scrollTop = 600 + 40 * 36;
+  await settle();
+  scroller.scrollTop = 600;
+  await settle();
+  expect(scroller.scrollHeight).toBe(total);
+  expect(rowTop('Room 30')).toBe(before);
+});
+
+test('arrow keys walk past the initial window and back without losing focus', async () => {
+  directRooms(1000);
+  await mountShortNav();
+  const rows = () => [...document.querySelectorAll<HTMLElement>('.room-row')];
+  rows()[0].focus();
+
+  for (let step = 0; step < 60; step++) {
+    await userEvent.keyboard('{ArrowDown}');
+    await expect
+      .poll(() => document.activeElement?.getAttribute('aria-posinset'))
+      .toBe(String(step + 2));
+  }
+  expect(document.activeElement?.textContent).toContain('Room 60');
+
+  for (let step = 0; step < 60; step++) await userEvent.keyboard('{ArrowUp}');
+  await expect.poll(() => document.activeElement?.getAttribute('aria-posinset')).toBe('1');
+});
+
+test('navigating to a room far down the list scrolls it into view', async () => {
+  directRooms(1000);
+  visit(`/direct/${encodeURIComponent('!r700:example.org')}`);
+  const scroller = await mountShortNav();
+
+  await expect.poll(() => document.querySelector('[aria-current="page"]')).not.toBeNull();
+  await settle();
+  const active = document.querySelector('[aria-current="page"]');
+  const box = active?.getBoundingClientRect();
+  const view = scroller.getBoundingClientRect();
+  expect(box && box.top >= view.top && box.bottom <= view.bottom).toBe(true);
 });
