@@ -1,7 +1,13 @@
 {
-  "v2.3.9": {
+  "upcoming": {
     "added": [
       "voiceParticipantPlacement",
+      "linkMscReferences"
+    ],
+    "changed": []
+  },
+  "v2.3.9": {
+    "added": [
       "showBridgeBadges",
       "messagePreviews",
       "showAlertZoo",
