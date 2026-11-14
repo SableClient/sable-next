@@ -255,17 +255,10 @@ impl RoomListWorker {
                 }
                 change = state_changes.recv() => {
                     let Some(change) = change else { break; };
-                    let mut rooms = HashSet::new();
-                    let mut spaces = HashSet::new();
-                    let mut members = HashSet::new();
-                    for change in std::iter::once(change).chain(std::iter::from_fn(|| state_changes.try_recv().ok())) {
-                        match change {
-                            ParentStateChange::Room(id) => { rooms.insert(id); }
-                            ParentStateChange::Space(id) => { spaces.insert(id); }
-                            ParentStateChange::Member(id, user) => { members.insert((id, user)); }
-                        }
-                    }
-                    self.refresh_changed_parents(&rooms, &spaces, &members).await;
+                    let changes = std::iter::once(change)
+                        .chain(std::iter::from_fn(|| state_changes.try_recv().ok()))
+                        .collect();
+                    self.on_parent_state_changes(changes).await;
                     self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parents.links)
                 }
                 room_id = avatar_overrides.recv() => {
@@ -336,6 +329,27 @@ impl RoomListWorker {
 
     async fn load_dm_spaces(&self) -> DmSpaceLinks {
         crate::account_documents::synced_dm_spaces(&self.client).await
+    }
+
+    async fn on_parent_state_changes(&mut self, changes: Vec<ParentStateChange>) {
+        let mut rooms = HashSet::new();
+        let mut spaces = HashSet::new();
+        let mut members = HashSet::new();
+        for change in changes {
+            match change {
+                ParentStateChange::Room(id) => {
+                    rooms.insert(id);
+                }
+                ParentStateChange::Space(id) => {
+                    spaces.insert(id);
+                }
+                ParentStateChange::Member(id, user) => {
+                    members.insert((id, user));
+                }
+            }
+        }
+        self.refresh_changed_parents(&rooms, &spaces, &members)
+            .await;
     }
 
     async fn refresh_changed_parents(
