@@ -342,22 +342,24 @@ pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeRep
     transaction_id: JString<'frame>,
     event_id: JString<'frame>,
     private_receipt: jni::sys::jboolean,
-) -> jni::sys::jboolean {
-    let result = unowned_env.with_env(|_: &mut Env<'frame>| -> Result<_, jni::errors::Error> {
+) -> JString<'frame> {
+    let result = unowned_env.with_env(|env: &mut Env<'frame>| -> Result<_, jni::errors::Error> {
         let args = ColdArgs::new(&store_dir, &user_id, &device_id, &room_id);
         let (text, transaction_id, event_id) = (
             text.to_string(),
             transaction_id.to_string(),
             event_id.to_string(),
         );
-        Ok(args.run(Duration::from_secs(20), false, async {
-            let Some(session) = args.session().await else {
-                return false;
-            };
-            session
+        let sent = args.run(Duration::from_secs(20), None, async {
+            args.session()
+                .await?
                 .reply(&text, &transaction_id, &event_id, private_receipt)
                 .await
-        }))
+        });
+        match sent {
+            Some(sent) => JString::from_str(env, sent),
+            None => Ok(JString::null()),
+        }
     });
     result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
 }

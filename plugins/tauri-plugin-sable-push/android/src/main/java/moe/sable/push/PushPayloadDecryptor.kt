@@ -168,7 +168,7 @@ internal object PushPayloadDecryptor {
         transactionId: String,
         eventId: String,
         privateReceipt: Boolean,
-    ): Boolean
+    ): String?
 
     private external fun nativeMarkRead(
         storeDir: String,
@@ -179,13 +179,16 @@ internal object PushPayloadDecryptor {
         privateReceipt: Boolean,
     ): Boolean
 
-    fun reply(context: Context, action: ConversationAction, deviceId: String, privateReceipt: Boolean): Boolean =
-        available(context) && runCatching {
+    /** The body that was sent, without a profile shorthand, or null when nothing was sent. */
+    fun reply(context: Context, action: ConversationAction, deviceId: String, privateReceipt: Boolean): String? {
+        if (!available(context)) return null
+        return runCatching {
             nativeReply(
                 context.dataDir.absolutePath, action.userId, deviceId, action.roomId,
                 action.text.orEmpty(), action.id, action.eventId, privateReceipt,
             )
-        }.onFailure { Log.i(TAG, "Reply not sent: ${it.message}") }.getOrDefault(false)
+        }.onFailure { Log.i(TAG, "Reply not sent: ${it.message}") }.getOrNull()
+    }
 
     fun markRead(context: Context, action: ConversationAction, deviceId: String, privateReceipt: Boolean): Boolean =
         available(context) && runCatching {

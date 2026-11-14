@@ -1668,11 +1668,13 @@ async fn a_notification_reply_sends_the_text_then_reads_the_main_timeline() {
             .mount()
             .await;
 
-        assert!(
+        assert_eq!(
             session(&fixture)
                 .await
-                .reply("on my way", "reply-1", "$notified", false,)
-                .await,
+                .reply("on my way", "reply-1", "$notified", false)
+                .await
+                .as_deref(),
+            Some("on my way"),
             "selected={selected}"
         );
 

@@ -94,13 +94,16 @@ class ConversationActionWorker(context: Context, parameters: WorkerParameters) :
             ?: return Result.failure()
         val policy = PushPolicy(applicationContext)
         val deviceId = policy.deviceIdFor(action.userId)
-        val done = deviceId != null && when (action.kind) {
-            PushActions.REPLY -> PushPayloadDecryptor.reply(applicationContext, action, deviceId, policy.privateReceipts)
-            else -> PushPayloadDecryptor.markRead(applicationContext, action, deviceId, policy.privateReceipts)
+        val sent = deviceId?.takeIf { action.kind == PushActions.REPLY }
+            ?.let { PushPayloadDecryptor.reply(applicationContext, action, it, policy.privateReceipts) }
+        val done = when (action.kind) {
+            PushActions.REPLY -> sent != null
+            else -> deviceId != null &&
+                PushPayloadDecryptor.markRead(applicationContext, action, deviceId, policy.privateReceipts)
         }
         // The reply's spinner shows until the notification is re-posted, so only receipts retry.
         if (!done && action.kind == PushActions.MARK_READ && runAttemptCount < MAX_RETRIES) return Result.retry()
-        action.text?.let { PushNotifier.showReply(applicationContext, action.notificationId, it, done) }
+        (sent ?: action.text)?.let { PushNotifier.showReply(applicationContext, action.notificationId, it, done) }
         file.delete()
         return if (done) Result.success() else Result.failure()
     }

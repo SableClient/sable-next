@@ -133,12 +133,12 @@ class ConversationActionsTest {
         PushPolicy(context).privateReceipts = true
         mockkObject(PushPayloadDecryptor)
         val sent = slot<ConversationAction>()
-        every { PushPayloadDecryptor.reply(any(), capture(sent), "A", true) } returns true
+        every { PushPayloadDecryptor.reply(any(), capture(sent), "A", true) } returns "on my way"
 
-        ConversationActionReceiver().onReceive(context, actionIntent(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, "on my way"))
+        ConversationActionReceiver().onReceive(context, actionIntent(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, "k: on my way"))
 
         assertEquals(Result.success(), runQueued())
-        assertEquals("on my way", sent.captured.text)
+        assertEquals("k: on my way", sent.captured.text)
         assertEquals("\$notified", sent.captured.eventId)
         assertEquals(listOf("hello", "on my way"), texts())
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted())!!
@@ -152,7 +152,7 @@ class ConversationActionsTest {
         post()
         PushPolicy(context).accounts = mapOf(user to "A")
         mockkObject(PushPayloadDecryptor)
-        every { PushPayloadDecryptor.reply(any(), any(), any(), any()) } returns false
+        every { PushPayloadDecryptor.reply(any(), any(), any(), any()) } returns null
 
         ConversationActionReceiver().onReceive(context, actionIntent(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, "on my way"))
 

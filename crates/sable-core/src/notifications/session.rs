@@ -331,18 +331,17 @@ impl PushSession {
         }
     }
 
-    /// Sends `text` to the room, then marks `event_id` read. Retrying with the same
-    /// `transaction_id` never sends it twice.
+    /// Sends `text` to the room, then marks `event_id` read, and returns the body that was
+    /// sent, which drops a profile shorthand. Retrying with the same `transaction_id` never
+    /// sends it twice.
     pub async fn reply(
         &self,
         text: &str,
         transaction_id: &str,
         event_id: &str,
         private_receipt: bool,
-    ) -> bool {
-        let Some(room) = self.host.client().get_room(&self.room_id) else {
-            return false;
-        };
+    ) -> Option<String> {
+        let room = self.host.client().get_room(&self.room_id)?;
         let (text, profile) = match self
             .host
             .retry(|| crate::personas::notification_reply(self.host.client(), &self.room_id, text))
@@ -351,19 +350,17 @@ impl PushSession {
             Ok(reply) => reply,
             Err(error) => {
                 tracing::warn!("notification reply profile unavailable: {error}");
-                return false;
+                return None;
             }
         };
         let content = crate::outgoing::message_content(
-            text,
+            text.clone(),
             None,
             crate::protocol::MessageKind::Text,
             Vec::new(),
             false,
         );
-        let Ok(mut content) = serde_json::to_value(content) else {
-            return false;
-        };
+        let mut content = serde_json::to_value(content).ok()?;
         if let Some(profile) = profile.as_ref() {
             crate::personas::stamp_profile(&mut content, profile);
         }
@@ -378,10 +375,10 @@ impl PushSession {
             .await;
         if let Err(error) = sent {
             tracing::warn!("notification reply not sent: {error}");
-            return false;
+            return None;
         }
         self.mark_read(event_id, private_receipt).await;
-        true
+        Some(text)
     }
 
     /// In the event's thread, or the main timeline, as the app's timelines would.
