@@ -3839,6 +3839,7 @@
     "errorNoFocus": "No call server is configured for this room.",
     "errorE2eeUnsupported": "Encrypted calls are not supported on this device.",
     "errorE2eeFailed": "Could not set up call encryption.",
+    "errorLocalNetworkBlocked": "Your browser is blocking {{appName}} from reaching the call server on your local network. Allow local network access for this site in the browser’s site settings.",
     "errorSetupFailed": "Could not connect to the call.",
     "lobbyEmpty": "Voice chat’s empty - be the first to hop in!",
     "lobbyNoPermission": "You don’t have permission to join.",

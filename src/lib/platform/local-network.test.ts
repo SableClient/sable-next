@@ -4,8 +4,11 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 
 import {
   browserGatesCoreNetwork,
+  isLocalNetworkHost,
+  LocalNetworkBlockedError,
   localNetworkDenied,
   requestAndroidLocalNetwork,
+  withLocalNetworkAccess,
 } from './local-network';
 
 const android = vi.hoisted(() => ({ value: true }));
@@ -62,4 +65,56 @@ test('a refusal or another platform leaves access blocked', async () => {
   vi.mocked(invoke).mockClear();
   expect(await requestAndroidLocalNetwork()).toBe(false);
   expect(invoke).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['192.168.1.20', true],
+  ['10.0.0.5', true],
+  ['172.16.0.1', true],
+  ['172.32.0.1', false],
+  ['127.0.0.1', true],
+  ['169.254.1.1', true],
+  ['[::1]', true],
+  ['[fd00::1]', true],
+  ['localhost', true],
+  ['sfu.local', true],
+  ['sfu.example.org', false],
+  ['8.8.8.8', false],
+])('%s is local network: %s', (host, expected) => {
+  expect(isLocalNetworkHost(host)).toBe(expected);
+});
+
+test('a failed connect to a private call server probes the origin and retries once when granted', async () => {
+  const fetchMock = vi.fn().mockResolvedValue({});
+  vi.stubGlobal('fetch', fetchMock);
+  const connect = vi.fn().mockRejectedValueOnce(new Error('connect')).mockResolvedValue(undefined);
+
+  await withLocalNetworkAccess('wss://192.168.1.20:7880', connect);
+
+  expect(fetchMock).toHaveBeenCalledWith(new URL('https://192.168.1.20:7880'), {
+    mode: 'no-cors',
+  });
+  expect(connect).toHaveBeenCalledTimes(2);
+});
+
+test('a private call server that stays blocked reports the local network', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('blocked')));
+  android.value = false;
+  const connect = vi.fn().mockRejectedValue(new Error('connect'));
+
+  await expect(withLocalNetworkAccess('wss://sfu.local', connect)).rejects.toEqual(
+    new LocalNetworkBlockedError('sfu.local')
+  );
+  expect(connect).toHaveBeenCalledOnce();
+});
+
+test('a public call server is never probed', async () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+  const failure = new Error('connect');
+  const connect = vi.fn().mockRejectedValue(failure);
+
+  await expect(withLocalNetworkAccess('wss://sfu.example.org', connect)).rejects.toBe(failure);
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(connect).toHaveBeenCalledOnce();
 });

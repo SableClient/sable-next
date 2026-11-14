@@ -28,7 +28,14 @@ test('a failed call says so', () => {
 
 test('every failure has its own message', () => {
   const keys = (
-    ['busy', 'no-focus', 'e2ee-unsupported', 'e2ee-failed', 'setup-failed'] as const
+    [
+      'busy',
+      'no-focus',
+      'e2ee-unsupported',
+      'e2ee-failed',
+      'local-network-blocked',
+      'setup-failed',
+    ] as const
   ).map(callFailureKey);
 
   expect(new Set(keys).size).toBe(keys.length);

@@ -15,6 +15,7 @@ const failureKeys: Record<CallFailure, string> = {
   'no-focus': 'call.errorNoFocus',
   'e2ee-unsupported': 'call.errorE2eeUnsupported',
   'e2ee-failed': 'call.errorE2eeFailed',
+  'local-network-blocked': 'call.errorLocalNetworkBlocked',
   'setup-failed': 'call.errorSetupFailed',
 };
 

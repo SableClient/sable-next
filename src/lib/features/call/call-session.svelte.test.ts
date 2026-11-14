@@ -278,6 +278,22 @@ test('a call tears down after a successful join reports disconnected', async () 
   expect(retry.lifecycle).toBe('active');
 });
 
+test('a call server blocked by the local network fails with its own message', async () => {
+  const { client, transport } = harness();
+  vi.mocked(client.rpc.calls.join).mockResolvedValueOnce({
+    ...(await client.rpc.calls.join({} as never)),
+    url: 'wss://192.168.1.20:7880',
+  });
+  transport.connect = vi.fn(() => Promise.reject(new Error('connect')));
+  globalThis.fetch = vi.fn<() => Promise<Response>>().mockRejectedValue(new TypeError('blocked'));
+  const session = new CallSession(client, { createTransport: () => transport });
+
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  expect(session.failure).toBe('local-network-blocked');
+  expect(transport.connect).toHaveBeenCalledOnce();
+});
+
 test('a connect promise does not make the session active while transport is still connecting', async () => {
   const { client, transport, emitTransportState } = harness();
   const session = new CallSession(client, { createTransport: () => transport });
