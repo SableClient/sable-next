@@ -2568,7 +2568,7 @@
     "richPushPayloads": "Include message text in push",
     "richPushPayloadsHint": "The push gateway can read message text from unencrypted rooms.",
     "highlightMentions": "Highlight mentions",
-    "faviconForMentionsOnly": "Tab badge for mentions and keywords",
+    "faviconForMentionsOnly": "Tab badge only for mentions and keywords",
     "clearNotificationsOnRead": "Clear alerts when read",
     "callsTitle": "Voice & video",
     "callServiceTitle": "Call service",
