@@ -25,7 +25,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   cargoDeps = rustPlatform.fetchCargoVendor {
     inherit (finalAttrs) src;
-    hash = "sha256-wb9vBqdbXCPjmVJ1MY4wNPE4BeWNLpOyhaLAVKCwHWc=";
+    hash = "sha256-hAvxB8bBZ9BHAV9NmgIcpgwT8qsv9DSrG6RaXC+mv8I=";
   };
 
   pnpmDeps = fetchPnpmDeps {
