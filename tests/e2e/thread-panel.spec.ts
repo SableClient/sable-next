@@ -205,6 +205,8 @@ for (const context of ['desktop', 'mobile'] as const) {
       if (surface === 'forum') await page.goto('/rooms/!room%3Aexample.test');
       else await app.openRoom('!room:example.test');
       const parent = page.locator(surface === 'forum' ? '.forum-main' : '.room-view > .timeline');
+      if (surface === 'forum')
+        await parent.getByRole('button', { name: en.forum.newThread }).click();
       const editor = parent.locator('[contenteditable="true"]').first();
       await expect(editor).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
@@ -311,6 +313,8 @@ for (const context of ['desktop', 'mobile'] as const) {
       else await app.openRoom('!room:example.test');
       const parent = page.locator(surface === 'forum' ? '.forum-main' : '.room-view > .timeline');
       if (surface === 'room') await page.locator('.room-view .members-button').click();
+      if (surface === 'forum')
+        await parent.getByRole('button', { name: en.forum.newThread }).click();
       await expect(parent.locator('[contenteditable="true"]').first()).toBeVisible();
       await core.emitTimelineDiff(await core.subscription(), [
         {

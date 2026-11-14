@@ -23,6 +23,8 @@ for (const surface of ['room', 'forum'] as const) {
       else await app.openRoom('!room:example.test');
 
       const parent = page.locator(surface === 'forum' ? '.forum-main' : '.room-view > .timeline');
+      if (surface === 'forum')
+        await parent.getByRole('button', { name: en.forum.newThread }).click();
       await expect(parent.locator('[contenteditable="true"]').first()).toBeVisible({
         timeout: 45_000,
       });

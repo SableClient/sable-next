@@ -1,9 +1,28 @@
 import type {
+  GalleryItemView,
   ReactionGroup,
   TimelineItemContentView,
   TimelineItemView,
 } from '#src/generated/protocol';
 import { isMediaCaptionContent } from '#lib/features/room/messages/media-caption.js';
+
+export type ForumSort = 'active' | 'created' | 'votes';
+export type ForumLayout = 'list' | 'gallery';
+
+export interface ForumView {
+  sort: ForumSort;
+  layout: ForumLayout;
+}
+
+export interface ForumThumbnail {
+  source: string;
+  thumbnail: string | null;
+  width: number | null;
+  height: number | null;
+  blurhash: string | null;
+  video: boolean;
+  spoiler: boolean;
+}
 
 export interface ForumThread {
   id: string;
@@ -19,6 +38,7 @@ export interface ForumThread {
   mediaCaption: boolean;
   createdAt: number;
   preview: string;
+  thumbnail: ForumThumbnail | null;
   replyCount: number;
   lastActivityAt: number;
   lastBody: string | null;
@@ -29,6 +49,8 @@ export interface ForumThread {
   ownVote: string | null;
   resolved: boolean;
 }
+
+export const MAX_PINNED = 3;
 
 export const VOTE = '👍';
 const RESOLVED = '✅';
@@ -57,6 +79,30 @@ function htmlOf(content: TimelineItemContentView): string | null {
   if (content.kind === 'message') return content.html;
   if (isMediaCaptionContent(content)) return content.html;
   return null;
+}
+
+type Visual = Extract<TimelineItemContentView | GalleryItemView, { kind: 'image' | 'video' }>;
+
+function thumbnailOf(content: TimelineItemContentView): ForumThumbnail | null {
+  const visual: Visual | undefined =
+    content.kind === 'gallery'
+      ? content.items.find((item) => item.kind === 'image' || item.kind === 'video')
+      : content.kind === 'image' || content.kind === 'video'
+        ? content
+        : undefined;
+  if (!visual) return null;
+  const video = visual.kind === 'video';
+  const source = video ? visual.thumbnail : visual.source;
+  if (source === null) return null;
+  return {
+    source,
+    thumbnail: video ? null : visual.thumbnail,
+    width: visual.width,
+    height: visual.height,
+    blurhash: visual.blurhash,
+    video,
+    spoiler: visual.spoiler !== null,
+  };
 }
 
 function isPost(item: TimelineItemView): boolean {
@@ -90,7 +136,9 @@ function isResolved(reactions: readonly ReactionGroup[], author: string | null):
   );
 }
 
-export function sortByVotes(threads: readonly ForumThread[]): ForumThread[] {
+export function sortThreads(threads: readonly ForumThread[], sort: ForumSort): ForumThread[] {
+  if (sort === 'active') return threads.slice();
+  if (sort === 'created') return threads.slice().sort((a, b) => b.createdAt - a.createdAt);
   return threads
     .slice()
     .sort(
@@ -99,6 +147,16 @@ export function sortByVotes(threads: readonly ForumThread[]): ForumThread[] {
         b.votes - a.votes ||
         b.lastActivityAt - a.lastActivityAt
     );
+}
+
+export function filterThreads(threads: readonly ForumThread[], query: string): ForumThread[] {
+  const needle = query.trim().toLowerCase();
+  if (needle === '') return threads.slice();
+  return threads.filter((thread) =>
+    [thread.title, thread.preview, thread.senderName].some((text) =>
+      text?.toLowerCase().includes(needle)
+    )
+  );
 }
 
 function isUnread(latest: TimelineItemView, currentUserId: string | null): boolean {
@@ -147,7 +205,7 @@ export function collectForumThreads(
       eventId: rootId,
       title: root.forum_title,
       sender: root.sender,
-      senderName: root.sender_name,
+      senderName: root.per_message_profile?.display_name ?? root.sender_name,
       senderAvatar: root.sender_avatar,
       isOwn: root.is_own,
       editable:
@@ -156,6 +214,7 @@ export function collectForumThreads(
       mediaCaption: isMediaCaptionContent(root.content),
       createdAt: root.timestamp,
       preview: bodyOf(root.content),
+      thumbnail: thumbnailOf(root.content),
       replyCount: root.thread_summary?.num_replies ?? 0,
       lastActivityAt: latest.timestamp,
       lastBody:

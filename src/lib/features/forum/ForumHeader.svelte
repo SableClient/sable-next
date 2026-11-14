@@ -2,7 +2,6 @@
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
-  import ThumbsUpIcon from 'phosphor-svelte/lib/ThumbsUpIcon';
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -16,20 +15,9 @@
     onBack: () => void;
     onSearch: () => void;
     onEventTimeline?: () => void;
-    sortByVotes: boolean;
-    onSortByVotes: (sortByVotes: boolean) => void;
   }
 
-  let {
-    roomId,
-    roomName,
-    roomAvatar,
-    onBack,
-    onSearch,
-    onEventTimeline,
-    sortByVotes,
-    onSortByVotes,
-  }: Props = $props();
+  let { roomId, roomName, roomAvatar, onBack, onSearch, onEventTimeline }: Props = $props();
 </script>
 
 <PanelHeader class="forum-header" title={roomName} titleSize="h1">
@@ -45,13 +33,6 @@
         <ListBulletsIcon />
       </PanelHeaderButton>
     {/if}
-    <PanelHeaderButton
-      label={i18n.t('forum.sortByVotes')}
-      aria-pressed={sortByVotes}
-      onclick={() => onSortByVotes(!sortByVotes)}
-    >
-      <ThumbsUpIcon />
-    </PanelHeaderButton>
     <PanelHeaderButton
       class="search-button"
       label={i18n.t('common.searchMessages')}

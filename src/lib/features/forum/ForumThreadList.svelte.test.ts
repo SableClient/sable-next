@@ -23,3 +23,30 @@ test('a failed empty forum offers recovery', async () => {
   await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }));
   expect(retry).toHaveBeenCalledOnce();
 });
+
+const base = {
+  threads: [],
+  loading: false,
+  canLoadMore: false,
+  onOpen: vi.fn(),
+  canDelete: () => false,
+  onDelete: vi.fn(),
+  roomId: '!forum:example.org',
+  onCopyLink: vi.fn(),
+  onLoadMore: vi.fn(),
+};
+
+test('an empty forum offers to start its first thread', async () => {
+  const create = vi.fn();
+  render(ForumThreadList, { ...base, onCreate: create });
+  expect(screen.getByText('No threads yet.')).toBeVisible();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'New thread' }));
+  expect(create).toHaveBeenCalledOnce();
+});
+
+test('a search that misses says so only once every thread is loaded', async () => {
+  const { rerender } = render(ForumThreadList, { ...base, filtered: true, canLoadMore: true });
+  expect(screen.queryByText('No threads match your search.')).not.toBeInTheDocument();
+  await rerender({ canLoadMore: false });
+  expect(screen.getByText('No threads match your search.')).toBeVisible();
+});

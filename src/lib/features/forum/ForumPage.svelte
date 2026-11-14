@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
   import PageTitle from '#lib/ui/primitives/PageTitle.svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import type { RoomPermissionsView } from '#src/generated/protocol';
@@ -12,6 +13,10 @@
   import ConversationComposer from '#lib/features/room/conversation/ConversationComposer.svelte';
   import ThreadView from '#lib/features/room/conversation/ThreadView.svelte';
   import { Conversation } from '#lib/features/room/conversation/conversation.svelte.js';
+  import {
+    provideRoomMediaPreviews,
+    RoomMediaPreviews,
+  } from '#lib/features/room/media/room-media-previews.svelte.js';
   import { donateSentMessage } from '#lib/features/share/donate-sent-message.js';
   import {
     PinnedEvents,
@@ -36,16 +41,20 @@
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { readText, writeText } from '#lib/platform/local-json.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
-  import { sortByVotes } from './forum-threads';
+  import { filterThreads, MAX_PINNED, sortThreads, type ForumView } from './forum-threads';
   import { ForumThreads } from './forum-threads.svelte.js';
   import ForumHeader from './ForumHeader.svelte';
   import ForumThreadList from './ForumThreadList.svelte';
+  import ForumToolbar from './ForumToolbar.svelte';
 
+  const LAYOUT_KEY = 'sable-forum-layout';
   const AUTO_FILL_ROUNDS = 10;
   const FORUM_TITLE_MAX = 150;
 
@@ -64,6 +73,9 @@
   const memberLoader = new RoomMemberLoader();
   const pinnedEvents = new PinnedEvents(core.rpc.timeline);
   providePinnedEvents(pinnedEvents);
+  const mediaPreviews = provideRoomMediaPreviews(
+    new RoomMediaPreviews(() => resolvedRoom?.join_rule ?? null)
+  );
 
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
@@ -85,8 +97,15 @@
     return null;
   });
   let autoFills = 0;
-  let votesFirst = $state(false);
-  let threads = $derived(votesFirst ? sortByVotes(forumThreads.threads) : forumThreads.threads);
+  let view = $state.raw<ForumView>({
+    sort: 'active',
+    layout: readText(LAYOUT_KEY) === 'gallery' ? 'gallery' : 'list',
+  });
+  let query = $state('');
+  let composing = $state(false);
+  let composeArea = $state<HTMLElement>();
+  let threads = $derived(sortThreads(filterThreads(forumThreads.threads, query), view.sort));
+  let canPost = $derived(permissions?.can_post ?? true);
 
   const conversation = new Conversation({
     core,
@@ -96,8 +115,12 @@
     spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
     publicRoom: () => resolvedRoom?.join_rule === 'public',
-    afterSend: (id) => donateSentMessage(core, roomList.byId(id)),
+    afterSend: (id) => {
+      composing = false;
+      donateSentMessage(core, roomList.byId(id));
+    },
   });
+  let composerOpen = $derived(canPost && (composing || conversation.context !== null));
 
   $effect(() => {
     autoFills = 0;
@@ -125,6 +148,10 @@
 
   $effect(() => {
     void pinnedEvents.load(resolvedRoomId);
+  });
+
+  $effect(() => {
+    void mediaPreviews.load(resolvedRoomId);
   });
 
   let wasEditing = false;
@@ -187,6 +214,11 @@
   }
 
   function togglePin(eventId: string): void {
+    const shown = forumThreads.threads.filter((thread) => pinnedEvents.has(thread.eventId));
+    if (!pinnedEvents.has(eventId) && shown.length >= MAX_PINNED) {
+      toasts.info(i18n.t('forum.pinLimit', { count: MAX_PINNED }));
+      return;
+    }
     pinnedEvents.toggle(resolvedRoomId, eventId).catch((error: unknown) => {
       console.warn('[sable forum] pinning a thread failed', error);
       toasts.error(pinErrorMessage(error));
@@ -220,9 +252,34 @@
     });
   }
 
-  // A ranking is only right once every thread and its reactions are loaded.
+  function setView(next: ForumView): void {
+    view = next;
+    writeText(LAYOUT_KEY, next.layout);
+  }
+
+  async function startThread(): Promise<void> {
+    const title = query.trim().slice(0, FORUM_TITLE_MAX);
+    if (title !== '' && conversation.forumTitle === '') conversation.forumTitle = title;
+    query = '';
+    composing = true;
+    await tick();
+    composeArea?.querySelector('input')?.focus();
+  }
+
+  function submitSearch(): void {
+    if (!canPost || query.trim() === '' || threads.length > 0 || forumThreads.canLoadMore) return;
+    void startThread();
+  }
+
+  function closeComposer(): void {
+    composing = false;
+    conversation.clearContext();
+  }
+
+  // A search or a ranking is only right once every thread is loaded.
   $effect(() => {
-    if (!votesFirst || forumThreads.error || !forumThreads.canLoadMore) return;
+    if (view.sort === 'active' && query.trim() === '') return;
+    if (forumThreads.error || !forumThreads.canLoadMore) return;
     if (forumThreads.loading || forumThreads.backwardPagination !== 'idle') return;
     untrack(loadMoreThreads);
   });
@@ -282,8 +339,6 @@
       {roomAvatar}
       onBack={backToRoomList}
       onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
-      sortByVotes={votesFirst}
-      onSortByVotes={(value) => (votesFirst = value)}
       onEventTimeline={preferences.developerTools
         ? () => {
             // eslint-disable-next-line svelte/no-navigation-without-resolve -- eventTimelinePath() resolves the route itself
@@ -293,23 +348,34 @@
     />
     <RoomBannerStrip roomId={resolvedRoomId} />
     <div class="forum-content">
-      <div class="forum-compose-area">
-        <p class="forum-composer-hint">{i18n.t('forum.newThreadHint')}</p>
-        <TextInput
-          bind:value={conversation.forumTitle}
-          maxlength={FORUM_TITLE_MAX}
-          placeholder={i18n.t('forum.titlePlaceholder')}
-          aria-label={i18n.t('forum.titleLabel')}
-          disabled={permissions ? !permissions.can_post : false}
-        />
-        <ConversationComposer
-          {conversation}
-          roomId={resolvedRoomId}
-          onSend={sendMessage}
-          {roomName}
-          readOnly={permissions ? !permissions.can_post : false}
-        />
-      </div>
+      <ForumToolbar
+        bind:query
+        {view}
+        onView={setView}
+        onSubmit={submitSearch}
+        onCreate={canPost ? () => void startThread() : undefined}
+      />
+      {#if composerOpen}
+        <div class="forum-compose-area" bind:this={composeArea}>
+          <div class="forum-compose-title">
+            <TextInput
+              bind:value={conversation.forumTitle}
+              maxlength={FORUM_TITLE_MAX}
+              placeholder={i18n.t('forum.titlePlaceholder')}
+              aria-label={i18n.t('forum.titleLabel')}
+            />
+            <IconButton variant="ghost" label={i18n.t('common.close')} onclick={closeComposer}>
+              <XIcon />
+            </IconButton>
+          </div>
+          <ConversationComposer
+            {conversation}
+            roomId={resolvedRoomId}
+            onSend={sendMessage}
+            {roomName}
+          />
+        </div>
+      {/if}
       <ForumThreadList
         {threads}
         failed={forumThreads.error}
@@ -326,6 +392,9 @@
         onLoadMore={loadMoreThreads}
         isPinned={(eventId) => pinnedEvents.has(eventId)}
         onPin={permissions?.can_pin ? togglePin : undefined}
+        layout={view.layout}
+        filtered={query.trim() !== ''}
+        onCreate={canPost ? () => void startThread() : undefined}
       />
     </div>
   </div>
@@ -393,17 +462,17 @@
 
   .forum-compose-area {
     flex: 0 0 auto;
-    padding: var(--space-400) var(--space-400) var(--space-200);
+    padding: var(--space-200) var(--space-400);
   }
 
-  .forum-compose-area :global(.text-input) {
+  .forum-compose-area :global(.composer-stack) {
+    width: 100%;
+  }
+
+  .forum-compose-title {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
     margin-bottom: var(--space-200);
-  }
-
-  .forum-composer-hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-    padding: 0 0 var(--space-200);
   }
 </style>

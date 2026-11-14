@@ -1,13 +1,12 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
-  import type { ForumThread } from './forum-threads';
+  import { MAX_PINNED, type ForumLayout, type ForumThread } from './forum-threads';
   import ForumThreadItem from './ForumThreadItem.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
-
-  const MAX_PINNED = 3;
 
   interface Props {
     threads: readonly ForumThread[];
@@ -25,6 +24,9 @@
     onLoadMore: () => void;
     isPinned?: (eventId: string) => boolean;
     onPin?: (eventId: string) => void;
+    layout?: ForumLayout;
+    filtered?: boolean;
+    onCreate?: () => void;
   }
 
   let {
@@ -43,6 +45,9 @@
     onLoadMore,
     isPinned = () => false,
     onPin,
+    layout = 'list',
+    filtered = false,
+    onCreate,
   }: Props = $props();
 
   let pinnedThreads = $derived(
@@ -60,11 +65,28 @@
       >
     </div>
   {/if}
-  {#if threads.length === 0 && !loading && !failed}
-    <p class="forum-thread-list-empty">{i18n.t('forum.empty')}</p>
+  {#if threads.length === 0 && loading && !failed}
+    <div class={['forum-threads', layout]} aria-hidden="true">
+      {#each { length: 4 }, index (index)}
+        <Skeleton class="forum-thread-skeleton" />
+      {/each}
+    </div>
+  {:else if threads.length === 0 && !failed && !(filtered && canLoadMore)}
+    <div class="forum-thread-list-empty">
+      <p class="forum-thread-list-empty-title">
+        {filtered ? i18n.t('forum.noMatches') : i18n.t('forum.empty')}
+      </p>
+      {#if onCreate}
+        {#if !filtered}<p>{i18n.t('forum.newThreadHint')}</p>{/if}
+        <Button variant="primary" size="small" onclick={onCreate}>
+          {i18n.t('forum.newThread')}
+        </Button>
+      {/if}
+    </div>
   {:else if threads.length > 0}
     {#if pinnedThreads.length > 0}
-      <ul aria-label={i18n.t('forum.pinned')}>
+      <h2 class="forum-threads-heading">{i18n.t('forum.pinned')}</h2>
+      <ul class={['forum-threads', layout]} aria-label={i18n.t('forum.pinned')}>
         {#each pinnedThreads as thread (thread.id)}
           <ForumThreadItem
             {thread}
@@ -76,12 +98,16 @@
             {onReact}
             {onCopyLink}
             {onPin}
+            {layout}
             pinned
           />
         {/each}
       </ul>
     {/if}
-    <ul aria-label={i18n.t('forum.threads')}>
+    {#if pinnedThreads.length > 0 && otherThreads.length > 0}
+      <h2 class="forum-threads-heading">{i18n.t('forum.threads')}</h2>
+    {/if}
+    <ul class={['forum-threads', layout]} aria-label={i18n.t('forum.threads')}>
       {#each otherThreads as thread (thread.id)}
         <ForumThreadItem
           {thread}
@@ -93,6 +119,7 @@
           {onReact}
           {onCopyLink}
           {onPin}
+          {layout}
           pinned={isPinned(thread.eventId)}
         />
       {/each}
@@ -104,7 +131,7 @@
         {i18n.t('forum.loadMore')}
       </Button>
     </div>
-  {:else if loading}
+  {:else if loading && threads.length > 0}
     <div class="forum-thread-list-more">
       <Spinner small label={i18n.t('a11y.loading')} />
     </div>
@@ -119,16 +146,63 @@
     padding: var(--space-200) var(--space-400) var(--space-500);
   }
 
-  .forum-thread-list ul {
+  .forum-threads {
+    display: grid;
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     padding: 0;
   }
 
-  .forum-thread-list-empty {
+  .forum-threads-heading {
     color: var(--surface-var-on-container);
-    padding: var(--space-500);
+    font-size: var(--font-size-label);
+    font-weight: var(--font-weight-600);
+    margin: var(--space-500) 0 var(--space-200);
+  }
+
+  .forum-threads-heading:first-child {
+    margin-top: 0;
+  }
+
+  .forum-threads.gallery {
+    gap: var(--space-300);
+    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  }
+
+  .forum-threads :global(.forum-thread-skeleton) {
+    border-radius: var(--radii-400);
+    height: 5.5rem;
+  }
+
+  .forum-threads.gallery :global(.forum-thread-skeleton) {
+    height: 14rem;
+  }
+
+  .forum-thread-list-empty {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-200);
+    margin: 0 auto;
+    max-width: 28rem;
+    padding: var(--space-700) var(--space-400);
     text-align: center;
+  }
+
+  .forum-thread-list-empty p {
+    margin: 0;
+  }
+
+  .forum-thread-list-empty-title {
+    color: var(--surface-on-container);
+    font-size: var(--font-size-subheading);
+    font-weight: var(--font-weight-600);
+  }
+
+  .forum-thread-list-empty :global(.btn) {
+    margin-top: var(--space-200);
   }
 
   .forum-thread-list-more {

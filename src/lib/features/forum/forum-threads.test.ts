@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 
-import { collectForumThreads, sortByVotes } from './forum-threads';
+import { collectForumThreads, filterThreads, sortThreads } from './forum-threads';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineItemView {
@@ -361,11 +361,77 @@ test('sorts by votes, then activity, with resolved threads last', () => {
     null
   );
 
-  expect(sortByVotes(threads).map((thread) => thread.id)).toEqual([
+  expect(sortThreads(threads, 'votes').map((thread) => thread.id)).toEqual([
     'many',
     'few',
     'new',
     'old',
     'done',
   ]);
+});
+
+test('sorts by the date a thread was started', () => {
+  const reply = item({ id: 'reply', timestamp: 9, thread_root: '$first' });
+  const threads = collectForumThreads(
+    [item({ id: 'first', timestamp: 1 }), item({ id: 'second', timestamp: 2 }), reply],
+    null
+  );
+
+  expect(threads.map((thread) => thread.id)).toEqual(['first', 'second']);
+  expect(sortThreads(threads, 'created').map((thread) => thread.id)).toEqual(['second', 'first']);
+});
+
+test('filters threads by title, body or author', () => {
+  const threads = collectForumThreads(
+    [
+      item({ id: 'titled', forum_title: 'Release Plans' }),
+      item({ id: 'body' }),
+      item({ id: 'other', sender_name: 'Bob' }),
+    ],
+    null
+  );
+  const ids = (query: string): string[] => filterThreads(threads, query).map((thread) => thread.id);
+
+  expect(ids('  release ')).toEqual(['titled']);
+  expect(ids('BODY')).toEqual(['body']);
+  expect(ids('bob')).toEqual(['other']);
+  expect(ids('')).toHaveLength(3);
+});
+
+test('takes the thumbnail from the first image or video of a thread', () => {
+  const image = {
+    kind: 'image' as const,
+    filename: 'cat.png',
+    caption: null,
+    source: 'mxc://example.org/cat',
+    mime: 'image/png',
+    width: 640,
+    height: 480,
+    size: 1,
+    blurhash: null,
+    thumbnail: 'mxc://example.org/cat-small',
+    spoiler: 'surprise',
+  };
+  const video = { ...image, kind: 'video' as const, thumbnail: null, spoiler: null };
+  const threads = collectForumThreads(
+    [
+      item({ id: 'text' }),
+      item({
+        id: 'gallery',
+        content: { kind: 'gallery', body: '', html: '', items: [image] },
+      }),
+      item({ id: 'bare', content: { kind: 'gallery', body: '', html: '', items: [video] } }),
+    ],
+    null
+  );
+  const thumbnail = (id: string) => threads.find((thread) => thread.id === id)?.thumbnail;
+
+  expect(thumbnail('text')).toBeNull();
+  expect(thumbnail('bare')).toBeNull();
+  expect(thumbnail('gallery')).toMatchObject({
+    source: 'mxc://example.org/cat',
+    thumbnail: 'mxc://example.org/cat-small',
+    video: false,
+    spoiler: true,
+  });
 });
