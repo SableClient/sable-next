@@ -4144,12 +4144,12 @@
     "titlePlaceholder": "Title (optional)",
     "empty": "No threads yet.",
     "loadMore": "Load older threads",
+    "sortByVotes": "Most voted first",
     "newThreadHint": "Send a message to start a new thread. Reply to it to begin the discussion.",
     "thread": "{{name}}: {{preview}}",
     "threadUnread": "Unread. {{name}}: {{preview}}",
     "replyCount_one": "{{count, number}} reply",
     "replyCount_other": "{{count, number}} replies"
-    "sortByVotes": "Most voted first",
   },
   "share": {
     "title": "Share to",
