@@ -126,12 +126,15 @@ impl Core {
         enabled: bool,
     ) -> Result<DehydratedDeviceView, RpcError> {
         let client = self.client().await?;
-        self.put_global_account_data(
-            PREFERENCE_EVENT.into(),
-            &Preference { enabled },
-            "set_dehydrated_device",
-        )
-        .await?;
+        {
+            let _guard = self.account_data_lock.lock().await;
+            self.put_global_account_data(
+                PREFERENCE_EVENT.into(),
+                &Preference { enabled },
+                "set_dehydrated_device",
+            )
+            .await?;
+        }
         let devices = client.encryption().dehydrated_devices();
         if enabled {
             devices

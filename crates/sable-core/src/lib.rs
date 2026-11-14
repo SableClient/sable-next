@@ -754,6 +754,65 @@ impl Core {
         Ok(())
     }
 
+    /// Reads `event_types` in order from the server and hands the first one
+    /// found to `update`, which returns what to write or `None` to leave it.
+    /// The write goes to the first type. Returns the document as it stands.
+    /// A fetch failure or a document that is not a JSON object is an error
+    /// and nothing is written.
+    pub(crate) async fn update_account_data(
+        &self,
+        event_types: &[&str],
+        label: &str,
+        update: impl AsyncFnOnce(
+            Option<serde_json::Value>,
+        ) -> Result<Option<serde_json::Value>, RpcError>,
+    ) -> Result<Option<serde_json::Value>, RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        self.update_account_data_locked(event_types, label, update)
+            .await
+    }
+
+    /// For callers that already hold `account_data_lock`.
+    pub(crate) async fn update_account_data_locked(
+        &self,
+        event_types: &[&str],
+        label: &str,
+        update: impl AsyncFnOnce(
+            Option<serde_json::Value>,
+        ) -> Result<Option<serde_json::Value>, RpcError>,
+    ) -> Result<Option<serde_json::Value>, RpcError> {
+        let current = self.account_object(event_types, label).await?;
+        let Some(content) = update(current.clone()).await? else {
+            return Ok(current);
+        };
+        let target = event_types
+            .first()
+            .ok_or_else(|| self.failed(label, "no account data type to write"))?;
+        self.set_account_data(target, &content).await?;
+        Ok(Some(content))
+    }
+
+    /// `None` when the server holds none of `event_types`.
+    pub(crate) async fn account_object(
+        &self,
+        event_types: &[&str],
+        label: &str,
+    ) -> Result<Option<serde_json::Value>, RpcError> {
+        for event_type in event_types {
+            let Some(raw) = self
+                .global_account_data((*event_type).into(), label)
+                .await?
+            else {
+                continue;
+            };
+            return match raw.deserialize_as::<serde_json::Value>() {
+                Ok(content @ serde_json::Value::Object(_)) => Ok(Some(content)),
+                _ => Err(self.failed(label, format_args!("{event_type} is not a JSON object"))),
+            };
+        }
+        Ok(None)
+    }
+
     pub(crate) async fn push_rules(&self) -> Result<Arc<push_rules::PushRules>, RpcError> {
         let client = self.client().await?;
         let mut cached = self.push_rules.lock().await;

@@ -252,6 +252,7 @@ impl Handler for SetDataParams {
         if matches!(self.event_type.as_str(), "m.push_rules" | "m.fully_read") {
             return Err(RpcCode::Unsupported.into());
         }
+        let _guard = core.account_data_lock.lock().await;
         core.set_account_data(&self.event_type, &self.content).await
     }
 }
@@ -532,15 +533,11 @@ async fn edit_ignored_users(
     if ignore && core.client().await?.user_id() == Some(user_id) {
         return Err(core.failed(label, "a user cannot ignore themselves"));
     }
-    let current = core
-        .global_account_data(IGNORED_USER_LIST.into(), label)
-        .await?
-        .and_then(|raw| raw.deserialize_as::<serde_json::Value>().ok());
-    let Some(content) = with_ignored_user(current, user_id.as_str(), ignore) else {
-        return Ok(());
-    };
-    core.put_global_account_data(IGNORED_USER_LIST.into(), &content, label)
-        .await
+    core.update_account_data(&[IGNORED_USER_LIST], label, async |current| {
+        Ok(with_ignored_user(current, user_id.as_str(), ignore))
+    })
+    .await?;
+    Ok(())
 }
 
 /// Read from the account data, since the SDK's observable only fills once a sync changes the list.

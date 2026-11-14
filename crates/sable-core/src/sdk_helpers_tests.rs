@@ -1916,7 +1916,68 @@ async fn pack_subscriptions_are_not_rewritten_from_the_store_when_the_server_rea
     }))
     .unwrap();
 
-    assert!(core.run(params).await.is_err());
+    core.run(params).await.unwrap_err();
+}
+
+const TEST_DOCUMENT: &str = "org.example.document";
+
+async fn mount_document(server: &MatrixMockServer, get: ResponseTemplate, puts: u64) {
+    Mock::given(method("GET"))
+        .and(path_regex("/_matrix/client/v3/user/.*/account_data/.*"))
+        .respond_with(get)
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(puts)
+        .mount(server.server())
+        .await;
+}
+
+#[tokio::test]
+async fn updating_account_data_refuses_a_failed_or_malformed_server_read() {
+    for get in [
+        ResponseTemplate::new(403)
+            .set_body_json(json!({ "errcode": "M_FORBIDDEN", "error": "unreachable" })),
+        ResponseTemplate::new(200).set_body_json(json!([1])),
+    ] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        mount_document(&server, get, 0).await;
+        let core = core(&server, client).await;
+
+        let result = core
+            .update_account_data(&[TEST_DOCUMENT], "test", async |_| {
+                Ok(Some(json!({ "a": 1 })))
+            })
+            .await;
+
+        result.unwrap_err();
+    }
+}
+
+#[tokio::test]
+async fn updating_an_absent_account_document_starts_from_nothing() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    mount_document(
+        &server,
+        ResponseTemplate::new(404)
+            .set_body_json(json!({ "errcode": "M_NOT_FOUND", "error": "absent" })),
+        1,
+    )
+    .await;
+    let core = core(&server, client).await;
+
+    let written = core
+        .update_account_data(&[TEST_DOCUMENT], "test", async |current| {
+            assert!(current.is_none());
+            Ok(Some(json!({ "a": 1 })))
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(written, Some(json!({ "a": 1 })));
 }
 
 #[tokio::test]

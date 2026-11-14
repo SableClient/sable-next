@@ -295,6 +295,19 @@ struct ScalarRegisterOut {
     expires_in: u64,
 }
 
+fn accepted_urls(content: Option<Value>) -> Vec<String> {
+    content
+        .and_then(|content| {
+            content.get("accepted")?.as_array().map(|urls| {
+                urls.iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
+}
+
 impl Core {
     pub(crate) async fn room_timeline_events(
         &self,
@@ -901,34 +914,25 @@ impl Core {
             .and_then(reqwest::Response::error_for_status)
             .or_failed(self, LABEL)?;
 
-        let mut accepted = self.accepted_terms(LABEL).await?;
-        for url in urls {
-            if !accepted.contains(&url) {
-                accepted.push(url);
+        self.update_account_data(&["m.accepted_terms"], LABEL, async |current| {
+            let mut accepted = accepted_urls(current);
+            for url in urls {
+                if !accepted.contains(&url) {
+                    accepted.push(url);
+                }
             }
-        }
-        self.put_global_account_data(
-            GlobalAccountDataEventType::from("m.accepted_terms"),
-            &serde_json::json!({ "accepted": accepted }),
-            LABEL,
-        )
-        .await
+            Ok(Some(serde_json::json!({ "accepted": accepted })))
+        })
+        .await?;
+        Ok(())
     }
 
     async fn accepted_terms(&self, label: &str) -> Result<Vec<String>, RpcError> {
-        Ok(self
-            .global_account_data(GlobalAccountDataEventType::from("m.accepted_terms"), label)
-            .await?
-            .and_then(|raw| serde_json::from_str::<Value>(raw.json().get()).ok())
-            .and_then(|content| {
-                content.get("accepted")?.as_array().map(|urls| {
-                    urls.iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_owned)
-                        .collect()
-                })
-            })
-            .unwrap_or_default())
+        Ok(accepted_urls(
+            self.global_account_data(GlobalAccountDataEventType::from("m.accepted_terms"), label)
+                .await?
+                .and_then(|raw| serde_json::from_str::<Value>(raw.json().get()).ok()),
+        ))
     }
 
     async fn scalar_token(&self, api_url: &str) -> Option<String> {

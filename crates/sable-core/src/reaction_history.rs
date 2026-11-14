@@ -328,7 +328,14 @@ impl Core {
         }
         // Keep local counters even offline. A later read merges them before retrying the upload.
         if let Ok(remote) = remote {
-            let previous = remote.and_then(|raw| raw.deserialize_as::<Value>().ok());
+            let previous = remote.map(|raw| raw.deserialize_as::<Value>());
+            if previous.as_ref().is_some_and(Result::is_err) {
+                tracing::warn!(
+                    "reaction history was saved locally but the server copy is unreadable"
+                );
+                return Ok(history.keys());
+            }
+            let previous = previous.and_then(Result::ok);
             if previous.as_ref() != Some(&content)
                 && (previous.is_some() || !history.entries.is_empty())
                 && let Err(error) = client

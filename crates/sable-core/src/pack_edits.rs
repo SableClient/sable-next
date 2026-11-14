@@ -280,8 +280,7 @@ impl Core {
         target: PackTargetView,
         draft: &PackDraftView,
     ) -> Result<(), RpcError> {
-        let _guard = self.account_data_lock.lock().await;
-        let current = match &target {
+        match target {
             PackTargetView::Room { room_id, state_key } => {
                 let stable = self
                     .room_state_event_content(
@@ -291,23 +290,23 @@ impl Core {
                     )
                     .await?
                     .filter(|content| !is_empty_content(Some(content)));
-                match stable {
+                let current = match stable {
                     Some(content) => Some(content),
-                    None => self.legacy_pack(room_id, state_key).await?,
-                }
-            }
-            PackTargetView::Account => self
-                .global_account_data(USER_EMOTES.into(), "save_image_pack")
-                .await?
-                .and_then(|raw| raw.deserialize_as::<Value>().ok()),
-        };
-        let content = pack_content(draft, current.as_ref())?;
-        match target {
-            PackTargetView::Room { room_id, state_key } => {
+                    None => self.legacy_pack(&room_id, &state_key).await?,
+                };
+                let content = pack_content(draft, current.as_ref())?;
                 self.send_state(room_id, ROOM_IMAGE_PACK, &state_key, &content)
                     .await?;
             }
-            PackTargetView::Account => self.set_account_data(USER_EMOTES, &content).await?,
+            PackTargetView::Account => {
+                self.update_account_data(&[USER_EMOTES], "save_image_pack", async |current| {
+                    let content = pack_content(draft, current.as_ref())?;
+                    serde_json::to_value(content)
+                        .map(Some)
+                        .or_failed(self, "save_image_pack")
+                })
+                .await?;
+            }
         }
         Ok(())
     }
@@ -416,14 +415,14 @@ impl Core {
         &self,
         images: &[PackImageDraftView],
     ) -> Result<(), RpcError> {
-        let _guard = self.account_data_lock.lock().await;
-        let current = self
-            .global_account_data(USER_EMOTES.into(), "add_account_pack_images")
-            .await?
-            .and_then(|raw| raw.deserialize_as::<Value>().ok());
-        let merged =
-            merged_pack_content(current, images).or_failed(self, "add_account_pack_images")?;
-        self.set_account_data(USER_EMOTES, &merged).await
+        self.update_account_data(&[USER_EMOTES], "add_account_pack_images", async |current| {
+            let merged = merged_pack_content(current, images)
+                .and_then(serde_json::to_value)
+                .or_failed(self, "add_account_pack_images")?;
+            Ok(Some(merged))
+        })
+        .await?;
+        Ok(())
     }
 
     pub(crate) async fn pack_subscriptions(&self) -> Result<Vec<PackAddressView>, RpcError> {
@@ -443,30 +442,21 @@ impl Core {
         added: &[PackAddressView],
         removed: &[PackAddressView],
     ) -> Result<Vec<PackAddressView>, RpcError> {
-        let _guard = self.account_data_lock.lock().await;
-        {
-            let mut cache = self.pack_cache.lock().await;
-            cache.forget_account_data(IMAGE_PACK_ROOMS);
-            cache.forget_account_data(EMOTE_ROOMS);
-        }
-        let client = self.client().await?;
-        let (raw, complete) = self
-            .subscribed_pack_rooms(&client, true)
-            .await
-            .or_failed(self, "set_pack_subscriptions")?;
-        if !complete {
-            return Err(self.failed(
-                "set_pack_subscriptions",
-                "the pack subscriptions on the server could not be read",
-            ));
-        }
-        let current = raw
-            .and_then(|raw| raw.deserialize_as_unchecked::<EmoteRooms>().ok())
-            .map(|rooms| subscription_addresses(&rooms))
-            .unwrap_or_default();
-        let next = with_subscriptions(&current, added, removed);
-        self.set_account_data(IMAGE_PACK_ROOMS, &subscriptions_content(&next))
-            .await?;
+        let label = "set_pack_subscriptions";
+        let mut next = Vec::new();
+        self.update_account_data(&[IMAGE_PACK_ROOMS, EMOTE_ROOMS], label, async |current| {
+            let current = match current {
+                Some(content) => EmoteRooms::deserialize(content)
+                    .map(|rooms| subscription_addresses(&rooms))
+                    .or_failed(self, label)?,
+                None => Vec::new(),
+            };
+            next = with_subscriptions(&current, added, removed);
+            serde_json::to_value(subscriptions_content(&next))
+                .map(Some)
+                .or_failed(self, label)
+        })
+        .await?;
         Ok(next)
     }
 }

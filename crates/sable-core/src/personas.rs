@@ -40,8 +40,12 @@ pub(crate) fn is_persona_event(event_type: &str) -> bool {
             .is_some_and(|scope| scope.starts_with('.'))
 }
 
+fn selection_type(scope: &str) -> String {
+    format!("{SELECTION_PREFIX}.{scope}")
+}
+
 fn selection_event(scope: &str) -> GlobalAccountDataEventType {
-    GlobalAccountDataEventType::from(format!("{SELECTION_PREFIX}.{scope}"))
+    GlobalAccountDataEventType::from(selection_type(scope))
 }
 
 #[serde_as]
@@ -1142,9 +1146,11 @@ impl Core {
             return Ok(None);
         };
 
-        raw.deserialize_as::<Value>()
-            .map(Some)
-            .or_failed(self, "personas_deserialize")
+        match raw.deserialize_as::<Value>() {
+            Ok(content @ Value::Object(_)) => Ok(Some(content)),
+            Ok(_) => Err(self.failed("personas_deserialize", "the document is not a JSON object")),
+            Err(error) => Err(self.rpc_error("personas_deserialize", &error)),
+        }
     }
 
     async fn load_personas(&self, fetch: bool) -> Result<Vec<PersonaView>, RpcError> {
@@ -1341,64 +1347,85 @@ impl Core {
     }
 
     async fn repoint_selections(&self, from: &str, to: Option<&str>) -> Result<(), RpcError> {
-        if let Some(account) = self.account_selection(true).await?
-            && account.persona_id == from
-        {
-            let selection = to.map(|id| PersonaSelectionView {
-                persona_id: id.to_owned(),
-                alternate_avatar_id: account.alternate_avatar_id,
-                valid_until: account.valid_until,
-            });
-            self.put_global_account_data(
-                selection_event("globalassociation"),
-                &AccountSelectionOut {
+        self.update_account_data_locked(
+            &[&selection_type("globalassociation")],
+            "personas",
+            async |current| {
+                let Some(account) = current.as_ref().and_then(|content| {
+                    AccountSelectionIn::deserialize(content)
+                        .ok()?
+                        .association?
+                        .into_view()
+                }) else {
+                    return Ok(None);
+                };
+                if account.persona_id != from {
+                    return Ok(None);
+                }
+                let selection = to.map(|id| PersonaSelectionView {
+                    persona_id: id.to_owned(),
+                    alternate_avatar_id: account.alternate_avatar_id,
+                    valid_until: account.valid_until,
+                });
+                serde_json::to_value(AccountSelectionOut {
                     association: selection.as_ref().map(Into::into),
-                },
-                "personas",
-            )
-            .await?;
-        }
+                })
+                .map(Some)
+                .or_failed(self, "personas")
+            },
+        )
+        .await?;
 
-        let mut rooms = self.room_selections(true).await?;
-        let affected: Vec<String> = rooms
-            .iter()
-            .filter(|(_, association)| {
-                matches!(association, RoomAssociation::Persona(selection) if selection.persona_id == from)
-            })
-            .map(|(room_id, _)| room_id.clone())
-            .collect();
-        if affected.is_empty() {
-            return Ok(());
-        }
+        self.edit_room_selections(|rooms| {
+            let affected: Vec<String> = rooms
+                .iter()
+                .filter(|(_, association)| {
+                    matches!(association, RoomAssociation::Persona(selection) if selection.persona_id == from)
+                })
+                .map(|(room_id, _)| room_id.clone())
+                .collect();
+            if affected.is_empty() {
+                return false;
+            }
 
-        for room_id in affected {
-            match to {
-                Some(id) => {
-                    if let Some(RoomAssociation::Persona(selection)) = rooms.get_mut(&room_id) {
-                        id.clone_into(&mut selection.persona_id);
+            for room_id in affected {
+                match to {
+                    Some(id) => {
+                        if let Some(RoomAssociation::Persona(selection)) = rooms.get_mut(&room_id) {
+                            id.clone_into(&mut selection.persona_id);
+                        }
+                    }
+                    None => {
+                        rooms.remove(&room_id);
                     }
                 }
-                None => {
-                    rooms.remove(&room_id);
-                }
             }
-        }
-
-        self.write_room_selections(rooms).await
+            true
+        })
+        .await
     }
 
-    async fn write_room_selections(
+    async fn edit_room_selections(
         &self,
-        rooms: BTreeMap<String, RoomAssociation>,
+        edit: impl FnOnce(&mut BTreeMap<String, RoomAssociation>) -> bool,
     ) -> Result<(), RpcError> {
-        self.put_global_account_data(
-            selection_event("roomassociation"),
-            &RoomAssociationsOut {
-                associations: rooms,
-            },
+        self.update_account_data_locked(
+            &[&selection_type("roomassociation")],
             "personas",
+            async |current| {
+                let mut rooms = current.as_ref().map(room_associations).unwrap_or_default();
+                if !edit(&mut rooms) {
+                    return Ok(None);
+                }
+                serde_json::to_value(RoomAssociationsOut {
+                    associations: rooms,
+                })
+                .map(Some)
+                .or_failed(self, "personas")
+            },
         )
         .await
+        .map(drop)
     }
 
     pub(crate) async fn set_persona_selection(
@@ -1429,17 +1456,18 @@ impl Core {
                 .await;
         };
 
-        let mut rooms = self.room_selections(true).await?;
-        match selection {
-            Some(selection) => {
-                rooms.insert(room_id.to_string(), RoomAssociation::Persona(selection));
+        self.edit_room_selections(|rooms| {
+            match selection {
+                Some(selection) => {
+                    rooms.insert(room_id.to_string(), RoomAssociation::Persona(selection));
+                }
+                None => {
+                    rooms.remove(room_id.as_str());
+                }
             }
-            None => {
-                rooms.remove(room_id.as_str());
-            }
-        }
-
-        self.write_room_selections(rooms).await
+            true
+        })
+        .await
     }
 
     pub(crate) async fn disable_room_personas(
@@ -1447,9 +1475,11 @@ impl Core {
         DisableRoomParams { room_id }: DisableRoomParams,
     ) -> Result<(), RpcError> {
         let _guard = self.account_data_lock.lock().await;
-        let mut rooms = self.room_selections(true).await?;
-        rooms.insert(room_id.to_string(), RoomAssociation::Disabled);
-        self.write_room_selections(rooms).await
+        self.edit_room_selections(|rooms| {
+            rooms.insert(room_id.to_string(), RoomAssociation::Disabled);
+            true
+        })
+        .await
     }
 
     pub(crate) async fn account_room_personas(
@@ -1457,9 +1487,11 @@ impl Core {
         AccountRoomParams { room_id }: AccountRoomParams,
     ) -> Result<(), RpcError> {
         let _guard = self.account_data_lock.lock().await;
-        let mut rooms = self.room_selections(true).await?;
-        rooms.insert(room_id.to_string(), RoomAssociation::Account);
-        self.write_room_selections(rooms).await
+        self.edit_room_selections(|rooms| {
+            rooms.insert(room_id.to_string(), RoomAssociation::Account);
+            true
+        })
+        .await
     }
 }
 

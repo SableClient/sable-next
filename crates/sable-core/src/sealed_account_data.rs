@@ -247,7 +247,15 @@ pub(crate) async fn read_account_data(
     } else {
         account.account_data_raw(event_type.into()).await?
     };
-    Ok(content.and_then(|raw| raw.deserialize_as::<serde_json::Value>().ok()))
+    content
+        .map(|raw| match raw.deserialize_as::<serde_json::Value>()? {
+            content @ serde_json::Value::Object(_) => Ok(content),
+            _ => Err(serde::de::Error::custom(
+                "the account data is not a JSON object",
+            )),
+        })
+        .transpose()
+        .map_err(|error: serde_json::Error| error.into())
 }
 
 pub(crate) async fn read_document(
@@ -292,6 +300,16 @@ impl Core {
     }
 
     pub(crate) async fn set_sealed_account_data(
+        &self,
+        event_type: &str,
+        content: &serde_json::Value,
+    ) -> Result<(), RpcError> {
+        let _guard = self.account_data_lock.lock().await;
+        self.set_sealed_account_data_locked(event_type, content)
+            .await
+    }
+
+    pub(crate) async fn set_sealed_account_data_locked(
         &self,
         event_type: &str,
         content: &serde_json::Value,

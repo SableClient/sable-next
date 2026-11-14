@@ -52,13 +52,6 @@ impl Revised {
             Self::Unstable => &[UNSTABLE_PERSISTENT_EVENT],
         }
     }
-
-    const fn persistent_event(self) -> &'static str {
-        match self {
-            Self::Stable => PERSISTENT_EVENT,
-            Self::Unstable => UNSTABLE_PERSISTENT_EVENT,
-        }
-    }
 }
 
 #[expect(
@@ -272,11 +265,12 @@ impl Core {
         let revised = self.revised_presence().await.ok_or_else(|| {
             self.failed(label, "the homeserver does not support revised presence")
         })?;
-        let stored = self.persistent_presence(revised, label).await?;
-        let content = edited_override(stored, edit, revised);
-        self.put_global_account_data(revised.persistent_event().into(), &content, label)
+        let content = self
+            .update_account_data(revised.persistent_candidates(), label, async |stored| {
+                Ok(Some(edited_override(stored, edit, revised)))
+            })
             .await?;
-        Ok(override_view(Some(&content)))
+        Ok(override_view(content.as_ref()))
     }
 
     async fn persistent_presence(

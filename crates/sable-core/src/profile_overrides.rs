@@ -250,8 +250,7 @@ async fn stored_overrides(
 ) -> matrix_sdk::Result<StoredOverrides> {
     let stable =
         crate::sealed_account_data::read_account_data(client, PROFILE_OVERRIDES_EVENT, fetch)
-            .await?
-            .filter(Value::is_object);
+            .await?;
     if stable.is_some() {
         return Ok(StoredOverrides {
             content: stable,
@@ -304,6 +303,7 @@ impl Core {
 
     /// A plaintext unstable document read while the key is at hand is sealed.
     pub(crate) async fn profile_overrides(&self) -> Result<ProfileOverridesView, RpcError> {
+        let _guard = self.account_data_lock.lock().await;
         let stored = self.stored_overrides().await?;
         let view = Self::overrides_view(&stored);
         if stored.sealed_type
@@ -312,7 +312,7 @@ impl Core {
             && !view.overrides.is_empty()
             && let Some(content) = &stored.content
         {
-            self.set_sealed_account_data(UNSTABLE_PROFILE_OVERRIDES_EVENT, content)
+            self.set_sealed_account_data_locked(UNSTABLE_PROFILE_OVERRIDES_EVENT, content)
                 .await?;
         }
         Ok(view)
@@ -332,7 +332,7 @@ impl Core {
         }
         let content = edited_overrides(stored.content, user_id.as_str(), edit);
         let event_type = if stored.sealed_type {
-            self.set_sealed_account_data(UNSTABLE_PROFILE_OVERRIDES_EVENT, &content)
+            self.set_sealed_account_data_locked(UNSTABLE_PROFILE_OVERRIDES_EVENT, &content)
                 .await?;
             UNSTABLE_PROFILE_OVERRIDES_EVENT
         } else {
