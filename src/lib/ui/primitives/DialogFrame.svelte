@@ -104,6 +104,12 @@
     position: fixed;
   }
 
+  :global(.dialog-backdrop[data-state='closed']),
+  :global(.dialog-content[data-state='closed']) {
+    /* stylelint-disable-next-line declaration-no-important -- bits-ui sets inline pointer-events: auto */
+    pointer-events: none !important;
+  }
+
   :global(.dialog-content) {
     box-sizing: border-box;
     position: fixed;

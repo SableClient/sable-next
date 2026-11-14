@@ -1,9 +1,9 @@
 import { createAttachmentKey } from 'svelte/attachments';
 
+const stack: Element[] = [];
+const detached = new Set<Element>();
 const depths = new Set<number>();
 let element: HTMLStyleElement | null = null;
-let openSurfaces = 0;
-let top = 0;
 
 function raise(depth: number): void {
   if (depths.has(depth)) return;
@@ -12,17 +12,27 @@ function raise(depth: number): void {
   element.textContent += `[data-overlay-depth="${String(depth)}"] { z-index: calc(var(--layer-overlay) + ${String(depth)}); }\n`;
 }
 
+function stamp(): void {
+  stack.forEach((node, index) => {
+    raise(index + 1);
+    node.setAttribute('data-overlay-depth', String(index + 1));
+  });
+}
+
 export function overlayLayer(): Record<symbol, (node: Element) => () => void> {
   return {
     [createAttachmentKey()]: (node: Element) => {
-      openSurfaces += 1;
-      top += 1;
-      raise(top);
-      node.setAttribute('data-overlay-depth', String(top));
+      detached.delete(node);
+      if (!stack.includes(node)) stack.push(node);
+      stamp();
 
       return () => {
-        openSurfaces -= 1;
-        if (openSurfaces === 0) top = 0;
+        detached.add(node);
+        queueMicrotask(() => {
+          if (!detached.delete(node)) return;
+          stack.splice(stack.indexOf(node), 1);
+          stamp();
+        });
       };
     },
   };
