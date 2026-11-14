@@ -322,12 +322,17 @@
     width: min(
       var(--timeline-media-fill),
       var(--timeline-media-max),
-      calc(var(--timeline-media-max) * var(--media-ratio)),
+      var(--media-fit, 100rem),
       max(
         var(--timeline-media-min),
         min(calc(var(--timeline-media-max) * var(--media-ratio)), var(--media-width, 100rem))
       )
     );
+  }
+
+  /* Motion is scaled to fit, where a tall still keeps a usable width and is cropped. */
+  :global(.image.animated) {
+    --media-fit: calc(var(--timeline-media-max) * var(--media-ratio));
   }
 
   .sticker {

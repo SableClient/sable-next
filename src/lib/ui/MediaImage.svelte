@@ -728,6 +728,7 @@
       {
         interactive: !showUnavailable && (manualGif || onclick || href),
         gif: manualGif,
+        animated,
         pixelated,
         painted,
       },
@@ -789,7 +790,7 @@
   </span>
 {:else if !showUnavailable && (manualGif || onclick)}
   <button
-    class={[className, 'media-image', 'interactive', { gif: manualGif, pixelated }]}
+    class={[className, 'media-image', 'interactive', { gif: manualGif, animated, pixelated }]}
     {style}
     style:--media-ratio={aspectRatio}
     style:--media-width={intrinsicCssWidth}
@@ -806,7 +807,7 @@
   </button>
 {:else}
   <span
-    class={[className, 'media-image', { pixelated }]}
+    class={[className, 'media-image', { animated, pixelated }]}
     {style}
     style:--media-ratio={aspectRatio}
     style:--media-width={intrinsicCssWidth}

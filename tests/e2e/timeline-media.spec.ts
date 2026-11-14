@@ -222,6 +222,30 @@ test('a very tall picture keeps a usable width and a bounded height on mobile', 
   expect(box.sideways).toBe(0);
 });
 
+test('a very tall GIF is scaled to fit rather than cropped on mobile', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('delayed_media');
+  await page.setViewportSize(NARROW);
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  const gif = picture(200, 2000);
+  await core.setTimelineItemById(await core.subscription(), 'general-19', {
+    ...gif,
+    content: { ...gif.content, mime: 'image/gif' },
+  });
+  await expect(timeline.image.first()).toBeVisible();
+
+  const box = await mediaBox(page);
+  expect(box.width / box.height).toBeCloseTo(200 / 2000, 2);
+  expect(box.height).toBeLessThanOrEqual(MEDIA_MAX_PX + 1);
+});
+
 test('an ordinary portrait keeps its shape on mobile', async ({
   page,
   app,
