@@ -2,9 +2,9 @@
 
 import i18next from 'i18next';
 import { flushSync } from 'svelte';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
-import { i18n, setAppName, t } from './i18n.js';
+import { i18n, setAppName, setLanguage, t } from './i18n.js';
 import { currentDirection } from './language.svelte.js';
 import { preferences } from './settings/preferences.svelte.js';
 
@@ -73,4 +73,17 @@ test('a right-to-left language mirrors the document', async () => {
   }
   expect(document.documentElement.dir).toBe('ltr');
   expect(currentDirection()).toBe('ltr');
+});
+
+test('the system language loads the bundle for the browser language', async () => {
+  const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR', 'en']);
+  try {
+    await setLanguage('system');
+    expect(i18next.resolvedLanguage).toBe('fr');
+    expect(i18next.hasResourceBundle('fr', 'translation')).toBe(true);
+    expect(document.documentElement.lang).toBe('fr');
+  } finally {
+    languages.mockRestore();
+    await i18next.changeLanguage('en');
+  }
 });

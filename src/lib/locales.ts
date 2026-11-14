@@ -17,6 +17,23 @@ export function localeLabel(code: string): string {
   }
 }
 
+export function matchLocale(tags: readonly string[]): string | undefined {
+  for (const tag of tags) {
+    let locale: Intl.Locale;
+    try {
+      locale = new Intl.Locale(tag);
+    } catch {
+      continue;
+    }
+    const script = locale.maximize().script;
+    const match = [locale.baseName, `${locale.language}-${script}`, locale.language].find((code) =>
+      availableLocales.includes(code)
+    );
+    if (match) return match;
+  }
+  return undefined;
+}
+
 export async function loadLocaleBundle(code: string): Promise<Record<string, unknown> | null> {
   if (!availableLocales.includes(code)) return null;
   return (await bundles[`../locales/${code}.json`]()).default;

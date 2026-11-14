@@ -8,7 +8,7 @@ import {
   translationsChanged,
 } from './language.svelte.js';
 import { DEFAULT_APP_NAME } from './deployment/default-app-name.js';
-import { availableLocales, loadLocaleBundle, SYSTEM_LANGUAGE } from './locales.js';
+import { availableLocales, loadLocaleBundle, matchLocale, SYSTEM_LANGUAGE } from './locales.js';
 import { preferences } from './settings/preferences.svelte.js';
 
 function chosenLanguage(): string | undefined {
@@ -70,21 +70,23 @@ export function setAppName(name: string): void {
   translationsChanged();
 }
 
+function systemLanguage(): string {
+  const detector = i18next.services.languageDetector as { detect(): unknown } | undefined;
+  const detected = detector?.detect();
+  const tags = [detected].flat().filter((tag) => typeof tag === 'string');
+  return matchLocale(tags) ?? 'en';
+}
+
 export async function setLanguage(value: string): Promise<void> {
-  if (value === SYSTEM_LANGUAGE) {
-    await i18next.changeLanguage();
-    return;
-  }
-  const language = availableLocales.includes(value) ? value : 'en';
+  const language =
+    value === SYSTEM_LANGUAGE ? systemLanguage() : availableLocales.includes(value) ? value : 'en';
   await ensureBundle(language);
   await i18next.changeLanguage(language);
 }
 
-if (initialLanguage !== undefined) {
-  setLanguage(initialLanguage).catch((error: unknown) => {
-    console.error('[sable i18n] the selected language could not be loaded', error);
-  });
-}
+setLanguage(initialLanguage ?? SYSTEM_LANGUAGE).catch((error: unknown) => {
+  console.error('[sable i18n] the selected language could not be loaded', error);
+});
 
 export const i18n = {
   get t() {
