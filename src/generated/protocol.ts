@@ -1344,7 +1344,9 @@ export type RoomKind =
 /**  `pl.chrome.forum` */
 "forum" |
 /**  `chat.commet.calendar` */
-"calendar";
+"calendar" |
+/**  `m.policy` / `support.feline.policy.lists.msc.v1` */
+"policy";
 
 export type RoomListItemView = {
 	room_id: string,
