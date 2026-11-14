@@ -147,3 +147,20 @@ test('the create-account link only shows when the caller offers it', async () =>
   await rerender({ onCreateAccount: vi.fn() });
   expect(screen.getByRole('button', { name: 'Create account' })).toBeTruthy();
 });
+
+test('Tab leaves the provider for the username without stopping on the options button', async () => {
+  setup(() => Promise.resolve(flows));
+  const user = userEvent.setup();
+  homeserver().focus();
+  await user.tab();
+  expect(screen.getByRole('textbox', { name: 'Username, Matrix ID or email' })).toHaveFocus();
+});
+
+test('Tab still reaches the username while the provider is being rechecked', async () => {
+  const { rerender } = setup(() => Promise.resolve(flows));
+  const user = userEvent.setup();
+  homeserver().focus();
+  await rerender({ isCheckingHomeserver: true });
+  await user.tab();
+  expect(screen.getByRole('textbox', { name: 'Username, Matrix ID or email' })).toHaveFocus();
+});

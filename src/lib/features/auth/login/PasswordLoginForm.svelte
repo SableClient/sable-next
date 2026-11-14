@@ -54,7 +54,8 @@
       autocapitalize="off"
       spellcheck={false}
       required
-      disabled={isAuthenticating || isCheckingHomeserver}
+      disabled={isAuthenticating}
+      readonly={isCheckingHomeserver}
       aria-invalid={invalidField === 'username'}
       aria-describedby={error && invalidField === 'username' ? `${hintId} ${errorId}` : hintId}
       oninput={() => {
@@ -68,7 +69,8 @@
     <PasswordField
       bind:value={password}
       bind:showPassword
-      disabled={isAuthenticating || isCheckingHomeserver}
+      disabled={isAuthenticating}
+      readonly={isCheckingHomeserver}
       invalid={invalidField === 'password'}
       describedBy={error && invalidField === 'password' ? errorId : undefined}
       oninput={() => {
