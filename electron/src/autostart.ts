@@ -2,10 +2,11 @@ import { app } from 'electron';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { installMethod } from './install-method';
 import { desktopExec } from './linux-schemes';
 
 export function autostartAvailable(): boolean {
-  return app.isPackaged && !process.env.FLATPAK_ID;
+  return app.isPackaged && installMethod() !== 'flatpak';
 }
 
 export async function setLaunchAtLogin(

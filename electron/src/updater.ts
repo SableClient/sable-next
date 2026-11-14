@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { app, ipcMain, type WebFrameMain } from 'electron';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
+
+import { installMethod } from './install-method';
 
 type IsAppFrame = (frame: WebFrameMain | null | undefined) => boolean;
 type WatchFlatpakUpdates = (notify: () => void) => void;
@@ -35,19 +37,9 @@ export function supportsAutoUpdate(): boolean {
     app.isPackaged &&
     autoUpdate !== false &&
     !process.mas &&
-    !process.env.FLATPAK_ID &&
-    (process.platform !== 'linux' || Boolean(process.env.APPIMAGE))
+    installMethod() !== 'flatpak' &&
+    (process.platform !== 'linux' || installMethod() === 'appimage')
   );
-}
-
-// electron-builder marks its own deb and rpm; Gentoo and Nix publish after the release feed.
-function distributionPackaged(): boolean {
-  try {
-    const type = readFileSync(join(dirname(app.getAppPath()), 'package-type'), 'utf8').trim();
-    return type !== 'deb' && type !== 'rpm';
-  } catch {
-    return false;
-  }
 }
 
 export function setUpdateChannel(channel: keyof typeof FEEDS): void {
@@ -69,8 +61,9 @@ export function registerUpdater(
 ): void {
   const enabled = supportsAutoUpdate();
   // Flathub and the nightly Flatpak repo publish after the release feed.
-  let flatpakUpdate = !process.env.FLATPAK_ID;
-  const distribution = distributionPackaged();
+  let flatpakUpdate = installMethod() !== 'flatpak';
+  // A distribution's repository publishes after the release feed too.
+  const distribution = installMethod() === 'distribution';
   if (!flatpakUpdate && app.isPackaged) {
     watchFlatpak(() => {
       flatpakUpdate = true;
