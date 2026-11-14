@@ -1538,6 +1538,7 @@
         "withheldUnverified": "{{name}} did not send you the message key for this message because this device is not verified.",
         "withheld": "You cannot view this message because {{name}} did not send you the message key. They may have blocked this device, or may be experiencing a technical problem."
       },
+      "detailsTitle": "Message details",
       "causeHeader": "What can I do?",
       "cause": {
         "waiting": "This message will appear once the message key is delivered. If it does not appear soon, {{name}}'s homeserver may be having issues connecting to your homeserver. Contact your homeserver administrators for assistance.",
@@ -4086,9 +4087,9 @@
     "replyNewer": "Reply to the next message",
     "editOlder": "Edit your previous message",
     "editNewer": "Edit your next message",
-    "pressKeys": "Press keys, Esc to cancel…",
     "nextMention": "Jump to the next unread mention",
     "jumpBack": "Go back after following a reply",
+    "pressKeys": "Press keys, Esc to cancel…",
     "conflict": "That combination is already used by “{{name}}”.",
     "resetOne": "Reset to default",
     "resetAll": "Reset every shortcut",
