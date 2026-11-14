@@ -361,7 +361,7 @@
     border-radius: var(--radius);
     font: inherit;
     margin-inline: 0;
-    padding: var(--space-200) var(--space-300);
+    padding-block: var(--space-200);
   }
 
   .persona-grid-option {
