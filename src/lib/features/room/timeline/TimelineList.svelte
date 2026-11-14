@@ -1,11 +1,14 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onDestroy, untrack, type Snippet } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { on } from 'svelte/events';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
+  import ArrowUDownLeftIcon from 'phosphor-svelte/lib/ArrowUDownLeftIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
+  import AtIcon from 'phosphor-svelte/lib/AtIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 
   import type {
@@ -35,9 +38,12 @@
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { rovingFocus } from '#lib/ui/roving-focus.js';
-  import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
+  import { isDialogOpen, isEditableTarget, matchesBinding } from '#lib/ui/shortcuts/binding.js';
+  import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
+  import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
 
   import MessageContextMenu from '../messages/MessageContextMenu.svelte';
   import MessageDialogHost from '../messages/MessageDialogHost.svelte';
@@ -102,6 +108,8 @@
     onRead: (eventId: string, fullyRead: boolean) => Promise<void>;
     onFullyRead?: (roomId: string, eventId: string) => void;
     hasUnread?: boolean;
+    /** Unread mentions of the reader in this timeline, oldest first. */
+    mentionEventIds?: readonly string[];
     onLoadReadMarker?: () => Promise<string | null>;
     onRequestUnread?: (eventId: string) => Promise<void>;
     onResumeLive?: () => Promise<void>;
@@ -154,6 +162,7 @@
     onRead,
     onFullyRead,
     hasUnread = false,
+    mentionEventIds = [],
     onLoadReadMarker,
     onRequestUnread,
     onResumeLive,
@@ -450,6 +459,58 @@
   let futureLoading = $derived(
     revealed && !live && visibleItems.length > 0 && timeline.forwardPagination === 'loading'
   );
+  const seenMentions = new SvelteSet<string>();
+  let pendingMentions = $derived(mentionEventIds.filter((eventId) => !seenMentions.has(eventId)));
+  let mentionTarget = $state<string | null>(null);
+  let jumpingMention = $derived(
+    mentionTarget !== null &&
+      !seenMentions.has(mentionTarget) &&
+      timeline.error === null &&
+      (timeline.loading || !timeline.items.some((item) => item.event_id === mentionTarget))
+  );
+  $effect(() => {
+    const { firstVisible, lastVisible, rows } = windowState;
+    if (!reading || !revealed || !windowActivity.active) return;
+    if (firstVisible === null || lastVisible === null) return;
+    untrack(() => {
+      for (const { index, value } of rows) {
+        const eventId = value.item.event_id;
+        if (
+          index >= firstVisible &&
+          index <= lastVisible &&
+          eventId &&
+          mentionEventIds.includes(eventId)
+        )
+          seenMentions.add(eventId);
+      }
+    });
+  });
+  /** The message a jump control is heading to, focused once it is on screen. */
+  let jumpFocusId = $state<string | null>(null);
+  let jumps = $state<HTMLElement | null>(null);
+  $effect(() => {
+    const eventId = jumpFocusId;
+    const { firstVisible, lastVisible, rows } = windowState;
+    if (eventId === null || firstVisible === null || lastVisible === null) return;
+    const row = rows.find(
+      ({ index, value }) =>
+        index >= firstVisible && index <= lastVisible && holdsEvent(value, eventId)
+    );
+    if (!row) return;
+    jumpFocusId = null;
+    // A reader who moved on to the composer or elsewhere keeps their focus.
+    const focused = document.activeElement;
+    if (focused === null || focused === document.body || jumps?.contains(focused))
+      articleFor(row.key)?.focus({ preventScroll: true });
+  });
+  /** Messages the reader left by following a reply, most recent first. */
+  let returnStack = $state.raw<readonly string[]>([]);
+  let returnEventId = $derived(
+    returnStack.find((eventId) => {
+      const index = entries.findIndex(({ value }) => holdsEvent(value, eventId));
+      return index < 0 || windowState.lastVisible === null || index > windowState.lastVisible;
+    }) ?? null
+  );
   let historyLoadingVisible = $state(false);
   $effect(() => {
     if (historyLoading) {
@@ -489,6 +550,7 @@
   });
   function windowChanged(state: TimelineWindowState<RowValue>): void {
     const wasScrolling = windowState.scrolling;
+    if (state.pinned && !windowState.pinned) returnStack = [];
     windowState = state;
     const node = viewport;
     const height = node?.clientHeight ?? 0;
@@ -1102,7 +1164,36 @@
     const viewportRect = node.getBoundingClientRect();
     return rowRect.top >= viewportRect.top && rowRect.bottom <= viewportRect.bottom;
   }
+  function jumpFrom(origin: string | null, target: string): void {
+    if (origin !== null) returnStack = [origin, ...returnStack];
+    onJumpToEvent?.(target);
+  }
+  function jumpDown(): void {
+    const eventId = returnEventId;
+    if (eventId === null || !onJumpToEvent) {
+      jumpToLatest();
+      return;
+    }
+    returnStack = returnStack.slice(returnStack.indexOf(eventId) + 1);
+    jumpFocusId = eventId;
+    onJumpToEvent(eventId);
+  }
+  function jumpToMention(): void {
+    if (jumpingMention) return;
+    for (const eventId of pendingMentions) {
+      // A loaded mention this timeline does not show can never reach the screen.
+      if (timeline.items.some((item) => item.event_id === eventId) && !entryFor(eventId)) {
+        seenMentions.add(eventId);
+        continue;
+      }
+      mentionTarget = eventId;
+      jumpFocusId = eventId;
+      onJumpToEvent?.(eventId);
+      return;
+    }
+  }
   function jumpToLatest(): void {
+    returnStack = [];
     focus.cancel();
     unreadNavigation?.abort();
     historyController.finishHistoryFill();
@@ -1117,6 +1208,22 @@
     unread.reachLatest();
     onReturnedToLatest?.();
     void controller?.jumpTo(null, 'start', !shouldReduceMotion());
+  }
+  function onJumpShortcut(event: KeyboardEvent): void {
+    if (event.defaultPrevented || event.isComposing || !active) return;
+    if (isEditableTarget(event.target) || isDialogOpen()) return;
+    const mac = isMacPlatform();
+    const pressed = (id: string): boolean => {
+      const binding = bindingFor(id);
+      return binding !== undefined && matchesBinding(binding, event, mac);
+    };
+    if (pressed('room.nextMention') && pendingMentions.length > 0) {
+      event.preventDefault();
+      jumpToMention();
+    } else if (pressed('room.jumpBack') && returnEventId !== null) {
+      event.preventDefault();
+      jumpDown();
+    }
   }
   function onEscape(event: KeyboardEvent): void {
     if (
@@ -1180,7 +1287,7 @@
     layout={preferences.layout}
     alignOwn={preferences.alignOwnMessages}
     avatarsInHeaders={preferences.avatarsInMessageHeaders}
-    {onJumpToEvent}
+    onJumpToEvent={onJumpToEvent && ((target: string) => jumpFrom(item.event_id, target))}
     {onOpenMedia}
     {onVotePoll}
     {onEndPoll}
@@ -1190,7 +1297,12 @@
   />
 {/snippet}
 
-<svelte:window onkeydown={onEscape} />
+<svelte:window
+  onkeydown={(event) => {
+    onJumpShortcut(event);
+    onEscape(event);
+  }}
+/>
 
 <TimelineReadReceipt
   {timeline}
@@ -1381,28 +1493,82 @@
     {/if}
   </div>
 
-  {#if revealed && visibleItems.length > 0 && (live ? jumpToLatestVisible : onJumpToLive !== undefined)}
-    {@const jumpLabel = i18n.t('timeline.jumpToLatest')}
-    <div
-      class="jump-to-latest-motion"
-      in:fly={{ y: 4, duration: motionMs(200), easing: cubicOut }}
-      out:fade={{ duration: motionMs(MOTION_MS.quick) }}
-    >
-      <Tooltip label={jumpLabel}>
-        {#snippet trigger({ props })}
-          <IconButton
-            {...props}
-            type="button"
-            class="jump-to-latest"
-            variant="secondary"
-            size="medium"
-            label={jumpLabel}
-            onclick={jumpToLatest}
+  {#if revealed && visibleItems.length > 0}
+    <div class="timeline-jumps" bind:this={jumps}>
+      {#if pendingMentions.length > 0 && onJumpToEvent}
+        {@const mentionLabel = i18n.t('timeline.jumpToMention', {
+          count: pendingMentions.length,
+        })}
+        <div
+          class="jump-to-mention-motion"
+          in:fly={{ y: 4, duration: motionMs(200), easing: cubicOut }}
+          out:fade={{ duration: motionMs(MOTION_MS.quick) }}
+        >
+          <Tooltip label={mentionLabel}>
+            {#snippet trigger({ props })}
+              <IconButton
+                {...props}
+                type="button"
+                class="jump-to-mention"
+                variant="secondary"
+                size="medium"
+                label={mentionLabel}
+                aria-busy={jumpingMention}
+                onclick={jumpToMention}
+              >
+                {#if jumpingMention}<Spinner />{:else}<AtIcon />{/if}
+              </IconButton>
+            {/snippet}
+          </Tooltip>
+          <UnreadBadge
+            class="mention-count"
+            counts={{ unread: 0, highlight: pendingMentions.length }}
+            aria-hidden="true"
+          />
+        </div>
+      {/if}
+      <div class="jump-to-latest-slot">
+        {#if live ? jumpToLatestVisible || returnEventId !== null : onJumpToLive !== undefined}
+          {@const jumpLabel = i18n.t(
+            returnEventId === null ? 'timeline.jumpToLatest' : 'timeline.jumpBack'
+          )}
+          <div
+            class="jump-to-latest-motion"
+            in:fly={{ y: 4, duration: motionMs(200), easing: cubicOut }}
+            out:fade={{ duration: motionMs(MOTION_MS.quick) }}
           >
-            <ArrowDownIcon />
-          </IconButton>
-        {/snippet}
-      </Tooltip>
+            <Tooltip label={jumpLabel}>
+              {#snippet trigger({ props })}
+                {#if returnEventId === null}
+                  <IconButton
+                    {...props}
+                    type="button"
+                    class="jump-to-latest"
+                    variant="secondary"
+                    size="medium"
+                    label={jumpLabel}
+                    onclick={jumpDown}
+                  >
+                    <ArrowDownIcon />
+                  </IconButton>
+                {:else}
+                  <Button
+                    {...props}
+                    type="button"
+                    class="jump-to-latest jump-back"
+                    variant="secondary"
+                    aria-label={jumpLabel}
+                    onclick={jumpDown}
+                  >
+                    <ArrowUDownLeftIcon class="mirror-rtl" aria-hidden="true" />
+                    {i18n.t('common.back')}
+                  </Button>
+                {/if}
+              {/snippet}
+            </Tooltip>
+          </div>
+        {/if}
+      </div>
     </div>
   {/if}
 
@@ -1636,16 +1802,48 @@
     flex: none;
   }
 
-  .jump-to-latest-motion {
+  .timeline-jumps {
+    align-items: center;
     inset-inline: 0;
     bottom: calc(var(--timeline-foot-height) + var(--space-200));
+    display: flex;
+    gap: var(--space-200);
     margin-inline: auto;
+    pointer-events: none;
     position: absolute;
     width: fit-content;
     z-index: 4;
   }
 
-  :global(button.jump-to-latest) {
+  .jump-to-mention-motion {
+    pointer-events: auto;
+    position: relative;
+  }
+
+  /* Kept empty while the control is away so the mention control never moves. */
+  .jump-to-latest-slot {
+    height: var(--timeline-indicator-size);
+    position: relative;
+    width: var(--timeline-indicator-size);
+  }
+
+  /* The labelled Back control grows past the slot, away from the mention control. */
+  .jump-to-latest-motion {
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    pointer-events: auto;
+    position: absolute;
+    width: max-content;
+  }
+
+  .jump-to-mention-motion :global(.mention-count) {
+    inset-block-start: calc(var(--space-100) * -1);
+    inset-inline-end: calc(var(--space-100) * -1);
+    position: absolute;
+  }
+
+  :global(button.jump-to-latest),
+  :global(button.jump-to-mention) {
     --button-height: var(--timeline-indicator-size);
     --button-container: var(--surface-var-container);
     --button-container-hover: var(--surface-var-container-hover);
@@ -1656,5 +1854,9 @@
     background-image: none;
     border-radius: 50%;
     box-shadow: var(--shadow-float);
+  }
+
+  :global(button.jump-back) {
+    border-radius: var(--radii-pill);
   }
 </style>

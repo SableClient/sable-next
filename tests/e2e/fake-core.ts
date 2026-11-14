@@ -1192,6 +1192,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           },
         ].filter(
           (item) =>
+            (params.room_id == null || item.room_id === params.room_id) &&
             (params.include_read || !item.read) &&
             (params.filter !== 'mentions' || item.highlight) &&
             (params.filter !== 'direct' || item.is_direct)

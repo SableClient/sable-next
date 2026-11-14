@@ -147,6 +147,14 @@ export function inviter(room: RoomListItemView): string | null {
   return room.latest_event?.sender ?? null;
 }
 
+/** The room timeline's mentions, oldest first. A thread's mentions sit in the thread. */
+export function timelineMentions(items: readonly InboxItemView[]): string[] {
+  return items
+    .filter((item) => item.thread_root === null)
+    .sort((a, b) => a.ts - b.ts)
+    .map((item) => item.event_id);
+}
+
 export function senderName(userId: string): string {
   return userId.startsWith('@') ? localpartOf(userId) : userId;
 }

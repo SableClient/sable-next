@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { BookmarkView, RoomListItemView } from '#src/generated/protocol';
+import type { BookmarkView, InboxItemView, RoomListItemView } from '#src/generated/protocol';
 
 import { NO_UNREAD, type RoomUnread } from '#lib/rooms/unread.js';
 import { roomView } from '#lib/test-support/room-views.js';
@@ -18,6 +18,7 @@ import {
   parseFilter,
   pendingInvites,
   senderName,
+  timelineMentions,
   unlistedNotifications,
 } from './inbox';
 
@@ -320,4 +321,16 @@ test('only a room with notifications moves the backfill signal', () => {
 
   expect(backfillSignal([quiet('$chatter'), pinged('$b')])).toBe(before);
   expect(backfillSignal([quiet('$a'), pinged('$ping')])).not.toBe(before);
+});
+
+test('the mentions to visit in a room are ordered oldest first and leave thread mentions out', () => {
+  const mention = (event_id: string, ts: number, thread_root: string | null = null) =>
+    ({ event_id, ts, thread_root }) as InboxItemView;
+  expect(
+    timelineMentions([
+      mention('$newest', 30),
+      mention('$threaded', 20, '$root'),
+      mention('$oldest', 10),
+    ])
+  ).toEqual(['$oldest', '$newest']);
 });

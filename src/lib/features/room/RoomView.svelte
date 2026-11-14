@@ -9,6 +9,8 @@
   import { setPageState } from '#lib/platform/page-state.js';
   import { page } from '$app/state';
 
+  import { InboxFeed } from '#lib/features/inbox/inbox-feed.svelte.js';
+  import { timelineMentions } from '#lib/features/inbox/inbox.js';
   import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -537,6 +539,29 @@
     });
   });
 
+  const UNREAD_MENTION_LIMIT = 1000;
+  let mentionFeed = $derived(new InboxFeed(core.rpc.notifications, resolvedRoomId));
+  let unreadMentions = $derived(timelineMentions(mentionFeed.items));
+  function loadMentions(feed: InboxFeed): Promise<void> {
+    return feed.load('mentions', false, UNREAD_MENTION_LIMIT);
+  }
+  $effect(() => {
+    const feed = mentionFeed;
+    void feed.backfill(false).then(() => loadMentions(feed));
+    const stop = core.subscribeEvents((event) => {
+      if (event.type === 'inbox_changed') void loadMentions(feed);
+    });
+    return () => {
+      stop();
+      feed.dispose();
+    };
+  });
+  // Reading clears mentions without an inbox event, so reload when the room's count moves.
+  $effect(() => {
+    void resolvedRoom?.highlight;
+    void loadMentions(mentionFeed);
+  });
+
   function toggleWidgets(): void {
     panels.toggleWidgets();
   }
@@ -822,6 +847,7 @@
       onRead={markRead}
       onFullyRead={setFullyRead}
       hasUnread={resolvedRoom === undefined || roomHasUnread}
+      mentionEventIds={unreadMentions}
       onLoadReadMarker={loadReadMarker}
       onRequestUnread={requestUnread}
       onResumeLive={resumeLive}

@@ -1471,11 +1471,20 @@ interface LiveTimeline {
 let currentLiveList: { followingLive: boolean };
 
 /** Every row lays out at `ROW`, so the virtualiser and the stubbed box agree. */
-async function mountLive(roomTimeline: RoomTimeline, roomId?: string): Promise<LiveTimeline> {
+async function mountLive(
+  roomTimeline: RoomTimeline,
+  roomId?: string,
+  props: {
+    mentionEventIds?: string[];
+    onJumpToEvent?: (eventId: string) => void;
+    onJumpToLive?: () => void;
+  } = {}
+): Promise<LiveTimeline> {
   layOutRows();
   roomTimeline.mode = { kind: 'live' };
   roomTimeline.backwardPagination = 'end';
   const list = {
+    ...props,
     timeline: roomTimeline,
     roomId,
     onRequestHistory: () => Promise.resolve(false),
@@ -3274,4 +3283,127 @@ test('Shift+F10 and the ContextMenu key raise the message context menu', async (
   await userEvent.keyboard('{Shift>}{F10}{/Shift}');
   await userEvent.keyboard('{ContextMenu}');
   expect(raised).toHaveBeenCalledTimes(2);
+});
+
+test('the mention control jumps to the oldest unread mention that has not been on screen, and retries one that has not arrived', async () => {
+  const focused = vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+  onTestFinished(() => {
+    focused.mockRestore();
+  });
+  const jump = vi.fn();
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20).map((entry, index) =>
+    index === 3 || index === 18 ? { ...entry, mention: 'loud' } : entry
+  );
+  await mountLive(roomTimeline, undefined, {
+    mentionEventIds: ['$3', '$18'],
+    onJumpToEvent: jump,
+  });
+
+  const control = screen.getByRole('button', { name: 'Next unread mention' });
+  await userEvent.click(control);
+  expect(jump).toHaveBeenCalledExactlyOnceWith('$3');
+  expect(control).toBeInTheDocument();
+
+  await userEvent.keyboard('{Alt>}m{/Alt}');
+  expect(jump).toHaveBeenCalledTimes(2);
+  expect(jump).toHaveBeenLastCalledWith('$3');
+});
+
+test('after following a reply the jump control first returns to the message it was followed from', async () => {
+  const jump = vi.fn();
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20).map((entry, index) =>
+    index === 19
+      ? {
+          ...entry,
+          in_reply_to: {
+            event_id: '$2',
+            sender: '@bob:example.org',
+            sender_mentioned: false,
+            sender_name: 'Bob',
+            body: 'original',
+            fallback: null,
+          },
+        }
+      : entry
+  );
+  const { element, end } = await mountLive(roomTimeline, undefined, { onJumpToEvent: jump });
+
+  const reply = document.querySelector<HTMLElement>('[data-event-id="$19"] .reply-preview');
+  if (!reply) throw new Error('no reply preview');
+  await userEvent.click(reply);
+  expect(jump).toHaveBeenLastCalledWith('$2');
+
+  await dragTo(element, end, 0);
+  expect(screen.getByRole('button', { name: 'Back to where you were' })).toHaveTextContent('Back');
+  await userEvent.keyboard('{Alt>}b{/Alt}');
+  expect(jump).toHaveBeenLastCalledWith('$19');
+  await flushed();
+  expect(screen.getByRole('button', { name: 'Jump to latest' })).toBeInTheDocument();
+});
+
+test('following a reply out of the loaded timeline keeps the way back', async () => {
+  const jump = vi.fn();
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20).map((entry, index) =>
+    index === 19
+      ? {
+          ...entry,
+          in_reply_to: {
+            event_id: '$old',
+            sender: '@bob:example.org',
+            sender_mentioned: false,
+            sender_name: 'Bob',
+            body: 'original',
+            fallback: null,
+          },
+        }
+      : entry
+  );
+  await mountLive(roomTimeline, undefined, { onJumpToEvent: jump, onJumpToLive: () => {} });
+
+  const reply = document.querySelector<HTMLElement>('[data-event-id="$19"] .reply-preview');
+  if (!reply) throw new Error('no reply preview');
+  await userEvent.click(reply);
+  expect(jump).toHaveBeenLastCalledWith('$old');
+
+  roomTimeline.mode = { kind: 'focused', eventId: '$old' };
+  roomTimeline.backwardPagination = 'idle';
+  roomTimeline.items = [item('older'), item('old'), item('newer')];
+  await flushed();
+  await runAnimationFrames();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Back to where you were' }));
+  expect(jump).toHaveBeenLastCalledWith('$19');
+});
+
+test('a mention outside the loaded timeline shows as loading, then takes focus once it is on screen', async () => {
+  const focused = vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+  onTestFinished(() => {
+    focused.mockRestore();
+  });
+  const jump = vi.fn();
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  await mountLive(roomTimeline, undefined, { mentionEventIds: ['$far'], onJumpToEvent: jump });
+
+  const control = screen.getByRole('button', { name: 'Next unread mention' });
+  await userEvent.click(control);
+  expect(jump).toHaveBeenCalledExactlyOnceWith('$far');
+  expect(control).toHaveAttribute('aria-busy', 'true');
+  await userEvent.click(control);
+  expect(jump).toHaveBeenCalledOnce();
+
+  roomTimeline.items = roomTimeline.items.map((entry, index) =>
+    index === 18 ? { ...item('far'), mention: 'loud' } : entry
+  );
+  await flushed();
+  await runAnimationFrames();
+
+  expect(document.querySelector('.jump-to-mention-motion')).toHaveAttribute('inert');
+  expect(document.activeElement?.closest('[data-event-id]')).toHaveAttribute(
+    'data-event-id',
+    '$far'
+  );
 });

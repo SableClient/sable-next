@@ -25,6 +25,8 @@ export type ShortcutId =
   | 'room.replyNewer'
   | 'room.editOlder'
   | 'room.editNewer'
+  | 'room.nextMention'
+  | 'room.jumpBack'
   | 'call.toggleMute'
   | 'call.toggleDeafen'
   | 'call.toggleCamera'
@@ -227,6 +229,18 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.editNewer',
     category: 'room',
     binding: 'ctrl+shift+down',
+  },
+  {
+    id: 'room.nextMention',
+    labelKey: 'shortcuts.nextMention',
+    category: 'room',
+    binding: 'alt+m',
+  },
+  {
+    id: 'room.jumpBack',
+    labelKey: 'shortcuts.jumpBack',
+    category: 'room',
+    binding: 'alt+b',
   },
   {
     id: 'call.toggleMute',
