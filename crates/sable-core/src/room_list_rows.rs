@@ -160,7 +160,10 @@ impl RoomListRows {
         let mut diffs = Vec::new();
         for (index, row) in self.rows.iter_mut().enumerate() {
             let (name, avatar) = (row.display_name.clone(), row.display_avatar_url.clone());
-            nicknames.apply_room(row);
+            let explicit = cache
+                .get(&row.room_id)
+                .is_some_and(|info| info.explicit_name);
+            nicknames.apply_room(row, explicit);
             crate::view::apply_avatar_override(row, cache.get(&row.room_id));
             if row.display_name != name || row.display_avatar_url != avatar {
                 diffs.push(VectorDiff::Set {
@@ -272,6 +275,7 @@ mod tests {
             avatar_url: None,
             avatar_source: None,
             direct_name: None,
+            explicit_name: false,
             children: Vec::new(),
             children_stale: false,
             tags: Vec::new(),
@@ -303,6 +307,7 @@ mod tests {
             avatar_url: None,
             avatar_source: None,
             direct_name: None,
+            explicit_name: false,
             children,
             children_stale: false,
             tags: Vec::new(),
@@ -425,6 +430,36 @@ mod tests {
     }
 
     #[test]
+    fn a_nickname_leaves_an_explicitly_named_one_to_one_room_alone() {
+        let rules = Ruleset::new();
+        let mut direct = summary(room_id!("!dm:x"), &rules);
+        direct.name = Some("Support".to_owned());
+        direct.is_direct = true;
+        direct.direct_targets = vec![user_id!("@bot:x").to_owned()];
+        let mut rows = RoomListRows::default();
+        rows.apply(&VectorDiff::PushBack { value: direct });
+        let nicknames = Nicknames::from_overrides(
+            vec![crate::protocol::ProfileOverrideView {
+                user_id: user_id!("@bot:x").to_owned(),
+                display_name: crate::protocol::OverrideTextView::Set {
+                    value: "Botty".to_owned(),
+                },
+                avatar: crate::protocol::OverrideTextView::Unset,
+                color: crate::protocol::OverrideColorView::Unset,
+            }],
+            None,
+        );
+        let mut info = space_info(Vec::new());
+        info.room_kind = None;
+        info.explicit_name = true;
+        let cache = HashMap::from([(room_id!("!dm:x").to_owned(), info)]);
+
+        rows.rename(&nicknames, &cache);
+
+        assert_eq!(rows.rows()[0].display_name, "Support");
+    }
+
+    #[test]
     fn a_nickname_renames_only_the_one_to_one_room_with_that_person() {
         let rules = Ruleset::new();
         let mut direct = summary(room_id!("!dm:x"), &rules);
@@ -435,7 +470,7 @@ mod tests {
         group.name = Some("Bob and friends".to_owned());
         let mut rows = RoomListRows::default();
         for mut row in [direct, group] {
-            Nicknames::default().apply_room(&mut row);
+            Nicknames::default().apply_room(&mut row, false);
             rows.apply(&VectorDiff::PushBack { value: row });
         }
         let nicknames = Nicknames::from_overrides(

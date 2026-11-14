@@ -167,7 +167,7 @@ impl Nicknames {
         }
     }
 
-    pub fn apply_room(&self, room: &mut RoomListItemView) {
+    pub fn apply_room(&self, room: &mut RoomListItemView, explicit_name: bool) {
         let real_name = room
             .name
             .clone()
@@ -179,7 +179,9 @@ impl Nicknames {
         };
         (room.display_name, room.display_avatar_url) = match peer {
             Some(peer) => (
-                self.name(peer, Some(&real_name)).unwrap_or(real_name),
+                self.name(peer, Some(&real_name))
+                    .filter(|_| !explicit_name)
+                    .unwrap_or(real_name),
                 self.avatar(peer, room.avatar_url.as_deref()),
             ),
             None => (real_name, room.avatar_url.clone()),

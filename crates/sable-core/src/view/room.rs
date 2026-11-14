@@ -46,6 +46,7 @@ pub struct RoomInfo {
     /// `None` for direct rooms, whose avatar can change through a member.
     pub avatar_source: Option<AvatarSource>,
     pub direct_name: Option<String>,
+    pub explicit_name: bool,
     pub children: Vec<SpaceChildEdge>,
     /// The last read of `children` failed, so they are the previous ones.
     pub children_stale: bool,
@@ -136,7 +137,7 @@ pub fn room_list_item<S: BuildHasher>(
         display_name: String::new(),
         display_avatar_url: None,
     };
-    nicknames.apply_room(&mut view);
+    nicknames.apply_room(&mut view, info.is_some_and(|info| info.explicit_name));
     apply_avatar_override(&mut view, info);
     view
 }
@@ -493,6 +494,7 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         avatar_url,
         avatar_source,
         direct_name,
+        explicit_name: room.name().is_some(),
         children,
         children_stale,
         tags: room_tags(room),

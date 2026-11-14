@@ -683,7 +683,7 @@ fn a_nickname_renames_and_re_sorts_a_direct_message() {
             direct_targets: vec![OwnedUserId::try_from(user).expect("a user id")],
             ..direct(room_id)
         };
-        Nicknames::default().apply_room(&mut row);
+        Nicknames::default().apply_room(&mut row, false);
         row
     };
     let mut rows = RoomListRows::default();
