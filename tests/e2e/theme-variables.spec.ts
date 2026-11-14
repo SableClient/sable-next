@@ -88,8 +88,8 @@ for (const theme of ['light', 'dark'] as const) {
     ).toContain('#abcdef');
     await expect.soft(page.locator('.settings-content')).toHaveCSS('color', 'rgb(238, 238, 238)');
     await page.setViewportSize({ width: 1600, height: 900 });
-    const settingsSearch = page.locator('#settings-search-input');
-    await expect(settingsSearch.locator('..')).toHaveCSS('background-color', 'rgb(32, 48, 64)');
+    const settingsSearch = page.getByRole('searchbox', { name: 'Search settings', exact: true });
+    await expect(settingsSearch).toHaveCSS('background-color', 'rgb(32, 48, 64)');
     await expect(settingsSearch).toHaveCSS('color', 'rgb(238, 238, 238)');
     await page.setViewportSize({ width: 1280, height: 720 });
     const quickCss = page.getByRole('textbox', { name: 'Quick CSS', exact: true });
@@ -209,8 +209,8 @@ for (const theme of ['light', 'dark'] as const) {
     await installRoomCore('ready');
     await installTheme(page, theme);
     await page.goto('/settings');
-    const search = page.locator('#settings-search-input');
-    await expect(search.locator('..')).toHaveCSS('background-color', 'rgb(32, 48, 64)');
+    const search = page.getByRole('searchbox', { name: 'Search settings', exact: true });
+    await expect(search).toHaveCSS('background-color', 'rgb(32, 48, 64)');
     await expect(search).toHaveCSS('color', 'rgb(238, 238, 238)');
     await page.goto('/settings/appearance');
     await expect(page.locator('.section-bar')).toHaveCSS('color', 'rgb(238, 238, 238)');

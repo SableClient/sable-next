@@ -114,6 +114,8 @@ for (const reading of [false, true]) {
     }
     await timeline.waitForScrollSettled();
     const anchor = reading ? await timeline.fullyVisibleAnchor() : null;
+    const viewportTop = async () => (await timeline.viewport.boundingBox())?.y ?? 0;
+    const initialTop = await viewportTop();
     const size = page.viewportSize();
     if (!size) throw new Error('missing viewport size');
     const subscription = await core.subscription();
@@ -136,7 +138,9 @@ for (const reading of [false, true]) {
       expect(growth).toBeGreaterThan(0);
       await timeline.waitForScrollSettled();
       if (anchor) {
-        await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
+        // A short touch viewport drops the room header, which moves the timeline itself.
+        const shift = (await viewportTop()) - initialTop;
+        await timeline.expectAnchorHeld({ ...anchor, y: anchor.y + shift }, { tolerance: 2 });
         await expect(timeline.jumpToLatest).toBeVisible();
       } else {
         await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
@@ -1299,7 +1303,8 @@ test('a message the reader sends from the bottom is followed on every frame', as
     {
       id: 'sent-from-bottom-tall',
       body: Array.from(
-        { length: 8 },
+        // Taller than the viewport in every layout, so its top may sit above the fold.
+        { length: 14 },
         (_, index) => `Wrapped line ${index} ${'with text '.repeat(12)}`
       ).join('\n'),
       method: 'button',

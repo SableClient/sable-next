@@ -1,6 +1,6 @@
 import type { MessageKind, TimelineItemView } from '#src/generated/protocol';
 import { expect, SIGNED_OUT, test } from './fixtures/test';
-import { timelineImage, timelineItem, withRowFields } from './fixtures/timeline-items';
+import { linkPreview, timelineImage, timelineItem, withRowFields } from './fixtures/timeline-items';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -55,21 +55,11 @@ const cases: Record<string, TimelineItemView> = {
   'link preview': {
     ...message('<a href="https://example.test/preview">Preview</a>'),
     bundled_link_previews: [
-      {
-        url: 'https://example.test/preview',
+      linkPreview('https://example.test/preview', {
         title: long,
         description: long,
         site_name: long,
-        image: null,
-        image_mime: null,
-        image_width: null,
-        image_height: null,
-        video: null,
-        theme_color: null,
-        card: null,
-        author_name: null,
-        post: null,
-      },
+      }),
     ],
   },
   reactions: {

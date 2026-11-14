@@ -52,7 +52,7 @@ for (const viewport of [
     await card.getByRole('button', { name: 'Continue' }).click();
 
     await expect(page).toHaveURL(/\/setup\/sync$/);
-    await expect(card).toContainText('unencrypted data');
+    await expect(card).toContainText('encrypted once recovery is set up');
     await card.getByRole('button', { name: 'Turn on sync' }).click();
 
     await expect(page).toHaveURL(/\/setup\/done$/);

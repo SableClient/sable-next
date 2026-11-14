@@ -28,7 +28,7 @@ test('search sharing starts by default and can be turned off', async ({ page }) 
   ).toBeChecked();
   await expect(
     page.getByText(
-      'Open Sable on both devices on the same network. Indexing continues if they cannot connect.'
+      'Search history is copied from your other devices after you verify this one, or when it has been away for a week.'
     )
   ).toBeVisible();
 
@@ -54,7 +54,9 @@ test('unsupported browsers keep direct sharing unavailable without starting it',
     Object.defineProperty(window, 'RTCPeerConnection', { value: undefined });
   });
   await page.goto('/settings/timeline');
-  await expect(page.getByText('Direct sharing unavailable', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('This browser cannot connect directly to your other devices.')
+  ).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() => {

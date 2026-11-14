@@ -47,6 +47,9 @@ test('QR verification completes and resets on touch devices', async ({
   const dialog = page.getByRole('dialog', { name: 'Device verification' });
   const scanner = dialog.getByLabel('Looking for a code…');
   const qr = dialog.getByRole('img', { name: 'Verification code' });
+  await expect(qr).toBeVisible();
+  await expect(scanner).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Scan a code instead' }).click();
   await expect(scanner).toBeVisible();
   await expect(qr).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Show this device’s code' }).click();
@@ -58,7 +61,7 @@ test('QR verification completes and resets on touch devices', async ({
   await expect(scanner).toHaveCount(0);
 
   await emitVerification({ phase: 'done' });
-  await expect(dialog.getByText('Your device is verified.')).toBeVisible();
+  await expect(dialog.getByRole('status')).toHaveText('Your device is verified.');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toBeHidden();
 
@@ -66,8 +69,8 @@ test('QR verification completes and resets on touch devices', async ({
     { phase: 'choose', qr: fixture.code, can_scan: true, can_compare: true },
     'qr-next-flow'
   );
-  await expect(scanner).toBeVisible();
-  await expect(qr).toHaveCount(0);
+  await expect(qr).toBeVisible();
+  await expect(scanner).toHaveCount(0);
 });
 
 test('the verification dialog moves focus to its title in each phase', async ({

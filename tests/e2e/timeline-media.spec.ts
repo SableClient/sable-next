@@ -4,7 +4,7 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test, SIGNED_OUT } from './fixtures/test';
-import { timelineItem } from './fixtures/timeline-items';
+import { linkPreview, timelineItem } from './fixtures/timeline-items';
 import { quietFor, NEGATIVE_SETTLE_MS } from './fixtures/settle';
 
 test.use({ storageState: SIGNED_OUT, hasTouch: true });
@@ -128,16 +128,14 @@ for (const mobile of [false, true]) {
       ...message,
       content: { ...message.content, html },
       bundled_link_previews: [
-        {
-          url: 'https://example.org/landscape',
+        linkPreview('https://example.org/landscape', {
           title: 'Landscape',
-          description: null,
           site_name: 'Example',
           image: 'mxc://example.test/spoiler-preview-link',
           image_width: 800,
           image_height: 600,
           image_mime: 'image/png',
-        },
+        }),
       ],
     });
     for (const selector of ['.inline-image', '.link-preview-image']) {
@@ -607,7 +605,8 @@ test('a picture that will not decode falls back to the original once, then stops
   await expect(media).toContainText('Media unavailable');
   const fetches = await core.mediaFetches();
   expect(fetches.at(-1)).toBe('fetch_media 0x0');
-  expect(fetches.filter((fetch) => fetch === 'fetch_media 0x0')).toHaveLength(1);
+  // The original gets its first load and both display recovery steps.
+  expect(fetches.filter((fetch) => fetch === 'fetch_media 0x0')).toHaveLength(3);
 
   await quietFor(page, NEGATIVE_SETTLE_MS * 6);
   expect(await core.mediaFetches()).toEqual(fetches);
@@ -644,8 +643,7 @@ test('square article previews use thumbnails while landscape previews stay large
     await core.setTimelineItemById(subscription, 'general-19', {
       ...timelineItem('general-19', 'https://example.test/article'),
       bundled_link_previews: [
-        {
-          url: 'https://example.test/article',
+        linkPreview('https://example.test/article', {
           title: 'Article title',
           description: 'Article description',
           site_name: 'Example',
@@ -653,7 +651,7 @@ test('square article previews use thumbnails while landscape previews stay large
           image_mime: 'image/png',
           image_width: width,
           image_height: height,
-        },
+        }),
       ],
     });
     const image = row.locator('.link-preview-image');

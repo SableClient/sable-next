@@ -1,6 +1,6 @@
 // These shapes must track TimelineItemContentView in src/generated/protocol.ts; the app
 // reads content.html, so a body-only override renders the previous text.
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { TimelineItemView, UrlPreviewView } from '#src/generated/protocol';
 import { timelineItem as makeTimelineItem } from '../../../src/lib/features/room/timeline/test-items';
 
 import { withRowFields } from '../../../src/lib/features/room/timeline/row-fixtures';
@@ -13,6 +13,25 @@ export const timelineItem = (id: string, body: string): TimelineItemView =>
     sender: '@alice:example.test',
     timestamp: 1_700_000_000_000,
   });
+
+export function linkPreview(url: string, fields: Partial<UrlPreviewView> = {}): UrlPreviewView {
+  return {
+    url,
+    title: null,
+    description: null,
+    site_name: null,
+    image: null,
+    image_mime: null,
+    image_width: null,
+    image_height: null,
+    video: null,
+    theme_color: null,
+    card: null,
+    author_name: null,
+    post: null,
+    ...fields,
+  };
+}
 
 export function readMarkerItem(id: string): TimelineItemView {
   return withRowFields({
