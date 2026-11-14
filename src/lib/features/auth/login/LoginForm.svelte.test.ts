@@ -164,3 +164,13 @@ test('Tab still reaches the username while the provider is being rechecked', asy
   await user.tab();
   expect(screen.getByRole('textbox', { name: 'Username, Matrix ID or email' })).toHaveFocus();
 });
+
+test('the password toggle changes its name instead of exposing a pressed state', async () => {
+  setup(() => Promise.resolve(flows));
+  const user = userEvent.setup();
+
+  const show = screen.getByRole('button', { name: 'Show password' });
+  expect(show).not.toHaveAttribute('aria-pressed');
+  await user.click(show);
+  expect(screen.getByRole('button', { name: 'Hide password' })).not.toHaveAttribute('aria-pressed');
+});

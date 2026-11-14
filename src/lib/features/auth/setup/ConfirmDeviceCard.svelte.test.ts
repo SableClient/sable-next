@@ -181,3 +181,27 @@ test('a device confirmed while its reset is running still hands the new key on',
   });
   expect(onComplete).not.toHaveBeenCalled();
 });
+
+test('moving to another view puts focus on its heading', async () => {
+  live.encryption = status('unverified');
+  const { user } = setup();
+
+  await press(user, /Skip for now/);
+
+  expect(
+    await screen.findByRole('heading', { name: /Skip confirming this device\?/ })
+  ).toHaveFocus();
+  await press(user, /Go back/);
+  expect(await screen.findByRole('heading', { name: 'Confirm it’s you' })).toHaveFocus();
+});
+
+test('asking another device says it is waiting', async () => {
+  live.encryption = status('unverified');
+  live.deviceList = [device('THIS', true, false), device('PHONE', false, true)];
+  core.requestVerification.mockReturnValueOnce(new Promise(() => {}));
+  const { user } = setup();
+
+  await press(user, /Use another device/);
+
+  expect(await screen.findByRole('status')).toHaveTextContent('Waiting for the other device…');
+});

@@ -69,7 +69,7 @@
     </h1>
 
     {#if supportHref || featuresHref || source || donate}
-      <div class="hero-actions" aria-label={i18n.t('home.resourcesLabel')}>
+      <div class="hero-actions" role="group" aria-label={i18n.t('home.resourcesLabel')}>
         {#if supportHref}
           <LinkButton href={supportHref} variant="primary">
             <ChatCircleDotsIcon aria-hidden="true" />

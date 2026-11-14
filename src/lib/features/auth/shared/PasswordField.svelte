@@ -49,7 +49,6 @@
     type="button"
     {disabled}
     aria-label={showPassword ? i18n.t('auth.hidePassword') : i18n.t('auth.showPassword')}
-    aria-pressed={showPassword}
     onclick={() => {
       showPassword = !showPassword;
     }}

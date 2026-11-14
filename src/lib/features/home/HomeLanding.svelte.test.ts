@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { isTauri } from '@tauri-apps/api/core';
 
@@ -40,6 +40,13 @@ test.each(['web', 'ios'])('donation links on %s', (platform) => {
   } else {
     expect(screen.getByRole('link', { name: 'Donate' })).toBeInTheDocument();
   }
+});
+
+test('names the resource links as a group', () => {
+  render(HomeLanding, { titleKey: 'nav.unspaced' });
+
+  const group = screen.getByRole('group', { name: 'Sable resources' });
+  expect(within(group).getByRole('link', { name: 'Get support' })).toBeInTheDocument();
 });
 
 test('opens Get support in the Sable general room', () => {
