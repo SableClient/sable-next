@@ -14,6 +14,7 @@ use crate::protocol::{CoreEvent, RpcCode, RpcError, SessionInfo};
 
 use crate::session::AccountRegistry;
 use crate::session::{PersistedAccount, PersistedSession, Session};
+use matrix_sdk_ui::sync_service::SyncService;
 
 use crate::Core;
 use crate::cosmetics;
@@ -916,6 +917,7 @@ impl Core {
     }
 
     pub(crate) async fn take_session(&self) -> Option<Session> {
+        self.end_all_calls().await;
         let (session, index) = self.detach_session().await;
         if let Some(session) = &session {
             search::save_index(&session.client, index).await;
@@ -924,6 +926,14 @@ impl Core {
     }
 
     async fn retire_session(&self) -> Option<Session> {
+        // Hanging up reads the session, so it cannot move behind the detach. The delayed leave
+        // event ends a call this gives up on.
+        if matrix_sdk::timeout::timeout(self.end_all_calls(), SWITCH_WAIT)
+            .await
+            .is_err()
+        {
+            tracing::warn!("calls were still hanging up when the account switched");
+        }
         let (session, index) = self.detach_session().await;
         if let Some(session) = &session {
             self.retire_search_index(&session.account_id, &session.client, index)
@@ -933,7 +943,6 @@ impl Core {
     }
 
     async fn detach_session(&self) -> (Option<Session>, search::MessageIndex) {
-        self.end_all_calls().await;
         let client = self.session.current(|session| session.client.clone());
         if let Some(client) = client {
             self.flush_inbox(&client).await;
@@ -1047,7 +1056,7 @@ impl Core {
         // Do not disrupt the active session unless its replacement started
         // successfully. `retire_session` also aborts its owned watcher tasks.
         if let Some(previous) = self.retire_session().await {
-            previous.sync_service.stop().await;
+            stop_after_switch(previous.sync_service).await;
         }
 
         self.watch_ephemeral(&client, generation);
@@ -1351,6 +1360,25 @@ fn oauth_account_deactivate_url(
     };
     url.map(|url| url.to_string())
         .ok_or_else(|| RpcCode::Unsupported.into())
+}
+
+/// How long a switch waits on the previous account's network work before moving on.
+const SWITCH_WAIT: std::time::Duration = if cfg!(test) {
+    std::time::Duration::from_millis(300)
+} else {
+    std::time::Duration::from_secs(3)
+};
+
+/// A stopping sync service finishes its in-flight long poll, which can take far longer than a
+/// switch should wait. The stop request is already sent by then, so the poll only drains.
+async fn stop_after_switch(sync_service: Arc<SyncService>) {
+    let stopping = spawn(async move { sync_service.stop().await });
+    if matrix_sdk::timeout::timeout(stopping, SWITCH_WAIT)
+        .await
+        .is_err()
+    {
+        tracing::warn!("the previous sync was still stopping when the account switched");
+    }
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -2150,6 +2178,74 @@ mod regression_tests {
         assert_eq!(handler_counts[0], handler_counts[1]);
         let session = core.take_session().await.unwrap();
         session.sync_service.stop().await;
+    }
+
+    #[tokio::test]
+    async fn switching_accounts_does_not_wait_for_the_previous_sync_poll() {
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+        use std::time::Duration;
+
+        let (_store, server, core, room) = core_with_room().await;
+        server
+            .mock_sliding_sync()
+            .with_delay(Duration::from_secs(60))
+            .ok_json(serde_json::json!({ "pos": "0", "lists": {}, "rooms": {}, "extensions": {} }))
+            .mount()
+            .await;
+        let previous = core.sync_service().await.unwrap();
+        previous.start().await;
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !server
+                .server()
+                .received_requests()
+                .await
+                .unwrap_or_default()
+                .iter()
+                .any(|request| request.url.path().contains("msc3575"))
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the long poll reaches the server");
+        let next_server = MatrixMockServer::new().await;
+        next_server.mock_versions().ok().mount().await;
+        let next = next_server
+            .client_builder()
+            .no_server_versions()
+            .build()
+            .await;
+        let mut registry = AccountRegistry::empty();
+        for (account_id, client, uri) in [
+            ("first", room.client(), server.server().uri()),
+            ("second", next.clone(), next_server.server().uri()),
+        ] {
+            registry.upsert(PersistedAccount {
+                account_id: account_id.to_owned(),
+                store_id: "unused".to_owned(),
+                session: current_session(&client, uri).unwrap(),
+                needs_reauth: false,
+                device_invalidated: false,
+            });
+        }
+        *core.accounts.lock().await = Some(registry);
+
+        let generation = core.claim_session_generation().await;
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            core.start_session(
+                next,
+                next_server.server().uri(),
+                "second".to_owned(),
+                &generation,
+                &crate::session::store_lease("unused").await,
+            ),
+        )
+        .await
+        .expect("a switch must not wait for the previous long poll")
+        .unwrap();
+
+        assert_eq!(core.active_session_info().unwrap().account_id, "second");
     }
 
     #[tokio::test]
