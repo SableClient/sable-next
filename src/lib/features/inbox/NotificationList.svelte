@@ -78,7 +78,6 @@
   let compact = $derived(limit !== undefined);
 
   $effect(() => {
-    void roomList.rooms;
     void feed.load(filter, includeRead, size);
   });
 
