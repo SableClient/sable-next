@@ -169,6 +169,19 @@ test('sticker rows keep every cell whole on one line', async () => {
   }
 });
 
+test('the previewed shortcode is set in the interface font', async () => {
+  const { screen } = await mountBoard({ tab: 'sticker' });
+  const cell = screen.getByRole('button', { name: ':alpha0:', exact: true });
+  await expect.element(cell).toBeVisible();
+  cell.element().focus();
+
+  await expect.poll(() => document.querySelector('.preview code')).not.toBeNull();
+  const shortcode = document.querySelector('.preview code');
+  const pack = document.querySelector('.preview-pack');
+  if (!shortcode || !pack) throw new Error('the preview is not rendered');
+  expect(getComputedStyle(shortcode).fontFamily).toBe(getComputedStyle(pack).fontFamily);
+});
+
 test('search shows matching emotes from different packs with the same shortcode', async () => {
   activePacks = ['one', 'two'].map((id) => ({
     id,

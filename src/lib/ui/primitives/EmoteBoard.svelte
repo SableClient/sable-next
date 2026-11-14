@@ -1263,6 +1263,7 @@
 
   .preview code {
     color: inherit;
+    font-family: inherit;
     font-size: var(--font-size-subheading);
     min-width: 0;
   }
