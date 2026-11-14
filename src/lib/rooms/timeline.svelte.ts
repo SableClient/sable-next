@@ -7,6 +7,7 @@ import type {
   Rpc,
 } from '#src/generated/protocol';
 import { applyDiffs } from '#src/transport';
+import { TimeoutError, withTimeout } from '#lib/timeout.js';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
@@ -18,6 +19,8 @@ export type TimelineMode =
   | { kind: 'focused'; eventId: string }
   | { kind: 'thread'; rootEventId: string };
 type TimelineSnapshot = Pick<RoomTimeline, 'items' | 'aggregations' | 'readMarkerEventId'>;
+
+const RPC_TIMEOUT_MS = 30_000;
 
 const sharedTimelines = new WeakMap<CoreClient, ActiveRoomTimeline>();
 
@@ -421,7 +424,7 @@ export class RoomTimeline {
       response =
         mode.kind === 'unread'
           ? await this.subscribeUnreadContext(roomId, mode.eventId, hiddenEvents, session, pending)
-          : await this.core.rpc.timeline.subscribe({
+          : await this.subscribe({
               room_id: roomId,
               focus: focusFor(mode),
               hidden_events: hiddenEvents,
@@ -492,9 +495,28 @@ export class RoomTimeline {
   }
 
   private readMarker(roomId: string): Promise<string | null> {
-    return this.core.rpc.timeline.readMarker({ room_id: roomId }).catch((error: unknown) => {
+    return withTimeout(
+      this.core.rpc.timeline.readMarker({ room_id: roomId }),
+      RPC_TIMEOUT_MS
+    ).catch((error: unknown) => {
       console.debug('[sable timeline] read marker not loaded', error);
       return null;
+    });
+  }
+
+  private subscribe(
+    params: Parameters<Rpc['timeline']['subscribe']>[0]
+  ): Promise<RpcResult<Rpc['timeline']['subscribe']>> {
+    const call = this.core.rpc.timeline.subscribe(params);
+    return withTimeout(call, RPC_TIMEOUT_MS).catch((error: unknown) => {
+      if (error instanceof TimeoutError) {
+        call
+          .then((late) => this.core.rpc.timeline.unsubscribe({ subscription: late.subscription }))
+          .catch((lateError: unknown) => {
+            console.debug('[sable timeline] late timeline not unsubscribed', lateError);
+          });
+      }
+      throw error;
     });
   }
 
@@ -507,7 +529,7 @@ export class RoomTimeline {
     live?: RpcResult<Rpc['timeline']['subscribe']>
   ): Promise<RpcResult<Rpc['timeline']['subscribe']>> {
     try {
-      return await this.core.rpc.timeline.subscribe({
+      return await this.subscribe({
         room_id: roomId,
         focus: { kind: 'event', event_id: eventId },
         hidden_events: hiddenEvents,
@@ -517,7 +539,7 @@ export class RoomTimeline {
       this.mode = { kind: 'live' };
       if (live) return live;
       pending.length = 0;
-      return this.core.rpc.timeline.subscribe({
+      return this.subscribe({
         room_id: roomId,
         focus: { kind: 'live' },
         hidden_events: hiddenEvents,

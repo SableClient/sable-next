@@ -136,6 +136,36 @@ pub(crate) async fn thread_root_of<Found: Future<Output = Option<Event>>>(
 }
 
 impl Core {
+    /// A build can outlast the session it started under, so it must not hold the session while it
+    /// runs: one slow room would block every other open and the teardown.
+    fn session_room(
+        &self,
+        room_id: &OwnedRoomId,
+    ) -> Result<(Room, Arc<matrix_sdk_ui::sync_service::SyncService>), RpcError> {
+        self.session
+            .current(|session| {
+                Some((
+                    session.client.get_room(room_id)?,
+                    session.sync_service.clone(),
+                ))
+            })
+            .ok_or(RpcCode::NotLoggedIn)?
+            .ok_or_else(|| RpcCode::UnknownRoom.into())
+    }
+
+    /// Holding the guard keeps the session from ending while a finished build is cached, so a
+    /// teardown never leaves a timeline of the old client in the next session's cache.
+    async fn session_of(
+        &self,
+        sync_service: &Arc<matrix_sdk_ui::sync_service::SyncService>,
+    ) -> Result<tokio::sync::RwLockReadGuard<'_, Option<crate::session::Session>>, RpcError> {
+        let session = self.session.read().await;
+        match session.as_ref() {
+            Some(current) if Arc::ptr_eq(&current.sync_service, sync_service) => Ok(session),
+            _ => Err(RpcCode::NotLoggedIn.into()),
+        }
+    }
+
     /// Cached: a second subscriber would give the UI two streams for one room.
     pub(crate) async fn timeline(&self, room_id: &OwnedRoomId) -> Result<Arc<Timeline>, RpcError> {
         {
@@ -162,14 +192,7 @@ impl Core {
         room_id: &OwnedRoomId,
         hidden_events: bool,
     ) -> Result<Arc<Timeline>, RpcError> {
-        tracing::info!(%room_id, "live_timeline: waiting for session");
-        let session = self.session.read().await;
-        let room = session
-            .as_ref()
-            .ok_or(RpcCode::NotLoggedIn)?
-            .client
-            .get_room(room_id)
-            .ok_or(RpcCode::UnknownRoom)?;
+        let (room, sync_service) = self.session_room(room_id)?;
         {
             let mut timelines = self.timelines.lock().await;
             if let Some(cached) = timelines.get(room_id)
@@ -189,6 +212,7 @@ impl Core {
         );
         tracing::info!(%room_id, "live_timeline: built");
 
+        let _session = self.session_of(&sync_service).await?;
         let subscribed_room_ids = self
             .subscriptions
             .lock()
@@ -344,13 +368,7 @@ impl Core {
         room_id: &OwnedRoomId,
         root_event_id: &OwnedEventId,
     ) -> Result<Arc<Timeline>, RpcError> {
-        let session = self.session.read().await;
-        let room = session
-            .as_ref()
-            .ok_or(RpcCode::NotLoggedIn)?
-            .client
-            .get_room(room_id)
-            .ok_or(RpcCode::UnknownRoom)?;
+        let (room, sync_service) = self.session_room(room_id)?;
         let key: ThreadKey = (room_id.clone(), root_event_id.clone());
         {
             let mut threads = self.thread_timelines.lock().await;
@@ -368,6 +386,7 @@ impl Core {
                 .or_failed(self, "build_thread_timeline")?,
         );
 
+        let _session = self.session_of(&sync_service).await?;
         let mut threads = self.thread_timelines.lock().await;
         if let Some(cached) = threads.get_mut(&key) {
             return Ok(cached.timeline.clone());

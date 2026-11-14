@@ -768,7 +768,9 @@ test('coalesces pagination and ignores completion after stop', async () => {
   const core = new PendingPaginationCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   const start = timeline.start('!room:example.org', '$event:example.org');
-  await Promise.resolve();
+  await vi.waitFor(() => {
+    expect(timeline.hasSnapshot).toBe(true);
+  });
 
   const first = timeline.paginateBackward(25);
   await timeline.paginateBackward(25);
@@ -1158,4 +1160,61 @@ test('retrying failed thread history makes a new pagination request', async () =
   expect(timeline.error).toBeNull();
   expect(subscribe).toHaveBeenCalledOnce();
   await timeline.stop();
+});
+
+test('a subscribe that never answers fails and the retry subscribes again', async () => {
+  vi.useFakeTimers();
+  try {
+    const core = new FakeCore();
+    let late!: (value: Awaited<ReturnType<FakeCore['subscribeTimeline']>>) => void;
+    vi.spyOn(core, 'subscribeTimeline')
+      .mockReturnValueOnce(new Promise((resolve) => (late = resolve)))
+      .mockResolvedValueOnce({ subscription: 2, items: [item('retried')], aggregations: [] });
+    const unsubscribe = vi.spyOn(core, 'unsubscribe');
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+    const opening = timeline.start('!room:example.org');
+    await vi.advanceTimersByTimeAsync(30_000);
+    await opening;
+
+    expect(timeline.error).toBe('load_failed');
+    expect(timeline.loading).toBe(false);
+
+    await timeline.retry();
+    expect(timeline.error).toBeNull();
+    expect(timeline.items.map((entry) => entry.id)).toEqual(['retried']);
+
+    late({ subscription: 1, items: [item('late')], aggregations: [] });
+    await vi.advanceTimersByTimeAsync(0);
+    core.emit({
+      type: 'timeline_diff',
+      subscription: 1,
+      diffs: [{ op: 'push_back', value: item('late-diff') }],
+    });
+
+    expect(timeline.items.map((entry) => entry.id)).toEqual(['retried']);
+    expect(unsubscribe).toHaveBeenCalled();
+    await timeline.stop();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('a read marker that never answers does not hold the timeline open', async () => {
+  vi.useFakeTimers();
+  try {
+    const core = new FakeCore();
+    vi.spyOn(core, 'readMarker').mockReturnValue(new Promise(() => {}));
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+    const opening = timeline.start('!room:example.org', null, false, true);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await opening;
+
+    expect(timeline.error).toBeNull();
+    expect(timeline.hasSnapshot).toBe(true);
+    await timeline.stop();
+  } finally {
+    vi.useRealTimers();
+  }
 });

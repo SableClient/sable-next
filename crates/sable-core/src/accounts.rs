@@ -3129,19 +3129,49 @@ mod regression_tests {
     }
 
     #[tokio::test]
-    async fn session_teardown_waits_for_in_flight_timeline_builders() {
+    async fn a_slow_timeline_build_blocks_neither_another_room_nor_the_teardown() {
         let (_store, server, core, room) = core_with_room().await;
-        server.mock_room_state_encryption().plain().mount().await;
-        let room_id = room.room_id().to_owned();
-        let cache = core.timelines.lock().await;
-        let mut build = std::pin::pin!(core.live_timeline(&room_id, false));
-        assert!(futures_util::poll!(build.as_mut()).is_pending());
-        drop(cache);
+        let slow = room.room_id().to_owned();
+        let fast = room_id!("!fast:example.org").to_owned();
+        server.sync_joined_room(&room.client(), &fast).await;
+        let requests = std::sync::atomic::AtomicUsize::new(0);
+        server
+            .mock_room_state_encryption()
+            .respond_with(move |_: &wiremock::Request| {
+                let response = ResponseTemplate::new(404).set_body_json(
+                    serde_json::json!({"errcode":"M_NOT_FOUND", "error":"not found"}),
+                );
+                if requests.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                    response.set_delay(std::time::Duration::from_secs(3))
+                } else {
+                    response
+                }
+            })
+            .mount()
+            .await;
 
-        let mut teardown = std::pin::pin!(core.take_session());
-        assert!(futures_util::poll!(teardown.as_mut()).is_pending());
-        build.await.unwrap();
-        assert!(teardown.await.is_some());
+        let mut slow_build = std::pin::pin!(core.live_timeline(&slow, false));
+        assert!(futures_util::poll!(slow_build.as_mut()).is_pending());
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            core.live_timeline(&fast, false),
+        )
+        .await
+        .expect("another room must open while one builds")
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), core.take_session())
+            .await
+            .expect("the teardown must not wait for a build")
+            .unwrap();
+
+        assert!(matches!(
+            slow_build.await,
+            Err(RpcError {
+                code: RpcCode::NotLoggedIn,
+                ..
+            })
+        ));
         assert!(core.timelines.lock().await.is_empty());
     }
 
