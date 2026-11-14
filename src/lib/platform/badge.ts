@@ -42,7 +42,10 @@ export async function setUnreadBadge(count: number): Promise<void> {
 
   if (isNativeMobile()) {
     // Android's badge follows its notifications.
-    if (osType() === 'ios') await invoke('set_badge_count', { count: value ?? 0 }).catch(() => {});
+    if (osType() === 'ios')
+      await invoke('set_badge_count', { count: value ?? 0 }).catch((error: unknown) => {
+        console.warn('[sable badge] the app badge was not set', error);
+      });
     return;
   }
 

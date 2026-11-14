@@ -94,7 +94,9 @@
       },
 
       retry() {
-        core.rpc.search.peerFind({}).catch(() => {});
+        core.rpc.search.peerFind({}).catch((error: unknown) => {
+          console.warn('[sable search] looking for the other device failed', error);
+        });
       },
     };
   }

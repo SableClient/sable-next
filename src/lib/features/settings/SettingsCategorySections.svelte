@@ -79,7 +79,9 @@
       .then((flags) => {
         if (!stale) serverFeatures = flags;
       })
-      .catch(() => {});
+      .catch((error: unknown) => {
+        console.warn('[sable settings] server features unavailable', error);
+      });
     return () => {
       stale = true;
     };

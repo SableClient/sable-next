@@ -257,7 +257,9 @@ function connectSearchPeers(
       }),
       rpc.peerStart({}),
     ])
-      .catch(() => {})
+      .catch((error: unknown) => {
+        console.debug('[sable search] search sharing could not start', error);
+      })
       .finally(() => {
         discovering = false;
       });

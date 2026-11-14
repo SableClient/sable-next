@@ -118,13 +118,17 @@
 
   async function find(): Promise<void> {
     finding = true;
-    await core.rpc.search.peerFind({}).catch(() => {});
+    await core.rpc.search.peerFind({}).catch((error: unknown) => {
+      console.warn('[sable search] looking for the other device failed', error);
+    });
     finding = false;
   }
 
   async function reset(): Promise<void> {
     resetting = true;
-    await core.rpc.search.peerReset({}).catch(() => {});
+    await core.rpc.search.peerReset({}).catch((error: unknown) => {
+      console.warn('[sable search] resetting search sharing failed', error);
+    });
     resetting = false;
   }
 </script>
