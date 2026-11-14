@@ -36,6 +36,7 @@ import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
+import moe.sable.push.CallAnswer
 import moe.sable.push.ConversationShortcuts
 import moe.sable.push.Secrets
 import java.lang.ref.WeakReference
@@ -71,6 +72,8 @@ class MainActivity : TauriActivity() {
     val reporting = getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false)
     NativeSentry.apply(this, reporting)
     enableEdgeToEdge()
+    val heldAnswer = intent.takeIf { CallAnswer.waitsForUnlock(this, it) }
+    if (heldAnswer != null) setIntent(Intent(Intent.ACTION_MAIN))
     super.onCreate(savedInstanceState)
     // Until the webview loads, the core would otherwise drop what it reports.
     runCatching { nativeSentryConsent(reporting) }
@@ -84,6 +87,7 @@ class MainActivity : TauriActivity() {
     AppLifecycle.start()
     startNetworkMonitor()
     stageShareIntent(intent)
+    heldAnswer?.let { CallAnswer.answerAfterUnlock(this, it, ::deliverIntent) }
   }
 
   private fun startNetworkMonitor() {
@@ -176,6 +180,14 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onNewIntent(intent: Intent) {
+    if (CallAnswer.waitsForUnlock(this, intent)) {
+      CallAnswer.answerAfterUnlock(this, intent, ::deliverIntent)
+      return
+    }
+    deliverIntent(intent)
+  }
+
+  private fun deliverIntent(intent: Intent) {
     setIntent(intent)
     super.onNewIntent(intent)
     stageShareIntent(intent)
