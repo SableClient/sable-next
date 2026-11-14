@@ -1,9 +1,11 @@
+use crate::api::account::ChangePasswordParams;
 use crate::api::auth::RequestPasswordResetEmailParams;
 use crate::api::auth::ResetPasswordParams;
 use matrix_sdk::ruma::api::client::account::change_password::v3::Request as ChangePasswordRequest;
 use matrix_sdk::ruma::api::client::account::request_password_change_token_via_email::v3::Request as PasswordEmailRequest;
+use matrix_sdk::ruma::api::client::discovery::get_capabilities;
 use matrix_sdk::ruma::api::client::uiaa::{
-    AuthData, AuthType, EmailIdentity, ThirdpartyIdCredentials, UiaaInfo,
+    AuthData, AuthType, EmailIdentity, Password, ThirdpartyIdCredentials, UiaaInfo, UserIdentifier,
 };
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::{ClientSecret, OwnedClientSecret, OwnedSessionId, SessionId, UInt};
@@ -82,6 +84,82 @@ impl Core {
             _ => return self.rpc_error(context, error),
         };
         crate::errors::coded(context, rpc, error)
+    }
+
+    pub(crate) async fn password_change_enabled(&self) -> Result<bool, RpcError> {
+        let capabilities = self
+            .client()
+            .await?
+            .send(get_capabilities::v3::Request::new())
+            .await
+            .map_err(|error| self.rpc_error("password_change_enabled", &error))?
+            .capabilities;
+        Ok(capabilities.change_password.enabled)
+    }
+
+    pub(crate) async fn change_password(
+        &self,
+        ChangePasswordParams {
+            current_password,
+            new_password,
+            logout_devices,
+        }: ChangePasswordParams,
+    ) -> Result<(), RpcError> {
+        let client = self.client().await?;
+        if client.oauth().full_session().is_some() {
+            return Err(RpcCode::Unsupported.into());
+        }
+        let user_id = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
+
+        let info = match client
+            .send(change_password_request(&new_password, logout_devices, None))
+            .await
+        {
+            Ok(_) => return Ok(()),
+            Err(error) => match error.as_uiaa_response() {
+                Some(info) => info.clone(),
+                None => return Err(self.change_password_error("change_password", &error, false)),
+            },
+        };
+        if !info
+            .flows
+            .iter()
+            .any(|flow| flow.stages == [AuthType::Password])
+        {
+            return Err(RpcCode::Unsupported.into());
+        }
+        let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), current_password);
+        auth.session = info.session;
+
+        client
+            .send(change_password_request(
+                &new_password,
+                logout_devices,
+                Some(AuthData::Password(auth)),
+            ))
+            .await
+            .map(drop)
+            .map_err(|error| self.change_password_error("change_password_auth", &error, true))
+    }
+
+    fn change_password_error(
+        &self,
+        context: &str,
+        error: &matrix_sdk::HttpError,
+        authenticated: bool,
+    ) -> RpcError {
+        if error.as_uiaa_response().is_some()
+            || (authenticated
+                && matches!(error.client_api_error_kind(), Some(ErrorKind::Forbidden)))
+        {
+            return crate::errors::coded(context, RpcCode::Denied, error);
+        }
+        match error.client_api_error_kind() {
+            Some(ErrorKind::Forbidden | ErrorKind::NotFound | ErrorKind::Unrecognized) => {
+                crate::errors::coded(context, RpcCode::Unsupported, error)
+            }
+            _ => self.password_reset_error(context, error),
+        }
     }
 
     pub(super) async fn request_password_reset_email(
@@ -441,5 +519,176 @@ mod tests {
         drop(core);
         drop(server);
         let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    async fn change_password_core(
+        challenge_flows: serde_json::Value,
+        retry: wiremock::ResponseTemplate,
+    ) -> (
+        matrix_sdk::test_utils::mocks::MatrixMockServer,
+        Arc<Core>,
+        wiremock::Mock,
+    ) {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{body_partial_json, method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/account/password"))
+            .and(body_partial_json(serde_json::json!({
+                "auth": {
+                    "type": "m.login.password",
+                    "session": "uia-1",
+                    "password": "old secret",
+                    "identifier": {"type": "m.id.user", "user": "@example:localhost"}
+                }
+            })))
+            .respond_with(retry)
+            .expect(1)
+            .with_priority(1)
+            .mount(server.server())
+            .await;
+        let challenge = Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/account/password"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "flows": challenge_flows,
+                "params": {},
+                "session": "uia-1"
+            })))
+            .expect(1)
+            .with_priority(2);
+        let (core, _events) = crate::test_support::signed_in_core(&server, client).await;
+        (server, core, challenge)
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn change_params() -> ChangePasswordParams {
+        ChangePasswordParams {
+            current_password: "old secret".to_owned(),
+            new_password: "new secret".to_owned(),
+            logout_devices: false,
+        }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_password_change_retries_with_the_current_password_and_the_session() {
+        let (server, core, challenge) = change_password_core(
+            serde_json::json!([{"stages": ["m.login.password"]}]),
+            wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({})),
+        )
+        .await;
+        challenge.mount(server.server()).await;
+
+        assert!(matches!(
+            core.change_password(change_params()).await,
+            Ok(())
+        ));
+        let requests = server.server().received_requests().await.unwrap();
+        let first: serde_json::Value = requests
+            .iter()
+            .find(|request| request.url.path() == "/_matrix/client/v3/account/password")
+            .map(|request| serde_json::from_slice(&request.body).unwrap())
+            .unwrap();
+        assert_eq!(first["new_password"], "new secret");
+        assert_eq!(first["logout_devices"], false);
+        assert!(first.get("auth").is_none());
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_wrong_current_password_is_denied() {
+        for retry in [
+            wiremock::ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "flows": [{"stages": ["m.login.password"]}],
+                "params": {},
+                "session": "uia-1",
+                "errcode": "M_FORBIDDEN",
+                "error": "Invalid password"
+            })),
+            wiremock::ResponseTemplate::new(403).set_body_json(serde_json::json!({
+                "errcode": "M_FORBIDDEN",
+                "error": "Invalid password"
+            })),
+        ] {
+            let (server, core, challenge) =
+                change_password_core(serde_json::json!([{"stages": ["m.login.password"]}]), retry)
+                    .await;
+            challenge.mount(server.server()).await;
+
+            let error = core.change_password(change_params()).await.unwrap_err();
+            assert!(matches!(error.code, RpcCode::Denied));
+        }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_weak_new_password_is_reported_as_weak() {
+        let (server, core, challenge) = change_password_core(
+            serde_json::json!([{"stages": ["m.login.password"]}]),
+            wiremock::ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "errcode": "M_WEAK_PASSWORD",
+                "error": "Password too short"
+            })),
+        )
+        .await;
+        challenge.mount(server.server()).await;
+
+        let error = core.change_password(change_params()).await.unwrap_err();
+        assert!(matches!(error.code, RpcCode::WeakPassword));
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_server_that_forbids_changing_the_password_is_unsupported() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/account/password"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(serde_json::json!({
+                "errcode": "M_FORBIDDEN",
+                "error": "Password changes are disabled"
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let (core, _events) = crate::test_support::signed_in_core(&server, client).await;
+
+        let error = core.change_password(change_params()).await.unwrap_err();
+        assert!(matches!(error.code, RpcCode::Unsupported));
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn the_change_password_capability_decides_whether_the_form_shows() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        for enabled in [true, false] {
+            let server = MatrixMockServer::new().await;
+            let client = server.client_builder().build().await;
+            Mock::given(method("GET"))
+                .and(path("/_matrix/client/v3/capabilities"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "capabilities": {"m.change_password": {"enabled": enabled}}
+                })))
+                .expect(1)
+                .mount(server.server())
+                .await;
+            let (core, _events) = crate::test_support::signed_in_core(&server, client).await;
+
+            assert_eq!(core.password_change_enabled().await.unwrap(), enabled);
+        }
     }
 }

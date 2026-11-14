@@ -9,6 +9,7 @@
   import '#lib/ui/primitives/settings-row.css';
   import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
+  import ChangePasswordSetting from './ChangePasswordSetting.svelte';
   import DeleteAccountSetting from './DeleteAccountSetting.svelte';
   import ProfileEditor from './ProfileEditor.svelte';
   import SettingsCategorySections from './SettingsCategorySections.svelte';
@@ -76,6 +77,7 @@
       {#if supporter.enabled && badge}
         <SupporterSettings />
       {/if}
+      <ChangePasswordSetting />
       <DeleteAccountSetting />
     {/if}
   </div>

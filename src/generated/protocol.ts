@@ -2358,6 +2358,12 @@ export type Rpc = {
     deactivateAccount: (params: {
 	password?: string | null,
 }) => Promise<string | null>;
+    changePassword: (params: {
+	current_password: string,
+	new_password: string,
+	logout_devices: boolean,
+}) => Promise<null>;
+    passwordChangeEnabled: (params?: Record<string, never>) => Promise<boolean>;
     setPresence: (params: {
 	presence: PresenceView,
 	status_message?: string | null,
@@ -3748,6 +3754,8 @@ export type RpcMethods = {
   'account.unignore_user': Rpc['account']['unignoreUser'];
   'account.report_user': Rpc['account']['reportUser'];
   'account.deactivate_account': Rpc['account']['deactivateAccount'];
+  'account.change_password': Rpc['account']['changePassword'];
+  'account.password_change_enabled': Rpc['account']['passwordChangeEnabled'];
   'account.set_presence': Rpc['account']['setPresence'];
   'account.set_device_activity': Rpc['account']['setDeviceActivity'];
   'account.fetch_presence': Rpc['account']['fetchPresence'];
@@ -4086,6 +4094,8 @@ export function createRpc(call: RpcCall): Rpc {
       unignoreUser: (params) => call('account.unignore_user', params) as ReturnType<Rpc['account']['unignoreUser']>,
       reportUser: (params) => call('account.report_user', params) as ReturnType<Rpc['account']['reportUser']>,
       deactivateAccount: (params) => call('account.deactivate_account', params) as ReturnType<Rpc['account']['deactivateAccount']>,
+      changePassword: (params) => call('account.change_password', params) as ReturnType<Rpc['account']['changePassword']>,
+      passwordChangeEnabled: (params = {}) => call('account.password_change_enabled', params) as ReturnType<Rpc['account']['passwordChangeEnabled']>,
       setPresence: (params) => call('account.set_presence', params) as ReturnType<Rpc['account']['setPresence']>,
       setDeviceActivity: (params) => call('account.set_device_activity', params) as ReturnType<Rpc['account']['setDeviceActivity']>,
       fetchPresence: (params) => call('account.fetch_presence', params) as ReturnType<Rpc['account']['fetchPresence']>,

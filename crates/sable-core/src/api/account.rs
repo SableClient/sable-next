@@ -35,6 +35,8 @@ domain! {
     unignore_user,
     report_user,
     deactivate_account,
+    change_password,
+    password_change_enabled,
     set_presence,
     set_device_activity,
     fetch_presence,
@@ -71,6 +73,34 @@ impl Handler for DeactivateAccountParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<Option<String>, RpcError> {
         core.deactivate_account(self.password).await
+    }
+}
+
+#[derive(Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct ChangePasswordParams {
+    pub current_password: String,
+    pub new_password: String,
+    pub logout_devices: bool,
+}
+
+impl Handler for ChangePasswordParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.change_password(self).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PasswordChangeEnabledParams {}
+
+impl Handler for PasswordChangeEnabledParams {
+    type Ok = bool;
+
+    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
+        core.password_change_enabled().await
     }
 }
 
