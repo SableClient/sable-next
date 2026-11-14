@@ -309,6 +309,8 @@ impl Core {
         sessions: Box<dyn SessionStore>,
         persistent_event_cache: bool,
     ) -> (Arc<Self>, mpsc::UnboundedReceiver<CoreEvent>) {
+        #[cfg(not(target_family = "wasm"))]
+        tls::install_crypto_provider();
         let (events, rx) = mpsc::unbounded_channel();
         let core = Arc::new(Self {
             store_id: store_id.into(),

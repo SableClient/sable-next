@@ -34,6 +34,12 @@ pub(crate) const fn proxy_configured() -> bool {
     false
 }
 
+// rustls panics when both `ring` and `aws-lc-rs` are enabled and no default is installed.
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn install_crypto_provider() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
+
 #[cfg(all(not(target_os = "android"), not(target_family = "wasm")))]
 #[must_use = "returns the configured builder"]
 pub fn apply(builder: ClientBuilder) -> ClientBuilder {
