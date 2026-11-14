@@ -14,6 +14,7 @@ export default defineConfig({
     'window-activity.spec.ts',
     'timeline-notified.spec.ts',
     'timeline-unread.spec.ts',
+    'timeline-mentions.spec.ts',
     'timeline-row-height.spec.ts',
     'timeline-name-overflow.spec.ts',
     'timeline-content-overflow.spec.ts',

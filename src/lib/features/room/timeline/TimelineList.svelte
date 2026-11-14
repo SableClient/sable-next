@@ -470,17 +470,14 @@
   );
   $effect(() => {
     const { firstVisible, lastVisible, rows } = windowState;
+    // The list arrives after its message is on screen, so it has to rerun this too.
+    const mentions = mentionEventIds;
     if (!reading || !revealed || !windowActivity.active) return;
     if (firstVisible === null || lastVisible === null) return;
     untrack(() => {
       for (const { index, value } of rows) {
         const eventId = value.item.event_id;
-        if (
-          index >= firstVisible &&
-          index <= lastVisible &&
-          eventId &&
-          mentionEventIds.includes(eventId)
-        )
+        if (index >= firstVisible && index <= lastVisible && eventId && mentions.includes(eventId))
           seenMentions.add(eventId);
       }
     });

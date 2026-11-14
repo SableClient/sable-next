@@ -68,6 +68,7 @@ declare global {
     __e2eSendError?: string;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eMembers?: MemberView[];
+    __e2eMentionEventIds?: string[];
     __e2eRelationEvents?: unknown[];
     /** Extra room state by event type, with an empty state key. */
     __e2eRoomState?: Record<string, unknown>;
@@ -1161,7 +1162,25 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'notifications.keywords': () => notificationKeywords.map((entry) => ({ ...entry })),
       'notifications.push_event': () => ({ kind: 'unavailable' }),
       'notifications.inbox': (params) => {
+        const mention = {
+          room_id: room.room_id,
+          ts: 1_700_000_000_019,
+          sender: '@alice:example.test',
+          sender_name: 'Alice',
+          body: 'General message 19',
+          highlight: true,
+          is_direct: false,
+          encrypted: true,
+          read: false,
+          thread_root: null,
+          reply: false,
+        };
         const items = [
+          ...(window.__e2eMentionEventIds ?? []).map((event_id, index) => ({
+            ...mention,
+            event_id,
+            ts: mention.ts + 1 + index,
+          })),
           {
             room_id: room.room_id,
             event_id: '$general-19:example.test',
