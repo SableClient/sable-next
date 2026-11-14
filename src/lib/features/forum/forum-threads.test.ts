@@ -306,6 +306,20 @@ test('counts each voter once across thumbs-up variants', () => {
   expect(collectForumThreads([root], null)[0]?.votes).toBe(3);
 });
 
+test('remembers which thumbs-up variant the user voted with', () => {
+  const root = item({
+    id: 'root',
+    reactions: [
+      { key: '👍', senders: ['@a:example.org'] },
+      { key: '👍🏽', senders: ['@me:example.org'] },
+      { key: '🎉', senders: ['@me:example.org'] },
+    ],
+  });
+
+  expect(collectForumThreads([root], '@me:example.org')[0]?.ownVote).toBe('👍🏽');
+  expect(collectForumThreads([root], '@other:example.org')[0]?.ownVote).toBeNull();
+});
+
 test('keeps the votes the timeline saw when the server lists the root too', () => {
   const seen = item({ id: 'root', reactions: [{ key: '👍', senders: ['@a:example.org'] }] });
   const listed = item({ id: 'root' });

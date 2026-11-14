@@ -25,10 +25,12 @@ export interface ForumThread {
   lastSenderName: string | null;
   unread: boolean;
   votes: number;
+  /** The thumbs-up variant the user voted with, which is the one to take back. */
+  ownVote: string | null;
   resolved: boolean;
 }
 
-const VOTE = '👍';
+export const VOTE = '👍';
 const RESOLVED = '✅';
 
 const POST_KINDS = new Set<TimelineItemContentView['kind']>([
@@ -71,6 +73,14 @@ function countVotes(reactions: readonly ReactionGroup[]): number {
     for (const sender of group.senders) voters.add(sender);
   }
   return voters.size;
+}
+
+function ownVote(reactions: readonly ReactionGroup[], currentUserId: string | null): string | null {
+  if (currentUserId === null) return null;
+  return (
+    reactions.find((group) => group.key.startsWith(VOTE) && group.senders.includes(currentUserId))
+      ?.key ?? null
+  );
 }
 
 function isResolved(reactions: readonly ReactionGroup[], author: string | null): boolean {
@@ -153,6 +163,7 @@ export function collectForumThreads(
       lastSenderName: latestReply?.sender_name ?? latestReply?.sender ?? null,
       unread: unreadByRoot.get(rootId) ?? isUnread(latest, currentUserId),
       votes: countVotes(rootReactions),
+      ownVote: ownVote(rootReactions, currentUserId),
       resolved: isResolved(rootReactions, root.sender),
     });
   }

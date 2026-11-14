@@ -4149,7 +4149,9 @@
     "thread": "{{name}}: {{preview}}",
     "threadUnread": "Unread. {{name}}: {{preview}}",
     "replyCount_one": "{{count, number}} reply",
-    "replyCount_other": "{{count, number}} replies"
+    "replyCount_other": "{{count, number}} replies",
+    "vote_one": "{{count, number}} vote",
+    "vote_other": "{{count, number}} votes"
   },
   "share": {
     "title": "Share to",

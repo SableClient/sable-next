@@ -99,6 +99,7 @@ const thread: ForumThread = {
   lastSenderName: null,
   unread: false,
   votes: 0,
+  ownVote: null,
   resolved: false,
 };
 
@@ -158,4 +159,45 @@ test('renders the thread root through the timeline renderer', async () => {
   expect(topic.tagName).toBe('STRONG');
   await user.click(topic);
   expect(onOpen).toHaveBeenCalledWith('$thread:example.org');
+});
+
+test('votes from the thread list without opening the thread', async () => {
+  const user = userEvent.setup();
+  const onOpen = vi.fn();
+  const onReact = vi.fn();
+  const { rerender } = render(ForumThreadItemHarness, {
+    thread: { ...thread, votes: 2 },
+    onOpen,
+    canDelete: false,
+    onDelete: vi.fn(),
+    roomId: '!forum:example.org',
+    onReact,
+    onCopyLink: vi.fn(),
+  });
+
+  const vote = within(card()).getByRole('button', { name: '2 votes' });
+  expect(vote).toHaveAttribute('aria-pressed', 'false');
+  await user.click(vote);
+  expect(onReact).toHaveBeenLastCalledWith('$thread:example.org', '👍');
+
+  await rerender({ thread: { ...thread, votes: 3, ownVote: '👍🏽' } });
+  const voted = within(card()).getByRole('button', { name: '3 votes' });
+  expect(voted).toHaveAttribute('aria-pressed', 'true');
+  await user.click(voted);
+  expect(onReact).toHaveBeenLastCalledWith('$thread:example.org', '👍🏽');
+  expect(onOpen).not.toHaveBeenCalled();
+});
+
+test('shows votes as text to someone who cannot react', () => {
+  render(ForumThreadItemHarness, {
+    thread: { ...thread, votes: 2 },
+    onOpen: vi.fn(),
+    canDelete: false,
+    onDelete: vi.fn(),
+    roomId: '!forum:example.org',
+    onCopyLink: vi.fn(),
+  });
+
+  expect(within(card()).getByText('👍 2')).toBeInTheDocument();
+  expect(within(card()).queryByRole('button', { name: '2 votes' })).not.toBeInTheDocument();
 });

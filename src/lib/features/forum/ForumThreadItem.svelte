@@ -13,7 +13,7 @@
   import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
   import { opensFrom } from '#lib/features/room/messages/message-preview.js';
 
-  import type { ForumThread } from './forum-threads';
+  import { VOTE, type ForumThread } from './forum-threads';
 
   interface Props {
     thread: ForumThread;
@@ -48,6 +48,11 @@
     thread.replyCount === 1
       ? i18n.t('forum.replyCount_one', { count: thread.replyCount })
       : i18n.t('forum.replyCount_other', { count: thread.replyCount })
+  );
+  let voteLabel = $derived(
+    thread.votes === 1
+      ? i18n.t('forum.vote_one', { count: thread.votes })
+      : i18n.t('forum.vote_other', { count: thread.votes })
   );
   let accessibleLabel = $derived(
     thread.unread
@@ -119,26 +124,39 @@
           <span class="forum-thread-preview">{thread.preview}</span>
         {/snippet}
       </MessagePreview>
-      <button
-        type="button"
-        class="forum-thread-meta"
-        aria-label={accessibleLabel}
-        onclick={() => onOpen(thread.eventId)}
-      >
-        <span class="forum-thread-replies">{replyLabel}</span>
-        {#if thread.votes > 0}
-          <span class="forum-thread-votes">👍 {thread.votes}</span>
+      <div class="forum-thread-meta">
+        {#if onReact}
+          <button
+            type="button"
+            class={['forum-thread-vote', { voted: thread.ownVote !== null }]}
+            aria-label={voteLabel}
+            aria-pressed={thread.ownVote !== null}
+            onclick={() => onReact(thread.eventId, thread.ownVote ?? VOTE)}
+          >
+            {VOTE}
+            {thread.votes}
+          </button>
+        {:else if thread.votes > 0}
+          <span class="forum-thread-votes">{VOTE} {thread.votes}</span>
         {/if}
-        {#if thread.lastBody}
-          <span class="forum-thread-last">
-            {thread.lastSenderName ?? displayName}: {thread.lastBody}
-          </span>
-        {/if}
-        <span class="forum-thread-time">{formatMessageTimestamp(thread.lastActivityAt)}</span>
-        {#if thread.unread}
-          <span class="forum-thread-unread-dot" aria-hidden="true"></span>
-        {/if}
-      </button>
+        <button
+          type="button"
+          class="forum-thread-open"
+          aria-label={accessibleLabel}
+          onclick={() => onOpen(thread.eventId)}
+        >
+          <span class="forum-thread-replies">{replyLabel}</span>
+          {#if thread.lastBody}
+            <span class="forum-thread-last">
+              {thread.lastSenderName ?? displayName}: {thread.lastBody}
+            </span>
+          {/if}
+          <span class="forum-thread-time">{formatMessageTimestamp(thread.lastActivityAt)}</span>
+          {#if thread.unread}
+            <span class="forum-thread-unread-dot" aria-hidden="true"></span>
+          {/if}
+        </button>
+      </div>
     </div>
     <MessageActions {...actions} />
   </article>
@@ -232,22 +250,50 @@
 
   .forum-thread-meta {
     align-items: center;
+    border-top: var(--border-width) solid var(--bg-container-line);
+    color: var(--surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-300);
+    padding: var(--space-200) 0 0;
+  }
+
+  .forum-thread-open {
+    align-items: center;
     background: none;
     border: 0;
     border-radius: var(--radius);
-    border-top: var(--border-width) solid var(--bg-container-line);
-    color: var(--surface-var-on-container);
+    color: inherit;
     cursor: pointer;
     display: flex;
+    flex: 1 1 auto;
     font: inherit;
-    font-size: var(--font-size-small);
     gap: var(--space-300);
+    min-width: 0;
     overflow: hidden;
-    padding: var(--space-200) 0 0;
+    padding: 0;
     text-align: start;
   }
 
-  .forum-thread-meta:focus-visible {
+  .forum-thread-vote {
+    background: var(--surface-container);
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-pill);
+    color: var(--surface-on-container);
+    cursor: pointer;
+    flex: 0 0 auto;
+    font: inherit;
+    padding: var(--space-050) var(--space-200);
+  }
+
+  .forum-thread-vote.voted {
+    background: var(--primary-container);
+    border-color: var(--primary-container-line);
+    color: var(--primary-on-container);
+  }
+
+  .forum-thread-vote:focus-visible,
+  .forum-thread-open:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
   }
 
