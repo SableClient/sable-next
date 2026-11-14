@@ -52,11 +52,21 @@ test('opens Get support in the Sable general room', () => {
   expect(screen.getByRole('link', { name: 'Get support' })).not.toHaveAttribute('target');
 });
 
+test('opens Vote on features in the Sable features room', () => {
+  render(HomeLanding, { titleKey: 'nav.unspaced' });
+
+  expect(screen.getByRole('link', { name: 'Vote on features' })).toHaveAttribute(
+    'href',
+    '/to/%23features%3Asable.moe'
+  );
+});
+
 test('drops the resources section when the deployment hides community links', () => {
   vi.mocked(deployment).mockReturnValue(parseRuntimeConfig({ hideCommunityLinks: true }));
   render(HomeLanding, { titleKey: 'nav.unspaced' });
 
   expect(screen.queryByRole('link', { name: 'Get support' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Vote on features' })).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'View source' })).not.toBeInTheDocument();
   expect(screen.queryByLabelText('Sable resources')).not.toBeInTheDocument();
 });

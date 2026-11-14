@@ -8,6 +8,7 @@ import { deployment } from './deployment.js';
 const SABLE_SOURCE_URL = 'https://git.sable.moe/SableClient/sable-next';
 const SABLE_DONATE_URL = 'https://opencollective.com/sable';
 const SABLE_SUPPORT_ROOM = '#general:sable.moe';
+const SABLE_FEATURES_ROOM = '#features:sable.moe';
 export const SABLE_PRIVACY_URL = 'https://sable.moe/privacy';
 export const SABLE_UPDATE_MANIFEST_URL =
   'https://git.sable.moe/SableClient/sable-next/releases/download/latest/latest.json';
@@ -33,6 +34,10 @@ export function donateUrl(config: RuntimeConfig = deployment()): string | null {
 
 export function supportRoom(config: RuntimeConfig = deployment()): string | null {
   return config.links.supportRoom ?? community(SABLE_SUPPORT_ROOM, config);
+}
+
+export function featuresRoom(config: RuntimeConfig = deployment()): string | null {
+  return community(SABLE_FEATURES_ROOM, config);
 }
 
 export function privacyUrl(config: RuntimeConfig = deployment()): string {

@@ -98,6 +98,8 @@ const thread: ForumThread = {
   lastBody: null,
   lastSenderName: null,
   unread: false,
+  votes: 0,
+  resolved: false,
 };
 
 const card = () => screen.getAllByRole('article')[0];

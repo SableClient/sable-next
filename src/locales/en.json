@@ -1033,6 +1033,7 @@
   "home": {
     "resourcesLabel": "Sable resources",
     "getSupport": "Get support",
+    "voteOnFeatures": "Vote on features",
     "supportDevelopment": "Donate",
     "nextStepsTitle": "What would you like to do?",
     "findCommunityTitle": "Find a community",
@@ -4148,6 +4149,7 @@
     "threadUnread": "Unread. {{name}}: {{preview}}",
     "replyCount_one": "{{count, number}} reply",
     "replyCount_other": "{{count, number}} replies"
+    "sortByVotes": "Most voted first",
   },
   "share": {
     "title": "Share to",

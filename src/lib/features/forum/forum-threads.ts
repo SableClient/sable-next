@@ -1,4 +1,8 @@
-import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
+import type {
+  ReactionGroup,
+  TimelineItemContentView,
+  TimelineItemView,
+} from '#src/generated/protocol';
 import { isMediaCaptionContent } from '#lib/features/room/messages/media-caption.js';
 
 export interface ForumThread {
@@ -20,7 +24,12 @@ export interface ForumThread {
   lastBody: string | null;
   lastSenderName: string | null;
   unread: boolean;
+  votes: number;
+  resolved: boolean;
 }
+
+const VOTE = '👍';
+const RESOLVED = '✅';
 
 const POST_KINDS = new Set<TimelineItemContentView['kind']>([
   'message',
@@ -55,6 +64,33 @@ function isPost(item: TimelineItemView): boolean {
   return POST_KINDS.has(item.content.kind);
 }
 
+function countVotes(reactions: readonly ReactionGroup[]): number {
+  const voters = new Set<string>();
+  for (const group of reactions) {
+    if (!group.key.startsWith(VOTE)) continue;
+    for (const sender of group.senders) voters.add(sender);
+  }
+  return voters.size;
+}
+
+function isResolved(reactions: readonly ReactionGroup[], author: string | null): boolean {
+  return (
+    author !== null &&
+    reactions.some((group) => group.key === RESOLVED && group.senders.includes(author))
+  );
+}
+
+export function sortByVotes(threads: readonly ForumThread[]): ForumThread[] {
+  return threads
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(a.resolved) - Number(b.resolved) ||
+        b.votes - a.votes ||
+        b.lastActivityAt - a.lastActivityAt
+    );
+}
+
 function isUnread(latest: TimelineItemView, currentUserId: string | null): boolean {
   if (currentUserId === null) return false;
   if (latest.sender === currentUserId) return false;
@@ -68,8 +104,11 @@ export function collectForumThreads(
   unreadByRoot: ReadonlyMap<string, boolean> = new Map()
 ): ForumThread[] {
   const roots = new Map<string, TimelineItemView>();
+  // Roots listed by the server carry no reactions, so keep the ones the timeline saw.
+  const reactions = new Map<string, readonly ReactionGroup[]>();
   for (const item of items) {
     if (item.event_id === null) continue;
+    if (item.reactions.length > 0) reactions.set(item.event_id, item.reactions);
     if (item.thread_summary !== null || isPost(item)) roots.set(item.event_id, item);
   }
 
@@ -91,6 +130,7 @@ export function collectForumThreads(
         ? candidate
         : null;
     const latest = latestReply ?? root;
+    const rootReactions = reactions.get(rootId) ?? [];
     threads.push({
       id: root.id,
       item: root,
@@ -112,6 +152,8 @@ export function collectForumThreads(
         root.thread_summary?.latest_body ?? (latestReply ? bodyOf(latestReply.content) : null),
       lastSenderName: latestReply?.sender_name ?? latestReply?.sender ?? null,
       unread: unreadByRoot.get(rootId) ?? isUnread(latest, currentUserId),
+      votes: countVotes(rootReactions),
+      resolved: isResolved(rootReactions, root.sender),
     });
   }
 

@@ -126,6 +126,9 @@
         onclick={() => onOpen(thread.eventId)}
       >
         <span class="forum-thread-replies">{replyLabel}</span>
+        {#if thread.votes > 0}
+          <span class="forum-thread-votes">👍 {thread.votes}</span>
+        {/if}
         {#if thread.lastBody}
           <span class="forum-thread-last">
             {thread.lastSenderName ?? displayName}: {thread.lastBody}
@@ -254,6 +257,10 @@
     color: var(--surface-on-container);
     flex: 0 0 auto;
     padding: var(--space-050) var(--space-200);
+  }
+
+  .forum-thread-votes {
+    flex: 0 0 auto;
   }
 
   .forum-thread-card.unread .forum-thread-replies {

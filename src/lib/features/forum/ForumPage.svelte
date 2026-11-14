@@ -41,6 +41,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
+  import { sortByVotes } from './forum-threads';
   import { ForumThreads } from './forum-threads.svelte.js';
   import ForumHeader from './ForumHeader.svelte';
   import ForumThreadList from './ForumThreadList.svelte';
@@ -84,6 +85,8 @@
     return null;
   });
   let autoFills = 0;
+  let votesFirst = $state(false);
+  let threads = $derived(votesFirst ? sortByVotes(forumThreads.threads) : forumThreads.threads);
 
   const conversation = new Conversation({
     core,
@@ -217,6 +220,13 @@
     });
   }
 
+  // A ranking is only right once every thread and its reactions are loaded.
+  $effect(() => {
+    if (!votesFirst || forumThreads.error || !forumThreads.canLoadMore) return;
+    if (forumThreads.loading || forumThreads.backwardPagination !== 'idle') return;
+    untrack(loadMoreThreads);
+  });
+
   async function findJustSent(body: string, sentAfter: number): Promise<string | null> {
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
@@ -272,6 +282,8 @@
       {roomAvatar}
       onBack={backToRoomList}
       onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
+      sortByVotes={votesFirst}
+      onSortByVotes={(value) => (votesFirst = value)}
       onEventTimeline={preferences.developerTools
         ? () => {
             // eslint-disable-next-line svelte/no-navigation-without-resolve -- eventTimelinePath() resolves the route itself
@@ -299,7 +311,7 @@
         />
       </div>
       <ForumThreadList
-        threads={forumThreads.threads}
+        {threads}
         failed={forumThreads.error}
         onRetry={() => void forumThreads.retry()}
         loading={forumThreads.loading || forumThreads.backwardPagination === 'loading'}

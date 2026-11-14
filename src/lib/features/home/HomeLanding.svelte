@@ -5,9 +5,10 @@
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
   import GithubLogoIcon from 'phosphor-svelte/lib/GithubLogoIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
+  import ThumbsUpIcon from 'phosphor-svelte/lib/ThumbsUpIcon';
   import PlusCircleIcon from 'phosphor-svelte/lib/PlusCircleIcon';
 
-  import { donateUrl, sourceUrl, supportRoom } from '#lib/deployment/links.js';
+  import { donateUrl, featuresRoom, sourceUrl, supportRoom } from '#lib/deployment/links.js';
   import { readReturningUser } from '#lib/features/auth/flow/auth-flow.svelte.js';
   import { openFindOrJoin } from '#lib/ui/find-or-join-state.svelte.js';
   import { i18n } from '#lib/i18n.js';
@@ -26,6 +27,12 @@
   let room = $derived(supportRoom());
   let supportHref = $derived(
     room ? resolve('/(app)/to/[...permalink]', { permalink: roomPathParamFromId(room) }) : null
+  );
+  let features = $derived(featuresRoom());
+  let featuresHref = $derived(
+    features
+      ? resolve('/(app)/to/[...permalink]', { permalink: roomPathParamFromId(features) })
+      : null
   );
   let source = $derived(sourceUrl());
   let donate = $derived(donateUrl());
@@ -61,12 +68,18 @@
       {i18n.t(hasLoggedInBefore ? 'auth.welcomeBack' : 'auth.welcome')}
     </h1>
 
-    {#if supportHref || source || donate}
+    {#if supportHref || featuresHref || source || donate}
       <div class="hero-actions" aria-label={i18n.t('home.resourcesLabel')}>
         {#if supportHref}
           <LinkButton href={supportHref} variant="primary">
             <ChatCircleDotsIcon aria-hidden="true" />
             {i18n.t('home.getSupport')}
+          </LinkButton>
+        {/if}
+        {#if featuresHref}
+          <LinkButton href={featuresHref} variant="ghost">
+            <ThumbsUpIcon aria-hidden="true" />
+            {i18n.t('home.voteOnFeatures')}
           </LinkButton>
         {/if}
         {#if source}

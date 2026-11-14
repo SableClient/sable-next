@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 
-import { collectForumThreads } from './forum-threads';
+import { collectForumThreads, sortByVotes } from './forum-threads';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineItemView {
@@ -291,4 +291,67 @@ test('uses hydrated latest replies and thread receipts when the main timeline hi
     collectForumThreads([older], '@alice:example.org', [reply], new Map([['$older', false]]))[0]
       ?.unread
   ).toBe(false);
+});
+
+test('counts each voter once across thumbs-up variants', () => {
+  const root = item({
+    id: 'root',
+    reactions: [
+      { key: '👍', senders: ['@a:example.org', '@b:example.org'] },
+      { key: '👍🏽', senders: ['@a:example.org', '@c:example.org'] },
+      { key: '🎉', senders: ['@d:example.org'] },
+    ],
+  });
+
+  expect(collectForumThreads([root], null)[0]?.votes).toBe(3);
+});
+
+test('keeps the votes the timeline saw when the server lists the root too', () => {
+  const seen = item({ id: 'root', reactions: [{ key: '👍', senders: ['@a:example.org'] }] });
+  const listed = item({ id: 'root' });
+
+  expect(collectForumThreads([seen, listed], null)[0]?.votes).toBe(1);
+});
+
+test('marks a thread resolved only when its author reacted with a check mark', () => {
+  const byAuthor = item({
+    id: 'done',
+    reactions: [{ key: '✅', senders: ['@alice:example.org'] }],
+  });
+  const byOther = item({ id: 'open', reactions: [{ key: '✅', senders: ['@bob:example.org'] }] });
+
+  const threads = collectForumThreads([byAuthor, byOther], null);
+
+  expect(threads.find((thread) => thread.id === 'done')?.resolved).toBe(true);
+  expect(threads.find((thread) => thread.id === 'open')?.resolved).toBe(false);
+});
+
+test('sorts by votes, then activity, with resolved threads last', () => {
+  const voters = (count: number): string[] =>
+    Array.from({ length: count }, (_, index) => `@voter${index}:example.org`);
+  const threads = collectForumThreads(
+    [
+      item({ id: 'few', timestamp: 4, reactions: [{ key: '👍', senders: voters(1) }] }),
+      item({ id: 'many', timestamp: 1, reactions: [{ key: '👍', senders: voters(3) }] }),
+      item({ id: 'old', timestamp: 2 }),
+      item({ id: 'new', timestamp: 3 }),
+      item({
+        id: 'done',
+        timestamp: 5,
+        reactions: [
+          { key: '👍', senders: voters(9) },
+          { key: '✅', senders: ['@alice:example.org'] },
+        ],
+      }),
+    ],
+    null
+  );
+
+  expect(sortByVotes(threads).map((thread) => thread.id)).toEqual([
+    'many',
+    'few',
+    'new',
+    'old',
+    'done',
+  ]);
 });
