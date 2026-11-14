@@ -74,11 +74,12 @@ object ConversationShortcuts {
             .setIntent(intent)
             .setIsConversation()
             .setLongLived(true)
-            .setPerson(person)
             .setLocusId(LocusIdCompat(id))
             .setCategories(setOf(ShortcutInfo.SHORTCUT_CATEGORY_CONVERSATION, SHARE_TARGET_CATEGORY))
             .apply {
+                // A group's shortcut would otherwise take the face of whoever wrote last.
                 if (direct) {
+                    setPerson(person)
                     addCapabilityBinding(SEND_MESSAGE)
                 } else {
                     addCapabilityBinding(SEND_MESSAGE, "message.recipient.@type", listOf("Audience"))
