@@ -313,7 +313,7 @@
         <input
           bind:this={avatarInput}
           use:nativeFilePicker
-          class="avatar-input"
+          class="screen-reader-only"
           type="file"
           accept="image/*"
           tabindex="-1"
@@ -455,13 +455,6 @@
     color: var(--surface-on-container);
     margin-bottom: var(--space-300);
     padding: var(--space-300) var(--space-400);
-  }
-
-  .avatar-input {
-    height: 0;
-    opacity: 0;
-    position: absolute;
-    width: 0;
   }
 
   .inline-field {

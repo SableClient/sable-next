@@ -277,7 +277,7 @@
         <input
           bind:this={avatarInput}
           use:nativeFilePicker
-          class="avatar-input"
+          class="screen-reader-only"
           type="file"
           accept="image/*"
           tabindex="-1"
@@ -303,7 +303,7 @@
         <input
           bind:this={bannerInput}
           use:nativeFilePicker
-          class="avatar-input"
+          class="screen-reader-only"
           type="file"
           accept="image/*"
           tabindex="-1"
@@ -472,13 +472,6 @@
     max-width: none;
     object-fit: cover;
     overflow: hidden;
-  }
-
-  .avatar-input {
-    height: 0;
-    opacity: 0;
-    position: absolute;
-    width: 0;
   }
 
   .save-bar {
