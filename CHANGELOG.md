@@ -1,5 +1,36 @@
 # Sable Changelog
 
+## 2.3.10 (2026-11-14)
+
+### Features
+
+* The insert sheet on iOS and Android shows your recent photos and videos, so one tap adds them to the message.
+* Hovering or tapping a custom emote shows its description under the shortcode when the sender gave one.
+* Typing an MSC reference like MSC4444 offers to link it to msc.sable.moe, once or always, and MSC references in messages you read now link there too.
+* Show Persian and Arabic text in Vazirmatn.
+
+### Fixes
+
+* In the bubble layout your own messages drop your avatar and name and keep only the time, your media and captions sit on the right, read receipts line up at the end of the timeline, consecutive bubbles sit closer together and replies no longer add a sideways scrollbar.
+* Stop a call hanging on "securing" when another participant's call server is unreachable.
+* YouTube, DeArrow and TikTok embeds and the GIF picker load through Sable's preview service, so those sites no longer see your device until you press play.
+* The emoji picker on phones opens at its full height again instead of showing a single row.
+* Flatpak browsers like Firefox and Chrome now show up in the app audio picker when Sable runs as a Flatpak.
+* Flatpak installs only announce an update once it can be installed from Flathub or the nightly Flatpak repo.
+* Keep sending messages after a room rejects an image with M_FORBIDDEN.
+* The F-Droid build can use the Native (FCM) push transport on devices with microG or Google Play services.
+* Reading a room now clears notifications from hidden events like call memberships.
+* Jump to room closes after you pick a room instead of needing a second Enter.
+* Link previews in encrypted and private rooms are loaded by the app through Sable's relay, so the preview service no longer sees the full link.
+* Stop the open room flashing over the room list when switching bottom tabs on phones.
+* Clicking the persona bio or banner no longer adds bold markers or removes the banner.
+* Dropdowns now show their selected "Server default" or "None" option instead of looking empty, and room versions are listed from newest to oldest.
+* Arabic mirrors the whole app from right to left. Read receipts no longer cover right-to-left messages, and the composer and text fields follow the direction of what you type.
+* The search index transfer alert only shows up when another device takes part in the copy, and names that device.
+* The spoiler cover on very small images no longer gets cut off, it shrinks to fit the image.
+* Opening a link that starts a chat with someone asks once, instead of asking again each time the prompt is dismissed.
+* See who is in a voice room before joining. Choose where participant avatars appear in the sidebar, with both displays enabled by default.
+
 ## 2.3.9 (2026-11-13)
 
 ### Features

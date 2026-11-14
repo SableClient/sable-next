@@ -1,0 +1,4 @@
+- The insert sheet on iOS and Android shows your recent photos and videos, so one tap adds them to the message.
+- Hovering or tapping a custom emote shows its description under the shortcode when the sender gave one.
+- Typing an MSC reference like MSC4444 offers to link it to msc.sable.moe, once or always, and MSC references in messages you read now link there too.
+- Show Persian and Arabic text in Vazirmatn.
