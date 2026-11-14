@@ -222,3 +222,19 @@ describe('toProseMirrorKey', () => {
     expect(toProseMirrorKey(binding)).toBe(expected);
   });
 });
+
+test('Option on macOS still matches and records the letter it was pressed with', () => {
+  const optionM = event({ key: 'µ', code: 'KeyM', altKey: true });
+  const optionN = event({ key: 'Dead', code: 'KeyN', altKey: true });
+  const optionShiftC = event({ key: 'Ç', code: 'KeyC', altKey: true, shiftKey: true });
+  expect(matchesBinding('alt+m', optionM, true)).toBe(true);
+  expect(matchesBinding('alt+n', optionN, true)).toBe(true);
+  expect(matchesBinding('alt+shift+c', optionShiftC, true)).toBe(true);
+  expect(bindingFromEvent(optionM, true)).toBe('alt+m');
+});
+
+test('Alt keeps the letter the layout types when it differs from the physical key', () => {
+  const azertyA = event({ key: 'a', code: 'KeyQ', altKey: true });
+  expect(matchesBinding('alt+a', azertyA, false)).toBe(true);
+  expect(matchesBinding('alt+q', azertyA, false)).toBe(false);
+});
