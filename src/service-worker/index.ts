@@ -47,6 +47,7 @@ import {
   settlePushActivation,
 } from '#lib/notifications/room-names.js';
 import { loadModel } from '#lib/model/model.js';
+import type { WorkerMessage } from '#lib/notifications/worker-message.js';
 import modelWasm from '#src/generated/wasm/sable_model_bg.wasm?url';
 import type { PushFetchView } from '#src/generated/protocol';
 import { reportWorkerError, watchWorkerOperation } from './telemetry.js';
@@ -189,7 +190,7 @@ async function acknowledge(validation: WebPushValidation): Promise<void> {
       type: 'sable:webpush-ack',
       appId: validation.app_id,
       ackToken: validation.ack_token,
-    });
+    } satisfies WorkerMessage);
   }
 }
 
@@ -277,7 +278,7 @@ async function handShares(): Promise<void> {
       serverUserId: share.serverUserId,
       text: share.text,
       files: share.files,
-    });
+    } satisfies WorkerMessage);
   }
 }
 
@@ -465,9 +466,10 @@ async function decryptInTab(
         clearTimeout(timer);
         settle(readPushFetch(event.data));
       };
-      client.postMessage({ type: 'sable:push-event', roomId, eventId, userId, serverUserId }, [
-        channel.port2,
-      ]);
+      client.postMessage(
+        { type: 'sable:push-event', roomId, eventId, userId, serverUserId } satisfies WorkerMessage,
+        [channel.port2]
+      );
     });
     if (answer !== null) return answer;
   }
@@ -576,7 +578,13 @@ async function callAction(
   const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:call-action', outcome, roomId, userId, eventId });
+    client.postMessage({
+      type: 'sable:call-action',
+      outcome,
+      roomId,
+      userId,
+      eventId,
+    } satisfies WorkerMessage);
     if (outcome === 'answer') await client.focus();
     return;
   }
@@ -594,7 +602,12 @@ async function inviteAction(
   const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:invite-action', outcome, roomId, userId });
+    client.postMessage({
+      type: 'sable:invite-action',
+      outcome,
+      roomId,
+      userId,
+    } satisfies WorkerMessage);
     if (outcome === 'accept') await client.focus();
     return;
   }
@@ -605,7 +618,10 @@ async function openInvites(userId: string | undefined): Promise<void> {
   const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:open-invites', userId });
+    client.postMessage({
+      type: 'sable:open-invites',
+      userId: userId ?? null,
+    } satisfies WorkerMessage);
     await client.focus();
     return;
   }
@@ -624,7 +640,14 @@ async function open(
 
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:open-room', roomId, userId, eventId });
+    if (roomId !== undefined) {
+      client.postMessage({
+        type: 'sable:open-room',
+        roomId,
+        userId: userId ?? null,
+        eventId: eventId ?? null,
+      } satisfies WorkerMessage);
+    }
     await client.focus();
     return;
   }
@@ -640,7 +663,8 @@ worker.addEventListener('pushsubscriptionchange', (event) => {
     watchWorkerOperation(
       'pushsubscriptionchange',
       worker.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-        for (const client of clients) client.postMessage({ type: 'sable:push-resubscribe' });
+        for (const client of clients)
+          client.postMessage({ type: 'sable:push-resubscribe' } satisfies WorkerMessage);
       })
     )
   );

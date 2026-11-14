@@ -1,4 +1,5 @@
 import type { PushSession } from '#lib/notifications/room-names.js';
+import type { WorkerMessage } from '#lib/notifications/worker-message.js';
 
 export async function belongsToServerUser(
   userId: string | null | undefined,
@@ -25,7 +26,7 @@ export function clientHasServerIdentity(
       resolve(event.data === identity);
     };
     try {
-      client.postMessage({ type: 'sable:server-user' }, [channel.port2]);
+      client.postMessage({ type: 'sable:server-user' } satisfies WorkerMessage, [channel.port2]);
     } catch {
       clearTimeout(timer);
       channel.port1.close();

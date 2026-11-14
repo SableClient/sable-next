@@ -104,6 +104,7 @@
     unregisterNativePush,
   } from '#lib/features/notifications/native-push.js';
   import { pushOverride } from '#lib/notifications/push-config.js';
+  import { parseWorkerMessage } from '#lib/notifications/worker-message.js';
   import { unregisterVoipPusher } from '#lib/features/notifications/voip-push.js';
   import {
     callNotificationAction,
@@ -768,9 +769,7 @@
     return on(navigator.serviceWorker, 'message', (event) => {
       const message = event as MessageEvent;
       const port = message.ports[0];
-      if ((message.data as { type?: unknown } | undefined)?.type !== 'sable:push-event' || !port) {
-        return;
-      }
+      if (parseWorkerMessage(message.data)?.type !== 'sable:push-event' || !port) return;
       void answerPushEvent(core, message.data).then((fetched) => {
         port.postMessage(fetched);
       });
@@ -803,19 +802,14 @@
     });
     const stopGranted = onPermissionGranted(resync);
     const stopMessages = on(navigator.serviceWorker, 'message', (event) => {
-      const message = (event as MessageEvent).data as
-        | { type?: string; appId?: string; ackToken?: string }
-        | undefined;
-
+      const message = parseWorkerMessage((event as MessageEvent).data);
       if (message?.type === 'sable:push-resubscribe') resync();
       if (message?.type === 'sable:webpush-ack') {
-        if (message.appId && message.ackToken) {
-          void core.rpc.push
-            .ackWebPusher({ app_id: message.appId, ack_token: message.ackToken })
-            .catch((error: unknown) => {
-              console.debug('[sable notifications] web push not acknowledged', error);
-            });
-        }
+        void core.rpc.push
+          .ackWebPusher({ app_id: message.appId, ack_token: message.ackToken })
+          .catch((error: unknown) => {
+            console.debug('[sable notifications] web push not acknowledged', error);
+          });
       }
     });
     return () => {
@@ -835,15 +829,7 @@
     if (!hostsServiceWorker()) return;
 
     return on(navigator.serviceWorker, 'message', (event) => {
-      const message = (event as MessageEvent).data as
-        | {
-            type?: string;
-            roomId?: string;
-            userId?: string;
-            eventId?: string | null;
-            outcome?: 'answer' | 'decline' | 'accept';
-          }
-        | undefined;
+      const message = parseWorkerMessage((event as MessageEvent).data);
       if (message?.type === 'sable:open-invites') {
         void selectNotificationAccount(core, message.userId ?? '')
           .then(() => goto(resolve('/(app)/inbox')))
@@ -852,27 +838,17 @@
           });
         return;
       }
-      if (
-        message?.type === 'sable:invite-action' &&
-        message.roomId !== undefined &&
-        message.userId !== undefined &&
-        (message.outcome === 'accept' || message.outcome === 'decline')
-      ) {
+      if (message?.type === 'sable:invite-action') {
         const { roomId, userId, outcome } = message;
         void answerInvite(userId, roomId, outcome).catch((error: unknown) => {
           console.debug('[sable notifications] invite not answered', error);
         });
         return;
       }
-      if (
-        message?.type === 'sable:call-action' &&
-        message.roomId !== undefined &&
-        message.userId !== undefined &&
-        (message.outcome === 'answer' || message.outcome === 'decline')
-      ) {
+      if (message?.type === 'sable:call-action') {
         const outcome = message.outcome;
         void openFromNotification(
-          { userId: message.userId, roomId: message.roomId, eventId: message.eventId ?? null },
+          { userId: message.userId, roomId: message.roomId, eventId: message.eventId },
           (roomId, eventId) => {
             answerFromNotification(roomId, eventId, outcome);
           }
@@ -881,12 +857,8 @@
         });
         return;
       }
-      if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
-        pushedRoom = {
-          roomId: message.roomId,
-          userId: message.userId ?? null,
-          eventId: message.eventId ?? null,
-        };
+      if (message?.type === 'sable:open-room') {
+        pushedRoom = { roomId: message.roomId, userId: message.userId, eventId: message.eventId };
       }
     });
   });
@@ -917,9 +889,7 @@
 
     const off = on(navigator.serviceWorker, 'message', (event) => {
       const workerMessage = event as MessageEvent;
-      const message = workerMessage.data as
-        | { type?: string; serverUserId?: string | null; text?: string; files?: File[] }
-        | undefined;
+      const message = parseWorkerMessage(workerMessage.data);
       if (message?.type === 'sable:server-user') {
         workerMessage.ports[0]?.postMessage(boundServerIdentity());
       } else if (
@@ -928,12 +898,12 @@
           (message.serverUserId && message.serverUserId === boundServerIdentity()))
       ) {
         if (!import.meta.env.VITE_SABLE_SERVER_URL) {
-          shareInbox.accept(message.text ?? '', message.files ?? []);
+          shareInbox.accept(message.text, message.files);
         } else {
           void currentServerUser()
             .then((identity) => {
               if (identity === message.serverUserId && identity === boundServerIdentity()) {
-                shareInbox.accept(message.text ?? '', message.files ?? []);
+                shareInbox.accept(message.text, message.files);
               }
             })
             .catch((error: unknown) => {
