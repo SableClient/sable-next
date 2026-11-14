@@ -11,6 +11,7 @@
   import { i18n } from '#lib/i18n.js';
   import { isPlainClick } from '#lib/ui/plain-click.js';
   import { isRoomSwitch } from '#lib/features/room/room-navigation.js';
+  import { openFindOrJoin } from '#lib/ui/find-or-join-state.svelte.js';
   import { isBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
   import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { addUnread } from '#lib/rooms/spaces.js';
@@ -258,11 +259,7 @@
   const createEntries = [
     { href: resolve('create-room'), label: 'common.createRoom', icon: PlusIcon },
     { href: resolve('create-space'), label: 'common.createSpace', icon: HouseIcon },
-    {
-      href: `${resolve('explore')}#explore-join-by-address`,
-      label: 'nav.joinWithAddress',
-      icon: LinkIcon,
-    },
+    { href: null, label: 'nav.findOrJoin', icon: LinkIcon },
     { href: resolve('explore'), label: 'nav.explore', icon: CompassIcon },
   ] as const;
   let createOpen = $state(false);
@@ -499,6 +496,12 @@
     return pathname.startsWith(item.activePrefix);
   }
 
+  function itemHref(item: RailItem, active: boolean): string {
+    const inside = active && (item.section === 'home' || item.section === 'unspaced');
+    const landing = !mobile && inside && pathname !== item.href;
+    return landing ? item.href : (item.navigateHref ?? item.href);
+  }
+
   function navigate(item: RailItem, event: MouseEvent): void {
     const href = item.navigateHref ?? item.href;
     if (onNavigate) {
@@ -648,7 +651,7 @@
       'rail-item nav-tab nav-tab-side selection-layer',
       { 'nav-tab-outlined': outlined(item), 'space-item': Boolean(item.initial) },
     ]}
-    href={item.navigateHref ?? item.href}
+    href={itemHref(item, active)}
     draggable="false"
     onclick={mobile
       ? (event) => {
@@ -1038,7 +1041,8 @@
   {#each createEntries as entry (entry.label)}
     <ActionMenuItem
       onSelect={() => {
-        navigateTo(entry.href);
+        if (entry.href === null) openFindOrJoin();
+        else navigateTo(entry.href);
       }}
     >
       <entry.icon />

@@ -9,6 +9,7 @@
 
   import { donateUrl, sourceUrl, supportRoom } from '#lib/deployment/links.js';
   import { readReturningUser } from '#lib/features/auth/flow/auth-flow.svelte.js';
+  import { openFindOrJoin } from '#lib/ui/find-or-join-state.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
   import ActionCard from '#lib/ui/ActionCard.svelte';
@@ -43,10 +44,10 @@
       description: 'home.startRoomDescription',
     },
     {
-      href: resolve('direct'),
+      onclick: () => openFindOrJoin(),
       icon: ChatCircleDotsIcon,
-      title: 'home.joinConversationTitle',
-      description: 'home.joinConversationDescription',
+      title: 'home.findOrJoinTitle',
+      description: 'home.findOrJoinDescription',
     },
   ];
 </script>
@@ -98,7 +99,7 @@
           title={i18n.t(card.title)}
           description={i18n.t(card.description)}
           href={card.href}
-          disabled={!card.href}
+          onclick={card.onclick}
         />
       {/each}
     </div>

@@ -273,6 +273,13 @@
 
     return space?.name ?? i18n.t(labels.title);
   });
+  let titleHref = $derived(
+    section === 'home'
+      ? resolve('/(app)/home')
+      : section === 'unspaced'
+        ? resolve('/(app)/rooms')
+        : undefined
+  );
   let TitleIcon = $derived(SECTION_ICONS[section]);
   let spacedRoomIds = $derived(claimedRoomIds(roomList.rooms));
   let sortKey = $derived<'directSort' | 'roomSort'>(directSection ? 'directSort' : 'roomSort');
@@ -435,6 +442,8 @@
     {activeSpace}
     {activeRoom}
     {title}
+    {titleHref}
+    {onNavigate}
     titleIcon={TitleIcon}
     {collapsed}
     menuItems={listMenuItems}

@@ -568,7 +568,8 @@ test('direct page offers starting a chat and searching instead of creating or br
     Array.from(document.querySelectorAll('.room-nav-actions a')).map((node) =>
       node.getAttribute('href')
     )
-  ).toEqual(['/direct', '/search']);
+  ).toEqual(['/search']);
+  expect(screen.getByRole('button', { name: 'nav.newChat' })).toBeInTheDocument();
   expect(document.querySelector('.rooms-heading-label')?.textContent).toBe('nav.chats');
   expect(document.querySelector('.empty-rooms p')?.textContent).toBe('nav.chatsEmpty');
 });
@@ -618,8 +619,8 @@ test('a space you cannot add rooms to does not show a create action', async () =
   visit('/space/!space:example.org', { spaceId: '!space:example.org' });
 
   await mountNav();
-  expect(screen.queryByRole('button', { name: 'nav.createRoomInSpace' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'nav.joinWithAddress' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'nav.newMenu' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'nav.findOrJoin' })).not.toBeInTheDocument();
 
   core.rpc.members.permissions.mockResolvedValue({
     can_invite: false,
@@ -627,7 +628,7 @@ test('a space you cannot add rooms to does not show a create action', async () =
   } as RoomPermissionsView);
   cleanup();
   await mountNav();
-  expect(await screen.findByRole('button', { name: 'nav.createRoomInSpace' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'nav.newMenu' })).toBeInTheDocument();
 });
 
 test('a space list header shows the space banner above it', async () => {

@@ -10,6 +10,7 @@
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -18,6 +19,7 @@
     goToPage,
     scopedSearchPath,
   } from '#lib/features/room/room-navigation.js';
+  import { openFindOrJoin } from '#lib/ui/find-or-join-state.svelte.js';
 
   interface Props {
     pathname: string;
@@ -60,7 +62,6 @@
           activeSpace.room_id
         )}`
   );
-  const joinHref = `${resolve('explore')}#explore-join-by-address`;
   let createSpaceHref = $derived(
     activeSpace === null
       ? resolve('create-space')
@@ -72,14 +73,12 @@
     activeSpace === null ? i18n.t('common.createSpace') : i18n.t('nav.createSubspace')
   );
   let browseLabel = $derived(
-    activeSpace === null ? i18n.t('nav.exploreSpaces') : i18n.t('nav.lobby')
+    activeSpace === null ? i18n.t('nav.exploreRoomsAndSpaces') : i18n.t('nav.lobby')
   );
 
   let createRoomLabel = $derived(
     activeSpace === null ? i18n.t('common.createRoom') : i18n.t('nav.createRoomInSpace')
   );
-
-  const newChatHref = resolve('direct');
 
   function navigateTo(href: string): void {
     if (onNavigate) {
@@ -133,22 +132,40 @@
     </a>
     <!-- eslint-enable svelte/no-navigation-without-resolve -->
   {/snippet}
+  {#snippet findOrJoin(label: string, icon: Component)}
+    {@const Icon = icon}
+    <button
+      type="button"
+      class="room-nav-trigger"
+      aria-label={collapsed ? label : undefined}
+      style="text-align: start"
+      onclick={() => openFindOrJoin()}
+    >
+      <span class="room-icon" aria-hidden="true"><Icon /></span>
+      {#if !collapsed}<span class="room-text"><span class="room-name">{label}</span></span>{/if}
+    </button>
+  {/snippet}
   {#snippet createMenu()}
-    <ActionMenu label={createRoomLabel} side="right" align="start">
+    {@const label = i18n.t('nav.newMenu')}
+    <ActionMenu {label} side="right" align="start">
       {#snippet trigger({ props })}
         <button
           {...props}
           type="button"
           class="room-nav-trigger"
-          aria-label={collapsed ? createRoomLabel : undefined}
+          aria-label={collapsed ? label : undefined}
           style="align-items: center; display: flex; gap: var(--space-200); text-align: start"
         >
           <span class="room-icon" aria-hidden="true"><PlusIcon /></span>
-          {#if !collapsed}<span class="room-text"
-              ><span class="room-name">{createRoomLabel}</span></span
-            >{/if}
+          {#if !collapsed}<span class="room-text"><span class="room-name">{label}</span></span>{/if}
         </button>
       {/snippet}
+      {#if activeSpace === null}
+        <ActionMenuItem onSelect={() => openFindOrJoin()}>
+          <ChatCircleIcon />
+          {i18n.t('nav.newChat')}
+        </ActionMenuItem>
+      {/if}
       <ActionMenuItem onSelect={() => navigateTo(createRoomHref)}>
         <PlusIcon />
         {createRoomLabel}
@@ -157,22 +174,17 @@
         <HouseIcon />
         {createSpaceLabel}
       </ActionMenuItem>
-      <ActionMenuItem onSelect={() => navigateTo(joinHref)}>
-        <LinkIcon />
-        {i18n.t('nav.joinWithAddress')}
-      </ActionMenuItem>
-      <ActionMenuItem onSelect={() => navigateTo(browseHref)}>
-        <CompassIcon />
-        {browseLabel}
-      </ActionMenuItem>
     </ActionMenu>
   {/snippet}
   {#if directSection}
-    {@render action(newChatHref, i18n.t('nav.newChat'), PlusIcon)}
+    {@render findOrJoin(i18n.t('nav.newChat'), PlusIcon)}
     {@render action(searchHref, i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
   {:else}
     {#if canCreateHere}
       {@render createMenu()}
+    {/if}
+    {#if activeSpace === null}
+      {@render findOrJoin(i18n.t('nav.findOrJoin'), LinkIcon)}
     {/if}
     {@render action(browseHref, browseLabel, activeSpace === null ? CompassIcon : FlagIcon)}
     {@render action(searchHref, i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}

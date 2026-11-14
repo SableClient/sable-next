@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RoomListItemView } from '#src/generated/protocol';
+  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -15,9 +16,10 @@
   interface Props {
     onSelect: (room: RoomListItemView) => void;
     onClose?: () => void;
+    onFindOrJoin?: (query: string) => void;
   }
 
-  let { onSelect, onClose }: Props = $props();
+  let { onSelect, onClose, onFindOrJoin }: Props = $props();
 
   const roomList = useRoomList();
   const uid = $props.id();
@@ -31,6 +33,9 @@
   let parents = $derived(parentSpaceNames(roomList.rooms));
   let active = $derived(Math.min(activeIndex, Math.max(0, results.length - 1)));
   let heading = $derived(parsed.text === '' ? i18n.t('shortcuts.paletteRecents') : null);
+  let fallback = $derived(
+    onFindOrJoin !== undefined && results.length === 0 && query.trim() !== ''
+  );
 
   function optionId(index: number): string {
     return `${uid}-option-${index}`;
@@ -51,6 +56,7 @@
       event.preventDefault();
       const room = results[active];
       if (room) onSelect(room);
+      else if (fallback) onFindOrJoin?.(query.trim());
     } else if (event.key === 'Escape') {
       onClose?.();
     }
@@ -72,7 +78,18 @@
     autocomplete="off"
   />
   <p class="hint">{i18n.t('shortcuts.paletteHint')}</p>
-  {#if results.length === 0}
+  {#if fallback}
+    <button
+      type="button"
+      class="menu-item option selection-highlight"
+      onclick={() => onFindOrJoin?.(query.trim())}
+    >
+      <LinkIcon aria-hidden="true" />
+      <span class="text">
+        <span class="name">{i18n.t('shortcuts.paletteFindOrJoin', { query: query.trim() })}</span>
+      </span>
+    </button>
+  {:else if results.length === 0}
     <p class="empty-text empty">{i18n.t('shortcuts.paletteEmpty')}</p>
   {:else}
     {#if heading}<p class="heading">{heading}</p>{/if}

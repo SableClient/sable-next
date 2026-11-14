@@ -15,7 +15,7 @@ test('opens a joined room from Explore spaces when Home is disabled', async ({
   });
   await app.openRooms();
 
-  const explore = app.primaryNavigation.getByRole('link', { name: en.nav.exploreSpaces });
+  const explore = app.primaryNavigation.getByRole('link', { name: en.nav.exploreRoomsAndSpaces });
   await explore.click();
   await expect(page).toHaveURL(/\/explore$/);
   await expect(explore).toHaveAttribute('aria-current', 'page');

@@ -54,6 +54,7 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { setBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
+import { findOrJoinState } from '#lib/ui/find-or-join-state.svelte.js';
 import { reads as mediaImageReads } from './media-image-reads.test-support.js';
 
 beforeEach(() => {
@@ -811,6 +812,20 @@ test('restores the home and rooms tabs to their last desktop room', async () => 
   expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms/!b%3Aexample.org');
 });
 
+test('the home tab leads to its landing page from inside the home section', async () => {
+  localStorage.setItem(
+    'sable-space-paths',
+    JSON.stringify({ home: '/home/!a%3Aexample.org', rooms: '/rooms/!b%3Aexample.org' })
+  );
+  setPreference('showHome', true);
+  visit('/home/!a%3Aexample.org');
+  renderRail({ spaces: [] });
+  await tick();
+
+  expect(tab('nav.home')).toHaveAttribute('href', '/home');
+  expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms/!b%3Aexample.org');
+});
+
 test('records the active desktop home and rooms routes', async () => {
   renderRail({ spaces: [] });
   await tick();
@@ -872,7 +887,7 @@ test('a space joined by address does not become the rooms tab target', async () 
   expect(savedSpacePaths().rooms).toBe('/rooms');
 });
 
-test('offers join by address from the add button', async () => {
+test('offers find or join from the add button', async () => {
   const visited: string[] = [];
   renderRail({
     spaces: [],
@@ -887,14 +902,16 @@ test('offers join by address from the add button', async () => {
     expect(labels(screen.getAllByRole('menuitem'))).toEqual([
       'common.createRoom',
       'common.createSpace',
-      'nav.joinWithAddress',
+      'nav.findOrJoin',
       'nav.explore',
     ]);
   });
 
-  await user.click(screen.getByRole('menuitem', { name: 'nav.joinWithAddress' }));
+  await user.click(screen.getByRole('menuitem', { name: 'nav.findOrJoin' }));
 
-  expect(visited).toEqual(['/explore#explore-join-by-address']);
+  expect(visited).toEqual([]);
+  expect(findOrJoinState.open).toBe(true);
+  findOrJoinState.open = false;
 });
 
 test('the rail is a navigation landmark holding one tree with a single tab stop', async () => {

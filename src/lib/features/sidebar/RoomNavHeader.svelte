@@ -18,6 +18,8 @@
     activeSpace: RoomListItemView | null;
     activeRoom: RoomListItemView | null;
     title: string;
+    titleHref?: string;
+    onNavigate?: (href: string) => void;
     titleIcon: Component;
     collapsed: boolean;
     menuItems: Snippet;
@@ -27,6 +29,8 @@
     activeSpace,
     activeRoom,
     title,
+    titleHref,
+    onNavigate,
     titleIcon: TitleIcon,
     collapsed,
     menuItems,
@@ -111,6 +115,15 @@
           {/snippet}
           {@render menuItems()}
         </ActionMenu>
+      {:else if titleHref}
+        <!-- eslint-disable svelte/no-navigation-without-resolve -- the caller passes a resolved href -->
+        <a
+          class="title-link"
+          href={titleHref}
+          draggable="false"
+          onclick={() => onNavigate?.(titleHref)}>{title}</a
+        >
+        <!-- eslint-enable svelte/no-navigation-without-resolve -->
       {:else}
         {title}
       {/if}
@@ -211,6 +224,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .title-link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .title-link:hover {
+    text-decoration: underline;
   }
 
   :global(.room-nav-badge) {

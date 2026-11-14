@@ -42,23 +42,6 @@ for (const { path, heading } of MOBILE_DESTINATIONS) {
   });
 }
 
-test('separates the room directory filters from the join-by-address section', async ({ page }) => {
-  await page.goto('/explore');
-
-  const joinSection = page.getByRole('region', { name: en.room.directoryJoinByAddress });
-  const filters = page.locator('.directory .filters');
-  await expect(filters).toBeVisible();
-
-  const joinBounds = await joinSection.boundingBox();
-  const filterBounds = await filters.boundingBox();
-
-  if (joinBounds === null || filterBounds === null) {
-    throw new Error('Explore sections must have layout bounds');
-  }
-
-  expect(filterBounds.y - (joinBounds.y + joinBounds.height)).toBeGreaterThanOrEqual(20);
-});
-
 test('opens the chats list first, and reaches the new-chat form from there', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/direct');

@@ -20,6 +20,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 }));
 
 import CommandPalette from './CommandPalette.svelte';
+import { findOrJoinState } from '#lib/ui/find-or-join-state.svelte.js';
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -97,3 +98,19 @@ test.each(['light', 'dark'] as const)(
     expect(goto).toHaveBeenCalledWith('/rooms/!beta%3Aexample.org');
   }
 );
+
+test('offers find or join when no joined room matches', async () => {
+  await render(CommandPalette, { open: true });
+  const input = page.getByRole('combobox');
+
+  await userEvent.fill(input, '#new:example.org');
+  await expect
+    .element(page.getByRole('button', { name: 'shortcuts.paletteFindOrJoin:#new:example.org' }))
+    .toBeVisible();
+  await userEvent.keyboard('{Enter}');
+
+  await expect.element(page.getByRole('combobox')).not.toBeInTheDocument();
+  expect(findOrJoinState.open).toBe(true);
+  expect(findOrJoinState.initial).toBe('#new:example.org');
+  findOrJoinState.open = false;
+});
