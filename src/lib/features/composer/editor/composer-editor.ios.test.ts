@@ -18,6 +18,7 @@ let dispose: (() => void) | undefined;
 
 afterEach(() => {
   preferences.enterForNewline = 'send';
+  vi.unstubAllGlobals();
   dispose?.();
   dispose = undefined;
   document.body.replaceChildren();
@@ -47,12 +48,12 @@ function open(onSubmit: () => void): ComposerEditor {
   return editor;
 }
 
-function pressEnter(shiftKey: boolean, heldShift = shiftKey): void {
+function pressEnter(shiftKey: boolean, heldShift = shiftKey, code = ''): void {
   const surface = document.querySelector<HTMLElement>('[contenteditable]');
   if (!surface) throw new Error('editor surface not found');
   if (heldShift)
     surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }));
-  const event = new KeyboardEvent('keydown', { key: 'Enter', shiftKey, bubbles: true });
+  const event = new KeyboardEvent('keydown', { key: 'Enter', code, shiftKey, bubbles: true });
   Object.defineProperty(event, 'keyCode', { value: 13 });
   surface.dispatchEvent(event);
   vi.advanceTimersByTime(250);
@@ -107,4 +108,27 @@ test('on iOS a dropped Shift keyup does not make later Enters sends', () => {
 
   expect(submit).not.toHaveBeenCalled();
   expect(editor.doc()?.firstChild?.toString()).toBe('paragraph("hi", hard_break)');
+});
+
+test.each([
+  ['a physical keyboard sends', 'Enter', 1, 'paragraph("hi")'],
+  ['the on-screen keyboard breaks the line', '', 0, 'paragraph("hi", hard_break)'],
+])('on a touch device the adaptive Enter key from %s', (_, code, submits, doc) => {
+  vi.useFakeTimers();
+  vi.stubGlobal('matchMedia', (query: string) =>
+    Object.assign(new EventTarget(), { matches: query === '(pointer: coarse)', media: query })
+  );
+  vi.stubGlobal(
+    'visualViewport',
+    Object.assign(new EventTarget(), { height: window.innerHeight, offsetTop: 0 })
+  );
+  preferences.enterForNewline = 'adaptive';
+  const submit = vi.fn();
+  const editor = open(submit);
+  editor.setText('hi');
+
+  pressEnter(false, false, code);
+
+  expect(submit).toHaveBeenCalledTimes(submits);
+  expect(editor.doc()?.firstChild?.toString()).toBe(doc);
 });

@@ -3,6 +3,7 @@ import {
   dismissKeyboardOnScroll,
   keepKeyboardOnTap,
   resetDocumentScroll,
+  softwareKeyboardShown,
   trackKeyboardInset,
 } from './keyboard';
 
@@ -227,6 +228,23 @@ test('pinch zoom and panning do not become keyboard insets', async () => {
   await vi.runAllTimersAsync();
   expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
   stop();
+});
+
+test.each([
+  [500, true],
+  [800, false],
+])('a visual viewport %i tall under an 800 window shows a keyboard=%s', (height, shown) => {
+  vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height, offsetTop: 0 }));
+  vi.stubGlobal('innerHeight', 800);
+  expect(softwareKeyboardShown()).toBe(shown);
+});
+
+test('the Android app cannot tell whether its keyboard is shown', () => {
+  document.documentElement.dataset.tauriOs = 'android';
+  vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height: 800, offsetTop: 0 }));
+  vi.stubGlobal('innerHeight', 800);
+  expect(softwareKeyboardShown()).toBeNull();
+  delete document.documentElement.dataset.tauriOs;
 });
 
 test('a document offset the shell cannot scroll back is zeroed', () => {

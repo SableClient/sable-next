@@ -71,6 +71,13 @@ function keyboardInset(viewport: VisualViewport): number {
   return Math.max(0, Math.round(window.innerHeight - (viewport.height * scale + offset)));
 }
 
+/** Null where it cannot be measured: Android resizes the native webview for the IME. */
+export function softwareKeyboardShown(): boolean | null {
+  if (document.documentElement.dataset.tauriOs === 'android') return null;
+  const viewport = window.visualViewport;
+  return viewport ? keyboardInset(viewport) > 0 : null;
+}
+
 export function resetDocumentScroll(): void {
   const scroller = document.scrollingElement;
   if (!scroller || window.scrollY === 0) return;

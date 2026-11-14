@@ -31,7 +31,7 @@ import 'prosemirror-gapcursor/style/gapcursor.css';
 
 import type { PackImageView } from '#src/generated/protocol';
 
-import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
+import { enterInsertsNewline, noteKeyboardInput } from '#lib/settings/enter-key.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { isNumpadEvent, matchesBinding, toProseMirrorKey } from '#lib/ui/shortcuts/binding.js';
 import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
@@ -963,6 +963,7 @@ export class ComposerEditor {
               return false;
             },
             keydown: (_view, event) => {
+              noteKeyboardInput(event);
               if (event.key === 'Escape' && !event.isComposing) {
                 if (this.options.onNavigate('Escape')) event.preventDefault();
                 return true;
