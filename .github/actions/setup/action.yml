@@ -77,6 +77,14 @@ runs:
       working-directory: ${{ github.workspace }}
       run: pnpm install --frozen-lockfile
 
+    - name: Install the WASM C toolchain
+      if: ${{ inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        SUDO=$([ "$(id -u)" -eq 0 ] || echo sudo)
+        $SUDO apt-get update
+        $SUDO apt-get install --no-install-recommends -y clang llvm
+
     - name: Build the WASM bindings
       if: ${{ inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true' }}
       shell: bash

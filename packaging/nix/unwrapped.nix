@@ -10,6 +10,7 @@
   sable-wasm-bindgen-cli,
   binaryen,
   lld,
+  llvmPackages,
 }:
 
 let
@@ -48,6 +49,8 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   env = {
+    CC_wasm32_unknown_unknown = lib.getExe llvmPackages.clang-unwrapped;
+    AR_wasm32_unknown_unknown = lib.getExe' llvmPackages.bintools-unwrapped "llvm-ar";
     SABLE_FOSS = "1";
     VITE_APP_VERSION = finalAttrs.version;
     VITE_BUILD_HASH = src.shortRev or src.dirtyShortRev or "";

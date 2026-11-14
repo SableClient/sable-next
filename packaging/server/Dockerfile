@@ -8,7 +8,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 COPY patches ./patches
 ARG TARGETARCH
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates curl \
+    && apt-get install --no-install-recommends -y ca-certificates clang curl llvm \
     && rm -rf /var/lib/apt/lists/* \
     && case "$TARGETARCH" in \
          amd64) binaryen_arch=x86_64 ;; \
@@ -24,6 +24,7 @@ RUN apt-get update \
     && corepack prepare pnpm@12.14.0 --activate
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
+ENV AR_wasm32_unknown_unknown=llvm-ar
 RUN pnpm run build:server
 
 FROM rust:1.97-bookworm AS build
