@@ -1292,6 +1292,41 @@ async fn push_media_is_thumbnailed_once_and_reused() {
 }
 
 #[tokio::test]
+async fn a_direct_chat_without_a_picture_borrows_the_other_persons() {
+    let factory = matrix_sdk_test::event_factory::EventFactory::new()
+        .room(room_id!("!cold:example.org"))
+        .sender(user_id!("@sender:example.org"));
+    let room = JoinedRoomBuilder::new(room_id!("!cold:example.org"))
+        .add_state_event(factory.member(user_id!("@alice:example.org")))
+        .add_state_event(
+            factory
+                .member(user_id!("@sender:example.org"))
+                .avatar_url(mxc_uri!("mxc://example.org/face")),
+        );
+    let fixture = ColdFixture::new("media-direct", room, None).await;
+    fixture
+        .server
+        .mock_sync()
+        .ok_and_run(fixture.client.as_ref().unwrap(), |builder| {
+            builder.add_global_account_data(factory.direct().add_user(
+                user_id!("@sender:example.org").to_owned(),
+                room_id!("!cold:example.org"),
+            ));
+        })
+        .await;
+    let thumbnails = mount_thumbnails(&fixture, 0..=2).await;
+
+    let media = media(&fixture, None).await;
+
+    assert_eq!(
+        std::fs::read(media.room.as_deref().unwrap()).unwrap(),
+        thumbnails["face"]
+    );
+
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
 async fn a_room_with_media_previews_off_gets_no_push_image() {
     let off = Raw::from_json_string(
         json!({"type": "m.media_preview_config", "content": {"media_previews": "off"}}).to_string(),

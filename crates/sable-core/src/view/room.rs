@@ -527,7 +527,7 @@ impl AvatarSource {
     }
 }
 
-async fn room_avatar_url(room: &Room) -> Option<String> {
+pub(crate) async fn room_avatar_url(room: &Room) -> Option<String> {
     let avatar = if let Ok(Some(event)) = room
         .get_state_event_static::<RoomAvatarEventContent>()
         .await

@@ -273,10 +273,11 @@ impl PushSession {
                     .and_then(|member| member.avatar_url().map(ToOwned::to_owned)),
                 None => None,
             };
-        let room_url = if sender.is_none() || room.is_direct().await.unwrap_or(false) {
-            None
-        } else {
-            room.avatar_url()
+        let room_url = match sender {
+            Some(_) => crate::view::room_avatar_url(&room)
+                .await
+                .map(matrix_sdk::ruma::OwnedMxcUri::from),
+            None => None,
         };
         let own = match sender {
             Some(_) => room
