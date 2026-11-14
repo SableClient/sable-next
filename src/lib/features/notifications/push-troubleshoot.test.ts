@@ -327,6 +327,45 @@ function android(provider: string, overrides: Partial<TroubleshootDeps> = {}): T
   });
 }
 
+test('the built-in connection warns when native push is available', async () => {
+  const results = await run(
+    android('embedded', {
+      nativeTransport: () =>
+        Promise.resolve({ provider: 'embedded', distributor: 'embedded', fcmAvailable: true }),
+    })
+  );
+
+  expect(results.transport).toMatchObject({
+    state: 'warn',
+    message: 'settings.troubleshootTransportEmbeddedFcmAvailable',
+  });
+});
+
+test.each([false, undefined])(
+  'the built-in connection passes when native push is unavailable (%s)',
+  async (fcmAvailable) => {
+    const results = await run(
+      android('embedded', {
+        nativeTransport: () =>
+          Promise.resolve({ provider: 'embedded', distributor: 'embedded', fcmAvailable }),
+      })
+    );
+
+    expect(results.transport?.state).toBe('pass');
+  }
+);
+
+test('native push passes even when it reports itself available', async () => {
+  const results = await run(
+    android('fcm', {
+      nativeTransport: () =>
+        Promise.resolve({ provider: 'fcm', distributor: 'fcm', fcmAvailable: true }),
+    })
+  );
+
+  expect(results.transport?.state).toBe('pass');
+});
+
 test('background activity passes when battery optimizations are ignored', async () => {
   const results = await run(android('fcm'));
 

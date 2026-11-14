@@ -30,6 +30,7 @@ export interface TroubleshootResult {
 export interface PushTransportInfo {
   provider: string | null;
   distributor: string | null;
+  fcmAvailable?: boolean;
 }
 
 export interface TroubleshootDeps {
@@ -95,6 +96,13 @@ async function transport(deps: TroubleshootDeps): Promise<TroubleshootResult> {
   const native = await deps.nativeTransport();
   if (native?.provider == null) {
     return { check: 'transport', state: 'fail', message: 'settings.troubleshootTransportNone' };
+  }
+  if (native.provider === 'embedded' && native.fcmAvailable) {
+    return {
+      check: 'transport',
+      state: 'warn',
+      message: 'settings.troubleshootTransportEmbeddedFcmAvailable',
+    };
   }
   return {
     check: 'transport',

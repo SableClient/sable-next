@@ -2773,6 +2773,7 @@
     "troubleshootTransportApple": "Apple Push Notification service.",
     "troubleshootTransportAppleNoToken": "iOS has not given {{appName}} a push token. A copy installed from AltStore or SideStore is signed with your own certificate, and Apple only delivers {{appName}}’s pushes to builds {{appName}} signs.",
     "troubleshootTransportNative": "{{provider}} through {{distributor}}.",
+    "troubleshootTransportEmbeddedFcmAvailable": "The built-in connection can miss notifications in the background on this phone. Choosing Native (FCM) under Notification transport in the notification settings is more reliable.",
     "troubleshootTransportNone": "No push service is set up on this device.",
     "troubleshootAndroidOnly": "Only checked on Android.",
     "troubleshootBackgroundAllowed": "Android lets {{appName}} run in the background.",
