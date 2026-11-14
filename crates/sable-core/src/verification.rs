@@ -339,8 +339,12 @@ impl Core {
                     view,
                     VerificationView::Done | VerificationView::Cancelled { .. }
                 );
-                let view = if sas.is_done() && !core.verified_after_done(&user_id).await {
-                    not_cross_signed()
+                let view = if sas.is_done()
+                    && !core
+                        .verified_after_done(&user_id, sas.other_device().device_id())
+                        .await
+                {
+                    core.unsigned_after_done().await
                 } else {
                     view
                 };
@@ -381,8 +385,12 @@ impl Core {
                     view,
                     VerificationView::Done | VerificationView::Cancelled { .. }
                 );
-                let view = if qr.is_done() && !core.verified_after_done(&user_id).await {
-                    not_cross_signed()
+                let view = if qr.is_done()
+                    && !core
+                        .verified_after_done(&user_id, qr.other_device().device_id())
+                        .await
+                {
+                    core.unsigned_after_done().await
                 } else {
                     view
                 };
@@ -410,7 +418,25 @@ impl Core {
         });
     }
 
-    pub(crate) async fn verified_after_done(&self, user_id: &UserId) -> bool {
+    /// A signed device that finished a verification without the other one
+    /// getting signed is the side that could not sign.
+    async fn unsigned_after_done(&self) -> VerificationView {
+        let signed = match self.client().await {
+            Ok(client) => client
+                .encryption()
+                .get_own_device()
+                .await
+                .is_ok_and(|device| device.is_some_and(|device| device.is_cross_signed_by_owner())),
+            Err(_) => false,
+        };
+        if signed {
+            could_not_sign()
+        } else {
+            not_cross_signed()
+        }
+    }
+
+    pub(crate) async fn verified_after_done(&self, user_id: &UserId, device_id: &DeviceId) -> bool {
         let Ok(client) = self.client().await else {
             return false;
         };
@@ -425,12 +451,16 @@ impl Core {
             if let Err(error) = client.encryption().request_user_identity(user_id).await {
                 self.failed_with("verification_refresh_identity", &error);
             }
-            if client
-                .encryption()
-                .get_own_device()
-                .await
-                .is_ok_and(|device| device.is_some_and(|device| device.is_cross_signed_by_owner()))
-            {
+            let encryption = client.encryption();
+            let (own, other) = (
+                encryption.get_own_device().await,
+                encryption.get_device(user_id, device_id).await,
+            );
+            if [own, other].into_iter().all(|device| {
+                device.is_ok_and(|device| {
+                    device.is_some_and(|device| device.is_cross_signed_by_owner())
+                })
+            }) {
                 return true;
             }
         }
@@ -757,6 +787,14 @@ fn not_cross_signed() -> VerificationView {
     VerificationView::Cancelled {
         reason: "The other device did not sign this session, use your recovery key instead"
             .to_owned(),
+    }
+}
+
+fn could_not_sign() -> VerificationView {
+    VerificationView::Cancelled {
+        reason:
+            "This device could not sign the other one, enter your recovery key on this device first"
+                .to_owned(),
     }
 }
 
