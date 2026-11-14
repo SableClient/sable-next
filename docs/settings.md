@@ -24,6 +24,7 @@ except those marked deployment only.
 - `alwaysShowAltText` (Always show image descriptions): `true` or `false`. Default `false`.
 - `nameColorCorrection` (Improve name colour readability): One of `strong`, `weak`, `off`. Default `strong`.
 - `showRoomIcon` (Room icons): One of `always`, `sometimes`, `collapsed`, `never`. Default `always`.
+- `voiceParticipantPlacement` (Voice room participants): One of `both`, `below`, `inline`. Default `both`.
 - `showRoomBanners` (Room banners above the list): `true` or `false`. Default `true`.
 - `showDmTopics` (Show topics in direct messages): `true` or `false`. Default `true`.
 - `messagePreviews` (Message previews): One of `off`, `direct`, `rooms`, `all`. Default `off`.
@@ -118,6 +119,7 @@ except those marked deployment only.
 - `alwaysInlineEditor` (Always inline editor): `true` or `false`. Default `false`.
 - `enterForNewline` (Newline on touch screens, send otherwise): One of `adaptive`, `newline`, `send`. Default `adaptive`.
 - `sedEdits` (Edit your last message with s/old/new): `true` or `false`. Default `false`.
+- `linkMscReferences` (Always link MSC references): `true` or `false`. Default `false`.
 - `inlineEditing` (Edit messages in the timeline): `true` or `false`. Default `false`.
 - `mentionInReplies` (Default reply notifications): `true` or `false`. Default `true`.
 - `formattingToolbar` (Keep formatting toolbar open): `true` or `false`. Default `false`.
@@ -187,7 +189,7 @@ except those marked deployment only.
 - `richPushPayloads` (Include message text in push): `true` or `false`. Default `true`. Deployment only.
 - `clearNotificationsOnRead` (Clear alerts when read): `true` or `false`. Default `true`. Deployment only.
 - `highlightMentions` (Highlight mentions): `true` or `false`. Default `true`.
-- `faviconForMentionsOnly` (Tab badge for mentions and keywords): `true` or `false`. Default `false`.
+- `faviconForMentionsOnly` (Tab badge only for mentions and keywords): `true` or `false`. Default `false`.
 
 ## Voice & video
 

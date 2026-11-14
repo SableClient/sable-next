@@ -451,6 +451,15 @@
           ],
           "default": "always"
         },
+        "voiceParticipantPlacement": {
+          "title": "Voice room participants",
+          "enum": [
+            "both",
+            "below",
+            "inline"
+          ],
+          "default": "both"
+        },
         "showRoomBanners": {
           "title": "Room banners above the list",
           "type": "boolean",
@@ -897,6 +906,11 @@
           "type": "boolean",
           "default": false
         },
+        "linkMscReferences": {
+          "title": "Always link MSC references",
+          "type": "boolean",
+          "default": false
+        },
         "inlineEditing": {
           "title": "Edit messages in the timeline",
           "type": "boolean",
@@ -1292,7 +1306,7 @@
           "default": true
         },
         "faviconForMentionsOnly": {
-          "title": "Tab badge for mentions and keywords",
+          "title": "Tab badge only for mentions and keywords",
           "type": "boolean",
           "default": false
         },
@@ -1916,6 +1930,15 @@
           ],
           "default": "always"
         },
+        "voiceParticipantPlacement": {
+          "title": "Voice room participants",
+          "enum": [
+            "both",
+            "below",
+            "inline"
+          ],
+          "default": "both"
+        },
         "showRoomBanners": {
           "title": "Room banners above the list",
           "type": "boolean",
@@ -2362,6 +2385,11 @@
           "type": "boolean",
           "default": false
         },
+        "linkMscReferences": {
+          "title": "Always link MSC references",
+          "type": "boolean",
+          "default": false
+        },
         "inlineEditing": {
           "title": "Edit messages in the timeline",
           "type": "boolean",
@@ -2757,7 +2785,7 @@
           "default": true
         },
         "faviconForMentionsOnly": {
-          "title": "Tab badge for mentions and keywords",
+          "title": "Tab badge only for mentions and keywords",
           "type": "boolean",
           "default": false
         },
