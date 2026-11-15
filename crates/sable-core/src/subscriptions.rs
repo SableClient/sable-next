@@ -40,7 +40,7 @@ use crate::room_list_batch::DiffBatch;
 use crate::room_list_rows::{DmSpaceLinks, RoomListRows};
 use crate::room_sections::RoomSections;
 use crate::space_parents::{ParentResult, ParentTracker};
-use crate::timeline_overlay::{ReplyFallback, TimelineOverlay};
+use crate::timeline_overlay::{BanRedaction, ReplyFallback, TimelineOverlay};
 use crate::timelines::{
     AggregationScope, aggregation_items, build_room_timeline, fill_sender_profiles,
 };
@@ -720,6 +720,8 @@ impl Core {
         if stored_bridge {
             overlay.lock().set_bridged();
         }
+        let bans = BanRedaction::in_room(&room).await;
+        overlay.lock().seed_ban_redactions(bans);
         // Seeded before the stream starts, so its diffs apply to this snapshot.
         let items = overlay.lock().reset(items);
         let task = spawn(
@@ -980,6 +982,41 @@ impl Core {
             overlay.set_redaction_reason(redacted.to_owned(), reason.to_owned())
         })
         .await;
+    }
+
+    /// Hides or shows again `user_id`'s messages in every open timeline of the room.
+    pub(crate) async fn overlay_ban_redaction(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        ban: Option<BanRedaction>,
+    ) {
+        self.overlay_room(room_id, |overlay| {
+            overlay.set_ban_redaction(user_id, ban.clone())
+        })
+        .await;
+    }
+
+    /// What a ban hides of `event_id` in an open timeline of the room.
+    pub(crate) async fn ban_hidden_content(
+        &self,
+        room_id: &RoomId,
+        event_id: &OwnedEventId,
+    ) -> Option<crate::protocol::TimelineItemContentView> {
+        let subscriptions = self.subscriptions.lock().await;
+        subscriptions.values().find_map(|entry| {
+            let (SubscriptionKind::LiveTimeline(room) | SubscriptionKind::FocusedTimeline(room)) =
+                &entry.kind
+            else {
+                return None;
+            };
+            entry
+                .overlay
+                .as_ref()
+                .filter(|_| room == room_id)?
+                .lock()
+                .hidden_content(event_id)
+        })
     }
 
     /// Fills in the replies to `replied` in every open timeline of the room.

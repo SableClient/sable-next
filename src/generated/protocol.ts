@@ -2127,6 +2127,11 @@ export type TimelineItemView = {
 	forwarded: ForwardedView | null,
 	forum_title: string | null,
 	shield: MessageShieldView | null,
+	/**
+	 *  MSC4293: shown as deleted because its sender was banned or kicked with
+	 *  `redact_events`. The content is still held locally.
+	 */
+	redacted_on_ban: boolean | null,
 };
 
 export type TimelineReadDiagnostics = {
@@ -2162,6 +2167,18 @@ export type UnreadDiagnosticsView = {
 	server_highlights: number,
 	threads: ThreadReadDiagnostics[],
 };
+
+/**  What the homeserver still holds of a redacted event (MSC2815). */
+export type UnredactedEventView = { kind: "content"; content: TimelineItemContentView } |
+/**  Encrypted, and this device has no key for it. */
+{ kind: "undecryptable" } |
+/**
+ *  Erased from the server's database. `content_keep_ms` is how long that
+ *  server keeps redacted content, when it says.
+ */
+{ kind: "deleted"; content_keep_ms: number | null } |
+/**  The server only ever saw the event already redacted. */
+{ kind: "not_received" };
 
 export type UploadProgressView = {
 	index: number,
@@ -2736,7 +2753,9 @@ export type Rpc = {
 	room_id: string,
 	user_id: string,
 	reason?: string | null,
-}) => Promise<null>;
+	/**  MSC4293: also remove everything they sent since they joined. */
+	redact_events?: boolean,
+}) => Promise<number>;
     denyKnock: (params: {
 	room_id: string,
 	user_id: string,
@@ -2745,7 +2764,9 @@ export type Rpc = {
 	room_id: string,
 	user_id: string,
 	reason?: string | null,
-}) => Promise<null>;
+	/**  MSC4293: also remove everything they sent since they joined. */
+	redact_events?: boolean,
+}) => Promise<number>;
     unban: (params: {
 	room_id: string,
 	user_id: string,
@@ -3646,6 +3667,10 @@ export type Rpc = {
 	original: string | null,
 	encryption: string | null,
 }>;
+    unredactedEvent: (params: {
+	room_id: string,
+	event_id: string,
+}) => Promise<UnredactedEventView>;
     editHistory: (params: {
 	room_id: string,
 	event_id: string,
@@ -4053,6 +4078,7 @@ export type RpcMethods = {
   'timeline.timestamp_to_event': Rpc['timeline']['timestampToEvent'];
   'timeline.list_threads': Rpc['timeline']['listThreads'];
   'timeline.event_source': Rpc['timeline']['eventSource'];
+  'timeline.unredacted_event': Rpc['timeline']['unredactedEvent'];
   'timeline.edit_history': Rpc['timeline']['editHistory'];
   'timeline.mark_read': Rpc['timeline']['markRead'];
   'timeline.set_fully_read': Rpc['timeline']['setFullyRead'];
@@ -4427,6 +4453,7 @@ export function createRpc(call: RpcCall): Rpc {
       timestampToEvent: (params) => call('timeline.timestamp_to_event', params) as ReturnType<Rpc['timeline']['timestampToEvent']>,
       listThreads: (params) => call('timeline.list_threads', params) as ReturnType<Rpc['timeline']['listThreads']>,
       eventSource: (params) => call('timeline.event_source', params) as ReturnType<Rpc['timeline']['eventSource']>,
+      unredactedEvent: (params) => call('timeline.unredacted_event', params) as ReturnType<Rpc['timeline']['unredactedEvent']>,
       editHistory: (params) => call('timeline.edit_history', params) as ReturnType<Rpc['timeline']['editHistory']>,
       markRead: (params) => call('timeline.mark_read', params) as ReturnType<Rpc['timeline']['markRead']>,
       setFullyRead: (params) => call('timeline.set_fully_read', params) as ReturnType<Rpc['timeline']['setFullyRead']>,

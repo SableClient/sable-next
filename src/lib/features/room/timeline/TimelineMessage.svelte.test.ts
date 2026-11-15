@@ -42,6 +42,7 @@ import {
 } from './timeline-item-fixtures';
 import { senderColor } from './timeline-format';
 import { withRowFields } from './row-fixtures.js';
+import { hideContent, setRevealState } from '../messages/revealed-redactions.svelte.js';
 
 afterEach(resetTimelineItemTest);
 
@@ -554,6 +555,66 @@ test('a deleted message keeps its sender, its time and its menu', async () => {
   expect(document.querySelector('.message-actions')).not.toBeNull();
 });
 
+test('a moderator sees revealed content under the tombstone until it is hidden', async () => {
+  const deleted = withRowFields({
+    ...item(false),
+    content: { kind: 'redacted', reason: null, redacted_by: null },
+    redacted_on_ban: true,
+  });
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: deleted, collapsed: false, roomId: '!room:example.org', canRedactOthers: true },
+    },
+  });
+  const eventId = deleted.event_id ?? '';
+  setRevealState('!room:example.org', eventId, {
+    kind: 'shown',
+    content: {
+      kind: 'message',
+      body: 'spam',
+      html: 'spam',
+      msgtype: 'text',
+      edited: false,
+      jumbo: null,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.redacted')?.textContent.trim()).toBe('Message deleted');
+  expect(screen.getByRole('button', { name: 'Hide content' })).toBeInTheDocument();
+  expect(
+    screen.getByRole('region', { name: 'Deleted content, shown only to you' })
+  ).toHaveTextContent('spam');
+
+  hideContent('!room:example.org', eventId);
+  await tick();
+  expect(document.querySelector('.revealed')).toBeNull();
+});
+
+test('a deleted message that cannot be shown says why next to its toggle', async () => {
+  const deleted = withRowFields({
+    ...item(false),
+    content: { kind: 'redacted', reason: null, redacted_by: null },
+    redacted_on_ban: true,
+  });
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: deleted, collapsed: false, roomId: '!room:example.org', canRedactOthers: true },
+    },
+  });
+  setRevealState('!room:example.org', deleted.event_id ?? '', {
+    kind: 'failed',
+    message: 'Your homeserver has already erased this message.',
+  });
+  await tick();
+
+  expect(screen.getByRole('status')).toHaveTextContent('already erased');
+  expect(screen.getByRole('button', { name: 'View content' })).toBeInTheDocument();
+  hideContent('!room:example.org', deleted.event_id ?? '');
+});
+
 test('a message the core sized as jumbo reads at that size', async () => {
   const html = '<img alt="rotate" height="32" src="mxc://example.org/rotate" title="rotate"> ';
   const emoteItem = withRowFields({
@@ -658,6 +719,7 @@ test('a message whose embeds were removed renders none, bundled or found', async
       },
     ],
     link_previews_removed: true,
+    redacted_on_ban: null,
   });
   const instance = render(TimelineItemHarness, {
     props: { core, item: { item: message, collapsed: false, encrypted: false } },

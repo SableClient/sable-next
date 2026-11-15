@@ -18,8 +18,6 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switcher from '#lib/ui/primitives/Switcher.svelte';
   import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
@@ -45,7 +43,9 @@
 
   import '#lib/ui/primitives/settings-row.css';
   import SearchField from '#lib/ui/primitives/SearchField.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
+  import ModerationDialog from '../members/ModerationDialog.svelte';
+  import { deletedMessagesNotice } from '../members/member-profile-actions';
 
   import {
     FOUNDER_POWER_LEVEL,
@@ -291,46 +291,29 @@
   }
 
   let moderationTarget = $state<{ userId: string; action: 'kick' | 'ban' } | null>(null);
-  let moderationReason = $state('');
-  let moderationBusy = $state(false);
-  let moderationMember = $derived.by(() => {
+  let moderationName = $derived.by(() => {
     const target = moderationTarget;
-    if (target === null) return null;
-    return members.find((member) => member.user_id === target.userId) ?? null;
+    if (target === null) return '';
+    const member = members.find((entry) => entry.user_id === target.userId);
+    return member ? memberName(member) : target.userId;
   });
 
   function openModeration(userId: string, action: 'kick' | 'ban'): void {
     moderationTarget = { userId, action };
-    moderationReason = '';
   }
 
-  function cancelModeration(): void {
-    moderationTarget = null;
-    moderationReason = '';
-  }
-
-  function submitModeration(): void {
-    void confirmModeration();
-  }
-
-  async function confirmModeration(): Promise<void> {
+  async function confirmModeration(reason: string | null, redactEvents: boolean): Promise<void> {
     const target = moderationTarget;
     const room = roomId;
-    if (!target || !room || moderationBusy) return;
+    if (!target || !room) return;
 
-    const reason = moderationReason.trim() || null;
-    moderationBusy = true;
-    try {
-      await act(target.userId, () =>
-        target.action === 'kick'
-          ? core.rpc.members.kick({ room_id: room, user_id: target.userId, reason })
-          : core.rpc.members.ban({ room_id: room, user_id: target.userId, reason })
-      );
-    } finally {
-      moderationBusy = false;
-      moderationTarget = null;
-      moderationReason = '';
-    }
+    const params = { room_id: room, user_id: target.userId, reason, redact_events: redactEvents };
+    await act(target.userId, async () => {
+      const deleted = await (target.action === 'kick'
+        ? core.rpc.members.kick(params)
+        : core.rpc.members.ban(params));
+      if (redactEvents) toasts.info(deletedMessagesNotice(moderationName, deleted));
+    });
   }
 </script>
 
@@ -651,44 +634,12 @@
   }}
 />
 
-<DialogFrame
-  open={moderationTarget !== null}
-  onOpenChange={(next) => {
-    if (!next) cancelModeration();
-  }}
-  variant="verification"
-  label={moderationTarget?.action === 'ban'
-    ? i18n.t('timeline.profileBan')
-    : i18n.t('timeline.profileKick')}
-  onConfirm={submitModeration}
->
-  {#if moderationTarget}
-    <div class="moderation">
-      <h2>
-        {moderationTarget.action === 'ban'
-          ? i18n.t('timeline.profileBanConfirm', {
-              name: moderationMember ? memberName(moderationMember) : moderationTarget.userId,
-            })
-          : i18n.t('timeline.profileKickConfirm', {
-              name: moderationMember ? memberName(moderationMember) : moderationTarget.userId,
-            })}
-      </h2>
-      <FormField fieldId="member-moderation-reason" label={i18n.t('timeline.deleteReason')}>
-        <TextInput id="member-moderation-reason" bind:value={moderationReason} autocomplete="off" />
-      </FormField>
-      <div class="moderation-actions">
-        <Button type="button" variant="ghost" disabled={moderationBusy} onclick={cancelModeration}>
-          {i18n.t('common.cancel')}
-        </Button>
-        <Button type="submit" variant="danger" loading={moderationBusy}>
-          {moderationTarget.action === 'ban'
-            ? i18n.t('timeline.profileBan')
-            : i18n.t('timeline.profileKick')}
-        </Button>
-      </div>
-    </div>
-  {/if}
-</DialogFrame>
+<ModerationDialog
+  action={moderationTarget?.action ?? null}
+  name={moderationName}
+  onConfirm={confirmModeration}
+  onClose={() => (moderationTarget = null)}
+/>
 
 <style>
   .section {
@@ -721,24 +672,5 @@
   .power {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-  }
-
-  .moderation {
-    display: grid;
-    gap: var(--space-300);
-    width: min(27rem, calc(100vw - 2rem));
-  }
-
-  .moderation h2 {
-    font-size: var(--font-size-heading);
-    line-height: 1.3;
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .moderation-actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
   }
 </style>

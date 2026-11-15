@@ -43,6 +43,7 @@ ruma = { version = "0.17.2", git = "https://github.com/ruma/ruma", rev = "5133d4
   "client-api-c",
   "unstable-msc4143",
   "unstable-msc4195",
+  "unstable-msc4293",
   "unstable-msc4480",
   "unstable-msc4466",
   "unstable-msc4532",

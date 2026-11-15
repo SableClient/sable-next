@@ -10,6 +10,8 @@ export type MessageActionPolicyInput = {
   canPin: boolean;
   canRedactOwn: boolean;
   canRedactOthers: boolean;
+  /** This user may re-read the content: through MSC2815, or held here after a ban hid it. */
+  canViewRedacted: boolean;
   canToggleReaction: boolean;
   canMarkUnread: boolean;
   canReply: boolean;
@@ -53,6 +55,7 @@ export type MessageActionPolicy = {
   stealEmotes: boolean;
   editHistory: boolean;
   viewSource: boolean;
+  viewRedacted: boolean;
   report: boolean;
 };
 
@@ -62,6 +65,7 @@ export function messageActionPolicy({
   canPin,
   canRedactOwn,
   canRedactOthers,
+  canViewRedacted,
   canToggleReaction,
   canMarkUnread,
   canReply,
@@ -135,6 +139,7 @@ export function messageActionPolicy({
     stealEmotes: stealCount > 0,
     editHistory: hasRoomEvent && item.content.kind === 'message' && item.content.edited,
     viewSource: hasRoomEvent,
+    viewRedacted: hasRoomEvent && redacted && canViewRedacted,
     report: hasRoomEvent && !item.is_own,
   };
 }

@@ -14,9 +14,17 @@ import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-
 import { pinErrorMessage, type PinnedEvents } from '../timeline/pinned-events.svelte.js';
 import type { Bookmarks } from '#lib/rooms/bookmarks.svelte.js';
 import { meowlnirFor } from '#lib/rooms/meowlnir-registry.svelte.js';
+import { serverFeatures } from '#lib/core/server-features.svelte.js';
+import { isCoreError } from '#src/transport';
 import type { MessageDialogs } from './message-dialogs.svelte.js';
 import type { ReplyVersion } from './reply-preview';
 import { messageActionPolicy } from './message-action-policy';
+import {
+  hideContent,
+  revealState,
+  setRevealState,
+  type RevealState,
+} from './revealed-redactions.svelte.js';
 
 export interface MessageCallbacks {
   onToggleReaction?: (
@@ -53,6 +61,8 @@ interface MessageActionDeps {
 }
 
 const SAVE_FEEDBACK_DELAY_MS = 300;
+const MSC2815 = 'fi.mau.msc2815';
+const DAY_MS = 86_400_000;
 
 export class MessageActionExecutor {
   savingSource = $state<string | null>(null);
@@ -91,6 +101,10 @@ export class MessageActionExecutor {
       canPin,
       canRedactOwn,
       canRedactOthers,
+      canViewRedacted:
+        item.content.kind === 'redacted' &&
+        canRedactOthers &&
+        (item.redacted_on_ban === true || serverFeatures(core).includes(MSC2815)),
       canToggleReaction: onToggleReaction !== undefined,
       canMarkUnread: onMarkUnread !== undefined,
       canReply: onReply !== undefined,
@@ -223,6 +237,50 @@ export class MessageActionExecutor {
       } catch (error) {
         console.warn('[sable timeline] source unavailable', error);
         toasts.error(t('errors.actionFailed'));
+      }
+    }
+
+    const reveal = revealState(roomId, item.event_id);
+    const redactedRevealed = reveal?.kind === 'shown';
+
+    async function toggleRedacted(eventId: string): Promise<void> {
+      if (reveal?.kind === 'loading') return;
+      if (redactedRevealed) {
+        hideContent(roomId, eventId);
+        return;
+      }
+      setRevealState(roomId, eventId, { kind: 'loading' });
+      setRevealState(roomId, eventId, await unredacted(eventId));
+    }
+
+    async function unredacted(eventId: string): Promise<RevealState> {
+      const failed = (message: string): RevealState => ({ kind: 'failed', message });
+      try {
+        const found = await core.rpc.timeline.unredactedEvent({
+          room_id: roomId,
+          event_id: eventId,
+        });
+        switch (found.kind) {
+          case 'content':
+            return { kind: 'shown', content: found.content };
+          case 'undecryptable':
+            return failed(t('timeline.redactedUndecryptable'));
+          case 'deleted':
+            return failed(
+              found.content_keep_ms === null
+                ? t('timeline.redactedErased')
+                : t('timeline.redactedErasedAfter', {
+                    count: Math.max(1, Math.round(found.content_keep_ms / DAY_MS)),
+                  })
+            );
+          case 'not_received':
+            return failed(t('timeline.redactedNotReceived'));
+        }
+      } catch (error) {
+        console.warn('[sable timeline] redacted content unavailable', error);
+        return failed(
+          isCoreError(error, 'denied') ? t('timeline.redactedDenied') : t('errors.actionFailed')
+        );
       }
     }
 
@@ -369,6 +427,8 @@ export class MessageActionExecutor {
         : undefined,
       onEditHistory: policy.editHistory ? () => void openEditHistory(policy.eventId) : undefined,
       onViewSource: policy.viewSource ? () => void openSource(policy.eventId) : undefined,
+      redactedRevealed,
+      onViewRedacted: policy.viewRedacted ? () => void toggleRedacted(policy.eventId) : undefined,
       onReport: policy.report
         ? () => {
             dialogs.open(item, { kind: 'report' });

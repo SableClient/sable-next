@@ -549,7 +549,7 @@ test('keeps a failed profile silent when the room member still names the user', 
 });
 
 test('collects an optional reason before kicking a member', async () => {
-  core.rpc.members.kick.mockResolvedValue(null);
+  core.rpc.members.kick.mockResolvedValue(0);
   render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
@@ -600,12 +600,13 @@ test('collects an optional reason before kicking a member', async () => {
       room_id: '!room:example.org',
       user_id: '@alice:example.org',
       reason: 'spamming links',
+      redact_events: false,
     });
   });
 });
 
 test('sends no reason when the moderation reason is left blank', async () => {
-  core.rpc.members.ban.mockResolvedValue(null);
+  core.rpc.members.ban.mockResolvedValue(0);
   render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
@@ -652,6 +653,61 @@ test('sends no reason when the moderation reason is left blank', async () => {
       room_id: '!room:example.org',
       user_id: '@alice:example.org',
       reason: null,
+      redact_events: false,
+    });
+  });
+});
+
+test("a ban can also delete the member's messages", async () => {
+  core.rpc.members.ban.mockResolvedValue(0);
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_react: true,
+        can_redact_own: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: false,
+        can_ban: true,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: false,
+        can_manage_children: false,
+      },
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        real_name: 'Alice',
+        real_avatar_url: null,
+        avatar_url: null,
+        power_level: 0,
+        membership: 'join',
+        member_ts: null,
+        kicked: false,
+        service: false,
+      },
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  await chooseAction('Ban from room');
+
+  const dialog = await screen.findByRole('dialog');
+  await user.click(within(dialog).getByRole('switch', { name: 'Also delete their messages' }));
+  await user.click(within(dialog).getByRole('button', { name: 'Ban and delete messages' }));
+  await vi.waitFor(() => {
+    expect(core.rpc.members.ban).toHaveBeenCalledWith({
+      room_id: '!room:example.org',
+      user_id: '@alice:example.org',
+      reason: null,
+      redact_events: true,
     });
   });
 });

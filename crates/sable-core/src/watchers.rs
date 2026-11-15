@@ -30,6 +30,7 @@ use crate::Core;
 use crate::notifications;
 use crate::search::ignored_user_ids;
 use crate::spaces::{self, SidebarSpacesEvent};
+use crate::timeline_overlay::BanRedaction;
 
 type NotificationSender = tokio::sync::mpsc::UnboundedSender<(Notification, matrix_sdk::Room)>;
 pub(crate) type NotificationRoute = Arc<parking_lot::Mutex<Option<NotificationSender>>>;
@@ -626,6 +627,16 @@ impl Core {
                     if event.prev_content().is_none() {
                         core.emit_profile_changed(generation, &room, &event).await;
                     }
+                    let ban = room.power_levels().await.ok().and_then(|power_levels| {
+                        BanRedaction::from_membership(
+                            &event.sender,
+                            &event.state_key,
+                            &event.content,
+                            &power_levels,
+                        )
+                    });
+                    core.overlay_ban_redaction(room.room_id(), &event.state_key, ban)
+                        .await;
                 }
             }
         });

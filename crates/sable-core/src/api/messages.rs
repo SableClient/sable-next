@@ -575,6 +575,7 @@ impl Handler for BulkRedactParams {
             &self.senders,
             self.after_ts,
             &self.event_types,
+            false,
             self.reason.as_deref(),
         )
         .await

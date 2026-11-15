@@ -10,6 +10,13 @@ export function moderationErrorMessage(cause: unknown): string {
     : t('timeline.profileModerationFailed');
 }
 
+/** What a kick or ban that also deleted the member's messages did. */
+export function deletedMessagesNotice(name: string, deleted: number): string {
+  return deleted > 0
+    ? t('timeline.moderationDeletedMessages', { name, count: deleted })
+    : t('timeline.moderationDeletingMessages', { name });
+}
+
 export class MemberProfileActions {
   constructor(private readonly core: CoreClient) {}
 
@@ -49,11 +56,13 @@ export class MemberProfileActions {
     roomId: string,
     userId: string,
     action: 'kick' | 'ban',
-    reason: string | null
-  ): Promise<void> {
-    if (action === 'kick')
-      await this.core.rpc.members.kick({ room_id: roomId, user_id: userId, reason });
-    else await this.core.rpc.members.ban({ room_id: roomId, user_id: userId, reason });
+    reason: string | null,
+    redactEvents = false
+  ): Promise<number> {
+    const params = { room_id: roomId, user_id: userId, reason, redact_events: redactEvents };
+    return action === 'kick'
+      ? this.core.rpc.members.kick(params)
+      : this.core.rpc.members.ban(params);
   }
 
   async setPowerLevel(roomId: string, userId: string, level: number): Promise<void> {

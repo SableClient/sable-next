@@ -32,6 +32,7 @@ function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
     per_message_profile: null,
     bundled_link_previews: [],
     link_previews_removed: null,
+    redacted_on_ban: null,
     mention: 'none',
     forwarded: null,
     forum_title: null,
@@ -40,13 +41,18 @@ function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
   });
 }
 
-function policy(overrides: Partial<TimelineItemView> = {}, hasLinkPreviews = false) {
+function policy(
+  overrides: Partial<TimelineItemView> = {},
+  hasLinkPreviews = false,
+  canViewRedacted = false
+) {
   return messageActionPolicy({
     item: item(overrides),
     roomId: '!room:example.org',
     canPin: true,
     canRedactOwn: true,
     canRedactOthers: false,
+    canViewRedacted,
     canToggleReaction: true,
     canMarkUnread: true,
     canReply: true,
@@ -87,6 +93,17 @@ test('policy centralizes ownership and permission gates', () => {
   expect(other.edit).toBe(false);
   expect(other.redact).toBe(false);
   expect(other.report).toBe(true);
+});
+
+test('deleted content can be re-read only from a redacted server event', () => {
+  const redacted = { kind: 'redacted', reason: null, redacted_by: '@mod:example.org' } as const;
+
+  expect(policy({ content: redacted }, false, true).viewRedacted).toBe(true);
+  expect(policy({ content: redacted }, false, false).viewRedacted).toBe(false);
+  expect(policy({}, false, true).viewRedacted).toBe(false);
+  expect(
+    policy({ content: redacted, event_id: null, transaction_id: 'local' }, false, true).viewRedacted
+  ).toBe(false);
 });
 
 const MEDIA_KINDS = ['image', 'video', 'audio', 'file'] as const;

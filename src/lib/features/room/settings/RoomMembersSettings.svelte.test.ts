@@ -99,7 +99,7 @@ test('offers approval and denial for join requests', async () => {
 test.each(['Approve', 'Deny'])('answers a join request with %s', async (action) => {
   core.rpc.members.list.mockResolvedValue([{ ...alice, membership: 'knock' }]);
   core.rpc.rooms.invite.mockResolvedValue(null);
-  core.rpc.members.kick.mockResolvedValue(null);
+  core.rpc.members.kick.mockResolvedValue(0);
   render(RoomMembersSettings, { room, permissions: { ...permissions, can_invite: true } });
   const user = userEvent.setup();
   await user.click(screen.getByRole('radio', { name: 'Requests' }));
@@ -124,7 +124,7 @@ test.each(['Approve', 'Deny'])('answers a join request with %s', async (action) 
 
 test('collects an optional reason before kicking a member', async () => {
   core.rpc.members.list.mockResolvedValue([alice]);
-  core.rpc.members.kick.mockResolvedValue(null);
+  core.rpc.members.kick.mockResolvedValue(0);
   const user = await renderMembers();
 
   await user.click(screen.getByRole('button', { name: 'Remove from room' }));
@@ -140,13 +140,14 @@ test('collects an optional reason before kicking a member', async () => {
       room_id: '!room:example.org',
       user_id: '@alice:example.org',
       reason: 'spamming links',
+      redact_events: false,
     });
   });
 });
 
 test('sends no reason when the moderation reason is left blank', async () => {
   core.rpc.members.list.mockResolvedValue([alice]);
-  core.rpc.members.ban.mockResolvedValue(null);
+  core.rpc.members.ban.mockResolvedValue(0);
   const user = await renderMembers();
 
   await user.click(screen.getByRole('button', { name: 'Ban from room' }));
@@ -158,6 +159,7 @@ test('sends no reason when the moderation reason is left blank', async () => {
       room_id: '!room:example.org',
       user_id: '@alice:example.org',
       reason: null,
+      redact_events: false,
     });
   });
 });

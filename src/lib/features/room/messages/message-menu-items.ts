@@ -12,6 +12,8 @@ import PinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import ReportIcon from 'phosphor-svelte/lib/FlagIcon';
 import UnpinIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
 import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
+import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
+import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
 import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 import MarkUnreadIcon from 'phosphor-svelte/lib/CircleDashedIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
@@ -57,6 +59,8 @@ export type MessageActions = {
   onReport?: () => void;
   onMeowlnirBan?: () => void;
   onViewSource?: () => void;
+  onViewRedacted?: () => void;
+  redactedRevealed?: boolean;
   pinned?: boolean;
   bookmarked?: boolean;
 };
@@ -254,6 +258,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'common.viewSource',
       icon: CodeIcon,
       run: actions.onViewSource,
+    });
+  }
+  if (actions.onViewRedacted) {
+    rows.push({
+      key: 'view-redacted',
+      label: actions.redactedRevealed ? 'timeline.hideRedacted' : 'timeline.viewRedacted',
+      icon: actions.redactedRevealed ? EyeSlashIcon : EyeIcon,
+      run: actions.onViewRedacted,
     });
   }
   if (actions.onReport) {

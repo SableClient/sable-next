@@ -19,6 +19,8 @@
   import MessageBody from '../messages/MessageBody.svelte';
   import MessageReactions from '../messages/MessageReactions.svelte';
   import MessageActions from '../messages/MessageActions.svelte';
+  import RevealedRedaction from '../messages/RevealedRedaction.svelte';
+  import { revealState } from '../messages/revealed-redactions.svelte.js';
 
   import '#lib/ui/primitives/menu.css';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
@@ -89,6 +91,7 @@
   }: TimelineItemProps = $props();
 
   const labelId = $props.id();
+  const reveal = $derived(revealState(roomId, item.event_id));
   const named = $derived(layout === 'compact' || !collapsed);
   const ownBubble = $derived(layout === 'bubble' && item.is_own && alignOwn);
 
@@ -574,6 +577,20 @@
               redactionReason={item.event_id ? events?.redactionReason(item.event_id) : null}
               redactedBy={events?.redactor(item) ?? item.content.redacted_by ?? null}
             />
+            {#if row.actions.onViewRedacted}
+              <RevealedRedaction
+                {item}
+                {reveal}
+                onToggle={row.actions.onViewRedacted}
+                senderTimezone={row.senderTimezone}
+                {members}
+                {canRedactOthers}
+                {encrypted}
+                {onMatrixLink}
+                {onOpenMedia}
+                {onSenderProfile}
+              />
+            {/if}
             {@render inlineReceiptSlot()}
           </div>
         {:else if item.content.kind === 'unable_to_decrypt'}

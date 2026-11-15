@@ -271,6 +271,65 @@ async fn a_redacted_message_in_an_encrypted_room_has_no_shield() {
 }
 
 #[tokio::test]
+async fn a_message_the_server_redacted_on_ban_reads_as_deleted_by_the_moderator() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!banned:example.org");
+    let event_id = event_id!("$spam");
+    let event = json!({
+        "type": "m.room.message",
+        "event_id": event_id,
+        "sender": "@spam:example.org",
+        "origin_server_ts": 1_700_000_000_000_u64,
+        "content": {},
+        "unsigned": { "redacted_because": {
+            "type": "m.room.member",
+            "event_id": "$ban",
+            "sender": "@mod:example.org",
+            "state_key": "@spam:example.org",
+            "origin_server_ts": 1_700_000_000_001_u64,
+            "content": {
+                "membership": "ban",
+                "reason": "flooding",
+                "org.matrix.msc4293.redact_events": true,
+            },
+        } },
+    });
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                matrix_sdk::ruma::serde::Raw::new(&event)
+                    .unwrap()
+                    .cast_unchecked(),
+            ),
+        )
+        .await;
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
+    let items = timeline.items().await;
+    let item = items
+        .iter()
+        .find(|item| item.as_event().and_then(|event| event.event_id()) == Some(event_id))
+        .unwrap();
+    let view = crate::view::timeline_item(
+        item,
+        client.user_id(),
+        &crate::view::Highlights::default(),
+        &crate::view::LocalContent::default(),
+    );
+
+    assert!(matches!(
+        view.content,
+        crate::protocol::TimelineItemContentView::Redacted {
+            reason: Some(ref reason),
+            redacted_by: Some(ref by),
+        } if reason == "flooding" && by == "@mod:example.org"
+    ));
+}
+
+#[tokio::test]
 async fn only_a_state_change_that_came_encrypted_is_hidden_as_forged() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -2338,8 +2397,8 @@ async fn videos_and_galleries_upload_their_thumbnails() {
 
 #[tokio::test]
 async fn a_silent_clip_is_sent_as_a_gif_unless_the_sender_chose() {
-    let silent = include_bytes!("../tests/fixtures/clips/silent.mp4").as_slice();
-    let sound = include_bytes!("../tests/fixtures/clips/sound.mp4").as_slice();
+    let silent = include_bytes!("../../sable-model/tests/fixtures/clips/silent.mp4").as_slice();
+    let sound = include_bytes!("../../sable-model/tests/fixtures/clips/sound.mp4").as_slice();
     for (clip, choice, gif) in [
         (silent, None, true),
         (sound, None, false),

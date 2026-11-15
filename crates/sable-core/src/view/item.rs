@@ -411,6 +411,7 @@ impl TimelineItemView {
             forwarded: None,
             forum_title: None,
             shield: None,
+            redacted_on_ban: None,
         }
     }
 }
@@ -641,6 +642,7 @@ pub fn timeline_item(
                         !event.content().is_redacted()
                             || shield.code != MessageShieldCode::SentInClear
                     }),
+                redacted_on_ban: None,
             }
         }
 

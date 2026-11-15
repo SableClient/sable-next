@@ -4035,6 +4035,273 @@ async fn server_features_lists_only_enabled_unstable_features() {
     );
 }
 
+async fn ban_redacting_events(server_kept_flag: bool) {
+    use matrix_sdk::ruma::{room_id, user_id};
+    use matrix_sdk_test::event_factory::EventFactory;
+    use wiremock::matchers::body_partial_json;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!moderated:example.org");
+    let spammer = user_id!("@spam:example.org");
+    let joined = EventFactory::new()
+        .room(room_id)
+        .sender(spammer)
+        .member(spammer)
+        .server_ts(5);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(joined),
+        )
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"^/_matrix/client/v3/rooms/.*/ban$"))
+        .and(body_partial_json(json!({
+            "user_id": spammer,
+            "reason": "spam",
+            "org.matrix.msc4293.redact_events": true,
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v3/rooms/.*/state/m\.room\.member/.*",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "membership": "ban",
+            "reason": "spam",
+            "org.matrix.msc4293.redact_events": server_kept_flag,
+        })))
+        .mount(server.server())
+        .await;
+    let message = |id: &str, sender: &str| {
+        json!({
+            "type": "m.room.message",
+            "event_id": id,
+            "room_id": room_id,
+            "sender": sender,
+            "origin_server_ts": 10,
+            "content": {"msgtype": "m.text", "body": "x"},
+        })
+    };
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/_matrix/client/v3/rooms/.*/messages$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "start": "t0",
+            "chunk": [
+                message("$spam", spammer.as_str()),
+                {
+                    "type": "m.room.member",
+                    "state_key": spammer,
+                    "event_id": "$join",
+                    "room_id": room_id,
+                    "sender": spammer,
+                    "origin_server_ts": 10,
+                    "content": {"membership": "join"},
+                },
+                message("$other", "@ok:example.org"),
+            ],
+        })))
+        .expect(u64::from(!server_kept_flag))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(
+            r"^/_matrix/client/v3/rooms/.*/redact/[^/]*spam/.*",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$r"})))
+        .expect(u64::from(!server_kept_flag))
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let banned = core
+        .run(crate::api::members::BanParams {
+            room_id: room_id.to_owned(),
+            user_id: spammer.to_owned(),
+            reason: Some("spam".to_owned()),
+            redact_events: true,
+        })
+        .await;
+    assert!(
+        matches!(banned, Ok(count) if count == u32::from(!server_kept_flag)),
+        "{banned:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_ban_that_redacts_events_relies_on_a_server_that_kept_the_flag() {
+    ban_redacting_events(true).await;
+}
+
+#[tokio::test]
+async fn a_ban_whose_flag_the_server_dropped_redacts_the_messages_itself() {
+    ban_redacting_events(false).await;
+}
+
+async fn read_unredacted(
+    status: u16,
+    body: serde_json::Value,
+) -> Result<crate::protocol::UnredactedEventView, RpcError> {
+    use matrix_sdk::ruma::{event_id, room_id};
+    use wiremock::matchers::query_param;
+
+    let room_id = room_id!("!moderated:example.org");
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().no_server_versions().build().await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/versions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "versions": ["v1.19"],
+            "unstable_features": {"fi.mau.msc2815": true},
+        })))
+        .mount(server.server())
+        .await;
+    server.sync_joined_room(&client, room_id).await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/_matrix/client/v3/rooms/.*/event/.*"))
+        .and(query_param(
+            "fi.mau.msc2815.include_unredacted_content",
+            "true",
+        ))
+        .respond_with(ResponseTemplate::new(status).set_body_json(body))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    core.run(crate::api::timeline::UnredactedEventParams {
+        room_id: room_id.to_owned(),
+        event_id: event_id!("$gone").to_owned(),
+    })
+    .await
+}
+
+fn redacted_event(event_type: &str, content: &serde_json::Value) -> serde_json::Value {
+    json!({
+        "type": event_type,
+        "event_id": "$gone",
+        "room_id": "!moderated:example.org",
+        "sender": "@spammer:example.org",
+        "origin_server_ts": 1,
+        "content": content,
+        "unsigned": {"redacted_because": {"type": "m.room.redaction", "sender": "@mod:example.org"}},
+    })
+}
+
+#[tokio::test]
+async fn unredacted_event_reads_what_the_server_still_holds() {
+    use crate::protocol::{TimelineItemContentView, UnredactedEventView};
+
+    let Ok(UnredactedEventView::Content { content }) = read_unredacted(
+        200,
+        redacted_event(
+            "m.room.message",
+            &json!({"msgtype": "m.text", "body": "spam"}),
+        ),
+    )
+    .await
+    else {
+        panic!("the content was not read");
+    };
+    let TimelineItemContentView::Message { body, .. } = *content else {
+        panic!("the content was not read as a message");
+    };
+    assert_eq!(body, "spam");
+
+    assert!(matches!(
+        read_unredacted(200, redacted_event("m.room.message", &json!({}))).await,
+        Ok(UnredactedEventView::NotReceived)
+    ));
+    assert!(matches!(
+        read_unredacted(
+            404,
+            json!({
+                "errcode": "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED",
+                "error": "erased",
+                "fi.mau.msc2815.content_keep_ms": 604_800_000,
+            })
+        )
+        .await,
+        Ok(UnredactedEventView::Deleted {
+            content_keep_ms: Some(604_800_000)
+        })
+    ));
+    assert!(matches!(
+        read_unredacted(
+            404,
+            json!({"errcode": "FI.MAU.MSC2815_UNREDACTED_CONTENT_NOT_RECEIVED", "error": "late"})
+        )
+        .await,
+        Ok(UnredactedEventView::NotReceived)
+    ));
+    assert!(matches!(
+        read_unredacted(403, json!({"errcode": "M_FORBIDDEN", "error": "no"})).await,
+        Err(RpcError {
+            code: RpcCode::Denied,
+            ..
+        })
+    ));
+}
+
+#[tokio::test]
+async fn unredacted_ciphertext_without_a_key_is_undecryptable() {
+    use crate::protocol::UnredactedEventView;
+
+    assert!(matches!(
+        read_unredacted(
+            200,
+            redacted_event(
+                "m.room.encrypted",
+                &json!({
+                    "algorithm": "m.megolm.v1.aes-sha2",
+                    "ciphertext": "AwgAEnAC",
+                    "device_id": "DEVICE",
+                    "sender_key": "AAAA",
+                    "session_id": "SESSION",
+                }),
+            ),
+        )
+        .await,
+        Ok(UnredactedEventView::Undecryptable)
+    ));
+}
+
+#[tokio::test]
+async fn unredacted_event_needs_the_server_to_advertise_msc2815() {
+    use matrix_sdk::ruma::{event_id, room_id};
+
+    use crate::api::timeline::UnredactedEventParams;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().no_server_versions().build().await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/versions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "versions": ["v1.19"],
+            "unstable_features": {"fi.mau.msc2815": false},
+        })))
+        .mount(server.server())
+        .await;
+    let room_id = room_id!("!plain:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    let core = core(&server, client).await;
+
+    assert!(matches!(
+        core.run(UnredactedEventParams {
+            room_id: room_id.to_owned(),
+            event_id: event_id!("$gone").to_owned(),
+        })
+        .await,
+        Err(RpcError {
+            code: RpcCode::Unsupported,
+            ..
+        })
+    ));
+}
+
 #[tokio::test]
 async fn a_live_redaction_shows_its_reason_in_an_open_timeline() {
     use matrix_sdk::ruma::event_id;

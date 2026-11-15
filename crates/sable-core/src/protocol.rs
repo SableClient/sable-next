@@ -1556,6 +1556,9 @@ pub struct TimelineItemView {
     pub forwarded: Option<ForwardedView>,
     pub forum_title: Option<String>,
     pub shield: Option<MessageShieldView>,
+    /// MSC4293: shown as deleted because its sender was banned or kicked with
+    /// `redact_events`. The content is still held locally.
+    pub redacted_on_ban: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -2038,6 +2041,27 @@ pub struct ReplyView {
     pub body: Option<String>,
     /// Set instead of `body` when the replied-to event has none to show.
     pub fallback: Option<ReplyFallbackView>,
+}
+
+/// What the homeserver still holds of a redacted event (MSC2815).
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum UnredactedEventView {
+    Content {
+        #[cfg_attr(feature = "typegen", specta(type = TimelineItemContentView))]
+        content: Box<TimelineItemContentView>,
+    },
+    /// Encrypted, and this device has no key for it.
+    Undecryptable,
+    /// Erased from the server's database. `content_keep_ms` is how long that
+    /// server keeps redacted content, when it says.
+    Deleted {
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        content_keep_ms: Option<u64>,
+    },
+    /// The server only ever saw the event already redacted.
+    NotReceived,
 }
 
 #[derive(Debug, Clone, Serialize)]

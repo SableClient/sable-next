@@ -379,19 +379,25 @@ pub struct KickParams {
     pub user_id: OwnedUserId,
     #[serde(default)]
     pub reason: Option<String>,
+    /// MSC4293: also remove everything they sent since they joined.
+    #[serde(default)]
+    pub redact_events: bool,
 }
 
 impl Handler for KickParams {
-    type Ok = ();
+    /// How many of their messages this client redacted itself.
+    type Ok = u32;
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.room(&self.room_id)
-            .await?
-            .kick_user(&self.user_id, self.reason.as_deref())
+    async fn run(self, core: &Arc<Core>) -> Result<u32, RpcError> {
+        let room = core.room(&self.room_id).await?;
+        if !self.redact_events {
+            room.kick_user(&self.user_id, self.reason.as_deref())
+                .await
+                .or_failed(core, "kick_user")?;
+            return Ok(0);
+        }
+        core.remove_redacting_events(&room, &self.user_id, self.reason.as_deref(), false)
             .await
-            .or_failed(core, "kick_user")?;
-
-        Ok(())
     }
 }
 
@@ -431,19 +437,25 @@ pub struct BanParams {
     pub user_id: OwnedUserId,
     #[serde(default)]
     pub reason: Option<String>,
+    /// MSC4293: also remove everything they sent since they joined.
+    #[serde(default)]
+    pub redact_events: bool,
 }
 
 impl Handler for BanParams {
-    type Ok = ();
+    /// How many of their messages this client redacted itself.
+    type Ok = u32;
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.room(&self.room_id)
-            .await?
-            .ban_user(&self.user_id, self.reason.as_deref())
+    async fn run(self, core: &Arc<Core>) -> Result<u32, RpcError> {
+        let room = core.room(&self.room_id).await?;
+        if !self.redact_events {
+            room.ban_user(&self.user_id, self.reason.as_deref())
+                .await
+                .or_failed(core, "ban_user")?;
+            return Ok(0);
+        }
+        core.remove_redacting_events(&room, &self.user_id, self.reason.as_deref(), true)
             .await
-            .or_failed(core, "ban_user")?;
-
-        Ok(())
     }
 }
 

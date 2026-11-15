@@ -63,8 +63,6 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Pill from '#lib/ui/primitives/Pill.svelte';
@@ -87,7 +85,8 @@
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import { profileFieldJson, profileFieldMap, profileFieldPreview } from './profile-field-map.js';
   import { MemberProfileRelations } from './member-profile-relations.svelte';
-  import { MemberProfileActions, moderationErrorMessage } from './member-profile-actions';
+  import { MemberProfileActions, deletedMessagesNotice } from './member-profile-actions';
+  import ModerationDialog from './ModerationDialog.svelte';
   import UserSecurityDialog from './UserSecurityDialog.svelte';
   import PersonaCard from './PersonaCard.svelte';
 
@@ -351,40 +350,23 @@
   let meowlnir = $derived(isSelf ? null : meowlnirFor(roomId, core.session?.user_id));
   let meowlnirBanOpen = $state(false);
   let moderationAction = $state<'kick' | 'ban' | null>(null);
-  let moderationReason = $state('');
-  let moderationBusy = $state(false);
-  let moderationError = $state<string | null>(null);
-  const moderationFieldId = $props.id();
-  const miscId = `${moderationFieldId}-misc`;
+  const profileId = $props.id();
+  const miscId = `${profileId}-misc`;
 
   function openModeration(action: 'kick' | 'ban'): void {
     moderationAction = action;
-    moderationReason = '';
-    moderationError = null;
   }
 
-  function cancelModeration(): void {
-    moderationAction = null;
-    moderationReason = '';
-  }
-
-  async function confirmModeration(): Promise<void> {
-    const action = moderationAction;
-    if (!action || moderationBusy) return;
-
-    const reason = moderationReason.trim();
-    moderationBusy = true;
-    moderationError = null;
-    try {
-      await profileActions.moderate(roomId, userId, action, reason || null);
-      moderationAction = null;
-      moderationReason = '';
-    } catch (error) {
-      console.warn('[sable profile] moderation action failed', error);
-      moderationError = moderationErrorMessage(error);
-    } finally {
-      moderationBusy = false;
-    }
+  async function confirmModeration(reason: string | null, redactEvents: boolean): Promise<void> {
+    if (!moderationAction) return;
+    const deleted = await profileActions.moderate(
+      roomId,
+      userId,
+      moderationAction,
+      reason,
+      redactEvents
+    );
+    if (redactEvents) toasts.info(deletedMessagesNotice(displayName, deleted));
   }
 
   function setPowerLevel(level: number): void {
@@ -940,40 +922,12 @@
   />
 {/if}
 
-<DialogFrame
-  open={moderationAction !== null}
-  onOpenChange={(next) => {
-    if (!next) cancelModeration();
-  }}
-  variant="verification"
-  label={moderationAction === 'ban'
-    ? i18n.t('timeline.profileBan')
-    : i18n.t('timeline.profileKick')}
->
-  {#if moderationAction}
-    <div class="moderation">
-      <h2>
-        {moderationAction === 'ban'
-          ? i18n.t('timeline.profileBanConfirm', { name: displayName })
-          : i18n.t('timeline.profileKickConfirm', { name: displayName })}
-      </h2>
-      {#if moderationError}
-        <Alert variant="critical" role="alert">{moderationError}</Alert>
-      {/if}
-      <FormField fieldId={moderationFieldId} label={i18n.t('timeline.deleteReason')}>
-        <TextInput id={moderationFieldId} bind:value={moderationReason} autocomplete="off" />
-      </FormField>
-      <div class="moderation-actions">
-        <Button variant="ghost" onclick={cancelModeration}>{i18n.t('common.cancel')}</Button>
-        <Button variant="danger" loading={moderationBusy} onclick={confirmModeration}>
-          {moderationAction === 'ban'
-            ? i18n.t('timeline.profileBan')
-            : i18n.t('timeline.profileKick')}
-        </Button>
-      </div>
-    </div>
-  {/if}
-</DialogFrame>
+<ModerationDialog
+  action={moderationAction}
+  name={displayName}
+  onConfirm={confirmModeration}
+  onClose={() => (moderationAction = null)}
+/>
 
 <style>
   :global(.profile-mutual-menu) {
@@ -1123,24 +1077,5 @@
     margin: 0;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
-  }
-
-  .moderation {
-    display: grid;
-    gap: var(--space-300);
-    width: min(27rem, calc(100vw - 2rem));
-  }
-
-  .moderation h2 {
-    font-size: var(--font-size-heading);
-    line-height: 1.3;
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .moderation-actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
   }
 </style>

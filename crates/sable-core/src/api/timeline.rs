@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use super::{Handler, Json};
 use crate::protocol::{
     EditVersionView, PaginationDirection, PinReadStateView, RelationsView, RoomListItemView,
-    RoomListOptionsView, RpcCode, RpcError, SubscriptionId, TimelineItemView,
+    RoomListOptionsView, RpcCode, RpcError, SubscriptionId, TimelineItemView, UnredactedEventView,
 };
 use crate::thread_receipts::thread_receipts;
 use crate::timelines::receipt_thread_root;
@@ -35,6 +35,7 @@ domain! {
     timestamp_to_event,
     list_threads,
     event_source,
+    unredacted_event,
     edit_history,
     mark_read,
     set_fully_read,
@@ -417,6 +418,23 @@ impl Handler for EventSourceParams {
             original,
             encryption,
         })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct UnredactedEventParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+}
+
+impl Handler for UnredactedEventParams {
+    type Ok = UnredactedEventView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<UnredactedEventView, RpcError> {
+        core.unredacted_event(&self.room_id, &self.event_id).await
     }
 }
 
