@@ -23,10 +23,8 @@
             sable-wasm-bindgen-cli = callPackage ./packaging/nix/wasm-bindgen-cli.nix { };
             sable-unwrapped = callPackage ./packaging/nix/unwrapped.nix { };
             sable = callPackage ./packaging/nix/sable.nix { };
-            default = packages.sable;
-          }
-          // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             sable-desktop = callPackage ./packaging/nix/desktop.nix { };
+            default = packages.sable;
           };
         in
         packages
