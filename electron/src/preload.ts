@@ -148,6 +148,7 @@ contextBridge.exposeInMainWorld('sableElectron', {
     ipcRenderer.invoke('sable-save-file', request) as Promise<{ path: string } | null>,
   shareFile: (request: PickedFile) =>
     ipcRenderer.invoke('sable-share-file', request) as Promise<void>,
+  openAppLink: (url: string) => ipcRenderer.invoke('sable-open-app-link', url) as Promise<void>,
   checkForUpdate: () =>
     ipcRenderer.invoke('sable-update-check') as Promise<{
       version: string;

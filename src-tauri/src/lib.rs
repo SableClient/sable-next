@@ -663,7 +663,10 @@ async fn dismiss_read_room_notifications(
 )]
 fn open_external_url(app: AppHandle<tauri::Wry>, url: String) -> Result<(), RpcError> {
     let parsed = tauri::Url::parse(&url).map_err(|_| RpcCode::Denied)?;
-    if !matches!(parsed.scheme(), "http" | "https" | "mailto" | "tel") {
+    let scheme = parsed.scheme();
+    if !sable_core::matrix_html::link_scheme_allowed(scheme)
+        || matches!(scheme, "tauri" | "sable-app")
+    {
         return Err(RpcCode::Denied.into());
     }
 

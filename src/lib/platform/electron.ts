@@ -66,6 +66,7 @@ export interface ElectronBridge {
   readThemeFile(path: string, since: number | null): Promise<ThemeFileSnapshot | null>;
   saveFile(request: SaveFileRequest): Promise<{ path: string } | null>;
   shareFile(request: PickedFile): Promise<void>;
+  openAppLink(url: string): Promise<void>;
   checkForUpdate(): Promise<{ version: string; notes: string | undefined } | null>;
   latestVersion(): Promise<string | null>;
   downloadUpdate(onProgress: (percent: number) => void): Promise<void>;

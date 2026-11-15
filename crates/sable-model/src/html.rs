@@ -9,6 +9,36 @@ static PREVIEW_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
         .allow_elements(["time", "dl", "dt", "dd"], ListBehavior::Add)
 });
 
+/// Schemes that run script, read local data or have launched code through an OS handler.
+const BLOCKED_LINK_SCHEMES: [&str; 14] = [
+    "about",
+    "blob",
+    "content",
+    "data",
+    "file",
+    "intent",
+    "jar",
+    "javascript",
+    "ms-msdt",
+    "ms-officecmd",
+    "mxc",
+    "search-ms",
+    "vbscript",
+    "view-source",
+];
+
+/// Whether a link with this scheme may be shown and handed to the OS, which picks the app.
+#[must_use]
+pub fn link_scheme_allowed(scheme: &str) -> bool {
+    scheme.starts_with(|first: char| first.is_ascii_alphabetic())
+        && scheme
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
+        && !BLOCKED_LINK_SCHEMES
+            .iter()
+            .any(|blocked| scheme.eq_ignore_ascii_case(blocked))
+}
+
 #[must_use]
 pub fn nests_too_deeply(formatted: &str) -> bool {
     const VOID_TAGS: [&str; 3] = ["br", "hr", "img"];

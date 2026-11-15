@@ -45,7 +45,7 @@ import { autostartAvailable, setLaunchAtLogin } from './autostart';
 import { installMethod } from './install-method';
 import { registerContextMenu } from './context-menu';
 import { claimSchemes } from './linux-schemes';
-import { historyDirection, openExternal, originOf } from './navigation';
+import { historyDirection, openAppLink, openExternal, originOf } from './navigation';
 import { enforcePermissions } from './permissions';
 import { flushWritesBeforeQuit, writeJson } from './persistence';
 import { writeDownload } from './downloads';
@@ -833,6 +833,11 @@ ipcMain.handle('sable-share-file', async (event, request: unknown) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) throw new Error('No share window');
   await shareFile(window, app.getPath('userData'), request);
+});
+
+ipcMain.handle('sable-open-app-link', async (event, url: unknown) => {
+  if (!isAppFrame(event.senderFrame)) throw new Error('Invalid link origin');
+  await openAppLink(url);
 });
 
 function cancelPicks(): void {

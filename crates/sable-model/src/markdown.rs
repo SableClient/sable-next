@@ -221,10 +221,7 @@ fn bare_href(address: &str, kind: &LinkKind) -> Option<String> {
         return Some(format!("mailto:{address}"));
     }
     if let Some((scheme, _)) = address.split_once("://") {
-        return ["http", "https", "ftp"]
-            .iter()
-            .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
-            .then(|| address.to_owned());
+        return crate::html::link_scheme_allowed(scheme).then(|| address.to_owned());
     }
     let host = address.split(['/', '?', '#', ':']).next()?;
     let tld = host.rsplit('.').next()?;
@@ -409,10 +406,12 @@ mod tests {
         ] {
             assert!(!topic_to_html(topic).contains("<a"), "{topic}");
         }
-        assert!(
-            topic_to_html("FTP://files.example.org/a")
-                .contains("href=\"FTP://files.example.org/a\"")
-        );
+        for topic in ["FTP://files.example.org/a", "discord://-/channels/1/2"] {
+            assert!(
+                topic_to_html(topic).contains(&format!("href=\"{topic}\"")),
+                "{topic}"
+            );
+        }
     }
 
     #[test]

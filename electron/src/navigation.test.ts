@@ -3,7 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 const { openExternal } = vi.hoisted(() => ({ openExternal: vi.fn(() => Promise.resolve()) }));
 vi.mock('electron', () => ({ shell: { openExternal } }));
 
-import { historyDirection, openExternal as openLink, originOf } from './navigation';
+import { historyDirection, openAppLink, openExternal as openLink, originOf } from './navigation';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -30,6 +30,19 @@ test.each(['https://example.org/', 'http://localhost/', 'mailto:user@example.org
   (url) => {
     openLink(url);
     expect(openExternal).toHaveBeenCalledWith(url);
+  }
+);
+
+test('a confirmed app link reaches the OS', async () => {
+  await openAppLink('discord://-/channels/1/2');
+  expect(openExternal).toHaveBeenCalledExactlyOnceWith('discord://-/channels/1/2');
+});
+
+test.each(['file:///etc/passwd', 'javascript:alert(1)', 'sable-app://app/', 'ms-msdt:/id', 7])(
+  'a confirmed link to %s is still refused',
+  async (url) => {
+    await expect(openAppLink(url)).rejects.toThrow();
+    expect(openExternal).not.toHaveBeenCalled();
   }
 );
 

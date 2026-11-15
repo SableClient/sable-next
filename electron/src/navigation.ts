@@ -1,5 +1,7 @@
 import { shell } from 'electron';
 
+import { isOpenableProtocol } from '../../src/lib/platform/link-schemes';
+
 export function originOf(url: string): string {
   const parsed = URL.parse(url);
   return parsed ? `${parsed.protocol}//${parsed.host}` : '';
@@ -11,6 +13,13 @@ export function openExternal(url: string): void {
   void shell.openExternal(url).catch((error: unknown) => {
     console.warn('[sable links] Could not open external link', error);
   });
+}
+
+/** For a link the user confirmed in the page, so any scheme the OS can route is allowed. */
+export async function openAppLink(url: unknown): Promise<void> {
+  const parsed = typeof url === 'string' ? URL.parse(url) : null;
+  if (!parsed || !isOpenableProtocol(parsed.protocol)) throw new Error('Link scheme not allowed');
+  await shell.openExternal(parsed.href);
 }
 
 export function historyDirection(
