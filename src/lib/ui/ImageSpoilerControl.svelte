@@ -136,13 +136,30 @@
     }
   }
 
-  @container (height < 2.5rem) or (width < 6rem) {
+  @container (height < 3.25rem) or (width < 6rem) {
     .media-image-spoiler-copy {
       display: none;
     }
 
     .hidden .media-image-spoiler-chip {
       padding: var(--space-050);
+    }
+
+    .hidden .media-image-spoiler-chip :global(svg) {
+      height: min(var(--icon-size-medium), 100cqmin - var(--space-100));
+      width: min(var(--icon-size-medium), 100cqmin - var(--space-100));
+    }
+  }
+
+  @container (height < 2rem) {
+    .media-image-spoiler.hidden,
+    .hidden .media-image-spoiler-chip {
+      padding: 0;
+    }
+
+    .hidden .media-image-spoiler-chip :global(svg) {
+      height: min(var(--icon-size-medium), 100cqmin);
+      width: min(var(--icon-size-medium), 100cqmin);
     }
   }
 
