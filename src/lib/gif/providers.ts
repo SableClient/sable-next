@@ -55,7 +55,7 @@ function urlExtension(url: URL): string {
 }
 
 const gifMimetypes = new Set(['image/gif', 'image/webp']);
-const animatedImageMimetypes = new Set(['image/webp', 'image/apng', 'image/avif']);
+const animatedImageMimetypes = new Set(['image/webp', 'image/png', 'image/apng', 'image/avif']);
 
 function mimetypeOf(mediaUrl: string): string {
   try {

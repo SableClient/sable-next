@@ -93,18 +93,29 @@ test('a decodable image gets a blurhash', async () => {
   expect(result.info?.blurhash).not.toBeNull();
 });
 
-test('a GIF is animated, and a WebP is left undecided', async () => {
+test('GIFs, animated WebP and APNG are marked animated, still images are not', async () => {
   vi.stubGlobal(
     'createImageBitmap',
     vi.fn(() => Promise.resolve({ width: 8, height: 8, close: () => {} }))
   );
+  const ascii = (text: string) => Array.from(text, (char) => char.charCodeAt(0));
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const webp = (flags: number) => [...ascii('RIFFxxxxWEBPVP8X'), 0, 0, 0, 0, flags];
+  const image = (bytes: number[], mime: string) =>
+    new Blob([new Uint8Array(bytes)], { type: mime });
 
-  await expect(measureAttachment(file('image/gif'))).resolves.toMatchObject({
-    info: { animated: true },
-  });
-  await expect(measureAttachment(file('image/webp'))).resolves.toMatchObject({
-    info: { animated: null },
-  });
+  const cases: [Blob, boolean][] = [
+    [image(ascii('GIF89a'), 'image/gif'), true],
+    [image(webp(0x02), 'image/webp'), true],
+    [image(webp(0), 'image/webp'), false],
+    [image([...png, ...ascii('acTL'), ...ascii('IDAT')], 'image/png'), true],
+    [image([...png, ...ascii('acTL'), ...ascii('IDAT')], 'image/apng'), true],
+    [image([...png, ...ascii('IDAT')], 'image/png'), false],
+    [file('image/jpeg'), false],
+  ];
+  for (const [blob, animated] of cases) {
+    await expect(measureAttachment(blob)).resolves.toMatchObject({ info: { animated } });
+  }
 });
 
 test('an undecodable image measures nothing rather than throwing', async () => {

@@ -277,6 +277,15 @@ test('only plain mxc gifs count as uploaded', () => {
   ).toBeUndefined();
 });
 
+test('an APNG uploaded as image/png can be saved like a gif, a still PNG cannot', () => {
+  expect(
+    gifFromUploadedMxc('mxc://example.org/abc', 'ball.png', 4, 3, 10, 'image/png', true)
+  ).toMatchObject({ mediaUrl: 'mxc://example.org/abc', mimetype: 'image/png' });
+  expect(
+    gifFromUploadedMxc('mxc://example.org/abc', 'ball.png', 4, 3, 10, 'image/png', false)
+  ).toBeUndefined();
+});
+
 test('an animated webp can be saved like a gif, a still one cannot', () => {
   expect(
     gifFromUploadedMxc('mxc://example.org/abc', 'cat.webp', 4, 3, 10, 'image/webp', true)

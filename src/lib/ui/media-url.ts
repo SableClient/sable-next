@@ -75,6 +75,7 @@ export function isAnimatedImage(bytes: Uint8Array): boolean {
     const frames = head.indexOf('acTL');
     return frames !== -1 && (head.indexOf('IDAT') === -1 || frames < head.indexOf('IDAT'));
   }
+  if (type === 'image/avif') return head.startsWith('avis', 8);
   return type === 'image/webp' && head.startsWith('VP8X', 12) && (bytes[20] & 0x02) !== 0;
 }
 

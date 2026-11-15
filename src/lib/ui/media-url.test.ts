@@ -608,4 +608,6 @@ test('only a multi-frame picture counts as animated', () => {
   expect(isAnimatedImage(new Uint8Array(webp(0x02)))).toBe(true);
   expect(isAnimatedImage(new Uint8Array(webp(0)))).toBe(false);
   expect(isAnimatedImage(new Uint8Array([0xff, 0xd8, 0xff, 0]))).toBe(false);
+  expect(isAnimatedImage(new Uint8Array([0, 0, 0, 0x20, ...ascii('ftypavis')]))).toBe(true);
+  expect(isAnimatedImage(new Uint8Array([0, 0, 0, 0x20, ...ascii('ftypavif')]))).toBe(false);
 });
