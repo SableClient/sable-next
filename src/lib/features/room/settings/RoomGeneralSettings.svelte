@@ -18,6 +18,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import SaveBar from '#lib/ui/primitives/SaveBar.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -438,23 +439,7 @@
   <RoomUpgradeSettings {room} {levels} {ownPowerLevel} {onClose} />
 
   {#if canEditGeneral || canEditAccess}
-    <div class={['save-bar', { pending: dirty }]}>
-      {#if failed}
-        <p class="save-status error" role="alert">{i18n.t('room.settingsFailed')}</p>
-      {:else if dirty}
-        <p class="save-status" role="status">{i18n.t('common.unsavedChangesNotice')}</p>
-      {:else if saved}
-        <p class="save-status" role="status">{i18n.t('room.settingsSaved')}</p>
-      {/if}
-      {#if dirty}
-        <Button variant="ghost" disabled={saving} onclick={resetDraft}>
-          {i18n.t('common.reset')}
-        </Button>
-      {/if}
-      <Button variant="primary" disabled={!dirty || saving} loading={saving} onclick={save}>
-        {i18n.t('common.save')}
-      </Button>
-    </div>
+    <SaveBar {dirty} {saving} {saved} {failed} onReset={resetDraft} onSave={() => void save()} />
   {/if}
 </div>
 
@@ -477,41 +462,5 @@
     max-width: none;
     object-fit: cover;
     overflow: hidden;
-  }
-
-  .save-bar {
-    align-items: center;
-    border: var(--border-width) solid transparent;
-    border-radius: var(--radius);
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
-    padding: var(--space-200) var(--space-300);
-  }
-
-  .save-bar.pending {
-    background: var(--bg-container);
-    border-color: var(--bg-container-line);
-    bottom: var(--space-300);
-    box-shadow: var(--shadow-e200);
-    color: var(--bg-on-container);
-    position: sticky;
-    z-index: 1;
-  }
-
-  .save-status {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-    margin-inline-end: auto;
-  }
-
-  .save-bar.pending .save-status:not(.error) {
-    color: var(--bg-on-container);
-    font-weight: var(--font-weight-medium);
-  }
-
-  .save-status.error {
-    color: var(--crit-main);
   }
 </style>

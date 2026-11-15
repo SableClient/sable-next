@@ -44,6 +44,10 @@ function stateChangeText(change: StateChangeView, user: string, t: Translate): s
     }
     case 'call_membership':
       return change.joined ? t('timeline.callJoined', { user }) : t('timeline.callLeft', { user });
+    case 'room_rules':
+      return change.removed
+        ? t('timeline.roomRulesRemoved', { user })
+        : t('timeline.roomRulesChanged', { user });
   }
 }
 

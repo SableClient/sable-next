@@ -29,6 +29,7 @@
   import RoomMembersSettings from './RoomMembersSettings.svelte';
   import RoomModerationSettings from './RoomModerationSettings.svelte';
   import RoomPermissionsSettings from './RoomPermissionsSettings.svelte';
+  import RoomRulesSettings from './RoomRulesSettings.svelte';
   import { roomSettingsSections, type RoomSettingsSectionId } from './room-settings-sections';
 
   interface Props {
@@ -171,6 +172,12 @@
     <RoomMembersSettings {room} {permissions} />
   {:else if active === 'permissions'}
     <RoomPermissionsSettings {room} {permissions} />
+  {:else if active === 'rules'}
+    <svelte:boundary>
+      <RoomRulesSettings {room} {permissions} {levels} />
+
+      {#snippet pending()}{/snippet}
+    </svelte:boundary>
   {:else if active === 'abbreviations'}
     <svelte:boundary>
       <RoomAbbreviationsSettings {room} {permissions} {levels} />

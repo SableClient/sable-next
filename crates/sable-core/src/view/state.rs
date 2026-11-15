@@ -97,6 +97,13 @@ pub(super) fn state_change(
             }
             Some(StateChangeView::CallMembership { joined })
         }
+        AnyOtherStateEventContentChange::_Custom { event_type }
+            if crate::room_rules::RULES_EVENTS.contains(&event_type.as_str()) =>
+        {
+            Some(StateChangeView::RoomRules {
+                removed: content?.get("rules").is_none(),
+            })
+        }
         _ => None,
     }
 }

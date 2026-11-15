@@ -60,6 +60,7 @@ mod registration;
 mod room_keys;
 mod room_list_batch;
 mod room_list_rows;
+mod room_rules;
 mod room_sections;
 mod room_settings;
 mod room_widgets;

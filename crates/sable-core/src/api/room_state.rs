@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use sable_model::bot_commands::BotCommand;
 
 use super::{Handler, Json};
-use crate::protocol::{AbbreviationView, RpcError, HistoryVisibilityView, PresenceHintView, JoinRuleView, RoomStateEventView};
+use crate::protocol::{AbbreviationView, RpcError, HistoryVisibilityView, PresenceHintView, JoinRuleView, RoomRulesSettingsView, RoomRulesView, RoomStateEventView};
 use crate::{Core, ResultExt, account_data};
 use crate::media::mxc_uri;
+use crate::room_rules::RulesEdit;
 use crate::room_settings::AclEdit;
 
 domain! {
@@ -31,6 +32,10 @@ domain! {
     update_server_acl,
     abbreviations,
     set_abbreviations,
+    rules,
+    accept_rules,
+    own_rules,
+    set_rules,
     event,
     events,
     events_raw,
@@ -438,6 +443,85 @@ impl Handler for FullStateParams {
             .filter_map(|raw| raw.deserialize_as::<serde_json::Value>().ok())
             .map(Json)
             .collect())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RulesParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+}
+
+impl Handler for RulesParams {
+    type Ok = Option<RoomRulesView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Option<RoomRulesView>, RpcError> {
+        core.room_rules(&self.room_id).await
+    }
+}
+
+/// `room_id` is the view's `source_room_id` and `version` the one it showed.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct AcceptRulesParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub version: i64,
+}
+
+impl Handler for AcceptRulesParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.accept_room_rules(self.room_id, self.version).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct OwnRulesParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+}
+
+impl Handler for OwnRulesParams {
+    type Ok = RoomRulesSettingsView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<RoomRulesSettingsView, RpcError> {
+        core.room_rules_settings(&self.room_id).await
+    }
+}
+
+/// An empty `body` removes the rules. `notify` asks members to accept again.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetRulesParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub body: String,
+    #[serde(default)]
+    pub formatted: Option<String>,
+    pub require_acceptance: bool,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    #[serde(default)]
+    pub delegate_to: Option<OwnedRoomId>,
+    pub notify: bool,
+}
+
+impl Handler for SetRulesParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        let edit = RulesEdit {
+            body: self.body,
+            formatted: self.formatted,
+            require_acceptance: self.require_acceptance,
+            delegate_to: self.delegate_to,
+            notify: self.notify,
+        };
+        core.set_room_rules(self.room_id, &edit).await
     }
 }
 

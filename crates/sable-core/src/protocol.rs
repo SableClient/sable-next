@@ -399,6 +399,11 @@ pub enum CoreEvent {
         room_id: OwnedRoomId,
     },
 
+    RoomRulesChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+
     NicknamesChanged {
         #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
         user_ids: Vec<OwnedUserId>,
@@ -2401,6 +2406,9 @@ pub enum StateChangeView {
     CallMembership {
         joined: bool,
     },
+    RoomRules {
+        removed: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3121,6 +3129,29 @@ pub struct AbbreviationView {
     pub definition: String,
     #[serde(default)]
     pub cased: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomRulesView {
+    /// The room whose rules these are, which differs from the room asked
+    /// about when it delegates. Acceptance is recorded there.
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub source_room_id: OwnedRoomId,
+    pub html: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub version: i64,
+    pub require_acceptance: bool,
+    pub accepted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomRulesSettingsView {
+    pub html: String,
+    pub require_acceptance: bool,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub delegate_to: Option<OwnedRoomId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

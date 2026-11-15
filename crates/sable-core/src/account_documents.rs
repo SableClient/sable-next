@@ -281,7 +281,7 @@ impl Core {
         }
     }
 
-    async fn room_document(
+    pub(crate) async fn room_document(
         &self,
         room_id: &OwnedRoomId,
         event_type: &str,

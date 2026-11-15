@@ -14,6 +14,7 @@ import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
 import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
+import ScrollIcon from 'phosphor-svelte/lib/ScrollIcon';
 import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
 import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
@@ -54,6 +55,8 @@ function stateChangeIcon(change: StateChangeView): Component {
       return PushPinIcon;
     case 'call_membership':
       return change.joined ? PhoneIcon : PhoneDisconnectIcon;
+    case 'room_rules':
+      return ScrollIcon;
   }
 }
 

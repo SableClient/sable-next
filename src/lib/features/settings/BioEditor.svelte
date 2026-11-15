@@ -42,9 +42,18 @@
   interface Props {
     id: string;
     value: BioContent;
+    label?: string;
+    formattingLabel?: string;
+    placeholder?: string;
   }
 
-  let { id, value = $bindable() }: Props = $props();
+  let {
+    id,
+    value = $bindable(),
+    label = i18n.t('settings.biography'),
+    formattingLabel = i18n.t('settings.bioFormatting'),
+    placeholder = i18n.t('settings.biographyHint'),
+  }: Props = $props();
   const core = useCoreClient();
   const uid = $props.id();
   const listboxId = `bio-suggestions-${uid}`;
@@ -78,7 +87,7 @@
       hold: (url) => holdMediaUrl(core, url, 0, 0),
     },
     emotes: () => sources.emotes,
-    label: () => i18n.t('settings.biography'),
+    label: () => label,
     listboxId,
     activeOptionId: () => (panelOpen && suggestions.length > 0 ? optionId(active) : null),
     editable: () => true,
@@ -165,7 +174,7 @@
   ] satisfies { id: string; action: FormatAction; icon: typeof TextBIcon }[];
 </script>
 
-<div class="bio-toolbar" role="toolbar" aria-label={i18n.t('settings.bioFormatting')}>
+<div class="bio-toolbar" role="toolbar" aria-label={formattingLabel}>
   {#each formats as format (format.id)}
     <IconButton
       variant="ghost"
@@ -208,7 +217,7 @@
   }}
 >
   <div class="form-control inline-edit bio-input">
-    <ComposerEditorView {editor} {showPlaceholder} placeholder={i18n.t('settings.biographyHint')} />
+    <ComposerEditorView {editor} {showPlaceholder} {placeholder} />
   </div>
   {#if panelOpen && query}
     <ComposerAutocomplete

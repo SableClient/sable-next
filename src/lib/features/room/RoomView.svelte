@@ -67,6 +67,9 @@
   import RoomPinMenu from './RoomPinMenu.svelte';
   import RoomPredecessorNotice from './RoomPredecessorNotice.svelte';
   import RoomPresencePrompt from './RoomPresencePrompt.svelte';
+  import RoomRulesBanner from './RoomRulesBanner.svelte';
+  import RoomRulesDialog from './RoomRulesDialog.svelte';
+  import { RoomRules } from './room-rules.svelte.js';
   import RoomTombstoneBanner from './RoomTombstoneBanner.svelte';
   import RoomReadReceipts from './timeline/RoomReadReceipts.svelte';
   import TimelineList from './timeline/TimelineList.svelte';
@@ -296,9 +299,11 @@
     void activeTimeline.stop(timelineOwner);
   });
 
+  const rules = new RoomRules(core.rpc);
   let callParticipants = $derived(resolvedRoom?.call_participants ?? []);
   let callable = $derived(
     !call.active &&
+      !rules.blocking &&
       callSupport.current !== null &&
       callSupport.current.can_join &&
       (callSupport.current.has_focus || callParticipants.length > 0)
@@ -353,6 +358,28 @@
 
   const abbreviations = new RoomAbbreviations(core.rpc);
   provideRoomAbbreviations(abbreviations);
+
+  let canPost = $derived(!rules.blocking && (roomSession.permissions?.can_post ?? true));
+  let canReact = $derived(!rules.blocking && (roomSession.permissions?.can_react ?? true));
+  let rulesSourceName = $derived.by(() => {
+    const source = rules.shown?.source_room_id;
+    if (!source || source === resolvedRoomId) return null;
+    return roomList.byId(source)?.name ?? source;
+  });
+  let online = $derived(core.sync?.state === 'live');
+
+  $effect(() => {
+    const target = resolvedRoomId;
+    if (!target) return;
+    void rules.load(target);
+    return core.subscribeEvents((event) => {
+      if (event.type === 'room_rules_changed') void rules.load(target);
+    });
+  });
+
+  $effect(() => {
+    if (online) rules.retry();
+  });
   const mediaPreviews = new RoomMediaPreviews(() => resolvedRoom?.join_rule ?? null);
   provideRoomMediaPreviews(mediaPreviews);
   $effect(() => {
@@ -878,15 +905,13 @@
       onMentionUser={mentionUser}
       onRetrySend={conversation.retrySend}
       onCancelSend={conversation.cancelSend}
-      onToggleReaction={roomSession.permissions?.can_react === false
-        ? undefined
-        : conversation.toggleReaction}
+      onToggleReaction={canReact ? conversation.toggleReaction : undefined}
       onDelete={conversation.redact}
-      onReply={roomSession.permissions?.can_post === false ? undefined : conversation.reply}
+      onReply={canPost ? conversation.reply : undefined}
       onSwipeMembers={toggleMembers}
       onCancelContext={conversation.clearContext}
       onOpenThread={openThread}
-      onEdit={roomSession.permissions?.can_post === false ? undefined : conversation.edit}
+      onEdit={canPost ? conversation.edit : undefined}
       roomId={resolvedRoomId}
       members={memberLoader.members}
       onJumpToEvent={jumpToEvent}
@@ -896,7 +921,7 @@
         mediaViewerState.open(eventId, () => timeline.items, jumpToEvent)}
       onVotePoll={conversation.votePoll}
       onEndPoll={conversation.endPoll}
-      readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+      readOnly={!canPost}
       canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
       canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
       canPin={roomSession.permissions?.can_pin ?? false}
@@ -939,6 +964,8 @@
         onOpen={() => tombstoneJoin.open()}
         onJoin={() => void tombstoneJoin.join()}
       />
+    {:else if rules.blocking}
+      <RoomRulesBanner onView={() => (rules.open = true)} />
     {:else}
       <RoomPresencePrompt roomId={resolvedRoomId} roomName={resolvedRoom?.display_name ?? ''} />
       {#if composerMounted}
@@ -954,9 +981,9 @@
           roomId={resolvedRoomId}
           roomMembers={memberLoader.members}
           onSchedule={conversation.schedule}
-          canReact={roomSession.permissions?.can_react ?? true}
+          {canReact}
           {roomName}
-          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+          readOnly={!canPost}
           encrypted={resolvedRoom?.encrypted ?? null}
           onDeleteEdited={conversation.redact}
           onEditLast={conversation.editLast}
@@ -1038,6 +1065,7 @@
         onWidgets={phone && (roomSession.widgets.length > 0 || canManageWidgets)
           ? toggleWidgets
           : undefined}
+        onRules={rules.view ? () => (rules.open = true) : undefined}
         onReport={() => (reportOpen = true)}
         onLeave={() => (leaveOpen = true)}
       />
@@ -1099,10 +1127,10 @@
         rootMessage={timeline.items.find((item) => item.event_id === panels.threadRootId)}
         {roomName}
         members={memberLoader.members}
-        readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+        readOnly={!canPost}
         canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
         canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
-        canReact={roomSession.permissions?.can_react ?? true}
+        {canReact}
         canPin={roomSession.permissions?.can_pin ?? false}
         encrypted={resolvedRoom?.encrypted ?? null}
         onClose={closeThread}
@@ -1145,6 +1173,15 @@
     bind:leaveOpen
     bind:settingsOpen
     onJump={jumpToEvent}
+    onMatrixLink={handleMatrixLink}
+  />
+
+  <RoomRulesDialog
+    {rules}
+    {roomName}
+    sourceName={rulesSourceName}
+    isSpace={resolvedRoom?.room_kind === 'space'}
+    onLeave={() => (leaveOpen = true)}
     onMatrixLink={handleMatrixLink}
   />
 

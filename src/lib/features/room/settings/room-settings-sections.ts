@@ -4,6 +4,7 @@ import GearIcon from 'phosphor-svelte/lib/GearSixIcon';
 import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
+import ScrollIcon from 'phosphor-svelte/lib/ScrollIcon';
 import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
@@ -14,6 +15,7 @@ export type RoomSettingsSectionId =
   | 'general'
   | 'members'
   | 'permissions'
+  | 'rules'
   | 'abbreviations'
   | 'appearance'
   | 'bridges'
@@ -36,6 +38,7 @@ const ALL: readonly (RoomSettingsSection & {
   { id: 'general', label: 'room.settingsGeneral', icon: GearIcon },
   { id: 'members', label: 'room.settingsMembers', icon: UserIcon },
   { id: 'permissions', label: 'room.settingsPermissions', icon: LockIcon },
+  { id: 'rules', label: 'room.rulesTitle', icon: ScrollIcon },
   { id: 'abbreviations', label: 'room.settingsAbbreviations', icon: InfoIcon },
   { id: 'appearance', label: 'room.settingsAppearance', icon: PaletteIcon, spaceOnly: true },
   { id: 'bridges', label: 'room.settingsBridges', icon: BridgeIcon, bridgedOnly: true },
