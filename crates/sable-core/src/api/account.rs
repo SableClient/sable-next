@@ -669,10 +669,8 @@ impl Handler for SetPresenceParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.set_desired_presence(self.presence);
 
-        let presence = core.sync_presence().await;
         let client = core.client().await?;
-        client
-            .set_presence(presence, self.status_message, true)
+        core.publish_presence(&client, self.status_message)
             .await
             .or_failed(core, "set_presence")?;
 

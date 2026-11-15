@@ -91,6 +91,37 @@ pub(crate) fn state(view: PresenceView, revised: bool) -> PresenceState {
     }
 }
 
+/// ruma adds the MSC4532 `status` object beside every status message, and Synapse rejects a body
+/// with a key it does not know.
+mod legacy_status {
+    use ruma::OwnedUserId;
+    use ruma::api::{auth_scheme::AccessToken, request, response};
+    use ruma::metadata;
+    use ruma::presence::PresenceState;
+
+    metadata! {
+        method: PUT,
+        rate_limited: true,
+        authentication: AccessToken,
+        history: {
+            1.0 => "/_matrix/client/r0/presence/{user_id}/status",
+            1.1 => "/_matrix/client/v3/presence/{user_id}/status",
+        }
+    }
+
+    #[request]
+    pub(crate) struct Request {
+        #[ruma_api(path)]
+        pub user_id: OwnedUserId,
+        pub presence: PresenceState,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub status_msg: Option<String>,
+    }
+
+    #[response]
+    pub(crate) struct Response {}
+}
+
 const UNSTABLE_PREFIX: &str = "org.continuwuity.presence_v2.msc4532.";
 
 fn revised_state_view(state: &str) -> Option<PresenceView> {
@@ -233,6 +264,31 @@ impl Core {
             && revised
             && !self.call_sessions.lock().await.is_empty();
         state(if in_call { PresenceView::Busy } else { desired }, revised)
+    }
+
+    pub(crate) async fn publish_presence(
+        &self,
+        client: &matrix_sdk::Client,
+        status_message: Option<String>,
+    ) -> matrix_sdk::Result<()> {
+        let revised = self.revised_presence().await.is_some();
+        let presence = self.sync_presence_for(revised).await;
+        if revised {
+            return client.set_presence(presence, status_message, true).await;
+        }
+        client.set_presence(presence.clone(), None, false).await?;
+        let user_id = client
+            .user_id()
+            .ok_or(matrix_sdk::Error::AuthenticationRequired)?
+            .to_owned();
+        client
+            .send(legacy_status::Request {
+                user_id,
+                presence,
+                status_msg: status_message,
+            })
+            .await?;
+        Ok(())
     }
 
     pub(crate) async fn refresh_presence(&self) {
@@ -478,6 +534,34 @@ mod tests {
         assert_eq!(
             state(PresenceView::Online, true).as_str(),
             "org.continuwuity.presence_v2.msc4532.active"
+        );
+    }
+
+    #[test]
+    #[expect(deprecated, reason = "legacy states are still on the wire")]
+    fn a_legacy_status_message_carries_no_revised_status() {
+        use ruma::api::auth_scheme::SendAccessToken;
+        use ruma::api::{OutgoingRequestExt, SupportedVersions};
+
+        let request = super::legacy_status::Request {
+            user_id: ruma::owned_user_id!("@a:example.org"),
+            presence: PresenceState::Online,
+            status_msg: Some("In a meeting".to_owned()),
+        };
+        let supported = SupportedVersions {
+            versions: [ruma::api::MatrixVersion::V1_1].into(),
+            features: std::collections::BTreeSet::default(),
+        };
+        let request = request
+            .try_into_http_request::<Vec<u8>>(
+                "https://example.org",
+                SendAccessToken::IfRequired("token"),
+                std::borrow::Cow::Owned(supported),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(request.body()).unwrap(),
+            json!({"presence": "online", "status_msg": "In a meeting"})
         );
     }
 
