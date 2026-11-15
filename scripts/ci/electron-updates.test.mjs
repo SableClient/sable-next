@@ -27,7 +27,7 @@ const { Arch } = builderRequire('builder-util');
 const { load } = createRequire(builderRequire.resolve('app-builder-lib/package.json'))('js-yaml');
 const run = promisify(execFile);
 
-for (const version of ['2.0.3', '2.0.3-nightly.261015175835.07839ca83887']) {
+for (const version of ['2.0.3', '26.11.0-nightly.15.1430.g07839c']) {
   test(`generates and publishes Electron update metadata for ${version}`, async (t) => {
     const channel = version.includes('-nightly.') ? 'nightly' : 'latest';
     const tag = channel === 'nightly' ? `nightly-${version}` : `v${version}`;

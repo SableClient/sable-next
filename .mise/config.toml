@@ -34,7 +34,7 @@ outputs = ['node_modules/.pnpm/lock.yaml']
 
 [tasks.knope]
 description = "Run Knope, the changelog and release tool"
-run = "knope"
+run = "node scripts/release/knope.mjs"
 tools = { "github:knope-dev/knope" = { version = "0.23.2", version_prefix = "knope/v" } }
 
 [tasks."knope:document-change"]

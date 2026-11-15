@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parse, valid } from 'semver';
 
@@ -8,7 +9,7 @@ export function tauriVersionConfig(version) {
     /^(\d+)\.(\d+)\.(\d+)-nightly\.(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\.g?[0-9a-f]+)?$/.exec(
       version
     );
-  const androidVersionCode = nightlyVersion
+  let androidVersionCode = nightlyVersion
     ? Date.UTC(
         2000 + +nightlyVersion[4],
         +nightlyVersion[5] - 1,
@@ -19,6 +20,12 @@ export function tauriVersionConfig(version) {
       ) / 1000
     : // Keep standard APKs on the same scale as previously released FOSS APKs.
       [parsed.major, parsed.minor, parsed.patch].reduce((code, part) => code * 1000 + part, 0) * 10;
+
+  if (/-nightly\.\d{1,2}\.\d{1,4}\.g[0-9a-f]{6}$/.test(version)) {
+    androidVersionCode = Number(
+      execFileSync('git', ['log', '-1', '--format=%ct'], { encoding: 'utf8' }).trim()
+    );
+  }
 
   if (parsed.minor >= 1000 || parsed.patch >= 1000) {
     throw new Error('Android versions require minor and patch numbers below 1000');

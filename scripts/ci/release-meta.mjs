@@ -1,8 +1,8 @@
 import { execSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
+import { nextCalver } from '../lib/calver.mjs';
 
 // The setup-release job installs no packages, so this cannot use `semver`.
-const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const IDENTIFIER = '(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)';
 const RELEASE_TAG = new RegExp(
   `^v?(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)` +
@@ -22,26 +22,10 @@ function commitDate() {
   return new Date();
 }
 
-function nightlyVersion(gitSha) {
-  const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
-  const match = STABLE_VERSION.exec(version);
-  if (!match) {
-    throw new Error(`package.json version must be stable SemVer (got: ${version})`);
-  }
-
-  const date = commitDate();
-  const pad = (value) => String(value).padStart(2, '0');
-  const stamp = [
-    String(date.getUTCFullYear()).slice(-2),
-    pad(date.getUTCMonth() + 1),
-    pad(date.getUTCDate()),
-    pad(date.getUTCHours()),
-    pad(date.getUTCMinutes()),
-    pad(date.getUTCSeconds()),
-  ].join('');
-
-  const [major, minor, patch] = match.slice(1).map(Number);
-  return `${major}.${minor}.${patch + 1}-nightly.${stamp}.g${gitSha.slice(0, 12)}`;
+function nightlyVersion(version, gitSha, date) {
+  const day = date.getUTCDate();
+  const time = date.getUTCHours() * 100 + date.getUTCMinutes();
+  return `${nextCalver(version, date)}-nightly.${day}.${time}.g${gitSha.slice(0, 6)}`;
 }
 
 function resolveReleaseMeta({ eventName, inputTag, gitRef, gitRefName, gitSha }) {
@@ -53,7 +37,8 @@ function resolveReleaseMeta({ eventName, inputTag, gitRef, gitRefName, gitSha })
     if (!/^[0-9a-f]{12,}$/i.test(gitSha)) {
       throw new Error('GIT_SHA must contain at least 12 hexadecimal characters for nightly builds');
     }
-    const version = nightlyVersion(gitSha);
+    const { version: current } = JSON.parse(readFileSync('package.json', 'utf8'));
+    const version = nightlyVersion(current, gitSha, commitDate());
     return { tag: `nightly-${version}`, version, ref: gitSha, nightly: true };
   }
   if (gitRefName.startsWith('v') && RELEASE_TAG.test(gitRefName)) {
