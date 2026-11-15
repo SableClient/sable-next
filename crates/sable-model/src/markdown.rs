@@ -113,7 +113,7 @@ fn mentions(text: &str, pills: &[ComposerPill], blocks: &[Block<Vec<Inline>>]) -
         .into_iter()
         .flatten()
         .filter_map(|node| match node {
-            Inline::Pill(index) => Some(*index),
+            Inline::Pill(index, _) => Some(*index),
             _ => None,
         })
     {
@@ -130,8 +130,8 @@ fn mentions(text: &str, pills: &[ComposerPill], blocks: &[Block<Vec<Inline>>]) -
     }
 }
 
-/// The pills put back where their placeholders were. A pill keeps none of the
-/// marks around it; inside a code block it is its text.
+/// The pills put back where their placeholders were. Emotes keep emphasis;
+/// inside a code block a pill is its text.
 fn splice_pills(nodes: Vec<Inline>, next: &mut usize, pills: &[ComposerPill]) -> Vec<Inline> {
     let mut out = Vec::with_capacity(nodes.len());
     for node in nodes {
@@ -147,8 +147,15 @@ fn splice_pills(nodes: Vec<Inline>, next: &mut usize, pills: &[ComposerPill]) ->
                         out.push(Inline::Text(pill.text(), marks.clone()));
                         *next += 1;
                     }
-                    Some(_) => {
-                        out.push(Inline::Pill(*next));
+                    Some(pill) => {
+                        let emphasis = if matches!(pill, ComposerPill::Emote { .. })
+                            && marks.contains(&Mark::Em)
+                        {
+                            vec![Mark::Em]
+                        } else {
+                            Vec::new()
+                        };
+                        out.push(Inline::Pill(*next, emphasis));
                         *next += 1;
                     }
                     None => out.push(Inline::Text(PILL.to_string(), marks.clone())),
@@ -572,6 +579,31 @@ mod tests {
                 "<strong>hey</strong> <img data-mx-emoticon=\"\" src=\"mxc://example.org/wave\" alt=\"wave\" title=\"wave\" height=\"32\">"
             )
         );
+    }
+
+    #[test]
+    fn an_emote_keeps_italics_in_html_and_the_editor_doc() {
+        let pills = [ComposerPill::Emote {
+            shortcode: "wave".to_owned(),
+            url: "mxc://example.org/wave".to_owned(),
+            body: None,
+        }];
+        for source in ["*\u{fffc}*", "_\u{fffc}_", "***\u{fffc}***"] {
+            let content = markdown_to_content(source, &pills);
+            assert_eq!(
+                content.formatted_body.as_deref(),
+                Some(
+                    "<em><img data-mx-emoticon=\"\" src=\"mxc://example.org/wave\" alt=\"wave\" title=\"wave\" height=\"32\"></em>"
+                ),
+                "{source}"
+            );
+            let doc = markdown_to_doc(source, &pills);
+            assert_eq!(
+                doc["content"][0]["content"][0]["marks"],
+                serde_json::json!([{ "type": "em" }]),
+                "{source}"
+            );
+        }
     }
 
     #[test]

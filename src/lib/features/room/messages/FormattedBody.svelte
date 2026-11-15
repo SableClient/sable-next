@@ -1054,6 +1054,10 @@
     vertical-align: var(--timeline-emote-align, middle);
   }
 
+  .formatted-body :global(:is(em, i) img[data-mx-emoticon]) {
+    transform: skewX(-10deg);
+  }
+
   .formatted-body :global(img[data-mx-emoticon].pixelated) {
     image-rendering: pixelated;
   }

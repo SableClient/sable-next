@@ -105,6 +105,19 @@ test('follows the markdown composer setting', async () => {
   await expect.poll(() => content().formatted).toContain('<em>more</em>');
 });
 
+test('italic custom emoji slant in the rich text composer', async () => {
+  const { editor } = await mount(
+    '<p><em><img data-mx-emoticon src="mxc://example.org/wave" alt=":italic:"></em> <img data-mx-emoticon src="mxc://example.org/wave" alt=":plain:"></p>'
+  );
+  const italic = editor.getByRole('img', { name: ':italic:' });
+  const plain = editor.getByRole('img', { name: ':plain:' });
+  await expect.element(italic).toBeVisible();
+  await expect.element(plain).toBeVisible();
+  const skew = new DOMMatrix(getComputedStyle(italic.element()).transform);
+  expect(skew.c).toBeCloseTo(Math.tan((-10 * Math.PI) / 180));
+  expect(getComputedStyle(plain.element()).transform).toBe('none');
+});
+
 test('autocomplete inserts custom emoji and can be dismissed and reopened', async () => {
   const { editor, content } = await mount();
   await userEvent.click(editor);

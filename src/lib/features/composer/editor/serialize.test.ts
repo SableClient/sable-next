@@ -705,6 +705,21 @@ describe('plain text mode', () => {
     expect(message.formatted).toContain('<strong>hey</strong>');
     expect(message.formatted).toContain('data-mx-emoticon');
   });
+
+  test('italics around an emote survive sending, editing and switching composer modes', () => {
+    const wave = emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave' });
+    const plain = docOf(para([composerSchema.text('*hey '), wave, composerSchema.text('*')]));
+    const rich = docOf(
+      para([composerSchema.text('hey ', [em.create()]), wave.mark([em.create()])])
+    );
+    const formatted =
+      '<em>hey <img data-mx-emoticon="" src="mxc://example.org/wave" alt="wave" title="wave" height="32"></em>';
+
+    expect(serializePlain(plain).formatted).toBe(formatted);
+    expect(serializeComposer(rich).formatted).toBe(formatted);
+    expect(richFromPlain(plain).eq(rich)).toBe(true);
+    expect(serializePlain(plainEditDoc('*hey :wave:*', formatted)).formatted).toBe(formatted);
+  });
 });
 
 describe('@room', () => {

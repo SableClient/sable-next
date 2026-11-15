@@ -135,7 +135,7 @@ fn inline_node(node: &Inline, pills: &[ComposerPill]) -> Option<Node> {
             vec![("data-mx-maths", latex.clone())],
             vec![element("code", Vec::new(), vec![Node::Text(latex.clone())])],
         ),
-        Inline::Pill(index) => pill_node(pills.get(*index)?),
+        Inline::Pill(index, _) => pill_node(pills.get(*index)?),
     })
 }
 

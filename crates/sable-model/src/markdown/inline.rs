@@ -132,7 +132,7 @@ pub(super) enum Inline {
         latex: String,
         marks: Vec<Mark>,
     },
-    Pill(usize),
+    Pill(usize, Vec<Mark>),
 }
 
 impl Inline {
@@ -142,8 +142,8 @@ impl Inline {
             | Self::Break(marks)
             | Self::Image { marks, .. }
             | Self::Time { marks, .. }
-            | Self::Math { marks, .. } => marks,
-            Self::Pill(_) => &[],
+            | Self::Math { marks, .. }
+            | Self::Pill(_, marks) => marks,
         }
     }
 }

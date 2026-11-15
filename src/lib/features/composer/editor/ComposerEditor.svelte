@@ -335,6 +335,10 @@
     width: auto;
   }
 
+  .editor :global(em .composer-emoticon img) {
+    transform: skewX(-10deg);
+  }
+
   .editor :global(.composer-emoticon.selected) {
     background: var(--surface-container-active);
     border-radius: var(--radius);

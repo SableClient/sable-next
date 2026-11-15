@@ -70,7 +70,7 @@ fn inline(node: &Inline, pills: &[ComposerPill]) -> Option<Value> {
             json!({ "type": "math_inline", "attrs": { "latex": latex } }),
             marks,
         ),
-        Inline::Pill(index) => pill(pills.get(*index)?),
+        Inline::Pill(index, marks) => marked(pill(pills.get(*index)?), marks),
     })
 }
 
