@@ -674,9 +674,15 @@ pub(crate) async fn reset_state_cache(
 
     let database = matrix_sdk::STATE_STORE_DATABASE_NAME;
     let replacement = temporary.path().join(database);
-    std::fs::File::open(&replacement)
+    // Windows refuses to flush a handle opened for reading only.
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&replacement)
         .and_then(|file| file.sync_all())
-        .map_err(StoreError::backend)?;
+        .map_err(|source| StoreError::Path {
+            path: replacement.clone(),
+            source,
+        })?;
     for suffix in ["-wal", "-shm"] {
         let sidecar = path.join(format!("{database}{suffix}"));
         match std::fs::remove_file(&sidecar) {
@@ -690,7 +696,11 @@ pub(crate) async fn reset_state_cache(
             }
         }
     }
-    std::fs::rename(replacement, path.join(database)).map_err(StoreError::backend)
+    let database = path.join(database);
+    std::fs::rename(replacement, &database).map_err(|source| StoreError::Path {
+        path: database,
+        source,
+    })
 }
 
 #[cfg(not(target_family = "wasm"))]
