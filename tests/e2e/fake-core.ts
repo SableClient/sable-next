@@ -1443,7 +1443,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           subscription,
           items: unreadContext
             ? [...items.slice(0, 5), marker, ...items.slice(5, 20)]
-            : workerMode === 'thread_links' && focus.kind === 'thread'
+            : focus.kind === 'thread' &&
+                (workerMode === 'thread_links' ||
+                  (workerMode === 'forum' && focus.root_event_id === '$thread-root:example.test'))
               ? [
                   { ...items[0], id: 'thread-root', event_id: '$thread-root:example.test' },
                   ...Array.from({ length: 40 }, (_, index) => ({
@@ -1454,7 +1456,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                     thread_root: '$thread-root:example.test',
                   })),
                 ]
-              : workerMode === 'thread_links' &&
+              : (workerMode === 'thread_links' || workerMode === 'forum') &&
                   focus.kind === 'event' &&
                   focus.event_id === '$thread-reply-older:example.test'
                 ? [
@@ -1639,27 +1641,45 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       'timeline.timestamp_to_event': () => null,
       'timeline.list_threads': () => ({ roots: [], next_batch: null }),
-      'timeline.event_source': (params) => ({
-        source:
-          workerMode === 'thread_links' && params.event_id.startsWith('$thread-reply-')
-            ? JSON.stringify({
-                type: 'm.room.message',
-                content: {
-                  'm.relates_to': { rel_type: 'm.thread', event_id: '$thread-root:example.test' },
-                },
-              })
-            : params.event_id === '$edit:example.test'
+      'timeline.event_source': (params) => {
+        if (params.event_id === '$missing:example.test') throw new Error('event not found');
+        return {
+          source:
+            (workerMode === 'thread_links' || workerMode === 'forum') &&
+            params.event_id.startsWith('$thread-reply-')
               ? JSON.stringify({
                   type: 'm.room.message',
                   content: {
-                    'm.relates_to': { rel_type: 'm.replace', event_id: '$general-8:example.test' },
+                    'm.relates_to': { rel_type: 'm.thread', event_id: '$thread-root:example.test' },
                   },
                 })
-              : '{}',
-        encrypted: false,
-        original: null,
-        encryption: null,
-      }),
+              : params.event_id === '$reaction:example.test'
+                ? JSON.stringify({
+                    type: 'm.reaction',
+                    content: {
+                      'm.relates_to': {
+                        rel_type: 'm.annotation',
+                        event_id: '$thread-reply-10:example.test',
+                        key: '👍',
+                      },
+                    },
+                  })
+                : params.event_id === '$edit:example.test'
+                  ? JSON.stringify({
+                      type: 'm.room.message',
+                      content: {
+                        'm.relates_to': {
+                          rel_type: 'm.replace',
+                          event_id: '$general-8:example.test',
+                        },
+                      },
+                    })
+                  : '{}',
+          encrypted: false,
+          original: null,
+          encryption: null,
+        };
+      },
       'timeline.edit_history': () => [],
       'timeline.read_marker': (params) => fullyReadEventId(params.room_id),
       'timeline.room_event_relations': () => ({

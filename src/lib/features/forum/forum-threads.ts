@@ -172,10 +172,15 @@ export function collectForumThreads(
   unreadByRoot: ReadonlyMap<string, boolean> = new Map()
 ): ForumThread[] {
   const roots = new Map<string, TimelineItemView>();
+  const redacted = new Set(
+    [...items, ...latestEvents]
+      .filter((item) => item.content.kind === 'redacted')
+      .map((item) => item.event_id)
+  );
   // Roots listed by the server carry no reactions, so keep the ones the timeline saw.
   const reactions = new Map<string, readonly ReactionGroup[]>();
   for (const item of items) {
-    if (item.event_id === null) continue;
+    if (item.event_id === null || redacted.has(item.event_id)) continue;
     if (item.reactions.length > 0) reactions.set(item.event_id, item.reactions);
     if (item.thread_summary !== null || isPost(item)) roots.set(item.event_id, item);
   }
@@ -184,6 +189,7 @@ export function collectForumThreads(
   for (const item of [...items, ...latestEvents]) {
     const rootId = item.thread_root;
     if (rootId === null || item.event_id === rootId || !roots.has(rootId)) continue;
+    if (redacted.has(item.event_id)) continue;
     const current = latestReplies.get(rootId);
     if (!current || item.timestamp > current.timestamp) latestReplies.set(rootId, item);
   }
@@ -191,10 +197,11 @@ export function collectForumThreads(
   const threads: ForumThread[] = [];
   for (const [rootId, root] of roots) {
     const candidate = latestReplies.get(rootId) ?? null;
+    const summaryLatestId = root.thread_summary?.latest_event_id ?? null;
+    const summaryLatestRedacted = summaryLatestId !== null && redacted.has(summaryLatestId);
     const latestReply =
       candidate &&
-      (!root.thread_summary?.latest_event_id ||
-        candidate.event_id === root.thread_summary.latest_event_id)
+      (!summaryLatestId || candidate.event_id === summaryLatestId || summaryLatestRedacted)
         ? candidate
         : null;
     const latest = latestReply ?? root;
@@ -218,7 +225,8 @@ export function collectForumThreads(
       replyCount: root.thread_summary?.num_replies ?? 0,
       lastActivityAt: latest.timestamp,
       lastBody:
-        root.thread_summary?.latest_body ?? (latestReply ? bodyOf(latestReply.content) : null),
+        (summaryLatestRedacted ? null : root.thread_summary?.latest_body) ??
+        (latestReply ? bodyOf(latestReply.content) : null),
       lastSenderName: latestReply?.sender_name ?? latestReply?.sender ?? null,
       unread: unreadByRoot.get(rootId) ?? isUnread(latest, currentUserId),
       votes: countVotes(rootReactions),

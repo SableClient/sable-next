@@ -18,7 +18,9 @@
   let room = $derived(findRoomByPathId(roomList.rooms, roomId));
   let eventTimeline = $derived(page.url.searchParams.get('timeline') === 'events');
   let roomTimeline = $derived(
-    eventTimeline || page.url.searchParams.has('event') || Boolean(page.state.notified)
+    eventTimeline ||
+      (room?.room_kind !== 'forum' && page.url.searchParams.has('event')) ||
+      Boolean(page.state.notified)
   );
   let userId = $derived(core.session?.user_id ?? null);
   let openRoomId = $derived(appLayout.drawerCovers(page.state) ? null : (room?.room_id ?? null));
@@ -35,10 +37,12 @@
   }
 </script>
 
-{#if !roomTimeline && room?.room_kind === 'forum'}
-  <ForumPage {roomId} />
-{:else if !roomTimeline && room?.room_kind === 'calendar'}
-  <CalendarPage {roomId} />
-{:else}
-  <RoomPage />
+{#if room || roomList.settled || !page.url.searchParams.has('event')}
+  {#if !roomTimeline && room?.room_kind === 'forum'}
+    <ForumPage {roomId} />
+  {:else if !roomTimeline && room?.room_kind === 'calendar'}
+    <CalendarPage {roomId} />
+  {:else}
+    <RoomPage />
+  {/if}
 {/if}

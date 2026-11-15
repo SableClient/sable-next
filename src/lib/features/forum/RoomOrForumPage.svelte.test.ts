@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest'
 
 import type { RoomListItemView } from '#src/generated/protocol';
 
-const state = vi.hoisted(() => ({ rooms: [] as RoomListItemView[] }));
+const state = vi.hoisted(() => ({ rooms: [] as RoomListItemView[], settled: true }));
 const rendered = vi.hoisted(() => [] as string[]);
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
@@ -35,6 +35,7 @@ import { page, visit } from '#lib/test-support/app-state.js';
 import RoomOrForumPage from './RoomOrForumPage.svelte';
 
 beforeEach(() => {
+  state.settled = true;
   state.rooms = [
     { room_id: '!forum:example.org', room_kind: 'forum' } as unknown as RoomListItemView,
   ];
@@ -59,8 +60,23 @@ test('keeps a forum in its specialized view normally', () => {
   expect(rendered).toEqual(['forum']);
 });
 
-test('a forum permalink uses the room event navigation', () => {
-  visit('/rooms/!forum:example.org?event=%24reply', { roomId: '!forum:example.org' });
+test.each(['root', 'reply'])('a forum permalink to a %s uses the forum view', (event) => {
+  visit(`/rooms/!forum:example.org?event=%24${event}`, { roomId: '!forum:example.org' });
+  render(RoomOrForumPage);
+  expect(rendered).toEqual(['forum']);
+});
+
+test('an explicit event timeline still takes precedence over a forum permalink', () => {
+  visit('/rooms/!forum:example.org?timeline=events&event=%24reply', {
+    roomId: '!forum:example.org',
+  });
+  render(RoomOrForumPage);
+  expect(rendered).toEqual(['room']);
+});
+
+test.each(['text', 'calendar'])('a %s permalink keeps the room event navigation', (kind) => {
+  state.rooms = [{ room_id: '!room:example.org', room_kind: kind } as RoomListItemView];
+  visit('/rooms/!room:example.org?event=%24reply', { roomId: '!room:example.org' });
   render(RoomOrForumPage);
   expect(rendered).toEqual(['room']);
 });
@@ -102,4 +118,27 @@ test('a room behind the open mobile drawer is not the open conversation until th
   await tick();
 
   expect(openConversation).toHaveBeenLastCalledWith(null, '!room:example.org');
+});
+
+test('waits for room metadata before choosing a view for a permalink', () => {
+  state.rooms = [];
+  state.settled = false;
+  visit('/rooms/!forum:example.org?event=%24reply', { roomId: '!forum:example.org' });
+  render(RoomOrForumPage);
+  expect(rendered).toEqual([]);
+});
+
+test('an unlisted room without a permalink opens before discovery settles', () => {
+  state.rooms = [];
+  state.settled = false;
+  visit('/rooms/!room:example.org', { roomId: '!room:example.org' });
+  render(RoomOrForumPage);
+  expect(rendered).toEqual(['room']);
+});
+
+test('an unlisted room still opens after discovery settles', () => {
+  state.rooms = [];
+  visit('/rooms/!room:example.org', { roomId: '!room:example.org' });
+  render(RoomOrForumPage);
+  expect(rendered).toEqual(['room']);
 });

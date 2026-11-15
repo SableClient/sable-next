@@ -45,7 +45,8 @@ vi.mock('#lib/features/room/messages/message-scope.svelte.js', async () => {
 });
 
 import ForumThreadItemHarness from './ForumThreadItemHarness.test.svelte';
-import type { ForumThread } from './forum-threads';
+import { collectForumThreads, type ForumThread } from './forum-threads';
+import ForumThreadList from './ForumThreadListHarness.test.svelte';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 const root = withRowFields({
@@ -248,3 +249,31 @@ test('shows votes as text to someone who cannot react', () => {
   expect(within(card()).getByText('👍 2')).toBeInTheDocument();
   expect(within(card()).queryByRole('button', { name: /2 votes/ })).not.toBeInTheDocument();
 });
+
+test.each(['list', 'gallery'] as const)(
+  'a deleted pinned post leaves the %s view',
+  async (layout) => {
+    const { rerender } = render(ForumThreadList, {
+      threads: [thread],
+      loading: false,
+      canLoadMore: false,
+      onOpen: vi.fn(),
+      canDelete: () => false,
+      onDelete: vi.fn(),
+      roomId: '!forum:example.org',
+      onCopyLink: vi.fn(),
+      onLoadMore: vi.fn(),
+      isPinned: () => true,
+      layout,
+    });
+    expect(screen.getByRole('list', { name: 'Pinned threads' })).toBeVisible();
+    const redacted = {
+      ...root,
+      content: { kind: 'redacted' as const, reason: null, redacted_by: null },
+    };
+    await rerender({ threads: collectForumThreads([redacted, root], null) });
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Pinned threads' })).not.toBeInTheDocument();
+    expect(screen.getByText('No threads yet.')).toBeVisible();
+  }
+);

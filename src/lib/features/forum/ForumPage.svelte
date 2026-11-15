@@ -10,6 +10,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
   import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
+  import { resolveForumLink } from './forum-link.js';
   import ConversationComposer from '#lib/features/room/conversation/ConversationComposer.svelte';
   import ThreadView from '#lib/features/room/conversation/ThreadView.svelte';
   import { Conversation } from '#lib/features/room/conversation/conversation.svelte.js';
@@ -42,7 +43,7 @@
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { readText, writeText } from '#lib/platform/local-json.js';
-  import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
+  import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -85,6 +86,8 @@
     void resolvedRoomId;
     return null;
   });
+  let linkedEventId = $derived(page.url.searchParams.get('event'));
+  let threadEventId = $state<string | null>(null);
   const sidePanels = new MediaQuery(BREAKPOINTS.sidePanels);
   let threadInPanel = $derived(sidePanels.current && preferences.threadPresentation === 'panel');
   let permissions = $state.raw<RoomPermissionsView | null>(null);
@@ -154,6 +157,36 @@
     void mediaPreviews.load(resolvedRoomId);
   });
 
+  $effect(() => {
+    const target = linkedEventId;
+    const targetRoomId = resolvedRoomId;
+    if (target === null) return;
+    threadRootId = null;
+    threadEventId = null;
+    let active = true;
+    const readSource = (eventId: string) =>
+      core.rpc.timeline
+        .eventSource({ room_id: targetRoomId, event_id: eventId, include_original: false })
+        .then(({ source }) => source);
+    void resolveForumLink(readSource, target)
+      .then((linked) => {
+        if (!active) return;
+        threadRootId = linked.rootEventId;
+        threadEventId = linked.eventId;
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        console.debug('[sable forum] linked event unavailable', error);
+        // eslint-disable-next-line svelte/no-navigation-without-resolve -- eventTimelinePath resolves the route
+        void goto(`${eventTimelinePath(targetRoomId)}&event=${encodeURIComponent(target)}`, {
+          replace: true,
+        });
+      });
+    return () => {
+      active = false;
+    };
+  });
+
   let wasEditing = false;
   $effect(() => {
     const editing = conversation.context?.kind === 'edit';
@@ -198,6 +231,8 @@
 
   function openThread(eventId: string): void {
     threadRootId = eventId;
+    threadEventId = null;
+    void clearLinkedEvent();
   }
 
   function editThread(thread: (typeof forumThreads.threads)[number]): void {
@@ -244,6 +279,16 @@
 
   function closeThread(): void {
     threadRootId = null;
+    threadEventId = null;
+    void afterOverlayPops().then(clearLinkedEvent);
+  }
+
+  function clearLinkedEvent(): Promise<void> | undefined {
+    if (!page.url.searchParams.has('event')) return;
+    const url = new URL(page.url.href);
+    url.searchParams.delete('event');
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
+    return goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
   }
 
   function loadMoreThreads(): void {
@@ -404,6 +449,7 @@
       <ThreadView
         roomId={resolvedRoomId}
         rootEventId={threadRootId}
+        focusEventId={threadEventId}
         sidePanel={threadInPanel}
         backLabel={i18n.t('forum.backToForum')}
         rootMessage={forumThreads.roomTimeline.items.find((item) => item.event_id === threadRootId)}

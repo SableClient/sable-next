@@ -62,6 +62,39 @@ test('collects an item with a thread summary as a root', () => {
   expect(threads[0]?.lastActivityAt).toBe(100);
 });
 
+test('hides a redacted post even when its thread summary remains', () => {
+  const root = item({
+    id: 'root',
+    content: { kind: 'redacted', reason: null, redacted_by: null },
+    thread_summary: {
+      num_replies: 2,
+      latest_event_id: '$reply',
+      latest_body: 'latest',
+      latest_fallback: null,
+    },
+  });
+  const reply = item({ id: 'reply', thread_root: '$root' });
+  const visible = item({ id: 'visible' });
+
+  expect(collectForumThreads([root, reply, visible], null).map((thread) => thread.eventId)).toEqual(
+    ['$visible']
+  );
+});
+
+test.each([false, true])(
+  'a stale root cannot restore a redacted post (listed first: %s)',
+  (listedFirst) => {
+    const listed = item({ id: 'root' });
+    const redacted = item({
+      id: 'root',
+      content: { kind: 'redacted', reason: null, redacted_by: null },
+    });
+    const items = listedFirst ? [listed, redacted] : [redacted, listed];
+
+    expect(collectForumThreads(items, null)).toEqual([]);
+  }
+);
+
 test('collects a post nobody has replied to yet', () => {
   const plain = item({ id: 'plain', timestamp: 5 });
 
@@ -435,4 +468,53 @@ test('takes the thumbnail from the first image or video of a thread', () => {
     video: false,
     spoiler: true,
   });
+});
+
+test('a deleted latest reply falls back to the previous reply', () => {
+  const root = item({
+    id: 'root',
+    timestamp: 1,
+    thread_summary: {
+      num_replies: 2,
+      latest_event_id: '$deleted',
+      latest_body: 'Deleted reply text',
+      latest_fallback: null,
+    },
+  });
+  const earlier = item({ id: 'earlier', thread_root: '$root', timestamp: 5 });
+  const deleted = item({
+    id: 'deleted',
+    thread_root: '$root',
+    timestamp: 9,
+    content: { kind: 'redacted', reason: null, redacted_by: null },
+  });
+
+  const threads = collectForumThreads([root, earlier, deleted], null);
+  expect(threads[0]?.lastBody).toBe('earlier');
+  expect(threads[0]?.lastActivityAt).toBe(5);
+});
+
+test.each(['timeline', 'hydrated'])('a deleted latest reply from %s is not previewed', (source) => {
+  const root = item({
+    id: 'root',
+    thread_summary: {
+      num_replies: 1,
+      latest_event_id: '$reply',
+      latest_body: 'Deleted reply text',
+      latest_fallback: null,
+    },
+  });
+  const reply = item({
+    id: 'reply',
+    thread_root: '$root',
+    content: { kind: 'redacted', reason: null, redacted_by: null },
+  });
+  const threads =
+    source === 'timeline'
+      ? collectForumThreads([root, reply], null)
+      : collectForumThreads([root], null, [reply]);
+
+  expect(threads).toHaveLength(1);
+  expect(threads[0]?.preview).toBe('root');
+  expect(threads[0]?.lastBody).toBeNull();
 });
