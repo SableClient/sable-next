@@ -1,5 +1,5 @@
 {
-  "upcoming": {
+  "v26.11.0": {
     "added": [
       "voiceParticipantPlacement",
       "linkMscReferences"
@@ -14,12 +14,6 @@
       "personaPickerShowAccountWhenDeselected",
       "jumpToLatestOnSend",
       "reuploadGifs"
-    ],
-    "changed": []
-  },
-  "v2.3.8": {
-    "added": [
-      "hideMessageShields"
     ],
     "changed": []
   }
