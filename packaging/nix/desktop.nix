@@ -15,6 +15,7 @@
   autoPatchelfHook,
   makeWrapper,
   electron_45,
+  darwin,
 }:
 
 let
@@ -34,6 +35,11 @@ stdenv.mkDerivation (finalAttrs: {
   __structuredAttrs = true;
   strictDeps = true;
 
+  postPatch = lib.optionalString stdenv.hostPlatform.isDarwin ''
+    # --deep does not exist in nixpkgs' codesign
+    substituteInPlace electron/after-pack.mjs --replace-fail "'--deep', " ""
+  '';
+
   nativeBuildInputs = [
     pnpm
     (pnpmConfigHook.override { inherit pnpm; })
@@ -43,13 +49,16 @@ stdenv.mkDerivation (finalAttrs: {
     rustPlatform.rust.rustc
     rustPlatform.rust.cargo
     rustPlatform.cargoSetupHook
-    autoPatchelfHook
     makeWrapper
-  ];
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isDarwin [ darwin.sigtool ]
+  ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
   buildInputs = [
     aws-lc
     sqlite
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isLinux [
     pipewire
     libpulseaudio
     stdenv.cc.cc.lib
@@ -67,7 +76,7 @@ stdenv.mkDerivation (finalAttrs: {
     cp -r --no-preserve=mode ${web} dist
     cp -r ${electron.dist} electron-dist
     chmod -R u+w electron-dist
-    pnpm --dir electron package --linux --dir \
+    pnpm --dir electron package ${if stdenv.hostPlatform.isDarwin then "--mac" else "--linux"} --dir \
       -c.electronDist=$PWD/electron-dist \
       -c.electronVersion=${electron.version} \
       -c.extraMetadata.autoUpdate=false
@@ -77,7 +86,16 @@ stdenv.mkDerivation (finalAttrs: {
 
   installPhase = ''
     runHook preInstall
+  ''
+  + lib.optionalString stdenv.hostPlatform.isDarwin ''
+    mkdir -p $out/Applications
+    mv electron/release/mac*/Sable.app $out/Applications
 
+    codesign --force --sign - $out/Applications/Sable.app
+
+    makeWrapper $out/Applications/Sable.app/Contents/MacOS/Sable $out/bin/sable
+  ''
+  + lib.optionalString stdenv.hostPlatform.isLinux ''
     mkdir -p $out/share/sable
     cp -r electron/release/linux*-unpacked/resources/. $out/share/sable
     echo nix > $out/share/sable/package-type
@@ -91,13 +109,20 @@ stdenv.mkDerivation (finalAttrs: {
       install -Dm644 packaging/flatpak/icons/''${size}x''${size}.png \
         $out/share/icons/hicolor/''${size}x''${size}/apps/moe.sable.client.png
     done
-
+  ''
+  + ''
     runHook postInstall
   '';
 
+  dontStrip = stdenv.hostPlatform.isDarwin;
+
   meta = sable-unwrapped.meta // {
     description = "Sable desktop app, a Matrix client";
-    platforms = lib.platforms.linux;
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+      "aarch64-darwin"
+    ];
     mainProgram = "sable";
   };
 })
