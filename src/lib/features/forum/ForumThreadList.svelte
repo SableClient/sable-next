@@ -7,6 +7,7 @@
   import { MAX_PINNED, type ForumLayout, type ForumThread } from './forum-threads';
   import ForumThreadItem from './ForumThreadItem.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { whenVisible } from '#lib/ui/when-visible.js';
 
   interface Props {
     threads: readonly ForumThread[];
@@ -58,12 +59,15 @@
 </script>
 
 <div class="forum-thread-list" {@attach scrollHint}>
-  {#if failed}
+  {#snippet failure()}
     <div class="forum-thread-list-more" role="alert">
       <span>{i18n.t('timeline.loadFailed')}</span>
       <Button variant="secondary" size="small" onclick={onRetry}>{i18n.t('common.tryAgain')}</Button
       >
     </div>
+  {/snippet}
+  {#if failed && threads.length === 0}
+    {@render failure()}
   {/if}
   {#if threads.length === 0 && loading && !failed}
     <div class={['forum-threads', layout]} aria-hidden="true">
@@ -125,16 +129,15 @@
       {/each}
     </ul>
   {/if}
-  {#if canLoadMore}
-    <div class="forum-thread-list-more">
-      <Button variant="ghost" size="small" onclick={onLoadMore} {loading}>
-        {i18n.t('forum.loadMore')}
-      </Button>
-    </div>
-  {:else if loading && threads.length > 0}
+  {#if failed && threads.length > 0}
+    {@render failure()}
+  {:else if !failed && (canLoadMore || loading) && threads.length > 0}
     <div class="forum-thread-list-more">
       <Spinner small label={i18n.t('a11y.loading')} />
     </div>
+  {/if}
+  {#if canLoadMore && !loading && !failed}
+    <div {@attach whenVisible(onLoadMore)}></div>
   {/if}
 </div>
 

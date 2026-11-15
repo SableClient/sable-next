@@ -2396,7 +2396,6 @@
     "label": "Forum",
     "threads": "Fils de discussion",
     "empty": "Aucun fil de discussion pour le moment.",
-    "loadMore": "Charger les fils plus anciens",
     "newThreadHint": "Envoyez un message pour créer un nouveau fil. Répondez-y pour commencer la discussion.",
     "thread": "{{name}} : {{preview}}",
     "threadUnread": "Non lu. {{name}} : {{preview}}",

@@ -3467,7 +3467,6 @@
     "replyCount_few": "{{count, number}} ответа",
     "replyCount_many": "{{count, number}} ответов",
     "threadUnread": "Не прочитано. {{name}}: {{preview}}",
-    "loadMore": "Загрузить более старые ветки",
     "empty": "Веток пока нет."
   },
   "share": {

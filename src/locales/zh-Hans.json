@@ -3753,7 +3753,6 @@
     "titleLabel": "消息列标题",
     "titlePlaceholder": "标题（可选）",
     "empty": "还没有消息列。",
-    "loadMore": "加载更早的消息列",
     "newThreadHint": "发送一条消息以开始新消息列，回复它以展开讨论。",
     "thread": "{{name}}：{{preview}}",
     "threadUnread": "未读，{{name}}：{{preview}}",

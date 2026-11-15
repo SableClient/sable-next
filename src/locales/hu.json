@@ -3419,7 +3419,6 @@
     "titleLabel": "Szál címe",
     "titlePlaceholder": "Cím (nem kötelező)",
     "empty": "Még nincsenek szálak.",
-    "loadMore": "Régebbi szálak betöltése",
     "newThreadHint": "Új szál indításához küldjön egy üzenetet. Válaszoljon rá a beszélgetés megkezdéséhez.",
     "thread": "{{name}}: {{preview}}",
     "threadUnread": "Olvasatlan. {{name}}: {{preview}}"

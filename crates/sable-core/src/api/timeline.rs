@@ -360,6 +360,7 @@ impl Handler for ListThreadsParams {
         let room = core.room(&self.room_id).await?;
         let options = ListThreadsOptions {
             from: self.from,
+            limit: Some(UInt::from(50u32)),
             ..ListThreadsOptions::default()
         };
         let threads = room

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import ForumThreadList from './ForumThreadList.svelte';
 
 test('a failed empty forum offers recovery', async () => {
@@ -49,4 +49,29 @@ test('a search that misses says so only once every thread is loaded', async () =
   expect(screen.queryByText('No threads match your search.')).not.toBeInTheDocument();
   await rerender({ canLoadMore: false });
   expect(screen.getByText('No threads match your search.')).toBeVisible();
+});
+
+test('reaching the end of the list loads older threads', () => {
+  const backup = globalThis.IntersectionObserver;
+  onTestFinished(() => {
+    globalThis.IntersectionObserver = backup;
+  });
+  const observers: IntersectionObserverCallback[] = [];
+  globalThis.IntersectionObserver = class {
+    disconnect = vi.fn();
+    observe = vi.fn();
+    constructor(callback: IntersectionObserverCallback) {
+      observers.push(callback);
+    }
+  } as unknown as typeof IntersectionObserver;
+  const loadMore = vi.fn();
+  render(ForumThreadList, { ...base, canLoadMore: true, onLoadMore: loadMore });
+  expect(loadMore).not.toHaveBeenCalled();
+
+  observers[0]?.(
+    [{ isIntersecting: true } as IntersectionObserverEntry],
+    {} as IntersectionObserver
+  );
+
+  expect(loadMore).toHaveBeenCalledOnce();
 });

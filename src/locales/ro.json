@@ -2436,7 +2436,6 @@
     "label": "Forum",
     "threads": "Fire",
     "empty": "Încă nu sunt fire.",
-    "loadMore": "Încarcă firele mai vechi",
     "newThreadHint": "Trimite un mesaj pentru a începe un fir. Răspunde la un mesaj pentru a începe o discuție.",
     "thread": "{{name}}: {{preview}}",
     "threadUnread": "Necitit. {{name}}: {{preview}}",
