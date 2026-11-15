@@ -360,6 +360,11 @@
     {#if session.desktopShortcutStatus === 'error'}
       <Alert variant="warning" class="notice">
         <p>{i18n.t('call.desktopShortcutsUnavailable')}</p>
+        <div class="notice-actions">
+          <Button variant="ghost" onclick={() => (session.desktopShortcutStatus = 'inactive')}>
+            {i18n.t('common.dismiss')}
+          </Button>
+        </div>
       </Alert>
     {/if}
     {#if session.listenOnly}
@@ -405,7 +410,11 @@
     class={[
       'media',
       {
-        'with-notice': session.deviceError !== null || session.listenOnly || backendUnreachable,
+        'with-notice':
+          session.deviceError !== null ||
+          session.desktopShortcutStatus === 'error' ||
+          session.listenOnly ||
+          backendUnreachable,
         locked: busy,
       },
     ]}
