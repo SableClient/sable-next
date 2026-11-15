@@ -4368,6 +4368,11 @@
     "announceCheckCode": "Your number is {{code}}. Enter it on the other device.",
     "announceUserCode": "The other device shows {{code}}. Approve the sign-in there."
   },
+  "externalLink": {
+    "title": "Open this link in another app?",
+    "description": "This link isn’t a web address. Opening it hands it to whichever app on this device is registered for it.",
+    "confirm": "Open link"
+  },
   "crop": {
     "titleAvatar": "Crop picture",
     "titleBanner": "Crop banner",
@@ -4390,11 +4395,6 @@
     "title": "Sounds",
     "volumeCategory": "Sound volume",
     "incoming_call": "Incoming call",
-  "externalLink": {
-    "title": "Open this link in another app?",
-    "description": "This link isn’t a web address. Opening it hands it to whichever app on this device is registered for it.",
-    "confirm": "Open link"
-  },
     "outgoing_call": "Outgoing call",
     "camera_on": "Camera on",
     "camera_off": "Camera off",
