@@ -7,7 +7,6 @@ import {
   isLocalNetworkHost,
   LocalNetworkBlockedError,
   localNetworkDenied,
-  requestAndroidLocalNetwork,
   withLocalNetworkAccess,
 } from './local-network';
 
@@ -48,23 +47,46 @@ test('a browser without the permission reports nothing denied', async () => {
   expect(await localNetworkDenied()).toBe(false);
 });
 
-test('on Android it asks for local network access and reports the grant', async () => {
-  vi.mocked(invoke).mockResolvedValue({ localNetwork: 'granted' });
+async function fresh() {
+  vi.resetModules();
+  const core = await import('@tauri-apps/api/core');
+  const module = await import('./local-network');
+  return { invoke: vi.mocked(core.invoke), request: module.requestAndroidLocalNetwork };
+}
 
-  expect(await requestAndroidLocalNetwork()).toBe(true);
-  expect(invoke).toHaveBeenCalledWith('plugin:sable-push|request_permissions', {
+test('on Android it asks for local network access once and reports the grant', async () => {
+  const { invoke, request } = await fresh();
+  invoke.mockResolvedValueOnce({ localNetwork: 'prompt' });
+  invoke.mockResolvedValueOnce({ localNetwork: 'granted' });
+
+  expect(await request()).toBe(true);
+  expect(invoke).toHaveBeenLastCalledWith('plugin:sable-push|request_permissions', {
     permissions: ['localNetwork'],
   });
+
+  expect(await request()).toBe(false);
+  expect(invoke).toHaveBeenCalledTimes(2);
+});
+
+test('a settled permission is not asked for again', async () => {
+  const { invoke, request } = await fresh();
+  invoke.mockResolvedValue({ localNetwork: 'granted' });
+
+  expect(await request()).toBe(false);
+  expect(invoke).toHaveBeenCalledExactlyOnceWith('plugin:sable-push|check_permissions');
 });
 
 test('a refusal or another platform leaves access blocked', async () => {
-  vi.mocked(invoke).mockResolvedValue({ localNetwork: 'denied' });
-  expect(await requestAndroidLocalNetwork()).toBe(false);
+  const { invoke, request } = await fresh();
+  invoke.mockResolvedValueOnce({ localNetwork: 'prompt' });
+  invoke.mockResolvedValueOnce({ localNetwork: 'denied' });
+  expect(await request()).toBe(false);
 
   android.value = false;
-  vi.mocked(invoke).mockClear();
-  expect(await requestAndroidLocalNetwork()).toBe(false);
-  expect(invoke).not.toHaveBeenCalled();
+  invoke.mockClear();
+  const other = await fresh();
+  expect(await other.request()).toBe(false);
+  expect(other.invoke).not.toHaveBeenCalled();
 });
 
 test.each([

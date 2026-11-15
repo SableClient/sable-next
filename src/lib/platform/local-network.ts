@@ -49,9 +49,15 @@ export async function localNetworkDenied(): Promise<boolean> {
   return false;
 }
 
+let askedAndroid = false;
+
+// The request opens a system activity even with nothing to ask, which closes the keyboard.
 export async function requestAndroidLocalNetwork(): Promise<boolean> {
-  if (!isAndroid()) return false;
+  if (!isAndroid() || askedAndroid) return false;
   try {
+    const current = await invoke<Record<string, string>>('plugin:sable-push|check_permissions');
+    if (!current.localNetwork.startsWith('prompt')) return false;
+    askedAndroid = true;
     const states = await invoke<Record<string, string>>('plugin:sable-push|request_permissions', {
       permissions: ['localNetwork'],
     });

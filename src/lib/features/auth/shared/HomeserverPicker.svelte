@@ -29,6 +29,7 @@
   }: Props = $props();
 
   const SETTLE_MS = 600;
+  const SERVER_NAME = /\.[a-z0-9-]{2,}|:/i;
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
   $effect(() => () => clearTimeout(settleTimer));
@@ -36,7 +37,8 @@
   function handleInput(event: Event & { currentTarget: EventTarget & HTMLInputElement }) {
     oninput?.(event);
     clearTimeout(settleTimer);
-    if (onsettle && event.currentTarget.value.trim()) settleTimer = setTimeout(onsettle, SETTLE_MS);
+    if (onsettle && SERVER_NAME.test(event.currentTarget.value.trim()))
+      settleTimer = setTimeout(onsettle, SETTLE_MS);
   }
 
   function handleBlur(event: FocusEvent & { currentTarget: EventTarget & HTMLInputElement }) {

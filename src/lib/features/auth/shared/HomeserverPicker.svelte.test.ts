@@ -52,6 +52,22 @@ test('a blur or a blank field cancels the pending settle', async () => {
   expect(onsettle).not.toHaveBeenCalled();
 });
 
+test('a half-typed name that is not a server yet is left alone', async () => {
+  const user = setupUser();
+  const onsettle = vi.fn();
+  render(HomeserverPicker, { id: 'homeserver', onsettle });
+  const input = screen.getByRole('combobox');
+
+  await user.type(input, 'kubes');
+  vi.advanceTimersByTime(1000);
+  expect(onsettle).not.toHaveBeenCalled();
+
+  await user.clear(input);
+  await user.type(input, 'localhost:8448');
+  vi.advanceTimersByTime(600);
+  expect(onsettle).toHaveBeenCalledOnce();
+});
+
 test('server names are never capitalised in the fixed list', () => {
   expect(homeservers.items.length).toBeGreaterThan(0);
   expect(homeservers.items.every((item) => item.labelClass === 'literal-label')).toBe(true);
