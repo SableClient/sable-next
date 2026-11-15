@@ -9,7 +9,7 @@
   import { alertListState } from './AlertList.svelte';
 
   // lowest to highest
-  const PRIORITY_HIERARCHY = [null, 'update', 'warning', 'task', 'security', 'critical'];
+  const PRIORITY_HIERARCHY = [null, 'task', 'update', 'warning', 'security', 'critical'];
 
   type Mode = 'mobile' | 'compact' | 'desktop';
 

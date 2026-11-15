@@ -58,7 +58,7 @@
               icon: CloudXIcon,
               level: 'warning',
             };
-          } else if (sharing.outcome === 'completed') {
+          } else if (sharing.outcome === 'completed' && sharing.transferred_rooms > 0) {
             return {
               icon: CloudCheckIcon,
               level: 'task',
