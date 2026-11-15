@@ -501,13 +501,13 @@
       );
     });
     if (!loaded) {
-      if (serving && targetEventId !== null && untrack(() => timeline.error) === null) {
-        const origin =
-          jumpOrigin !== null && jumpOrigin.target === eventId ? jumpOrigin.origin : null;
-        jumpOrigin = null;
-        const position = untrack(() => timelineList?.capturePosition(origin));
-        if (position) savedPosition = position;
-      }
+      const origin =
+        jumpOrigin !== null && jumpOrigin.target === eventId ? jumpOrigin.origin : null;
+      jumpOrigin = null;
+      savedPosition =
+        serving && targetEventId !== null && untrack(() => timeline.error) === null
+          ? (untrack(() => timelineList?.capturePosition(origin)) ?? null)
+          : null;
       void untrack(() =>
         activeTimeline.start(
           timelineOwner,
@@ -671,15 +671,15 @@
     void goto(roomUrl(null), { replace: true, reset: false });
   }
 
-  let savedPosition = $state<{ eventId: string | null } | null>(null);
+  let savedPosition = $state<string | null>(null);
   let jumpOrigin: { target: string; origin: string } | null = null;
 
   function returnToPosition(): void {
     const position = savedPosition;
     savedPosition = null;
-    timeline.error = null;
-    if (position === null || position.eventId === null) jumpToLive();
-    else jumpToEvent(position.eventId);
+    if (position === null) return;
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
+    void goto(roomUrl(position), { replace: true, reset: false });
   }
 
   function jumpToLive(): void {

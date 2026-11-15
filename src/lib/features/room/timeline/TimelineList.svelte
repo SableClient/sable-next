@@ -1148,18 +1148,15 @@
     return true;
   }
 
-  export function capturePosition(
-    preferredEventId?: string | null
-  ): { eventId: string | null } | null {
+  /** The event to come back to, or null at the latest messages, where jumping to latest already returns. */
+  export function capturePosition(preferredEventId?: string | null): string | null {
     if (!controller || !opened) return null;
-    if (preferredEventId != null && entryFor(preferredEventId))
-      return { eventId: preferredEventId };
-    if (windowState.pinned && live) return { eventId: null };
+    if (preferredEventId != null && entryFor(preferredEventId)) return preferredEventId;
+    if (windowState.pinned && live) return null;
     const first = windowState.firstVisible;
     if (first === null) return null;
     for (const row of windowState.rows) {
-      if (row.index >= first && row.value.item.event_id)
-        return { eventId: row.value.item.event_id };
+      if (row.index >= first && row.value.item.event_id) return row.value.item.event_id;
     }
     return null;
   }

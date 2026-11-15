@@ -3333,7 +3333,7 @@ test('after following a reply the jump control first returns to the message it w
   const reply = document.querySelector<HTMLElement>('[data-event-id="$19"] .reply-preview');
   if (!reply) throw new Error('no reply preview');
   await userEvent.click(reply);
-  expect(jump).toHaveBeenLastCalledWith('$2');
+  expect(jump).toHaveBeenLastCalledWith('$2', '$19');
 
   await dragTo(element, end, 0);
   expect(screen.getByRole('button', { name: 'Back to where you were' })).toHaveTextContent('Back');
@@ -3366,7 +3366,7 @@ test('following a reply out of the loaded timeline keeps the way back', async ()
   const reply = document.querySelector<HTMLElement>('[data-event-id="$19"] .reply-preview');
   if (!reply) throw new Error('no reply preview');
   await userEvent.click(reply);
-  expect(jump).toHaveBeenLastCalledWith('$old');
+  expect(jump).toHaveBeenLastCalledWith('$old', '$19');
 
   roomTimeline.mode = { kind: 'focused', eventId: '$old' };
   roomTimeline.backwardPagination = 'idle';
