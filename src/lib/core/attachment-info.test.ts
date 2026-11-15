@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { markVoiceRecording, measureAttachment, readAudioTags } from './attachment-info.js';
@@ -96,26 +94,15 @@ test('a decodable image gets a blurhash', async () => {
   expect(result.info?.blurhash).not.toBeNull();
 });
 
-test('an image counts as animated by its frames, whatever its type says', async () => {
-  vi.stubGlobal(
-    'createImageBitmap',
-    vi.fn(() => Promise.resolve({ width: 8, height: 8, close: () => {} }))
-  );
-  const fixture = (name: string, mime: string) =>
-    new Blob([readFileSync(`crates/sable-model/tests/fixtures/images/${name}`)], { type: mime });
+test('a file is measured once however many times it is asked for', async () => {
+  const decode = vi.fn(() => Promise.resolve({ width: 8, height: 8, close: () => {} }));
+  vi.stubGlobal('createImageBitmap', decode);
+  const image = file('image/png');
 
-  const cases: [Blob, boolean | null][] = [
-    [fixture('animated.gif', 'image/gif'), true],
-    [fixture('still.gif', 'image/gif'), false],
-    [fixture('animated.webp', 'image/webp'), true],
-    [fixture('still.webp', 'image/webp'), false],
-    [fixture('animated.png', 'image/png'), true],
-    [fixture('still.png', 'image/apng'), false],
-    [file('image/jpeg'), null],
-  ];
-  for (const [blob, animated] of cases) {
-    await expect(measureAttachment(blob)).resolves.toMatchObject({ info: { animated } });
-  }
+  await measureAttachment(image);
+  await measureAttachment(image);
+
+  expect(decode).toHaveBeenCalledTimes(1);
 });
 
 test('an undecodable image measures nothing rather than throwing', async () => {

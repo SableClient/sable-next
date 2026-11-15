@@ -4,6 +4,8 @@ import {
   createRpc,
 } from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
+import { playsAsGif } from '#lib/model/model.js';
+import { animatedImage } from '#lib/ui/media-url.js';
 import { withResolvedMime } from '#lib/platform/files.js';
 import { formatByteSize } from '#lib/ui/byte-size.js';
 import { CoreError, type Transport } from '../../transport';
@@ -27,20 +29,20 @@ export type SendGalleryOptions = Omit<SendAttachmentOptions, 'spoiler' | 'gif'> 
   gifs?: readonly (boolean | undefined)[];
 };
 
+const UNMEASURED: AttachmentInfoView = {
+  width: null,
+  height: null,
+  duration_ms: null,
+  animated: null,
+  blurhash: null,
+  waveform: null,
+  voice: false,
+  audio_metadata: null,
+  gif: null,
+};
+
 function withGif(info: AttachmentInfoView | null, gif: boolean | undefined) {
-  if (gif === undefined) return info;
-  return {
-    width: null,
-    height: null,
-    duration_ms: null,
-    animated: null,
-    blurhash: null,
-    waveform: null,
-    voice: false,
-    audio_metadata: null,
-    ...info,
-    gif,
-  };
+  return gif === undefined ? info : { ...(info ?? UNMEASURED), gif };
 }
 
 /** Moves bytes: uploads, attachments and media reads, which the RPC router does not carry. */
@@ -78,7 +80,16 @@ export function createMedia(transport: () => Transport) {
         mime: file.type || 'application/octet-stream',
         url,
         size: file.size,
-        info: withGif(measured.info, gif),
+        // The core never sees a scheduled file's bytes, so what it decides on sending is decided here.
+        info: {
+          ...(measured.info ?? UNMEASURED),
+          animated: animatedImage(file.type, bytes),
+          gif:
+            gif ??
+            (file.type.startsWith('video/')
+              ? playsAsGif(bytes, measured.info?.duration_ms ?? null)
+              : null),
+        },
         spoiler,
         persona: $state.snapshot(persona),
         delay_ms: Math.max(0, dueTs - Date.now()),

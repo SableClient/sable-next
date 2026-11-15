@@ -31,7 +31,6 @@
   import { objectSource, previewKind, type StagedFile } from '#lib/composer/composer-files.js';
   import StagedImageOptions from './StagedImageOptions.svelte';
   import StagedVideoOptions from './StagedVideoOptions.svelte';
-  import { gifOutcome } from '#lib/composer/gif-outcome.svelte.js';
   import { canStrip } from './strip-metadata';
 
   interface Props {
@@ -43,6 +42,8 @@
     onSetMetadata: (id: number, metadata: ImageMetadata) => void;
     onSetGif: (id: number, gif: boolean | undefined) => void;
     onReplace: (id: number, file: File) => void;
+    /** What automatic resolves to for a staged video, unknown until it has been read. */
+    autoGif: (file: File) => boolean | undefined;
   }
 
   let {
@@ -54,6 +55,7 @@
     onSetMetadata,
     onSetGif,
     onReplace,
+    autoGif,
   }: Props = $props();
 
   let currentId = $state(untrack(() => selectedId));
@@ -65,7 +67,7 @@
   );
   let item = $derived<StagedFile | undefined>(files[index]);
   let kind = $derived(item ? previewKind(item.file) : null);
-  let auto = $derived(item && kind === 'video' ? gifOutcome(item.file) : undefined);
+  let auto = $derived(item ? autoGif(item.file) : undefined);
   let playsAsGif = $derived((item?.gif ?? auto) === true);
   let failedId = $state<number | null>(null);
   let swipeX = $state(0);

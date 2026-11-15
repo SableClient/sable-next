@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
+
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { CoreError } from '#src/transport';
 
 import {
+  animatedImage,
   cachedMediaUrl,
   discardMediaUrl,
   holdMediaUrl,
@@ -578,4 +581,12 @@ test('an image sent as octet-stream is served with its own type', async () => {
   await loadMediaUrl(core, 'mxc://example.org/image.bin', 0, 0, 'application/octet-stream');
 
   expect(createObjectURL.mock.calls[0]?.[0]).toMatchObject({ type: 'image/png' });
+});
+
+test('only an animatable image small enough to copy is checked for frames', () => {
+  const gif = new Uint8Array(readFileSync('crates/sable-model/tests/fixtures/images/animated.gif'));
+
+  expect(animatedImage('image/gif', gif)).toBe(true);
+  expect(animatedImage('video/mp4', gif)).toBeNull();
+  expect(animatedImage('image/gif', new Uint8Array(16 * 1024 * 1024 + 1))).toBeNull();
 });

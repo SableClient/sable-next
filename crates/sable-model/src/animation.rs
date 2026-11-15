@@ -7,11 +7,13 @@ use std::io::Cursor;
 use matroska_demuxer::{MatroskaFile, TrackType};
 use mp4_atom::{Atom, Buf, Decode, FourCC, Ftyp, Hdlr, Header, Mdia, Moov, Trak};
 
-/// Whether an image has more than one frame, or `None` for bytes that are not
-/// a GIF, PNG, WebP or AVIF this can read.
+/// Whether an image has more than one frame, or `None` for bytes it cannot
+/// identify.
 #[must_use]
 pub fn image_is_animated(bytes: &[u8]) -> Option<bool> {
-    if bytes.starts_with(b"GIF8") {
+    if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some(false)
+    } else if bytes.starts_with(b"GIF8") {
         gif_is_animated(bytes)
     } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
         let reader = png::Decoder::new(Cursor::new(bytes)).read_info().ok()?;
@@ -222,8 +224,8 @@ mod tests {
     }
 
     #[test]
-    fn anything_else_is_not_an_image_it_can_read() {
-        assert_eq!(image_is_animated(&[0xff, 0xd8, 0xff, 0xe0]), None);
+    fn a_jpeg_is_still_and_anything_else_is_unknown() {
+        assert_eq!(image_is_animated(&[0xff, 0xd8, 0xff, 0xe0]), Some(false));
         assert_eq!(image_is_animated(clip!("silent.mp4")), None);
         assert_eq!(image_is_animated(&image!("animated.gif")[..12]), None);
     }

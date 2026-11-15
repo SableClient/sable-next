@@ -32,6 +32,8 @@ struct MediaInfoOut {
         skip_serializing_if = "Option::is_none"
     )]
     blurhash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_animated: Option<bool>,
     #[serde(flatten)]
     playback: serde_json::Map<String, serde_json::Value>,
 }
@@ -85,6 +87,7 @@ fn attachment_content(
             height: info.height,
             duration_ms: info.duration_ms,
             blurhash: info.blurhash,
+            is_animated: info.animated.filter(|_| mime.type_() == mime::IMAGE),
             playback: if mime.type_() == mime::VIDEO && info.gif == Some(true) {
                 gif_flags()
             } else {
@@ -339,6 +342,29 @@ mod tests {
                 .get("fi.mau.gif")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn only_an_image_carries_is_animated() {
+        let content = |mime: &str| {
+            let mime: Mime = mime.parse().expect("mime");
+            let info = AttachmentInfoView {
+                animated: Some(true),
+                ..AttachmentInfoView::default()
+            };
+            serde_json::to_value(attachment_content(
+                "a".to_owned(),
+                &mime,
+                OwnedMxcUri::from("mxc://example.org/abc"),
+                7,
+                info,
+                false,
+            ))
+            .unwrap()
+        };
+
+        assert_eq!(content("image/webp")["info"]["is_animated"], true);
+        assert!(content("video/mp4")["info"].get("is_animated").is_none());
     }
 
     #[test]

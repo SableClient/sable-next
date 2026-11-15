@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { deviceDisplayName } from '#lib/deployment/policy.js';
@@ -837,12 +839,70 @@ test('scheduling an attachment uploads it before creating its delayed event', as
       mime: 'image/png',
       url: 'mxc://example.org/later',
       size: 5,
-      info: null,
+      info: {
+        width: null,
+        height: null,
+        duration_ms: null,
+        animated: null,
+        blurhash: null,
+        waveform: null,
+        voice: false,
+        audio_metadata: null,
+        gif: null,
+      },
       spoiler: false,
       persona: null,
       delay_ms: 28_000,
     },
   });
+});
+
+test('a scheduled file carries the animation and GIF flags the core would set on sending', async () => {
+  const fake = fakeTransport({
+    'session.delayed_events_supported': true,
+    'messages.schedule_attachment': 'delayed',
+  });
+  fake.transport.uploadMedia = () => Promise.resolve('mxc://example.org/later');
+  const measure = vi.spyOn(attachmentInfo, 'measureAttachment').mockResolvedValue({
+    info: {
+      width: 16,
+      height: 16,
+      duration_ms: 300,
+      animated: null,
+      blurhash: null,
+      waveform: null,
+      voice: false,
+      audio_metadata: null,
+      gif: null,
+    },
+    thumbnail: null,
+  });
+  try {
+    const core = createCoreClient(() => fake.transport);
+    const fixture = (path: string, name: string, type: string) =>
+      new File([readFileSync(`crates/sable-model/tests/fixtures/${path}`)], name, { type });
+
+    await core.media.scheduleAttachment(
+      '!room:example.org',
+      fixture('images/animated.gif', 'party.gif', 'image/gif'),
+      40_000
+    );
+    await core.media.scheduleAttachment(
+      '!room:example.org',
+      fixture('clips/silent.mp4', 'clip.mp4', 'video/mp4'),
+      40_000
+    );
+
+    const infos = fake.called
+      .filter((call) => call.method === 'messages.schedule_attachment')
+      .map((call) => (call.params as { info: { animated: unknown; gif: unknown } }).info);
+    expect(infos).toMatchObject([
+      { animated: true, gif: null },
+      { animated: null, gif: true },
+    ]);
+  } finally {
+    measure.mockRestore();
+  }
 });
 
 test('an attachment is not uploaded when the homeserver cannot schedule it', async () => {

@@ -14,7 +14,6 @@ type CachedMediaUrl = {
   bytes: number;
   ratio: number | undefined;
   type: string;
-  /** Null for bytes the detector cannot read. */
   animated: boolean | null;
 };
 
@@ -67,6 +66,26 @@ function cacheKey(
 }
 
 export { imageMime } from '#lib/media-signatures.js';
+
+const ANIMATABLE_IMAGES = new Set([
+  'image/gif',
+  'image/png',
+  'image/apng',
+  'image/webp',
+  'image/avif',
+]);
+/* Checking copies the file into the model's memory, which never shrinks. */
+const ANIMATION_CHECK_MAX_BYTES = 16 * 1024 * 1024;
+
+export function mayAnimate(type: string): boolean {
+  return ANIMATABLE_IMAGES.has(type);
+}
+
+/** Null when the type cannot animate or the file is too large to check. */
+export function animatedImage(type: string, bytes: Uint8Array): boolean | null {
+  if (!mayAnimate(type) || bytes.length > ANIMATION_CHECK_MAX_BYTES) return null;
+  return imageIsAnimated(bytes);
+}
 
 function blobType(mime: string | null | undefined, bytes: Uint8Array): string {
   if (mime && mime !== 'application/octet-stream') return mime;
@@ -285,7 +304,7 @@ export function loadMediaUrl(
           bytes: blob.size,
           ratio: aspectRatios.get(key),
           type,
-          animated: imageIsAnimated(bytes),
+          animated: animatedImage(type, bytes),
         });
         objectUrlBytes += blob.size;
         failures.delete(key);
