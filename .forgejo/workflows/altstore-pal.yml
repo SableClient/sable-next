@@ -3,7 +3,7 @@ on:
   schedule:
     - cron: '17 */4 * * *'
   workflow_dispatch:
-permissions: {}
+
 concurrency:
   group: altstore-pal
   cancel-in-progress: false

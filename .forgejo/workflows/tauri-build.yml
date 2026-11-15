@@ -10,7 +10,7 @@ on:
         description: 'Release tag to build and attach bundles to (e.g. v1.2.3). Empty builds a nightly from HEAD.'
         required: false
         type: string
-permissions: {}
+
 concurrency:
   group: tauri-build-${{ github.event_name == 'workflow_dispatch' && (inputs.tag || github.run_id) || github.ref_name }}
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
