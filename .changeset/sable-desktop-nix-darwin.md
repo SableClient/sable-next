@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Let sable-desktop output from the flake be built on MacOS with Nix.
+The Nix flake's `sable-desktop` output now builds on macOS.

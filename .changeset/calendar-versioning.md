@@ -2,4 +2,4 @@
 default: note
 ---
 
-Swapped to calendar versioning for releases
+Releases now use calendar versioning.
