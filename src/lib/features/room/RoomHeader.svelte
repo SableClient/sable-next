@@ -152,8 +152,15 @@
     {#if encryptionLabel !== null}
       <Tooltip label={encryptionLabel}>
         {#snippet trigger({ props })}
-          <span {...props} class="encryption-state" role="img" aria-label={encryptionLabel}>
-            {#if encrypted}<LockSimpleIcon />{:else}<LockSimpleOpenIcon />{/if}
+          <span
+            {...props}
+            class={['encryption-state', { encrypted }]}
+            role="img"
+            aria-label={encryptionLabel}
+          >
+            {#if encrypted}<LockSimpleIcon weight="fill" />{:else}<LockSimpleOpenIcon
+                weight="bold"
+              />{/if}
           </span>
         {/snippet}
       </Tooltip>
@@ -309,10 +316,13 @@
   }
 
   .encryption-state {
-    color: var(--surface-var-on-container);
+    color: var(--crit-main);
     display: flex;
-    opacity: var(--opacity-placeholder);
     padding: var(--space-100);
+  }
+
+  .encryption-state.encrypted {
+    color: var(--success-main);
   }
 
   .encryption-state :global(svg) {
