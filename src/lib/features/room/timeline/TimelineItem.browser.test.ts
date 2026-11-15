@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { commands, page, userEvent } from 'vitest/browser';
 
 import en from '../../../../locales/en.json' with { type: 'json' };
@@ -159,6 +159,30 @@ test('a compact connected reply keeps its connector clear of the name gutter', a
     reply.getBoundingClientRect().left + parseFloat(getComputedStyle(reply, '::before').left);
   expect(connectorLeft).toBeGreaterThanOrEqual(gutter.getBoundingClientRect().right);
 });
+
+for (const dir of ['ltr', 'rtl'] as const) {
+  test(`a connected reply centres its connector on the avatar in ${dir}`, async () => {
+    document.documentElement.dir = dir;
+    onTestFinished(() => {
+      document.documentElement.removeAttribute('dir');
+    });
+    setPreference('replyPreviewStyle', 'connected');
+    await mountItem(replyToAlice('centred-reply', '@bob:example.test', 'Bob'));
+
+    const reply = document.querySelector('.reply-connected');
+    const avatar = document.querySelector('.message > .avatar-button, .message > .message-avatar');
+    if (!reply || !avatar) throw new Error('missing connected reply parts');
+    const box = reply.getBoundingClientRect();
+    const line = getComputedStyle(reply, '::before');
+    const stroke =
+      dir === 'rtl'
+        ? box.right - parseFloat(line.right) - parseFloat(line.borderRightWidth) / 2
+        : box.left + parseFloat(line.left) + parseFloat(line.borderLeftWidth) / 2;
+    const face = avatar.getBoundingClientRect();
+    expect(Math.abs(stroke - (face.left + face.right) / 2)).toBeLessThanOrEqual(0.5);
+    expect(dir === 'rtl' ? line.borderTopRightRadius : line.borderTopLeftRadius).not.toBe('0px');
+  });
+}
 
 test('a compact reply preview keeps the name gutter level with the message body', async () => {
   setPreference('replyPreviewStyle', 'compact');

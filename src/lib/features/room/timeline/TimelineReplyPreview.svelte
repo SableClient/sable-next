@@ -171,16 +171,21 @@
 
   .reply-connected::before {
     border-inline-start: var(--reply-connector-width) solid var(--surface-on-container);
-    border-radius: var(--radius) 0 0;
+    border-start-start-radius: var(--radius);
     border-top: var(--reply-connector-width) solid var(--surface-on-container);
     content: '';
     height: calc(var(--space-250) + var(--border-width-300));
-    inset-inline-start: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
+    inset-inline-start: calc(
+      -1 *
+        (var(--timeline-row-gap) + var(--avatar-size-small) / 2 + var(--reply-connector-width) / 2)
+    );
     opacity: var(--opacity-placeholder);
     pointer-events: none;
     position: absolute;
     top: calc(50% - var(--border-width-300));
-    width: calc(var(--timeline-row-gap) / 2 + var(--avatar-size-small) / 2);
+    width: calc(
+      var(--timeline-row-gap) / 2 + var(--avatar-size-small) / 2 + var(--reply-connector-width) / 2
+    );
   }
 
   .reply-connected:is(:hover, :focus-visible)::before {
