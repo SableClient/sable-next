@@ -1,5 +1,97 @@
 # Sable Changelog
 
+## 26.11.0 (2026-11-15)
+
+### Features
+
+* On mobile, the back button in a room shows how many notifications are waiting in your other rooms.
+* Calls have a "Report a problem" action, on the failed call screen and in the call controls, that adds scrubbed call diagnostics to the bug report.
+* You can now change your account password from the account settings.
+* The insert sheet on iOS and Android shows your recent photos and videos, so one tap adds them to the message.
+* Hovering or tapping a custom emote shows its description under the shortcode when the sender gave one.
+* Forums get a search bar, a New thread button, a sort menu, a list or gallery view, and compact thread cards with a thumbnail.
+* You can now crop a picture before using it as an avatar or banner, and crop images attached in the composer.
+* Mentions and direct messages that arrive while the app is open show as a banner instead of a system alert. Tap it to open the room, reply from it, or swipe it away. On by default on mobile; a setting under Notifications turns it on elsewhere.
+* Moderators can view the content of a deleted message when their homeserver supports MSC2815. Banning or kicking someone can also delete their messages (MSC4293), and messages from members removed that way show as deleted.
+* Typing an MSC reference like MSC4444 offers to link it to msc.sable.moe once, always, or never, and MSC references in messages you read now link there too.
+* Policy list rooms in spaces now show an appropriate default icon if none is set.
+* Android and iOS notifications for a message sent as a profile now show the profile's name and picture, and no longer repeat its name at the start of the text.
+* Rooms and spaces can now have rules (MSC4534). Admins set them in the room settings and can require members to accept them before taking part.
+* Short, small videos without sound, like the MP4 GIFs from Giphy or Telegram, are sent as GIFs that autoplay and loop. The composer shows which way a staged video will go, and you can choose GIF or video yourself.
+* A room with unread mentions shows a button that jumps to the next one, also on Alt+M, and after following a reply a Back button or Alt+B returns you to the message you came from. Clicking an invalid event gives an option to return to the most recent position in the timeline.
+* Show Persian and Arabic text in Vazirmatn.
+
+### Fixes
+
+* Settings saved to your account (bookmarks, ignored users, emoji packs, profiles, presence sharing and others) are no longer overwritten when the copy on the server could not be read. Subscribing to or leaving an emoji pack also fails in that case, preserving subscriptions made on your other devices.
+* With the Enter key set to adaptive, Enter now sends from a physical keyboard connected to an iPhone, an iPad or a touch browser, and still starts a new line from the on-screen keyboard. The Android app is unchanged.
+* Accepting a call from the Android lock screen now asks you to unlock and then answers, without asking again inside the app.
+* On Android, choosing Automatic or Native push after having used the built-in WebSocket transport now switches back to native push when it is available, so background notifications arrive again. The F-Droid build can also use Native (FCM) push on devices with microG or Google Play services. The notification troubleshooter warns when the built-in connection is selected on a phone where native push works and explains how to switch.
+* On Android, a group conversation shortcut no longer takes the picture of whoever wrote last.
+* On Android, the keyboard no longer covers the composer after the system reclaims the web renderer. Sable restarts instead of reloading the page in place.
+* Screen shares on Android show the whole screen, letterboxed to fit the tile, instead of being cropped.
+* GIF, WebP, PNG and AVIF images count as animated only when they have more than one frame: animated ones can be saved to your GIFs, and still ones no longer get a play button.
+* Links to other apps, such as `discord://` or `magnet:`, are now clickable and open after you confirm them.
+* In the bubble layout your own messages drop your avatar and name and keep only the time, your media and captions sit on the right, read receipts line up at the end of the timeline, consecutive bubbles sit closer together and replies no longer add a sideways scrollbar.
+* Keep a participant's camera from covering the call controls on narrow phones.
+* When a call server on your local network is blocked by the browser, Sable asks for local network access and says so if it is refused, instead of a generic "Could not connect to the call." Calls no longer hang on "securing" when another participant's call server is unreachable.
+* A call member whose device is unknown no longer triggers a device query to the homeserver on every call refresh.
+* A notification from a direct chat that has no picture of its own now shows the other person's picture as the conversation picture.
+* The global microphone shortcuts warning in calls can now be dismissed.
+* Share only app playback on Linux system audio, so the EasyEffects microphone no longer leaks into a screen share (#1447).
+* YouTube, DeArrow and TikTok embeds and the GIF picker load through Sable's preview service, so those sites no longer see your device until you press play. Link previews in encrypted and private rooms are loaded by the app through Sable's relay, so the preview service no longer sees the full link.
+* The emoji picker on phones opens at its full height again instead of showing a single row.
+* The emoji and sticker name shown at the bottom of the picker now uses your chosen font.
+* Fix others seeing a black camera or screen share in encrypted calls when the video codec is AV1. Those calls now use H.264 and tell you so.
+* Flatpak browsers like Firefox and Chrome now show up in the app audio picker when Sable runs as a Flatpak.
+* Flatpak installs only announce an update once it can be installed from Flathub or the nightly Flatpak repo. Gentoo and Nix installs no longer announce a release their repository may not carry yet.
+* Keep sending messages after a room rejects an image with M_FORBIDDEN.
+* Forum rooms now load older threads on their own as you scroll to the end of the list, replacing the "Load older threads" button that sometimes appeared to do nothing. You can vote on a forum thread straight from the thread list.
+* Opening a notification from a forum room now shows the forum with that thread open, instead of a flat list of replies with no topics. Links to forum posts and replies also open in the forum thread view.
+* Deleted forum posts no longer remain in the thread list, and deleted replies no longer appear in thread previews. A thread no longer keeps showing a deleted reply as its latest message in the room timeline.
+* HEIC images now display in the desktop app, which could only show them on iOS before.
+* The notifications view no longer reloads its list every time a room receives a message.
+* Fix thread replies reappearing as unread in the inbox after their room was marked as read. Reading a room also clears notifications from hidden events like call memberships.
+* Open the composer insert menu on release instead of on touch down (#1905).
+* Custom emoji now slant when italicized, including in the rich text composer.
+* Jump to room closes after you pick a room instead of needing a second Enter.
+* Tapping the timeline after closing the keyboard no longer opens it again.
+* Fix location links freezing the app on Android.
+* Typing an account provider on the sign-in screen no longer closes the keyboard on Android, and the provider is only checked once what you typed looks like a server name. Tab moves from the server field to the username and password, also while the server is being checked.
+* The jump to next mention button no longer shows for a mention that is already on screen.
+* Stop the open room flashing over the room list when switching bottom tabs on phones.
+* A direct chat that has its own room name keeps that name instead of showing the nickname you gave the other person.
+* The iOS and Android apps can no longer be pinch zoomed, so the iPad app stops coming back from the background zoomed into a corner.
+* When two people in a room share a display name, their notifications add the user ID so you can tell who wrote.
+* Shortcuts that use Option with a letter, like Option+N for the next unread room, now work on macOS.
+* A dialog that is still closing can no longer sit on top of a newer one and swallow its clicks. A dialog no longer closes itself when it opens right after another one was dismissed.
+* Each signed-in account now keeps its own settings and custom themes, so changing them on one account no longer changes them on another or overwrites the other account's synced settings. Settings that stay on the device are still shared.
+* Clicking the persona bio or banner no longer adds bold markers or removes the banner.
+* Setting a status message no longer fails on homeservers without revised presence, such as Synapse.
+* The "Search profiles" text in the composer profile menu no longer runs under the magnifier icon.
+* The Meowlnir protected rooms picker searches your rooms and shows their avatar and space, and can protect several rooms at once.
+* A quick reply sent as a profile no longer shows its shorthand in the Android notification.
+* Clearing the local cache no longer fails with "Access is denied" on Windows.
+* Opening a room list with hundreds of rooms no longer freezes the app, because only the rooms near the visible part of the list are drawn.
+* A room that fails to open now shows the retry button after 30 seconds instead of staying blank, and one slow room no longer holds up opening the others.
+* Room settings no longer scroll sideways on iPhone and iPad.
+* Dropdowns now show their selected "Server default" or "None" option instead of looking empty, and room versions are listed from newest to oldest.
+* Arabic mirrors the whole app from right to left. Read receipts no longer cover right-to-left messages, and the composer and text fields follow the direction of what you type.
+* The Nix flake's `sable-desktop` output now builds on macOS.
+* Fix still appearing in a call you left while sharing your screen.
+* Android accounts saved by Sable 2.3.8 no longer fail to restore after an update with "saved login tokens could not be opened". A login whose key is gone for good now asks you to sign in again.
+* The search index transfer alert only shows up when another device takes part in the copy, and names that device.
+* Screen readers now follow the device confirmation step: focus moves to the heading when the step changes, waiting for the other device is announced, and the show password button no longer reads as both "hide" and "pressed".
+* A very tall picture keeps a usable width in the timeline instead of shrinking to a sliver. The spoiler cover on very small images shrinks to fit instead of getting cut off.
+* Opening a link that starts a chat with someone asks once, instead of asking again each time the prompt is dismissed.
+* Approving a device no longer reports success when this device could not sign it, and says to enter your recovery key here first.
+* See who is in a voice room before joining. Choose where participant avatars appear in the sidebar, with both displays enabled by default.
+* YouTube embeds no longer make the chat wider than a narrow screen when the video has a long title.
+
+### Notes
+
+* Releases now use calendar versioning.
+
 ## 2.3.9 (2026-11-13)
 
 ### Features

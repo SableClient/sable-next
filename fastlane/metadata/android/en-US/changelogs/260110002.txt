@@ -1,0 +1,4 @@
+- On mobile, the back button in a room shows how many notifications are waiting in your other rooms.
+- Calls have a "Report a problem" action, on the failed call screen and in the call controls, that adds scrubbed call diagnostics to the bug report.
+- You can now change your account password from the account settings.
+- The insert sheet on iOS and Android shows your recent photos and videos, so one tap adds them to the message.
