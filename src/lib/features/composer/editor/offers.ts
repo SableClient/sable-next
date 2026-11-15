@@ -1,17 +1,32 @@
 import { Plugin, PluginKey, type EditorState, type Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
-import type { BooleanPreference } from '#lib/settings/registry.js';
+import type { Preferences } from '#lib/settings/definitions.js';
 import { composerSchema } from './schema';
+
+type OfferMode = 'ask' | 'always' | 'never';
+
+type OfferPreference = {
+  [K in keyof Preferences]: Preferences[K] extends OfferMode ? K : never;
+}[keyof Preferences];
 
 /** A rewrite the composer offers for text the caret has just finished typing. */
 export interface OfferRule {
   id: string;
   /** Must be global and anchored to its own word boundaries. */
   pattern: RegExp;
-  always: BooleanPreference;
+  mode: OfferPreference;
   /** i18n keys: the heading takes `{{text}}`, the match. */
-  strings: { heading: string; once: string; always: string; alwaysHint: string; enabled: string };
+  strings: {
+    heading: string;
+    once: string;
+    always: string;
+    alwaysHint: string;
+    enabled: string;
+    never: string;
+    neverHint: string;
+    disabled: string;
+  };
   apply: (match: RegExpExecArray) => { href: string; markdown: string };
 }
 

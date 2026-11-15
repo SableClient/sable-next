@@ -3,7 +3,7 @@ import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 import { CoreError } from '#src/transport';
@@ -722,7 +722,7 @@ test.for([true, false])(
 
 test('an MSC reference is offered once typed past, Tab links it and Enter sends', async () => {
   const { composer, sent, editor } = await mount(true);
-  setPreference('linkMscReferences', false);
+  setPreference('linkMscReferences', 'ask');
   const once = page.getByRole('option', { name: en.composer.offerOnce });
 
   await userEvent.click(composer);
@@ -761,5 +761,29 @@ test('an MSC reference is offered once typed past, Tab links it and Enter sends'
   notice()?.action?.run();
   await userEvent.keyboard('MSC5 ');
   await expect.element(once).toBeVisible();
-  setPreference('linkMscReferences', false);
+  setPreference('linkMscReferences', 'ask');
+});
+
+test('choosing never stops offering MSC links without linking the reference', async () => {
+  const { composer, sent } = await mount(true);
+  setPreference('linkMscReferences', 'ask');
+  const once = page.getByRole('option', { name: en.composer.offerOnce });
+
+  await userEvent.click(composer);
+  await userEvent.keyboard('see MSC4444 ');
+  await expect.element(once).toBeVisible();
+  await userEvent.keyboard('{ArrowDown}{ArrowDown}{Tab}');
+  await expect.poll(() => preferences.linkMscReferences).toBe('never');
+  const notice = () =>
+    toasts.items.find((toast) => toast.message === en.composer.offerNeverEnabled);
+  await expect.poll(() => notice()?.action?.label).toBe(en.common.undo);
+
+  await userEvent.keyboard('and MSC1 ');
+  expect(once.query()).toBeNull();
+  await userEvent.keyboard('{Enter}');
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent.at(-1)).toEqual({ body: 'see MSC4444 and MSC1', formatted: null });
+
+  notice()?.action?.run();
+  expect(preferences.linkMscReferences).toBe('ask');
 });

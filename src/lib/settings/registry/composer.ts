@@ -106,7 +106,12 @@ export const composerCategory: SettingsCategory = {
       icon: LinkSimpleIcon,
       name: 'settings.linkMscReferences',
       description: 'settings.linkMscReferencesHint',
-      type: 'boolean',
+      type: 'select',
+      options: [
+        { value: 'ask', label: 'settings.linkMscReferencesAsk' },
+        { value: 'always', label: 'common.always' },
+        { value: 'never', label: 'common.never' },
+      ],
     },
     {
       key: 'inlineEditing',

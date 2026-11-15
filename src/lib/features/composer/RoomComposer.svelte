@@ -392,7 +392,7 @@
   let offerOpen = $derived(
     !panelOpen &&
       offer !== null &&
-      !preferences[offer.rule.always] &&
+      preferences[offer.rule.mode] === 'ask' &&
       dismissedOffer !== offerKeyOf(offer)
   );
   let offerChoices = $derived(
@@ -403,6 +403,11 @@
             choice: 'always' as const,
             label: i18n.t(offer.rule.strings.always),
             hint: i18n.t(offer.rule.strings.alwaysHint),
+          },
+          {
+            choice: 'never' as const,
+            label: i18n.t(offer.rule.strings.never),
+            hint: i18n.t(offer.rule.strings.neverHint),
           },
         ]
       : []
@@ -1338,14 +1343,16 @@
   function chooseOffer(choice: OfferChoice): void {
     const current = offer;
     if (!current) return;
-    editor.acceptOffer(current);
-    if (choice !== 'always') return;
-    const key = current.rule.always;
-    setPreference(key, true);
-    toasts.undoable(i18n.t(current.rule.strings.enabled), {
+    if (choice !== 'never') editor.acceptOffer(current);
+    if (choice === 'once') return;
+    const key = current.rule.mode;
+    setPreference(key, choice);
+    const notice =
+      choice === 'always' ? current.rule.strings.enabled : current.rule.strings.disabled;
+    toasts.undoable(i18n.t(notice), {
       label: i18n.t('common.undo'),
       onUndo: () => {
-        setPreference(key, false);
+        setPreference(key, 'ask');
       },
     });
   }

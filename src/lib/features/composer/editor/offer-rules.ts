@@ -3,13 +3,16 @@ import type { OfferRule } from './offers';
 export const MSC_LINK: OfferRule = {
   id: 'msc-link',
   pattern: /(?<![\p{L}\p{N}_])MSC(\d{1,5})(?![\p{L}\p{N}_])/giu,
-  always: 'linkMscReferences',
+  mode: 'linkMscReferences',
   strings: {
     heading: 'composer.offerMscLink',
     once: 'composer.offerOnce',
     always: 'composer.offerAlways',
     alwaysHint: 'composer.offerAlwaysHint',
     enabled: 'composer.offerAlwaysEnabled',
+    never: 'composer.offerNever',
+    neverHint: 'composer.offerNeverHint',
+    disabled: 'composer.offerNeverEnabled',
   },
   apply: (match) => {
     const href = `https://msc.sable.moe/${match[1]}`;

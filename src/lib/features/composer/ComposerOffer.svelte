@@ -3,13 +3,14 @@
   import { fly } from 'svelte/transition';
   import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
   import ArrowsClockwiseIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
+  import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
 
   import '#lib/ui/primitives/menu.css';
   import { i18n } from '#lib/i18n.js';
   import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import { suppressBanners } from '#lib/ui/banner-suppression.svelte.js';
 
-  export type OfferChoice = 'once' | 'always';
+  export type OfferChoice = 'once' | 'always' | 'never';
 
   interface Props {
     id: string;
@@ -53,6 +54,8 @@
         >
           {#if choice === 'once'}
             <LinkSimpleIcon size="1.125rem" aria-hidden="true" />
+          {:else if choice === 'never'}
+            <ProhibitIcon size="1.125rem" aria-hidden="true" />
           {:else}
             <ArrowsClockwiseIcon size="1.125rem" aria-hidden="true" />
           {/if}

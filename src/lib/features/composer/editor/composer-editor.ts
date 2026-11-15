@@ -805,7 +805,7 @@ export class ComposerEditor {
         ? [
             offersPlugin({
               rules: this.options.offers,
-              enabled: (rule) => preferences[rule.always],
+              enabled: (rule) => preferences[rule.mode] === 'always',
               markdown: () => this.markdownMode(),
             }),
           ]
