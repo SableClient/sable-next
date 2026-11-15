@@ -46,22 +46,21 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let value = $derived(roomIconOverride(roomId) ?? DEFAULT);
-  let options = $derived([
-    {
-      value: DEFAULT,
-      label: i18n.t('room.appearanceIconDefault', {
-        mode: i18n.t(`settings.showRoomIcon${label(preferences.showRoomIcon)}`),
-      }),
-    },
+  let modes = $derived([
     { value: 'always', label: i18n.t('common.always') },
     { value: 'sometimes', label: i18n.t('settings.showRoomIconSometimes') },
     { value: 'collapsed', label: i18n.t('settings.showRoomIconCollapsed') },
     { value: 'never', label: i18n.t('common.never') },
   ]);
-
-  function label(mode: ShowRoomIcon): string {
-    return `${mode.slice(0, 1).toLocaleUpperCase()}${mode.slice(1)}`;
-  }
+  let options = $derived([
+    {
+      value: DEFAULT,
+      label: i18n.t('room.appearanceIconDefault', {
+        mode: modes.find((mode) => mode.value === preferences.showRoomIcon)?.label,
+      }),
+    },
+    ...modes,
+  ]);
 
   function select(next: string): void {
     const target = roomId;

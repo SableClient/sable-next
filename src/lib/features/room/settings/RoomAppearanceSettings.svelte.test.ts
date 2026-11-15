@@ -18,11 +18,13 @@ vi.mock('#lib/core/context.js');
 import { core as mockCore } from '#lib/core/__mocks__/context.js';
 import { isBridgedSpace, setBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
 import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 import RoomAppearanceSettings from './RoomAppearanceSettings.svelte';
 
 afterEach(() => {
   mediaPreviewSettings.stop();
   setBridgedSpace('!space:example.org', false);
+  setPreference('showRoomIcon', 'always');
 });
 
 test('a room can hide its media for you without touching the account default', async () => {
@@ -71,6 +73,22 @@ test('a space can be marked as bridged and unmarked again', async () => {
   expect(toggle).toBeChecked();
   await user.click(toggle);
   expect(isBridgedSpace('!space:example.org')).toBe(false);
+});
+
+test.each([
+  ['always', 'Always'],
+  ['sometimes', 'Sometimes'],
+  ['collapsed', 'Only when collapsed'],
+  ['never', 'Never'],
+] as const)('the default room icon choice names the account-wide %s setting', (mode, name) => {
+  setPreference('showRoomIcon', mode);
+  render(RoomAppearanceSettings, {
+    room: { room_id: '!space:example.org' } as RoomListItemView,
+  });
+
+  expect(
+    screen.getByRole('combobox', { name: 'Show room icons in the sidebar' })
+  ).toHaveTextContent(`Default (${name})`);
 });
 
 const levels: RoomPowerLevelsView = {
