@@ -47,6 +47,8 @@ const safeCodes = new Set([
   'unexpected',
 ]);
 
+export const safeCallCode = (code: string): string => (safeCodes.has(code) ? code : 'unknown');
+
 const safeMessages = new Map([
   ['e2ee-unsupported', 'code.e2ee-unsupported'],
   ['key-import-failed', 'code.key-import-failed'],

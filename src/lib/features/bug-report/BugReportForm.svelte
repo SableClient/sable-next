@@ -11,8 +11,10 @@
     searchForgeIssues,
     usesForge,
   } from '#lib/features/bug-report/forge.js';
+  import { takeCallSnapshot } from '#lib/features/call/call-snapshot.js';
   import { i18n } from '#lib/i18n.js';
   import { debugLog, exportDebugLogs } from '#lib/observability/debug-log.svelte.js';
+  import { buildCallDiagnostics } from '#lib/observability/diagnostics-bundle.js';
   import { describePlatform, issuePlatform } from '#lib/platform/diagnostics.js';
   import { describeVideoAcceleration } from '#lib/platform/video-encoders.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -45,6 +47,8 @@
   let context = $state('');
   let sendToSentry = $state(true);
   let includeDebugLogs = $state(true);
+  const callSnapshot = takeCallSnapshot();
+  let includeCallDiagnostics = $state(true);
   const trackerAvailable = issueTrackerAvailable();
   const forge = usesForge();
   let openOnForge = $state(trackerAvailable && !sentryEnabled);
@@ -100,7 +104,10 @@
             reproduction,
             platforms: platformOption,
             info: issueEnvironment(platform, video),
-            context,
+            context:
+              callSnapshot && includeCallDiagnostics
+                ? `${context.trim()}\n\nCall diagnostics:\n\`\`\`json\n${buildCallDiagnostics({ ...callSnapshot, video: undefined })}\n\`\`\``.trim()
+                : context,
           }
         : { problem, solution, alternatives, context };
     return reportIssueUrl(type, title, fields);
@@ -136,6 +143,9 @@
           video,
           version,
           ...(includeDebugLogs ? { debugLogs: exportDebugLogs(debugLog.entries.slice(-100)) } : {}),
+          ...(callSnapshot && includeCallDiagnostics
+            ? { callDiagnostics: buildCallDiagnostics(callSnapshot) }
+            : {}),
         },
       });
       if (eventId) {
@@ -234,6 +244,13 @@
   <FormField fieldId="bug-report-context" label={i18n.t('bugReport.context')}>
     <TextArea id="bug-report-context" bind:value={context} rows={2} />
   </FormField>
+
+  {#if type === 'bug' && callSnapshot}
+    <label class="option">
+      <input type="checkbox" bind:checked={includeCallDiagnostics} />
+      {i18n.t('bugReport.includeCallDiagnostics')}
+    </label>
+  {/if}
 
   {#if type === 'bug' && sentryEnabled}
     <fieldset class="options">

@@ -4,15 +4,21 @@ import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
-vi.mock('./call-telemetry', () => ({ CallTelemetry: vi.fn() }));
+vi.mock('./call-telemetry', () => ({
+  CallTelemetry: vi.fn(),
+  safeCallCode: (code: string) => code,
+}));
 vi.mock('#lib/platform/overlay-back.svelte.js', () => ({ holdOverlayBack: vi.fn() }));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { goto } from '#lib/test-support/app-navigation.js';
 
 import { recordCallDebug } from './call-debug.svelte.js';
 import { CallSession } from './call-session.svelte.js';
+import { takeCallSnapshot } from './call-snapshot';
 import type { CallPin } from './call-layout';
 import type { CallParticipant } from './call-transport';
 import { idleTransportState } from './call-transport';
@@ -297,4 +303,13 @@ test('the debug overlay follows its own switch under developer tools', () => {
     preferences.developerTools = false;
     preferences.callDebugOverlay = true;
   }
+});
+
+test('reporting a problem from a call opens the bug report with a call snapshot', async () => {
+  mountBothSharing();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Report a problem' }));
+  await vi.waitFor(() => {
+    expect(goto).toHaveBeenCalledOnce();
+  });
+  expect(takeCallSnapshot()).toMatchObject({ lifecycle: 'active', members: 2, participants: 1 });
 });

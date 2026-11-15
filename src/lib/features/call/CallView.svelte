@@ -13,6 +13,8 @@
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
   import { onDestroy, onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import type { MemberView } from '#src/generated/protocol';
 
   import { memberIdentity, type MemberIdentity } from '#lib/features/room/members/members.js';
@@ -42,6 +44,7 @@
     type CallTile,
   } from './call-layout';
   import type { CallSession } from './call-session.svelte.js';
+  import { collectCallSnapshot, holdCallSnapshot } from './call-snapshot';
   import { callFailureKey, callStatusKey } from './call-status';
   import { callFullscreen } from './call-fullscreen.svelte.js';
 
@@ -212,6 +215,12 @@
     onOpenSettings?.(event);
   }
 
+  async function reportProblem(): Promise<void> {
+    holdCallSnapshot(await collectCallSnapshot(session));
+    fullscreen.exit();
+    await goto(resolve('bugreport'));
+  }
+
   onDestroy(() => clearTimeout(idleTimer));
 
   onMount(() => {
@@ -339,6 +348,7 @@
         audioRoutes={session.audioRoutes}
         audioInputs={session.audioInputs}
         onOpenSettings={onOpenSettings ? openCallSettings : undefined}
+        onReportProblem={() => void reportProblem()}
       />
       {#if busy}
         <p class="securing">{i18n.t('call.controlsLocked')}</p>
@@ -408,6 +418,9 @@
       <div class="failed" role="alert">
         <EmptyState title={i18n.t('call.failed')} description={i18n.t(callFailureKey(failure))}>
           {#snippet actions()}
+            <Button variant="ghost" onclick={() => void reportProblem()}>
+              {i18n.t('call.reportProblem')}
+            </Button>
             <Button variant="secondary" onclick={() => session.clearFailure()}>
               {i18n.t('call.leave')}
             </Button>

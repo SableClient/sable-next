@@ -3,6 +3,10 @@ import type { DiagnosticsSystemInfo } from '#lib/platform/diagnostics.js';
 import type { DebugLogEntry } from './debug-log.svelte.js';
 import { sanitizePayload, scrubMatrixIds } from './scrubbers.js';
 
+export function buildCallDiagnostics(snapshot: unknown): string {
+  return JSON.stringify(sanitizePayload(snapshot), null, 2);
+}
+
 export function buildDiagnosticsBundle(
   entries: readonly DebugLogEntry[],
   systemInfo: DiagnosticsSystemInfo

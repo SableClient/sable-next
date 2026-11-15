@@ -3255,6 +3255,7 @@
     "errorTracking": "Error tracking",
     "sendToSentry": "Send an anonymous report to Sentry",
     "includeDebugLogs": "Include the latest debug logs",
+    "includeCallDiagnostics": "Include call diagnostics",
     "openOnForge": "Also create an issue on the Sable tracker",
     "submit": "Submit report",
     "openOnForgeAction": "Open the issue tracker"
@@ -3859,6 +3860,7 @@
     "start": "Start call",
     "join": "Join call",
     "leave": "Leave call",
+    "reportProblem": "Report a problem",
     "title": "Call",
     "joining": "Joining call",
     "connecting": "Connecting",

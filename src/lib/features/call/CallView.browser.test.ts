@@ -3,6 +3,7 @@ import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
 vi.mock('./call-telemetry', () => ({ CallTelemetry: vi.fn() }));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import type { CallSession } from './call-session.svelte.js';
 import { idleTransportState } from './call-transport';

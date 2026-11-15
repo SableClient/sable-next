@@ -10,6 +10,7 @@
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
   import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
+  import BugIcon from 'phosphor-svelte/lib/BugIcon';
   import type { Snippet } from 'svelte';
 
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -47,6 +48,7 @@
     audioRoutes?: CallTransportCapabilities['audioRoutes'];
     audioInputs?: CallTransportCapabilities['audioInputs'];
     onOpenSettings?: (event: MouseEvent) => void;
+    onReportProblem?: () => void;
     extra?: Snippet;
     action?: Snippet;
   }
@@ -71,6 +73,7 @@
     audioRoutes,
     audioInputs,
     onOpenSettings,
+    onReportProblem,
     extra,
     action,
   }: Props = $props();
@@ -338,6 +341,21 @@
 
   {#if extra}
     <div class="control">{@render extra()}</div>
+  {/if}
+
+  {#if onReportProblem}
+    {#snippet reportButton(props: Record<string, unknown>)}
+      <IconButton
+        {...props}
+        variant={neutral}
+        {size}
+        label={i18n.t('call.reportProblem')}
+        onclick={onReportProblem}
+      >
+        <BugIcon />
+      </IconButton>
+    {/snippet}
+    {@render control(i18n.t('call.reportProblem'), reportButton)}
   {/if}
 
   {#if onOpenSettings}
