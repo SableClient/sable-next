@@ -15,6 +15,7 @@
   autoPatchelfHook,
   makeWrapper,
   electron_45,
+  darwin,
 }:
 
 let
@@ -34,6 +35,11 @@ stdenv.mkDerivation (finalAttrs: {
   __structuredAttrs = true;
   strictDeps = true;
 
+  postPatch = lib.optionalString stdenv.hostPlatform.isDarwin ''
+    # --deep does not exist in nixpkgs' codesign
+    substituteInPlace electron/after-pack.mjs --replace-fail "'--deep', " ""
+  '';
+
   nativeBuildInputs = [
     pnpm
     (pnpmConfigHook.override { inherit pnpm; })
@@ -43,18 +49,19 @@ stdenv.mkDerivation (finalAttrs: {
     rustPlatform.rust.rustc
     rustPlatform.rust.cargo
     rustPlatform.cargoSetupHook
-    autoPatchelfHook
     makeWrapper
-  ];
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isDarwin [ darwin.sigtool ]
+  ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
   buildInputs = [
     aws-lc
     sqlite
-    stdenv.cc.cc.lib
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     pipewire
     libpulseaudio
+    stdenv.cc.cc.lib
   ];
 
   env = {
