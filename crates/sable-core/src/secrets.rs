@@ -67,6 +67,11 @@ fn read_id(id_file: &Path) -> Result<Option<String>, StoreError> {
     }
 }
 
+/// Forgetting one of two references to the same key loses it for the other.
+pub(crate) fn same_reference(first: &Path, second: &Path) -> Result<bool, StoreError> {
+    Ok(read_id(first)? == read_id(second)?)
+}
+
 /// The key's name lives in `id_file`, beside the data it protects, so two data directories never
 /// share a key. [`StoreError::KeyMissing`] means the reference outlived its key, as after a
 /// restore onto another device.
