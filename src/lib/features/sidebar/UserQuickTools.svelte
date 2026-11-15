@@ -149,11 +149,11 @@
           <!-- eslint-enable svelte/no-navigation-without-resolve -->
         </div>
       {/each}
-      <div class="mobile-tool-slot">
-        <AccountSwitcher mode="mobile" />
-      </div>
       <div class="mobile-tool-slot" style:display={hasAlerts ? undefined : 'none'}>
         <AlertListButton mode="mobile" />
+      </div>
+      <div class="mobile-tool-slot">
+        <AccountSwitcher mode="mobile" />
       </div>
     </div>
   </nav>
