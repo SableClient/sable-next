@@ -92,6 +92,18 @@ test('a turned attachment keeps the original shape, sideways', async () => {
   });
 });
 
+test('a fourth turn keeps spinning forward', async () => {
+  await render(ImageCropHost);
+  void requestCrop(await png(800, 400), 'attachment');
+  await expect.element(page.getByRole('button', { name: 'Apply' })).toBeEnabled();
+  const rotate = page.getByRole('button', { name: 'Rotate' });
+  for (let turn = 0; turn < 4; turn += 1) await rotate.click();
+
+  expect(document.querySelector<HTMLElement>('.crop-image')?.style.transform).toContain(
+    'rotate(360deg)'
+  );
+});
+
 test('cancel and use original settle without cropping', async () => {
   await render(ImageCropHost);
   const file = await png(300, 300);

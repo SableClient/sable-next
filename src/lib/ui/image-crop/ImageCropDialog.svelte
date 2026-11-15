@@ -70,7 +70,8 @@
         : i18n.t('crop.titleImage')
   );
   let aspect = $state<string>(untrack(() => PRESETS[preset].aspects[0]));
-  let rotation = $state<Rotation>(0);
+  let turns = $state(0);
+  let rotation = $derived(((turns % 4) * 90) as Rotation);
   let natural = $state.raw<Size | null>(null);
   let stage = $state.raw<Size | null>(null);
   let frame = $state.raw<Rect>({ x: 0, y: 0, width: 0, height: 0 });
@@ -122,7 +123,7 @@
   }
 
   function rotate(): void {
-    rotation = ((rotation + 90) % 360) as Rotation;
+    turns += 1;
     layout(aspect === 'free' ? imageRatio() : undefined);
   }
 
@@ -270,7 +271,7 @@
             style:width={natural ? `${String(natural.width)}px` : undefined}
             style:height={natural ? `${String(natural.height)}px` : undefined}
             style:transform={natural && image
-              ? `translate(${String(view.x)}px, ${String(view.y)}px) scale(${String(view.scale)}) translate(${String(image.width / 2)}px, ${String(image.height / 2)}px) rotate(${String(rotation)}deg) translate(${String(-natural.width / 2)}px, ${String(-natural.height / 2)}px)`
+              ? `translate(${String(view.x)}px, ${String(view.y)}px) scale(${String(view.scale)}) translate(${String(image.width / 2)}px, ${String(image.height / 2)}px) rotate(${String(turns * 90)}deg) translate(${String(-natural.width / 2)}px, ${String(-natural.height / 2)}px)`
               : undefined}
             onload={loaded}
             onerror={() => (unreadable = true)}
