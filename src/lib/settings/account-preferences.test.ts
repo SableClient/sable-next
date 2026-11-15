@@ -132,7 +132,7 @@ test('disabling receipts hides indicators and removes controls until the account
   expect(send?.supported?.({ oauth: false })).toBe(true);
 });
 
-test('each account keeps its own online status and starts from the shared one', async () => {
+test('each account keeps its own settings and its online status starts from the shared one', async () => {
   const settings = await loadWith({ sendPresence: false, theme: 'dark' });
   settings.selectPreferenceAccount('a');
   expect(settings.preferences.sendPresence).toBe(false);
@@ -144,12 +144,14 @@ test('each account keeps its own online status and starts from the shared one', 
 
   settings.selectPreferenceAccount('a');
   expect(settings.preferences.sendPresence).toBe(false);
-  expect(settings.preferences.theme).toBe('light');
+  expect(settings.preferences.theme).toBe('dark');
 
   vi.resetModules();
   const restored = await import('./preferences.svelte.js');
+  expect(restored.preferences.theme).toBe('dark');
   restored.selectPreferenceAccount('b');
   expect(restored.preferences.sendPresence).toBe(true);
+  expect(restored.preferences.theme).toBe('light');
   restored.selectPreferenceAccount('c');
   expect(restored.preferences.sendPresence).toBe(false);
 });
@@ -164,4 +166,26 @@ test('link previews and server search stay with the account that turned them on'
 
   expect(settings.preferences.urlPreviews).toBe(false);
   expect(settings.preferences.serverSearch).toBe(true);
+});
+
+test('settings that stay on the device are shared by every account', async () => {
+  const settings = await loadWith();
+  settings.selectPreferenceAccount('a');
+  settings.setPreference('settingsSync', true);
+
+  settings.selectPreferenceAccount('b');
+
+  expect(settings.preferences.settingsSync).toBe(true);
+});
+
+test('signing out returns to the settings from before any account', async () => {
+  const settings = await loadWith({ theme: 'dark' });
+  settings.selectPreferenceAccount('a');
+  settings.setPreference('theme', 'light');
+
+  settings.selectPreferenceAccount(null);
+  expect(settings.preferences.theme).toBe('dark');
+
+  settings.selectPreferenceAccount('a');
+  expect(settings.preferences.theme).toBe('light');
 });

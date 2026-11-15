@@ -48,6 +48,10 @@ interface DocumentState {
 const DEFAULT_DEBOUNCE_MS = 2000;
 const BASE_KEY_PREFIX = 'sable-sync-base';
 
+export function syncBaseKey(accountId: string, eventType: string): string {
+  return `${BASE_KEY_PREFIX}:${accountId}:${eventType}`;
+}
+
 function pageHidden(): boolean {
   return globalThis.document.visibilityState === 'hidden';
 }
@@ -299,7 +303,7 @@ export class AccountSync {
   }
 
   #baseKey(document: SyncedDocument): string {
-    return `${BASE_KEY_PREFIX}:${this.#accountId ?? ''}:${document.eventType}`;
+    return syncBaseKey(this.#accountId ?? '', document.eventType);
   }
 
   #rebase(document: SyncedDocument, state: DocumentState, base: unknown): void {

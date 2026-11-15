@@ -86,12 +86,12 @@
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { installAndroidBack } from '#lib/platform/android-back.js';
   import {
-    selectPreferenceAccount,
     preferences,
     readReceiptIsPrivate,
     setPreference,
   } from '#lib/settings/preferences.svelte.js';
   import { accountSync } from '#lib/settings/account-sync.svelte.js';
+  import { selectSettingsAccount } from '#lib/settings/account-settings.js';
   import {
     draftsDocumentFor,
     scheduledDocumentFor,
@@ -210,7 +210,9 @@
     untrack(() => callSession.setInputMode(inputMode));
   });
   $effect.pre(() => {
-    selectPreferenceAccount(core.session?.account_id ?? null);
+    const accountId = core.session?.account_id;
+    if (accountId) selectSettingsAccount(accountId);
+    else if (core.status === 'signed-out') selectSettingsAccount(null);
   });
   $effect(() => {
     void core.accountRevision;

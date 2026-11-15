@@ -211,6 +211,7 @@ interface Scope {
   account?: true;
   /** Stays on this device, settings sync leaves it alone. */
   device?: true;
+  /** Kept per account even when `device`. */
   perAccount?: true;
 }
 
@@ -594,8 +595,8 @@ export const PREFERENCE_RANGES = Object.fromEntries(
 ) as Record<RangePreference, { min: number; max: number }>;
 
 export const ACCOUNT_PREFERENCES = PREFERENCE_KEYS.filter((key) => SETTINGS[key].account);
-export const PER_ACCOUNT_PREFERENCES: ReadonlySet<keyof Preferences> = new Set(
-  PREFERENCE_KEYS.filter((key) => SETTINGS[key].perAccount)
+export const ACCOUNT_STORED_PREFERENCES: ReadonlySet<keyof Preferences> = new Set(
+  PREFERENCE_KEYS.filter((key) => SETTINGS[key].perAccount || !SETTINGS[key].device)
 );
 export const NON_SYNCABLE_KEYS: ReadonlySet<keyof Preferences> = new Set(
   PREFERENCE_KEYS.filter((key) => SETTINGS[key].device)

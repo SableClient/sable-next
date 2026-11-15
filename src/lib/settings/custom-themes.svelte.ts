@@ -1,8 +1,9 @@
 import { catalogFileUrl, fetchCatalogFile } from '#lib/settings/theme-catalog.js';
 import type { ThemeFileSnapshot } from '#lib/platform/file-dialog-types.js';
-import { readJson, writeJson } from '#lib/platform/local-json.js';
+import { readJson, readText, writeJson } from '#lib/platform/local-json.js';
 import { readThemeFile, watchesThemeFiles } from '#lib/platform/theme-files.js';
 
+import { lastSettingsAccount } from './preferences.svelte.js';
 import { parseThemeFile } from './theme-file.js';
 
 import type { ResolvedTheme } from './theme.js';
@@ -79,16 +80,48 @@ export function readThemes(data: unknown): StoredThemes | null {
   };
 }
 
-function load(): StoredThemes {
-  const stored = readJson(STORAGE_KEY, readThemes, null);
-  if (!stored) {
-    return { themes: [], tweaks: [], lightThemeId: null, darkThemeId: null, enabledTweakIds: [] };
-  }
+function load(key: string): StoredThemes | null {
+  const stored = readJson(key, readThemes, null);
+  if (!stored) return null;
   const held = new Set(stored.tweaks.map((tweak) => tweak.id));
   return { ...stored, enabledTweakIds: stored.enabledTweakIds.filter((id) => held.has(id)) };
 }
 
-export const customThemes = $state<StoredThemes>(load());
+function accountKey(key: string, accountId: string | null): string {
+  return accountId === null ? key : `${key}:${accountId}`;
+}
+
+let storageKey = STORAGE_KEY;
+let fileLinksKey = FILE_LINKS_KEY;
+
+const NO_THEMES: StoredThemes = {
+  themes: [],
+  tweaks: [],
+  lightThemeId: null,
+  darkThemeId: null,
+  enabledTweakIds: [],
+};
+
+export const customThemes = $state<StoredThemes>(load(STORAGE_KEY) ?? { ...NO_THEMES });
+
+export function accountThemesSettled(accountId: string): boolean {
+  return readText(accountKey(STORAGE_KEY, accountId)) !== null;
+}
+
+export function selectThemeAccount(accountId: string | null, seed?: StoredThemes): void {
+  const key = accountKey(STORAGE_KEY, accountId);
+  if (key === storageKey) return;
+  storageKey = key;
+  fileLinksKey = accountKey(FILE_LINKS_KEY, accountId);
+  const own = load(key);
+  assign(own ?? seed ?? load(STORAGE_KEY) ?? NO_THEMES);
+  fileLinks = readJson(
+    fileLinksKey,
+    readFileLinks,
+    own || seed ? {} : readJson(FILE_LINKS_KEY, readFileLinks, {})
+  );
+  if (!own) persist();
+}
 
 type ThemeFileLink = { path: string; modified: number };
 
@@ -105,7 +138,7 @@ function readFileLinks(value: unknown): Record<string, ThemeFileLink> {
 let fileLinks = readJson(FILE_LINKS_KEY, readFileLinks, {});
 
 function persistFileLinks(): void {
-  writeJson(FILE_LINKS_KEY, fileLinks, '[sable themes] theme files not persisted');
+  writeJson(fileLinksKey, fileLinks, '[sable themes] theme files not persisted');
 }
 
 function pruneFileLinks(): void {
@@ -117,7 +150,7 @@ function pruneFileLinks(): void {
 }
 
 function persist(): void {
-  writeJson(STORAGE_KEY, customThemes, '[sable themes] themes not persisted');
+  writeJson(storageKey, customThemes, '[sable themes] themes not persisted');
   pruneFileLinks();
 }
 
@@ -211,14 +244,20 @@ export function removeCustomTweak(id: string): void {
   persist();
 }
 
-export function replaceCustomThemes(next: StoredThemes): void {
+function assign(next: StoredThemes): void {
   customThemes.themes = next.themes;
   customThemes.tweaks = next.tweaks;
   customThemes.lightThemeId = next.lightThemeId;
   customThemes.darkThemeId = next.darkThemeId;
   customThemes.enabledTweakIds = next.enabledTweakIds;
+}
+
+export function replaceCustomThemes(next: StoredThemes): void {
+  assign(next);
   persist();
 }
+
+selectThemeAccount(lastSettingsAccount());
 
 export function selectCustomTheme(kind: ResolvedTheme, id: string | null): void {
   customThemes[`${kind}ThemeId`] = id;
