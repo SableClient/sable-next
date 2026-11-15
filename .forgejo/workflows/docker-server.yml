@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
 
-permissions: {}
+
 
 concurrency:
   group: docker-server-${{ github.workflow }}-${{ github.ref }}

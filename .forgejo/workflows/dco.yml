@@ -3,7 +3,7 @@ name: DCO
 on:
   pull_request:
 
-permissions: {}
+
 
 concurrency:
   group: dco-${{ github.workflow }}-${{ github.ref }}

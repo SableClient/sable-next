@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
 
-permissions: {}
+
 
 concurrency:
   group: quality-checks-${{ github.workflow }}-${{ github.ref }}

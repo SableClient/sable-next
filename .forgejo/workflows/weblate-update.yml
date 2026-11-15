@@ -6,14 +6,14 @@ on:
     - cron: '0 2 * * 1'
   workflow_dispatch:
 
-permissions: {}
+
 
 jobs:
   sync:
     name: Sync translations with Weblate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
+    
     steps:
       - name: Commit, push and pull on Weblate
         env:

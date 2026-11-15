@@ -6,7 +6,7 @@ on:
       - 'packaging/docker/**'
       - '.forgejo/workflows/docker-publish.yml'
 
-permissions: {}
+
 
 concurrency:
   group: docker-publish-${{ github.workflow }}-${{ github.ref }}

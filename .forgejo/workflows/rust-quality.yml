@@ -31,7 +31,7 @@ on:
       - '.forgejo/actions/rust/**'
       - '.forgejo/webdriver.json'
 
-permissions: {}
+
 
 concurrency:
   group: rust-quality-${{ github.workflow }}-${{ github.ref }}
