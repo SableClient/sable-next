@@ -9,21 +9,31 @@
 
   interface Props {
     item: StagedFile;
+    /** What automatic resolves to, unknown until the file has been read. */
+    auto: boolean | undefined;
     onSetGif: (id: number, gif: boolean | undefined) => void;
     trigger: Snippet<[{ props: Record<string, unknown> }]>;
   }
 
-  let { item, onSetGif, trigger }: Props = $props();
+  let { item, auto, onSetGif, trigger }: Props = $props();
 
-  const GIF_CHOICES: readonly { value: boolean | undefined; label: string }[] = [
-    { value: undefined, label: 'composer.playAsAuto' },
+  let choices = $derived([
+    {
+      value: undefined,
+      label:
+        auto === undefined
+          ? 'composer.playAsAuto'
+          : auto
+            ? 'composer.playAsAutoGif'
+            : 'composer.playAsAutoVideo',
+    },
     { value: true, label: 'composer.playAsGif' },
     { value: false, label: 'composer.playAsVideo' },
-  ];
+  ]);
 </script>
 
-<ActionMenu label={i18n.t('composer.imageOptions', { name: item.file.name })} {trigger}>
-  {#each GIF_CHOICES as choice (choice.label)}
+<ActionMenu label={i18n.t('composer.playbackOptions', { name: item.file.name })} {trigger}>
+  {#each choices as choice (choice.value)}
     <ActionMenuItem
       checked={item.gif === choice.value}
       onSelect={() => {

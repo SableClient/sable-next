@@ -17,6 +17,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
 
   import { previewKind, type StagedFile } from '#lib/composer/composer-files.js';
+  import { gifOutcome } from '#lib/composer/gif-outcome.svelte.js';
   import StagedImageOptions from './StagedImageOptions.svelte';
   import { canStrip } from './strip-metadata';
   import StagedMediaViewer from './StagedMediaViewer.svelte';
@@ -51,6 +52,7 @@
   <ul class="staged" aria-label={i18n.t('composer.stagedFiles')}>
     {#each files as item (item.id)}
       {@const kind = previewKind(item.file)}
+      {@const auto = kind === 'video' ? gifOutcome(item.file) : undefined}
       <li
         class={['staged-item', kind ? 'staged-media' : 'staged-file']}
         in:scale={{ start: 0.9, duration: motionMs(MOTION_MS.quick), easing: cubicOut }}
@@ -60,7 +62,7 @@
             file={item.file}
             {kind}
             spoiler={item.spoiler}
-            gif={item.gif === true}
+            gif={(item.gif ?? auto) === true}
             onOpen={() => {
               viewing = item.id;
             }}
@@ -98,18 +100,15 @@
               {/snippet}
             </StagedImageOptions>
           {:else if kind === 'video'}
-            <StagedVideoOptions {item} {onSetGif}>
+            <StagedVideoOptions {item} {auto} {onSetGif}>
               {#snippet trigger({ props })}
                 <IconButton
                   {...props}
                   variant="ghost"
                   size="small"
-                  class={[
-                    'staged-control staged-video-options',
-                    item.gif !== undefined && 'staged-spoiler-on',
-                  ]}
+                  class="staged-control staged-options"
                   {disabled}
-                  label={i18n.t('composer.imageOptions', { name: item.file.name })}
+                  label={i18n.t('composer.playbackOptions', { name: item.file.name })}
                 >
                   <SlidersHorizontalIcon />
                 </IconButton>
@@ -288,11 +287,6 @@
   }
 
   .staged-item :global(.staged-options) {
-    inset-block-start: var(--radius-padding);
-    inset-inline-start: var(--radius-padding);
-  }
-
-  .staged-item :global(.staged-video-options) {
     inset-block-end: var(--radius-padding);
     inset-inline-end: var(--radius-padding);
   }

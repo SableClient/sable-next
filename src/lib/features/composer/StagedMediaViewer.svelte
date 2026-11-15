@@ -31,6 +31,7 @@
   import { objectSource, previewKind, type StagedFile } from '#lib/composer/composer-files.js';
   import StagedImageOptions from './StagedImageOptions.svelte';
   import StagedVideoOptions from './StagedVideoOptions.svelte';
+  import { gifOutcome } from '#lib/composer/gif-outcome.svelte.js';
   import { canStrip } from './strip-metadata';
 
   interface Props {
@@ -64,6 +65,8 @@
   );
   let item = $derived<StagedFile | undefined>(files[index]);
   let kind = $derived(item ? previewKind(item.file) : null);
+  let auto = $derived(item && kind === 'video' ? gifOutcome(item.file) : undefined);
+  let playsAsGif = $derived((item?.gif ?? auto) === true);
   let failedId = $state<number | null>(null);
   let swipeX = $state(0);
   let swipeY = $state(0);
@@ -244,6 +247,8 @@
                 style:translate={`${String(swipeX)}px ${String(swipeY)}px`}
                 controls
                 playsinline
+                loop={playsAsGif}
+                muted={playsAsGif}
                 preload="metadata"
                 aria-label={item.file.name}
                 {@attach objectSource(item.file)}
@@ -312,16 +317,11 @@
               {/snippet}
             </StagedImageOptions>
           {:else if kind === 'video'}
-            <StagedVideoOptions {item} {onSetGif}>
+            <StagedVideoOptions {item} {auto} {onSetGif}>
               {#snippet trigger({ props })}
-                <Button
-                  {...props}
-                  variant="ghost"
-                  class={[item.gif !== undefined && 'staged-viewer-spoiler-on']}
-                  aria-label={i18n.t('composer.imageOptions', { name: item.file.name })}
-                >
+                <Button {...props} variant="ghost">
                   <SlidersHorizontalIcon aria-hidden="true" />
-                  {i18n.t('composer.options')}
+                  {i18n.t('composer.playAs')}
                 </Button>
               {/snippet}
             </StagedVideoOptions>
