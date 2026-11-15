@@ -501,6 +501,13 @@
       );
     });
     if (!loaded) {
+      if (serving && targetEventId !== null && untrack(() => timeline.error) === null) {
+        const origin =
+          jumpOrigin !== null && jumpOrigin.target === eventId ? jumpOrigin.origin : null;
+        jumpOrigin = null;
+        const position = untrack(() => timelineList?.capturePosition(origin));
+        if (position) savedPosition = position;
+      }
       void untrack(() =>
         activeTimeline.start(
           timelineOwner,
@@ -664,13 +671,25 @@
     void goto(roomUrl(null), { replace: true, reset: false });
   }
 
+  let savedPosition = $state<{ eventId: string | null } | null>(null);
+  let jumpOrigin: { target: string; origin: string } | null = null;
+
+  function returnToPosition(): void {
+    const position = savedPosition;
+    savedPosition = null;
+    timeline.error = null;
+    if (position === null || position.eventId === null) jumpToLive();
+    else jumpToEvent(position.eventId);
+  }
+
   function jumpToLive(): void {
     void activeTimeline.start(timelineOwner, resolvedRoomId, null, preferences.showHiddenEvents);
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
     void goto(roomUrl(null), { replace: true });
   }
 
-  function jumpToEvent(eventId: string): void {
+  function jumpToEvent(eventId: string, origin: string | null = null): void {
+    jumpOrigin = origin !== null ? { target: eventId, origin } : null;
     if (eventId === page.url.searchParams.get('event')) {
       if (!timelineList?.jumpToEvent(eventId)) {
         void activeTimeline.start(
@@ -871,6 +890,7 @@
       roomId={resolvedRoomId}
       members={memberLoader.members}
       onJumpToEvent={jumpToEvent}
+      onReturnToPosition={savedPosition !== null ? returnToPosition : undefined}
       onJumpToLive={jumpToLive}
       onOpenMedia={(eventId: string) =>
         mediaViewerState.open(eventId, () => timeline.items, jumpToEvent)}
