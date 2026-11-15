@@ -1,10 +1,9 @@
 import { encodeBlurhash } from '#lib/ui/blurhash.js';
-import { isAnimatedImage } from '#lib/ui/media-url.js';
+import { imageIsAnimated } from '#lib/model/model.js';
 import type { AttachmentInfoView, AudioMetadataView } from '#src/generated/protocol';
 import type { AttachmentThumbnail } from '#src/transport';
 
 const MEASURE_TIMEOUT_MS = 5_000;
-const ANIMATION_HEADER_BYTES = 65_536;
 
 type Size = { width: number; height: number; blurhash: string | null };
 
@@ -119,8 +118,8 @@ export function markVoiceRecording(
   voiceRecordings.set(file, { waveform, durationMs });
 }
 
-async function animated(file: Blob): Promise<boolean> {
-  return isAnimatedImage(new Uint8Array(await file.slice(0, ANIMATION_HEADER_BYTES).arrayBuffer()));
+async function animated(file: Blob): Promise<boolean | null> {
+  return imageIsAnimated(new Uint8Array(await file.arrayBuffer()));
 }
 
 async function imageSize(file: Blob): Promise<Size | null> {

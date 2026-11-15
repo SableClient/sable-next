@@ -161,7 +161,7 @@
   let intrinsicCssWidth = $derived(
     eventRatio !== null && intrinsicWidth !== null ? `${String(intrinsicWidth)}px` : undefined
   );
-  let animated = $derived(
+  let mayAnimate = $derived(
     animatedHint ??
       (ANIMATED_MIMES.includes(mime ?? '') ||
         ANIMATED_EXTENSIONS.some((extension) => named(extension)))
@@ -183,7 +183,7 @@
     original ||
       !thumbnailWorthIt ||
       mime === 'image/svg+xml' ||
-      animated ||
+      mayAnimate ||
       servedSideways ||
       undecodableThumbnail === source
   );
@@ -191,7 +191,7 @@
     thumbnail !== null &&
       isEncryptedMedia(source) &&
       !original &&
-      !animated &&
+      !mayAnimate &&
       !servedSideways &&
       undecodableThumbnail !== source
       ? thumbnail
@@ -222,6 +222,13 @@
       : mediaAspectRatio(core, requested, requestedWidth, requestedHeight)
   );
   let imageLoaded = $derived(url !== null && loadedUrl === url);
+  /* Without a hint, the frames in the file decide once it has loaded. */
+  let animated = $derived(
+    mayAnimate &&
+      (animatedHint !== null ||
+        url === null ||
+        cachedMediaAnimated(core, requested, requestedWidth, requestedHeight) !== false)
+  );
   let naturalImage = $derived(
     imageLoaded && asIs && requested === source ? (imageElement ?? null) : null
   );
@@ -260,7 +267,8 @@
     const image = imageElement;
     const source = url;
     if (!paused || !imageLoaded || !image || !source) return;
-    if (cachedMediaAnimated(core, requested, requestedWidth, requestedHeight) === false) return;
+    if (!animated && cachedMediaAnimated(core, requested, requestedWidth, requestedHeight) !== true)
+      return;
     let current = true;
     void stillFrame(image, source).then((still) => {
       if (current && still) heldFrame = { url: source, still };

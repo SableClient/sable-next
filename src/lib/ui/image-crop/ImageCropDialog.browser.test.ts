@@ -108,9 +108,11 @@ test('cancel and use original settle without cropping', async () => {
 
 test('animated images skip the cropper', async () => {
   await render(ImageCropHost);
-  const gif = new File([new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])], 'cat.gif', {
-    type: 'image/gif',
-  });
+  const animated = new URL(
+    '../../../../crates/sable-model/tests/fixtures/images/animated.gif',
+    import.meta.url
+  );
+  const gif = new File([await (await fetch(animated)).blob()], 'cat.gif', { type: 'image/gif' });
   expect(await requestCrop(gif, 'avatar')).toBe(gif);
   expect(cropRequest.current).toBeNull();
 });

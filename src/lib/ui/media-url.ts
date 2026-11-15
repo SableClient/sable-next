@@ -2,7 +2,8 @@ import QuickLRU from 'quick-lru';
 
 import { CoreError, isCoreError } from '#src/transport';
 import { mediaFailureHold } from '#lib/ui/media-retry.js';
-import { imageMime, mediaMime } from '#lib/media-signatures.js';
+import { mediaMime } from '#lib/media-signatures.js';
+import { imageIsAnimated } from '#lib/model/model.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { CoreMedia } from '#lib/core/media.svelte.js';
 
@@ -13,7 +14,8 @@ type CachedMediaUrl = {
   bytes: number;
   ratio: number | undefined;
   type: string;
-  animated: boolean;
+  /** Null for bytes the detector cannot read. */
+  animated: boolean | null;
 };
 
 const objectUrls = new Map<string, CachedMediaUrl>();
@@ -23,7 +25,6 @@ const displaced = new Map<string, string[]>();
 const MAX_OBJECT_URLS = 512;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
-const ANIMATION_HEADER_BYTES = 65536;
 const MEDIA_FAILURE_MEMORY_MS = 30 * 60_000;
 /* Failures expire at `until`; `Unavailable` covers a blip as well as a 404. */
 const failures = new QuickLRU<string, { count: number; until: number }>({
@@ -66,18 +67,6 @@ function cacheKey(
 }
 
 export { imageMime } from '#lib/media-signatures.js';
-
-export function isAnimatedImage(bytes: Uint8Array): boolean {
-  const type = imageMime(bytes);
-  if (type === 'image/gif') return true;
-  const head = new TextDecoder('latin1').decode(bytes);
-  if (type === 'image/png') {
-    const frames = head.indexOf('acTL');
-    return frames !== -1 && (head.indexOf('IDAT') === -1 || frames < head.indexOf('IDAT'));
-  }
-  if (type === 'image/avif') return head.startsWith('avis', 8);
-  return type === 'image/webp' && head.startsWith('VP8X', 12) && (bytes[20] & 0x02) !== 0;
-}
 
 function blobType(mime: string | null | undefined, bytes: Uint8Array): string {
   if (mime && mime !== 'application/octet-stream') return mime;
@@ -177,7 +166,7 @@ export function cachedMediaAnimated(
   source: string,
   width: number,
   height: number
-): boolean | undefined {
+): boolean | null | undefined {
   return objectUrls.get(cacheKey(core.session?.account_id, source, width, height))?.animated;
 }
 
@@ -296,7 +285,7 @@ export function loadMediaUrl(
           bytes: blob.size,
           ratio: aspectRatios.get(key),
           type,
-          animated: isAnimatedImage(bytes.subarray(0, ANIMATION_HEADER_BYTES)),
+          animated: imageIsAnimated(bytes),
         });
         objectUrlBytes += blob.size;
         failures.delete(key);

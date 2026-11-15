@@ -1,19 +1,64 @@
-//! A short video without sound plays as a GIF. Giphy and Telegram send GIFs
-//! as silent MP4s, and mautrix bridges flag them with the same `fi.mau.*` keys.
+//! Whether media moves: an image with more than one frame, or a short video
+//! without sound, which plays as a GIF. Giphy and Telegram send GIFs as silent
+//! MP4s, and mautrix bridges flag them with the same `fi.mau.*` keys.
 
 use std::io::Cursor;
 
 use matroska_demuxer::{MatroskaFile, TrackType};
-use mp4_atom::{Atom, Buf, Decode, FourCC, Hdlr, Header, Mdia, Moov, Trak};
+use mp4_atom::{Atom, Buf, Decode, FourCC, Ftyp, Hdlr, Header, Mdia, Moov, Trak};
+
+/// Whether an image has more than one frame, or `None` for bytes that are not
+/// a GIF, PNG, WebP or AVIF this can read.
+#[must_use]
+pub fn image_is_animated(bytes: &[u8]) -> Option<bool> {
+    if bytes.starts_with(b"GIF8") {
+        gif_is_animated(bytes)
+    } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        let reader = png::Decoder::new(Cursor::new(bytes)).read_info().ok()?;
+        Some(
+            reader
+                .info()
+                .animation_control()
+                .is_some_and(|control| control.num_frames > 1),
+        )
+    } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP".as_slice()) {
+        let decoder = image_webp::WebPDecoder::new(Cursor::new(bytes)).ok()?;
+        Some(decoder.is_animated() && decoder.num_frames() > 1)
+    } else if bytes.get(4..8) == Some(b"ftyp".as_slice()) {
+        let ftyp = Ftyp::decode(&mut &bytes[..]).ok()?;
+        let sequence = FourCC::new(b"avis");
+        let still = FourCC::new(b"avif");
+        let brands = || std::iter::once(&ftyp.major_brand).chain(&ftyp.compatible_brands);
+        if brands().any(|brand| *brand == sequence) {
+            Some(true)
+        } else {
+            brands().any(|brand| *brand == still).then_some(false)
+        }
+    } else {
+        None
+    }
+}
+
+fn gif_is_animated(bytes: &[u8]) -> Option<bool> {
+    let mut options = gif::DecodeOptions::new();
+    options.skip_frame_decoding(true);
+    let mut decoder = options.read_info(bytes).ok()?;
+    let mut frames = 0;
+    while frames < 2 && decoder.next_frame_info().ok()?.is_some() {
+        frames += 1;
+    }
+    Some(frames > 1)
+}
 
 /// Past these, a silent video is more likely a screen recording than a GIF.
 /// Telegram Desktop uses the same size limit.
 const GIF_MAX_DURATION_MS: u32 = 60_000;
-const GIF_MAX_BYTES: usize = 10 * 1024 * 1024;
+pub const GIF_MAX_BYTES: usize = 10 * 1024 * 1024;
 const EBML_MAGIC: [u8; 4] = [0x1a, 0x45, 0xdf, 0xa3];
 
 /// The mautrix keys that make a video autoplay and loop without controls.
-pub(crate) fn gif_flags() -> serde_json::Map<String, serde_json::Value> {
+#[must_use]
+pub fn gif_flags() -> serde_json::Map<String, serde_json::Value> {
     [
         "fi.mau.gif",
         "fi.mau.loop",
@@ -26,7 +71,8 @@ pub(crate) fn gif_flags() -> serde_json::Map<String, serde_json::Value> {
     .collect()
 }
 
-pub(crate) fn plays_as_gif(bytes: &[u8], duration_ms: Option<u32>) -> bool {
+#[must_use]
+pub fn plays_as_gif(bytes: &[u8], duration_ms: Option<u32>) -> bool {
     bytes.len() <= GIF_MAX_BYTES
         && duration_ms.is_some_and(|ms| ms <= GIF_MAX_DURATION_MS)
         && tracks(bytes).is_some_and(|tracks| tracks.video && !tracks.audio)
@@ -93,7 +139,7 @@ fn matroska_tracks(bytes: &[u8]) -> Option<Tracks> {
 
 #[cfg(test)]
 mod tests {
-    use super::{plays_as_gif, tracks};
+    use super::{image_is_animated, plays_as_gif, tracks};
 
     macro_rules! clip {
         ($name:literal) => {
@@ -146,5 +192,39 @@ mod tests {
         assert!(!plays_as_gif(&clip!("silent.webm")[..40], Some(300)));
         assert!(!plays_as_gif(b"\0\0\0\x08ftyp", Some(300)));
         assert!(!plays_as_gif(&[0; 64], Some(300)));
+    }
+
+    macro_rules! image {
+        ($name:literal) => {
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/images/",
+                $name
+            ))
+            .as_slice()
+        };
+    }
+
+    #[test]
+    fn counts_frames_in_each_image_format() {
+        for (name, image, animated) in [
+            ("animated.gif", image!("animated.gif"), true),
+            ("still.gif", image!("still.gif"), false),
+            ("animated.png", image!("animated.png"), true),
+            ("still.png", image!("still.png"), false),
+            ("animated.webp", image!("animated.webp"), true),
+            ("still.webp", image!("still.webp"), false),
+            ("animated.avif", image!("animated.avif"), true),
+            ("still.avif", image!("still.avif"), false),
+        ] {
+            assert_eq!(image_is_animated(image), Some(animated), "{name}");
+        }
+    }
+
+    #[test]
+    fn anything_else_is_not_an_image_it_can_read() {
+        assert_eq!(image_is_animated(&[0xff, 0xd8, 0xff, 0xe0]), None);
+        assert_eq!(image_is_animated(clip!("silent.mp4")), None);
+        assert_eq!(image_is_animated(&image!("animated.gif")[..12]), None);
     }
 }

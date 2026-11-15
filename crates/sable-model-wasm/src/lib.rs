@@ -79,6 +79,28 @@ pub fn proxy_body(
     sable_model::proxy::proxy_body(prefix.as_deref(), suffix.as_deref(), keep_trigger, body)
 }
 
+#[wasm_bindgen(js_name = imageIsAnimated)]
+#[must_use]
+pub fn image_is_animated(bytes: &[u8]) -> Option<bool> {
+    sable_model::animation::image_is_animated(bytes)
+}
+
+#[wasm_bindgen(js_name = playsAsGif)]
+#[must_use]
+pub fn plays_as_gif(bytes: &[u8], duration_ms: Option<u32>) -> bool {
+    sable_model::animation::plays_as_gif(bytes, duration_ms)
+}
+
+#[wasm_bindgen(js_name = gifMaxBytes)]
+#[must_use]
+#[expect(
+    clippy::missing_const_for_fn,
+    reason = "wasm-bindgen cannot export a const fn"
+)]
+pub fn gif_max_bytes() -> usize {
+    sable_model::animation::GIF_MAX_BYTES
+}
+
 #[wasm_bindgen(js_name = parseSearchQuery)]
 pub fn parse_search_query(input: &str) -> Result<String, JsError> {
     json(&search_query::parse_search_query(input))

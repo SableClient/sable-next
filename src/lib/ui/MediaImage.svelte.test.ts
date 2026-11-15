@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 // @vitest-environment happy-dom
 
 import { fireEvent, render, screen } from '@testing-library/svelte';
@@ -620,6 +622,29 @@ test.each(['image/gif', 'image/webp', 'image/apng', 'image/avif'])(
     expect(document.querySelector('.play-gif')).toBeNull();
   }
 );
+
+test('a still WebP without an animation hint shows as a picture, not a GIF', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(
+    new Uint8Array(readFileSync('crates/sable-model/tests/fixtures/images/still.webp'))
+  );
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:still-webp');
+  render(MediaImage, {
+    props: {
+      source: 'mxc://example.org/still-webp',
+      alt: 'photo.webp',
+      width: 800,
+      height: 600,
+      mime: 'image/webp',
+    },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img.media-image-content')).not.toBeNull();
+  });
+  expect(document.querySelector('.play-gif')).toBeNull();
+  expect(document.querySelector('.media-image.gif')).toBeNull();
+});
 
 test('an autoplay prop overrides the GIF preference in both directions', async () => {
   preferences.autoplayGifs = true;
@@ -1308,12 +1333,14 @@ test('retries a failed load on its own, without a retry button', async () => {
   vi.useRealTimers();
 });
 
-const GIF_HEADER = new TextEncoder().encode('GIF89a');
+const ANIMATED_GIF = new Uint8Array(
+  readFileSync('crates/sable-model/tests/fixtures/images/animated.gif')
+);
 
 async function mountLoadedEmote(
   source: string,
   extra: Partial<ComponentProps<typeof MediaImage>> = {},
-  bytes: Uint8Array = GIF_HEADER
+  bytes: Uint8Array = ANIMATED_GIF
 ): Promise<{
   image: () => HTMLImageElement | null;
 }> {
@@ -1490,7 +1517,7 @@ test('a frozen image that is not animated keeps its source', async () => {
   const { image } = await mountLoadedEmote(
     'mxc://example.org/static-avatar',
     { freeze: true },
-    new Uint8Array(new ArrayBuffer(4))
+    new Uint8Array(readFileSync('crates/sable-model/tests/fixtures/images/still.png'))
   );
   await settle();
 

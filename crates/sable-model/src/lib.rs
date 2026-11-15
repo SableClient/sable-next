@@ -9,6 +9,7 @@
     )
 )]
 
+pub mod animation;
 pub mod bot_commands;
 pub mod calendar;
 mod civil;

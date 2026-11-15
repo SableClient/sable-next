@@ -8,7 +8,7 @@
   import type { ClassValue } from 'svelte/elements';
 
   import MediaImage from '#lib/ui/MediaImage.svelte';
-  import { isAnimatedImage } from '#lib/ui/media-url.js';
+  import { imageIsAnimated } from '#lib/model/model.js';
   import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
 
   import { identityColor } from './identity-color.js';
@@ -72,9 +72,8 @@
   async function checkAnimated(source: string, url: string | null): Promise<void> {
     if (!url) return;
     try {
-      const blob = await (await fetch(url)).blob();
-      const head = await blob.slice(0, 65536).arrayBuffer();
-      if (isAnimatedImage(new Uint8Array(head))) animatedSrc = source;
+      const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+      if (imageIsAnimated(bytes) === true) animatedSrc = source;
     } catch (error) {
       console.debug('[sable media] the avatar could not be checked for animation', error);
     }

@@ -29,8 +29,8 @@ use crate::protocol::{
     AttachmentInfoView, AudioMetadataView, CoreEvent, PerMessageProfileView, RpcCode, RpcError,
     SendAttachmentRequest, SendGalleryRequest,
 };
-use crate::silent_clip::{gif_flags, plays_as_gif};
 use crate::view::SPOILER_PROPERTY;
+use sable_model::animation::{gif_flags, image_is_animated, plays_as_gif};
 
 use crate::{Core, MatrixClient};
 
@@ -510,7 +510,7 @@ impl Core {
                 request.outgoing.mentions_room,
             )),
             reply,
-            info: Some(attachment_info(&mime, &info, bytes.len())),
+            info: Some(attachment_info(&mime, &info, &bytes)),
             thumbnail,
             extra_content: attachment_extra_content(
                 persona.as_ref(),
@@ -584,7 +584,7 @@ impl Core {
         for (item, bytes, thumbnail) in attachments {
             let mime: Mime = item.mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
             let view = item.info.unwrap_or_default();
-            let info = attachment_info(&mime, &view, bytes.len());
+            let info = attachment_info(&mime, &view, &bytes);
             let gif = mime.type_() == mime::VIDEO
                 && view
                     .gif
@@ -799,8 +799,8 @@ fn attachment_caption(
     })
 }
 
-fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> AttachmentInfo {
-    let size = UInt::try_from(size).ok();
+fn attachment_info(mime: &Mime, view: &AttachmentInfoView, bytes: &[u8]) -> AttachmentInfo {
+    let size = UInt::try_from(bytes.len()).ok();
     let width = view.width.map(UInt::from);
     let height = view.height.map(UInt::from);
     let duration = view.duration_ms.map(|ms| Duration::from_millis(ms.into()));
@@ -812,7 +812,7 @@ fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> Attac
             height,
             size,
             blurhash,
-            is_animated: view.animated,
+            is_animated: image_is_animated(bytes).or(view.animated),
         }),
         mime::VIDEO => AttachmentInfo::Video(BaseVideoInfo {
             duration,
@@ -1146,7 +1146,11 @@ mod tests {
 
     #[test]
     fn an_image_carries_its_dimensions_and_byte_count() {
-        let info = attachment_info(&mime("image/png"), &view(Some(800), Some(600), None), 4096);
+        let info = attachment_info(
+            &mime("image/png"),
+            &view(Some(800), Some(600), None),
+            &[0; 4096],
+        );
 
         let AttachmentInfo::Image(image) = info else {
             panic!("an image mime type must produce image info: {info:?}");
@@ -1163,10 +1167,26 @@ mod tests {
             ..view(Some(1), Some(1), None)
         };
 
-        let AttachmentInfo::Image(image) = attachment_info(&mime("image/gif"), &animated, 1) else {
+        let AttachmentInfo::Image(image) = attachment_info(&mime("image/gif"), &animated, &[0])
+        else {
             panic!("wrong variant");
         };
         assert_eq!(image.is_animated, Some(true));
+    }
+
+    #[test]
+    fn the_image_bytes_decide_whether_it_is_animated() {
+        let guessed = AttachmentInfoView {
+            animated: Some(true),
+            ..view(Some(16), Some(16), None)
+        };
+        let still = include_bytes!("../../sable-model/tests/fixtures/images/still.webp");
+
+        let AttachmentInfo::Image(image) = attachment_info(&mime("image/webp"), &guessed, still)
+        else {
+            panic!("wrong variant");
+        };
+        assert_eq!(image.is_animated, Some(false));
     }
 
     #[test]
@@ -1174,7 +1194,7 @@ mod tests {
         let info = attachment_info(
             &mime("video/mp4"),
             &view(Some(1920), Some(1080), Some(3500)),
-            9,
+            &[0; 9],
         );
 
         let AttachmentInfo::Video(video) = info else {
@@ -1186,7 +1206,11 @@ mod tests {
 
     #[test]
     fn audio_keeps_the_duration_and_drops_dimensions_it_has_no_field_for() {
-        let info = attachment_info(&mime("audio/ogg"), &view(None, None, Some(12_000)), 64);
+        let info = attachment_info(
+            &mime("audio/ogg"),
+            &view(None, None, Some(12_000)),
+            &[0; 64],
+        );
 
         let AttachmentInfo::Audio(audio) = info else {
             panic!("wrong variant");
@@ -1197,7 +1221,11 @@ mod tests {
 
     #[test]
     fn anything_else_reports_only_its_size() {
-        let info = attachment_info(&mime("application/pdf"), &view(Some(9), Some(9), None), 128);
+        let info = attachment_info(
+            &mime("application/pdf"),
+            &view(Some(9), Some(9), None),
+            &[0; 128],
+        );
 
         let AttachmentInfo::File(file) = info else {
             panic!("wrong variant");
@@ -1207,7 +1235,11 @@ mod tests {
 
     #[test]
     fn an_unmeasurable_attachment_still_reports_its_size() {
-        let info = attachment_info(&mime("image/png"), &AttachmentInfoView::default(), 512);
+        let info = attachment_info(
+            &mime("image/png"),
+            &AttachmentInfoView::default(),
+            &[0; 512],
+        );
 
         let AttachmentInfo::Image(image) = info else {
             panic!("wrong variant");

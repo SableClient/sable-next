@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { markVoiceRecording, measureAttachment, readAudioTags } from './attachment-info.js';
@@ -64,7 +66,7 @@ test('an image reports the decoded dimensions', async () => {
       width: 1280,
       height: 720,
       duration_ms: null,
-      animated: false,
+      animated: null,
       blurhash: null,
       waveform: null,
       voice: false,
@@ -94,25 +96,22 @@ test('a decodable image gets a blurhash', async () => {
   expect(result.info?.blurhash).not.toBeNull();
 });
 
-test('GIFs, animated WebP and APNG are marked animated, still images are not', async () => {
+test('an image counts as animated by its frames, whatever its type says', async () => {
   vi.stubGlobal(
     'createImageBitmap',
     vi.fn(() => Promise.resolve({ width: 8, height: 8, close: () => {} }))
   );
-  const ascii = (text: string) => Array.from(text, (char) => char.charCodeAt(0));
-  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  const webp = (flags: number) => [...ascii('RIFFxxxxWEBPVP8X'), 0, 0, 0, 0, flags];
-  const image = (bytes: number[], mime: string) =>
-    new Blob([new Uint8Array(bytes)], { type: mime });
+  const fixture = (name: string, mime: string) =>
+    new Blob([readFileSync(`crates/sable-model/tests/fixtures/images/${name}`)], { type: mime });
 
-  const cases: [Blob, boolean][] = [
-    [image(ascii('GIF89a'), 'image/gif'), true],
-    [image(webp(0x02), 'image/webp'), true],
-    [image(webp(0), 'image/webp'), false],
-    [image([...png, ...ascii('acTL'), ...ascii('IDAT')], 'image/png'), true],
-    [image([...png, ...ascii('acTL'), ...ascii('IDAT')], 'image/apng'), true],
-    [image([...png, ...ascii('IDAT')], 'image/png'), false],
-    [file('image/jpeg'), false],
+  const cases: [Blob, boolean | null][] = [
+    [fixture('animated.gif', 'image/gif'), true],
+    [fixture('still.gif', 'image/gif'), false],
+    [fixture('animated.webp', 'image/webp'), true],
+    [fixture('still.webp', 'image/webp'), false],
+    [fixture('animated.png', 'image/png'), true],
+    [fixture('still.png', 'image/apng'), false],
+    [file('image/jpeg'), null],
   ];
   for (const [blob, animated] of cases) {
     await expect(measureAttachment(blob)).resolves.toMatchObject({ info: { animated } });

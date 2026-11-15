@@ -84,6 +84,20 @@ export function loadModel(source?: Promise<Response>): Promise<unknown> {
   return pending;
 }
 
+/** Whether an image has more than one frame, or null for bytes it cannot read. */
+export function imageIsAnimated(bytes: Uint8Array): boolean | null {
+  return wasm.imageIsAnimated(bytes) ?? null;
+}
+
+/** Whether a video will be sent as a GIF: short, small and without sound. */
+export function playsAsGif(bytes: Uint8Array, durationMs: number | null): boolean {
+  return wasm.playsAsGif(bytes, durationMs ?? undefined);
+}
+
+export function gifMaxBytes(): number {
+  return wasm.gifMaxBytes();
+}
+
 export function parseSearchQuery(input: string): ParsedQuery {
   return JSON.parse(wasm.parseSearchQuery(input)) as ParsedQuery;
 }

@@ -14,8 +14,8 @@ use crate::Core;
 use crate::ResultExt;
 use crate::delayed_events::{self, DelayedEvent, DelayedEventsSupport};
 use crate::protocol::{AttachmentInfoView, RpcCode, RpcError, ScheduledMessageView};
-use crate::silent_clip::gif_flags;
 use crate::view::SPOILER_PROPERTY;
+use sable_model::animation::gif_flags;
 
 #[derive(Serialize)]
 struct MediaInfoOut {

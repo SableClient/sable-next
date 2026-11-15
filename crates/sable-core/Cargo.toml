@@ -88,8 +88,6 @@ ctr = { version = "0.10.1", default-features = false }
 hkdf = "0.13"
 hmac = "0.13"
 zeroize = "1.9.1"
-mp4-atom = "0.17.1"
-matroska-demuxer = "0.8.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 aes-gcm = "0.11"
