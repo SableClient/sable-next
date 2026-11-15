@@ -74,7 +74,7 @@
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
   import { roomRow, type RoomNavRow } from './nav-rows.js';
   import { PeerProfiles } from './peer-profiles.svelte.js';
-  import { ListWindow } from './list-window.svelte.js';
+  import { VirtualWindow } from '#lib/ui/virtual-window.svelte.js';
   import { publishVisibleRoomOrder } from './visible-rooms.svelte.js';
   import { navSectionKind, navSectionLabels, type NavSectionKind } from './nav-section.js';
   import {
@@ -86,6 +86,8 @@
   } from './space-tree.js';
 
   const MAX_VOICE_FACES = 3;
+  const ESTIMATED_ROW_HEIGHT = 36;
+  const OVERSCAN_ROWS = 10;
   const WARM_DWELL_MS = 300;
   let contextRoom = $state<RoomListItemView | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
@@ -329,11 +331,19 @@
       keep: stillShownRow,
     })
   );
-  const rowWindow = new ListWindow(
-    () => (roomsClosed ? [] : rooms.map((item) => item.key)),
-    '.room-nav-content'
+  const rowWindow = new VirtualWindow(() => ({
+    count: roomsClosed ? 0 : rooms.length,
+    key: (index) => rooms[index].key,
+    estimate: ESTIMATED_ROW_HEIGHT,
+    overscan: OVERSCAN_ROWS,
+  }));
+  let windowedRooms = $derived(
+    roomsClosed
+      ? rooms.map((item, index) => ({ index, item }))
+      : rowWindow.items.flatMap(({ index }) =>
+          rooms[index] ? [{ index, item: rooms[index] }] : []
+        )
   );
-  let windowedRooms = $derived(roomsClosed ? rooms : rooms.slice(rowWindow.first, rowWindow.last));
   let activeIndex = $derived(rooms.findIndex((item) => pathname === roomHref(item)));
 
   $effect(() => {
@@ -341,7 +351,7 @@
     untrack(() => {
       if (activeIndex < 0) return;
       void tick().then(() => {
-        rowWindow.reveal(activeIndex);
+        rowWindow.scrollToIndex(activeIndex);
       });
     });
   });
@@ -360,7 +370,7 @@
   // Rows measured on the way down change the list's height, so one scroll can stop short of the end.
   async function settleEdge(move: 'start' | 'end'): Promise<void> {
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      if (move === 'end') rowWindow.reveal(rooms.length - 1);
+      if (move === 'end') rowWindow.scrollToIndex(rooms.length - 1);
       await tick();
       await new Promise(requestAnimationFrame);
       if (move === 'start' ? rowWindow.first === 0 : rowWindow.last === rooms.length) return;
@@ -898,7 +908,7 @@
     </div>
   {/snippet}
 
-  <div class="room-nav-content">
+  <div class="room-nav-content" {@attach rowWindow.scroller}>
     <RoomNavActions {pathname} {activeSpace} {collapsed} {onNavigate} />
 
     {#if !collapsed && activeSpace && preferences.showSpaceEvents && calendarRooms.length > 0}
@@ -978,12 +988,18 @@
             <div
               aria-hidden="true"
               style:height="{rowWindow.spaceBefore}px"
-              {@attach rowWindow.attach}
+              {@attach rowWindow.start}
             ></div>
-            {#each windowedRooms as item, index (item.key)}
-              {@render navRoom(item, roomsClosed, rowWindow.first + index + 1)}
+            {#each windowedRooms as { index, item } (item.key)}
+              <div
+                class={['window-row', { 'closed-row': roomsClosed && !stillShownRow(item) }]}
+                data-index={index}
+                {@attach rowWindow.measure}
+              >
+                {@render navRoom(item, roomsClosed, index + 1)}
+              </div>
             {/each}
-            <div aria-hidden="true" data-window-end style:height="{rowWindow.spaceAfter}px"></div>
+            <div aria-hidden="true" style:height="{rowWindow.spaceAfter}px"></div>
             {#each visibleSubspaces as item (item.key)}
               {#if item.kind === 'category'}
                 {@const name = item.room.display_name}
@@ -1143,6 +1159,12 @@
     min-height: 0;
     overflow: hidden auto;
     overflow-anchor: none;
+  }
+
+  .window-row {
+    display: grid;
+    justify-items: inherit;
+    min-width: 0;
   }
 
   .rooms-heading {

@@ -71,11 +71,11 @@ async function mountBoard(props: { tab?: 'emoticon' | 'sticker'; unicode?: boole
     ...props,
   });
   const list = () => {
-    const node = document.querySelector<HTMLElement>('.virtual-list-wrapper');
+    const node = document.querySelector<HTMLElement>('.grid-scroller');
     if (!node) throw new Error('the board list is not rendered');
     return node;
   };
-  await expect.poll(() => document.querySelector('.virtual-list-wrapper')).not.toBeNull();
+  await expect.poll(() => document.querySelector('.grid-scroller')).not.toBeNull();
   return { screen, list };
 }
 

@@ -168,7 +168,6 @@ patchedDependencies:
   app-builder-lib@26.18.0: facf1d0d35a984729a251fc70348081c9937ff84229f36b8fd203014521e51e9
   livekit-client@2.23.0: b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e
   recast@0.23.21: e5c14431cd63b5b1de6085bd3e471e62044dfceed736ecf3308a3b1fd6b82c15
-  svelte-tiny-virtual-list@4.0.0: f177a387bbc39a05975b2c81c1bc10a6c392f4dc66806263c77420d9b3395087
   svelte@5.57.3: 49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e
 
 importers:
@@ -211,6 +210,9 @@ importers:
       '@sapphi-red/web-noise-suppressor':
         specifier: 0.4.1
         version: 0.4.1(patch_hash=04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828)
+      '@tanstack/virtual-core':
+        specifier: 3.19.11
+        version: 3.19.11
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
@@ -370,9 +372,6 @@ importers:
       semver:
         specifier: ^7.8.5
         version: 7.8.6
-      svelte-tiny-virtual-list:
-        specifier: ^4.0.0
-        version: 4.0.0(patch_hash=f177a387bbc39a05975b2c81c1bc10a6c392f4dc66806263c77420d9b3395087)(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1))
       tauri-plugin-android-fs-api:
         specifier: 30.2.0
         version: 30.2.0
@@ -2992,6 +2991,9 @@ packages:
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
+
+  '@tanstack/virtual-core@3.19.11':
+    resolution: {integrity: sha512-/5iHb0RHBvj8Di59FDs4ESNm45jls33aZAi4zccVXZjc/6ZvwQP6nzEYeT6weXjTf9E6/vrp2JhYWRyO+ZP13A==}
 
   '@tauri-apps/api@2.12.4':
     resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
@@ -6126,12 +6128,6 @@ packages:
       svelte:
         optional: true
 
-  svelte-tiny-virtual-list@4.0.0:
-    resolution: {integrity: sha512-SrsI2dTYBAnzWeOhZ6fUX0qA3olSvsFeonIvEnyzvPL3AEsKropuSdRCPud84oCV53y6ztcawvs83Qnt0lux2A==}
-    engines: {node: '>=20.17.0'}
-    peerDependencies:
-      svelte: ^5.0.0
-
   svelte-toolbelt@0.10.7:
     resolution: {integrity: sha512-gjuUVEEpo38UJCeI1ssE3NxG31tYENczPTcTGTXf4338qAQNdR9I1oAEbQY0KQFmbdUojNIhHuRNix7ThwFNxQ==}
     engines: {node: '>=18', pnpm: '>=8.7.0'}
@@ -8514,6 +8510,8 @@ snapshots:
   '@szmarczak/http-timer@4.0.6':
     dependencies:
       defer-to-connect: 2.0.1
+
+  '@tanstack/virtual-core@3.19.11': {}
 
   '@tauri-apps/api@2.12.4': {}
 
@@ -12168,10 +12166,6 @@ snapshots:
       postcss-selector-parser: 7.1.7
       semver: 7.8.6
     optionalDependencies:
-      svelte: 5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1)
-
-  svelte-tiny-virtual-list@4.0.0(patch_hash=f177a387bbc39a05975b2c81c1bc10a6c392f4dc66806263c77420d9b3395087)(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1)):
-    dependencies:
       svelte: 5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1)
 
   svelte-toolbelt@0.10.7(@sveltejs/kit@3.1.1(patch_hash=6589fb8ecd1177fe34954a01735f3a86ea8c7c2e478a3937cfef8697fffd94b7)(@opentelemetry/api@1.10.0)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1))(typescript@6.0.3)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1)):

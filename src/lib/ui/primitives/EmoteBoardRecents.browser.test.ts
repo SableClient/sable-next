@@ -35,7 +35,7 @@ async function mountBoard() {
     unicode: true,
     onPick: vi.fn(),
   });
-  await expect.poll(() => document.querySelector('.virtual-list-wrapper')).not.toBeNull();
+  await expect.poll(() => document.querySelector('.grid-scroller')).not.toBeNull();
   return screen;
 }
 

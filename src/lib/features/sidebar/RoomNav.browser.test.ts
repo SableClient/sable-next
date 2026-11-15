@@ -74,7 +74,7 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
   });
 }
 
-async function mountNav(props: { collapsed?: boolean; width?: number } = {}) {
+async function mountNav(props: { collapsed?: boolean; width?: number; height?: number } = {}) {
   Object.assign(core.rpc.notifications, {
     settings: vi.fn().mockResolvedValue({ mode: 'all', default: 'all' }),
   });
@@ -179,10 +179,9 @@ test('a long room list mounts only the rows near the viewport and follows the sc
   roomsFixture.rooms = Array.from({ length: 1000 }, (_, index) =>
     room({ room_id: `!r${index}:example.org`, name: `Room ${index}`, is_direct: true })
   );
-  await mountNav();
+  await mountNav({ height: 400 });
   const scroller = document.querySelector<HTMLElement>('.room-nav-content');
   if (!scroller) throw new Error('the room list scroller is not rendered');
-  scroller.closest<HTMLElement>('.room-nav')?.style.setProperty('height', '400px');
   const rows = () => document.querySelectorAll('.room-list .room-row-wrap');
 
   await expect.poll(() => rows().length).toBeGreaterThan(0);
@@ -200,10 +199,9 @@ test('End moves focus to the last room of a windowed list', async () => {
   roomsFixture.rooms = Array.from({ length: 1000 }, (_, index) =>
     room({ room_id: `!r${index}:example.org`, name: `Room ${index}`, is_direct: true })
   );
-  await mountNav();
+  await mountNav({ height: 400 });
   const scroller = document.querySelector<HTMLElement>('.room-nav-content');
   if (!scroller) throw new Error('the room list scroller is not rendered');
-  scroller.closest<HTMLElement>('.room-nav')?.style.setProperty('height', '400px');
   await expect.poll(() => document.querySelector('.room-row')).not.toBeNull();
 
   document.querySelector<HTMLElement>('.room-row')?.focus();
@@ -227,10 +225,9 @@ function directRooms(
 }
 
 async function mountShortNav() {
-  await mountNav();
+  await mountNav({ height: 400 });
   const scroller = document.querySelector<HTMLElement>('.room-nav-content');
   if (!scroller) throw new Error('the room list scroller is not rendered');
-  scroller.closest<HTMLElement>('.room-nav')?.style.setProperty('height', '400px');
   await expect.poll(() => document.querySelector('.room-row')).not.toBeNull();
   return scroller;
 }

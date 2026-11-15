@@ -17,7 +17,6 @@
   import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import { packName } from '#lib/emoji/pack-name.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
-  import VirtualList from 'svelte-tiny-virtual-list';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -29,7 +28,8 @@
     readBoardSize,
     trackBoardSize,
   } from '#lib/ui/primitives/board-size.svelte.js';
-  import { tick, untrack } from 'svelte';
+  import { flushSync, tick, untrack } from 'svelte';
+  import { VirtualWindow } from '#lib/ui/virtual-window.svelte.js';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
   import { RecentReactions } from '#lib/emoji/recents.svelte.js';
@@ -100,16 +100,11 @@
   let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
   let activeCell = $state.raw<{ section: string; index: number }>({ section: '', index: 0 });
   let gridWidth = $state(0);
-  let gridHeight = $state(0);
-  let scrollToRow = $state(-1);
   let leadHeight = $state(0);
   let cellRowHeight = $state(48 + GRID_GAP);
   let imageMeasure = $state.raw<{ tab: BoardTab; width: number; gap: number; row: number } | null>(
     null
   );
-  let scrollAlign = $state<'start' | 'auto'>('start');
-  let mounted = $state.raw({ start: 0, end: 0 });
-  let pendingFocus: { section: string; index: number } | null = null;
   let searchFocused = $state(false);
   let chosen = $state.raw<{ key: string; row: number; col: number; source?: string }>({
     key: '',
@@ -328,6 +323,15 @@
     };
   });
   let rowIndex = $derived(new Map(pickerRows.map((row, index) => [row.id, index])));
+  const gridWindow = new VirtualWindow(() => ({
+    count: pickerRows.length,
+    key: (index) => pickerRows[index].id,
+    overscan: 2,
+    size: rowSize,
+    keep: rowIndex.get(
+      `cells-${activeCell.section}-${String(Math.floor(activeCell.index / emojiColumns) * emojiColumns)}`
+    ),
+  }));
 
   let navRows = $derived(
     pickerRows.filter(
@@ -399,10 +403,6 @@
     return true;
   }
 
-  function pickerRowKey(index: number): string | number {
-    return pickerRows[index]?.id ?? index;
-  }
-
   function jumpTo(id: string): void {
     const index = rowIndex.get(id);
     if (index !== undefined) {
@@ -413,29 +413,14 @@
   }
 
   function requestScroll(index: number, align: 'start' | 'auto'): void {
-    scrollAlign = align;
-    scrollToRow = index;
-    void tick().then(() => {
-      scrollToRow = -1;
+    gridWindow.scrollToIndex(index, {
+      align,
+      behavior: align === 'start' || shouldReduceMotion() ? 'auto' : 'smooth',
     });
   }
 
   function sectionId(pack: ImagePackView): string {
     return `pack-${pack.origin}-${pack.room_id ?? 'account'}-${pack.id}`;
-  }
-
-  function trackGridSize(element: HTMLElement): () => void {
-    const update = (size?: ResizeObserverSize): void => {
-      gridHeight = size?.blockSize ?? element.clientHeight;
-    };
-    update();
-    if (typeof ResizeObserver === 'undefined') return () => {};
-
-    const observer = new ResizeObserver(([entry]) => {
-      update(entry.contentBoxSize[0]);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
   }
 
   function measureImageRow(list: HTMLElement): () => void {
@@ -530,25 +515,14 @@
     const index = Math.min(Math.max(target, 0), count - 1);
     activeCell = { section: id, index };
     const grid = event.currentTarget.closest('.grids');
-    const cell = grid?.querySelector<HTMLElement>(
-      `[data-section="${id}"] [data-cell="${String(index)}"]`
-    );
-    if (cell) {
-      cell.focus();
-      return;
-    }
-    pendingFocus = { section: id, index };
+    // `keep` mounts the active row, so the cell exists once flushed.
+    flushSync();
+    grid
+      ?.querySelector<HTMLElement>(`[data-section="${id}"] [data-cell="${String(index)}"]`)
+      ?.focus();
     const start = Math.floor(index / emojiColumns) * emojiColumns;
     const row = rowIndex.get(`cells-${id}-${String(start)}`);
     if (row !== undefined) requestScroll(row, 'auto');
-  }
-
-  function focusWhenPending(section: string, index: number) {
-    return (element: HTMLElement): void => {
-      if (pendingFocus?.section !== section || pendingFocus.index !== index) return;
-      pendingFocus = null;
-      element.focus();
-    };
   }
 
   function tabStop(section: string, index: number, column: number): boolean {
@@ -557,7 +531,7 @@
     if (column !== 0) return false;
     const start = Math.floor(cursor / emojiColumns) * emojiColumns;
     const row = rowIndex.get(`cells-${section}-${String(start)}`);
-    return row === undefined || row < mounted.start || row > mounted.end;
+    return row === undefined || row < gridWindow.first || row >= gridWindow.last;
   }
 
   /** Clicking a cell moves focus too, so the roving tab stop follows it. */
@@ -739,31 +713,13 @@
     </div>
   {:else}
     <div class="board-body">
-      <div
-        class={['grids', { sticker: tab === 'sticker', emoji: tab === 'emoticon' }]}
-        {@attach trackGridSize}
-      >
+      <div class={['grids', { sticker: tab === 'sticker', emoji: tab === 'emoticon' }]}>
         {#key `${tab}:${query.trim()}`}
-          <VirtualList
-            height={gridHeight}
-            width="100%"
-            itemCount={pickerRows.length}
-            itemSize={rowSize}
-            estimatedItemSize={cellSize + GRID_GAP}
-            overscanCount={2}
-            getKey={pickerRowKey}
-            scrollToIndex={scrollToRow === -1 ? undefined : scrollToRow}
-            scrollToAlignment={scrollAlign}
-            onItemsUpdated={(range) => {
-              mounted = range;
-            }}
-            scrollToBehaviour={scrollAlign === 'start' || shouldReduceMotion()
-              ? 'instant'
-              : 'smooth'}
-          >
-            {#snippet item({ index, style })}
+          <div class="grid-scroller" {@attach gridWindow.scroller}>
+            <div aria-hidden="true" style:height="{gridWindow.spaceBefore}px"></div>
+            {#each gridWindow.items as { index, key, size, gap } (key)}
               {@const row = pickerRows[index]}
-              <div {style} class="virtual-row">
+              <div class="virtual-row" style:height="{size}px" style:margin-top="{gap}px">
                 {#if row.kind === 'lead'}
                   <div bind:clientHeight={leadHeight}>
                     {#if showFreeText}
@@ -826,7 +782,6 @@
                               onfocus={() => {
                                 if (cell.image !== undefined) showPreview(cell.image, null);
                               }}
-                              {@attach focusWhenPending(row.section, index)}
                             >
                               {#if source.startsWith('mxc://')}
                                 <MediaImage
@@ -888,8 +843,9 @@
                   </ul>
                 {/if}
               </div>
-            {/snippet}
-          </VirtualList>
+            {/each}
+            <div aria-hidden="true" style:height="{gridWindow.spaceAfter}px"></div>
+          </div>
         {/key}
       </div>
 
@@ -1098,7 +1054,10 @@
     min-width: 0;
   }
 
-  .grids :global(.virtual-list-wrapper) {
+  .grid-scroller {
+    height: 100%;
+    overflow: hidden auto;
+    overflow-anchor: none;
     scrollbar-gutter: stable;
   }
 

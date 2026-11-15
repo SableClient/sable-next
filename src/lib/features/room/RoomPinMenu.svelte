@@ -1,6 +1,5 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import VirtualList from 'svelte-tiny-virtual-list';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -22,10 +21,9 @@
   import { opensFrom } from './messages/message-preview';
   import { timelineMediaItems } from '#lib/ui/media/media-items.js';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
+  import { VirtualWindow } from '#lib/ui/virtual-window.svelte.js';
 
   const ESTIMATED_ROW = 120;
-  const ROW_GAP = 8;
-  const FALLBACK_LIST_HEIGHT = 384;
   const OVERSCAN_ROWS = 4;
 
   interface Props {
@@ -61,15 +59,19 @@
   let unreadCount = $state(0);
   let freshIds = $state.raw<ReadonlySet<string>>(new Set());
   let run = 0;
-  let sizeVersion = $state(0);
-  let listHeight = $state(0);
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- sizeVersion is the signal
-  const heights = new Map<string, number>();
 
   let ordered = $derived([...shownIds].reverse());
-  let rowSize = $derived.by(() => {
-    void sizeVersion;
-    return (index: number) => heights.get(ordered[index]) ?? ESTIMATED_ROW;
+  const pinWindow = new VirtualWindow(() => ({
+    count: ordered.length,
+    key: (index) => ordered[index],
+    estimate: ESTIMATED_ROW,
+    overscan: OVERSCAN_ROWS,
+  }));
+  $effect(() => {
+    const { first, last } = pinWindow;
+    untrack(() => {
+      resolveRange(first, last);
+    });
   });
   $effect(() => {
     void roomId;
@@ -155,19 +157,6 @@
     if (missing.length === 0) return;
     pending = new Set([...pending, ...missing]);
     void resolve(roomId, missing, run);
-  }
-
-  function measure(eventId: string) {
-    return (node: HTMLElement) => {
-      const observer = new ResizeObserver(() => {
-        const height = Math.ceil(node.offsetHeight) + ROW_GAP;
-        if (heights.get(eventId) === height) return;
-        heights.set(eventId, height);
-        sizeVersion += 1;
-      });
-      observer.observe(node);
-      return () => observer.disconnect();
-    };
   }
 
   function adopt(state: PinReadStateView): void {
@@ -262,74 +251,48 @@
         <p class="pin-empty-hint">{i18n.t('room.pinsEmptyHint')}</p>
       </div>
     {:else}
-      <div class="pin-list" bind:clientHeight={listHeight}>
-        <VirtualList
-          height={listHeight || FALLBACK_LIST_HEIGHT}
-          width="100%"
-          itemCount={ordered.length}
-          itemSize={rowSize}
-          estimatedItemSize={ESTIMATED_ROW}
-          overscanCount={OVERSCAN_ROWS}
-          getKey={(index) => ordered[index]}
-          onItemsUpdated={(range) => resolveRange(range.start, range.end)}
-        >
-          {#snippet item({ index, style })}
-            {@const eventId = ordered[index]}
-            <div {style} class="pin-row">
-              <div
-                class={['pin-item', { fresh: freshIds.has(eventId) }]}
-                {@attach measure(eventId)}
-              >
-                {#if !settled.has(eventId)}
-                  <p class="pin-status" role="status"><Spinner small /></p>
-                {:else}
-                  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-                  <div
-                    class="pin-open"
-                    onclick={(event) => {
-                      if (!opensFrom(event)) return;
-                      jump(eventId);
+      <div class="pin-list" {@attach pinWindow.scroller}>
+        <div aria-hidden="true" style:height="{pinWindow.spaceBefore}px"></div>
+        {#each pinWindow.items as { index, key } (key)}
+          {@const eventId = ordered[index]}
+          <div class="pin-row" data-index={index} {@attach pinWindow.measure}>
+            <div class={['pin-item', { fresh: freshIds.has(eventId) }]}>
+              {#if !settled.has(eventId)}
+                <p class="pin-status" role="status"><Spinner small /></p>
+              {:else}
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                <div
+                  class="pin-open"
+                  onclick={(event) => {
+                    if (!opensFrom(event)) return;
+                    jump(eventId);
+                  }}
+                >
+                  <MessagePreview
+                    {roomId}
+                    {eventId}
+                    item={entries.get(eventId) ?? null}
+                    {members}
+                    loadPreviewProfile
+                    timeAction={{
+                      label: i18n.t('common.jumpToMessage'),
+                      run: () => jump(eventId),
                     }}
+                    onJumpToEvent={jump}
+                    onOpenMedia={openMedia}
                   >
-                    <MessagePreview
-                      {roomId}
-                      {eventId}
-                      item={entries.get(eventId) ?? null}
-                      {members}
-                      loadPreviewProfile
-                      timeAction={{
-                        label: i18n.t('common.jumpToMessage'),
-                        run: () => jump(eventId),
-                      }}
-                      onJumpToEvent={jump}
-                      onOpenMedia={openMedia}
-                    >
-                      {#snippet fallback()}
-                        <div class="pin-unreadable">
-                          <button
-                            class="pin-unreadable-open"
-                            type="button"
-                            aria-label={i18n.t('common.jumpToMessage')}
-                            onclick={() => jump(eventId)}
-                          >
-                            {i18n.t('room.pinsUnreadable')}
-                          </button>
-                          {#if canPin}
-                            <IconButton
-                              variant="ghost"
-                              size="small"
-                              label={i18n.t('timeline.unpinMessage')}
-                              onclick={() => void unpin(eventId)}
-                            >
-                              <PushPinSlashIcon />
-                            </IconButton>
-                          {/if}
-                        </div>
-                      {/snippet}
-                      {#snippet headerAction()}
+                    {#snippet fallback()}
+                      <div class="pin-unreadable">
+                        <button
+                          class="pin-unreadable-open"
+                          type="button"
+                          aria-label={i18n.t('common.jumpToMessage')}
+                          onclick={() => jump(eventId)}
+                        >
+                          {i18n.t('room.pinsUnreadable')}
+                        </button>
                         {#if canPin}
                           <IconButton
-                            class="pin-unpin"
                             variant="ghost"
                             size="small"
                             label={i18n.t('timeline.unpinMessage')}
@@ -338,14 +301,28 @@
                             <PushPinSlashIcon />
                           </IconButton>
                         {/if}
-                      {/snippet}
-                    </MessagePreview>
-                  </div>
-                {/if}
-              </div>
+                      </div>
+                    {/snippet}
+                    {#snippet headerAction()}
+                      {#if canPin}
+                        <IconButton
+                          class="pin-unpin"
+                          variant="ghost"
+                          size="small"
+                          label={i18n.t('timeline.unpinMessage')}
+                          onclick={() => void unpin(eventId)}
+                        >
+                          <PushPinSlashIcon />
+                        </IconButton>
+                      {/if}
+                    {/snippet}
+                  </MessagePreview>
+                </div>
+              {/if}
             </div>
-          {/snippet}
-        </VirtualList>
+          </div>
+        {/each}
+        <div aria-hidden="true" style:height="{pinWindow.spaceAfter}px"></div>
       </div>
     {/if}
   </IconContext>
@@ -438,6 +415,8 @@
     height: min(24rem, 60dvh);
     max-height: 100%;
     min-height: 0;
+    overflow: hidden auto;
+    overflow-anchor: none;
   }
 
   .pin-row {
