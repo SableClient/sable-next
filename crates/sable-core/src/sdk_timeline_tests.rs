@@ -2337,6 +2337,80 @@ async fn videos_and_galleries_upload_their_thumbnails() {
 }
 
 #[tokio::test]
+async fn a_silent_clip_is_sent_as_a_gif() {
+    for (clip, gif) in [
+        (
+            include_bytes!("../tests/fixtures/clips/silent.mp4").as_slice(),
+            true,
+        ),
+        (
+            include_bytes!("../tests/fixtures/clips/sound.mp4").as_slice(),
+            false,
+        ),
+    ] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!clip:example.org");
+        server.sync_joined_room(&client, room_id).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server
+            .mock_authenticated_media_config()
+            .ok(matrix_sdk::ruma::uint!(1_000_000))
+            .mount()
+            .await;
+        server
+            .mock_upload()
+            .ok(matrix_sdk::ruma::mxc_uri!("mxc://example.org/uploaded"))
+            .mount()
+            .await;
+        server.mock_room_send().ok(event_id!("$clip")).mount().await;
+        let core = core_for(&server, client).await;
+        Box::pin(
+            core.send_attachment(
+                serde_json::from_value(json!({
+                    "room_id": room_id, "filename": "clip.mp4", "mime": "video/mp4",
+                    "info": {"duration_ms": 300},
+                }))
+                .unwrap(),
+                attachment_bytes(clip),
+            ),
+        )
+        .await
+        .unwrap();
+        let sent = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                let requests = server
+                    .server()
+                    .received_requests()
+                    .await
+                    .unwrap_or_default();
+                if let Some(request) = requests
+                    .iter()
+                    .find(|request| request.url.path().contains("/send/m.room.message/"))
+                {
+                    break request.body_json::<serde_json::Value>().unwrap();
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("the clip was sent");
+
+        assert_eq!(sent["msgtype"], "m.video");
+        assert_eq!(sent["info"]["duration"], 300);
+        for flag in [
+            "fi.mau.gif",
+            "fi.mau.loop",
+            "fi.mau.autoplay",
+            "fi.mau.hide_controls",
+            "fi.mau.no_audio",
+        ] {
+            assert_eq!(sent["info"].get(flag) == Some(&json!(true)), gif, "{flag}");
+        }
+    }
+}
+
+#[tokio::test]
 async fn a_room_read_elsewhere_reports_the_server_unread_count() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

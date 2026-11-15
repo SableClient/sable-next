@@ -29,6 +29,7 @@ use crate::protocol::{
     AttachmentInfoView, AudioMetadataView, CoreEvent, PerMessageProfileView, RpcCode, RpcError,
     SendAttachmentRequest, SendGalleryRequest,
 };
+use crate::silent_clip::plays_as_gif;
 use crate::view::SPOILER_PROPERTY;
 
 use crate::{Core, MatrixClient};
@@ -497,6 +498,7 @@ impl Core {
             .audio_metadata
             .clone()
             .filter(|_| mime.type_() == mime::AUDIO);
+        let gif = mime.type_() == mime::VIDEO && plays_as_gif(&bytes, info.duration_ms);
 
         let config = AttachmentConfig {
             caption: attachment_caption(caption, formatted_caption),
@@ -511,6 +513,7 @@ impl Core {
                 persona.as_ref(),
                 request.spoiler,
                 audio_metadata.as_ref(),
+                gif,
             ),
             ..AttachmentConfig::default()
         };
@@ -577,7 +580,9 @@ impl Core {
             ));
         for (item, bytes, thumbnail) in attachments {
             let mime: Mime = item.mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
-            let info = attachment_info(&mime, &item.info.unwrap_or_default(), bytes.len());
+            let view = item.info.unwrap_or_default();
+            let info = attachment_info(&mime, &view, bytes.len());
+            let gif = mime.type_() == mime::VIDEO && plays_as_gif(&bytes, view.duration_ms);
             gallery = gallery.add_item(GalleryItemInfo {
                 filename: item.filename,
                 content_type: mime,
@@ -585,7 +590,7 @@ impl Core {
                 attachment_info: info,
                 caption: None,
                 thumbnail,
-                extra_content: attachment_extra_content(None, item.spoiler, None),
+                extra_content: attachment_extra_content(None, item.spoiler, None, gif),
             });
         }
 
@@ -698,10 +703,23 @@ fn attachment_extra_content(
     persona: Option<&PerMessageProfileView>,
     spoiler: bool,
     audio: Option<&AudioMetadataView>,
+    gif: bool,
 ) -> Option<serde_json::Map<String, serde_json::Value>> {
     let mut extra = persona.map(attachment_profile).unwrap_or_default();
     if let Some(audio) = audio {
         extra.extend(audio_metadata_content(audio));
+    }
+    if gif {
+        extra.insert(
+            "info".to_owned(),
+            serde_json::json!({
+                "fi.mau.gif": true,
+                "fi.mau.loop": true,
+                "fi.mau.autoplay": true,
+                "fi.mau.hide_controls": true,
+                "fi.mau.no_audio": true,
+            }),
+        );
     }
     if spoiler {
         extra.insert(SPOILER_PROPERTY.to_owned(), serde_json::Value::Bool(true));
@@ -1069,7 +1087,8 @@ mod tests {
             album: None,
             cover_art_blurhash: Some("LBEpAr~VM{x[004:oyM|9GM|xtIU".to_owned()),
         };
-        let extra = attachment_extra_content(None, true, Some(&metadata)).expect("extra content");
+        let extra =
+            attachment_extra_content(None, true, Some(&metadata), false).expect("extra content");
 
         let inner = &extra["info"]["org.matrix.msc4549.audio_metadata"];
         assert_eq!(inner["title"], "Moonwalker");
@@ -1242,9 +1261,10 @@ mod tests {
 
     #[test]
     fn a_spoiler_rides_the_extra_content_beside_the_persona() {
-        assert!(attachment_extra_content(None, false, None).is_none());
+        assert!(attachment_extra_content(None, false, None, false).is_none());
 
-        let spoiler = attachment_extra_content(None, true, None).expect("a spoiler property");
+        let spoiler =
+            attachment_extra_content(None, true, None, false).expect("a spoiler property");
         assert_eq!(spoiler[SPOILER_PROPERTY], true);
 
         let profile = PerMessageProfileView {
@@ -1261,7 +1281,8 @@ mod tests {
             has_animal: None,
             animal_need: None,
         };
-        let both = attachment_extra_content(Some(&profile), true, None).expect("both properties");
+        let both =
+            attachment_extra_content(Some(&profile), true, None, false).expect("both properties");
         assert_eq!(both["com.beeper.per_message_profile"]["id"], "hatchy");
         assert_eq!(both[SPOILER_PROPERTY], true);
     }

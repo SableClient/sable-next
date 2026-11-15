@@ -5298,6 +5298,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "matroska-demuxer"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cbf36668475a45a46bf8710e927e7458b7c387e7c46ddb5457ae0c71cf5e817"
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5473,6 +5479,19 @@ checksum = "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b"
 dependencies = [
  "num-traits",
  "pxfm",
+]
+
+[[package]]
+name = "mp4-atom"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "327faeb7d11fc3735194fdaeaa82af72167801bf39dd3d6b2684c8fc5cd7fc19"
+dependencies = [
+ "derive_more 2.1.1",
+ "num",
+ "pastey",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -8063,8 +8082,10 @@ dependencies = [
  "matrix-sdk-test-utils",
  "matrix-sdk-ui",
  "matrix_indexed_db_futures",
+ "matroska-demuxer",
  "mime",
  "miniz_oxide 0.9.1",
+ "mp4-atom",
  "p256",
  "parking_lot 0.13.0",
  "pastey",

@@ -71,6 +71,7 @@ pub mod search;
 #[cfg(not(target_family = "wasm"))]
 pub mod secrets;
 pub mod session;
+mod silent_clip;
 mod space_parents;
 pub mod spaces;
 pub mod store;
