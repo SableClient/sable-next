@@ -1,17 +1,20 @@
-//! A short video without sound plays as a GIF. Telegram and Discord send GIFs
-//! this way, and mautrix bridges flag them with the same `fi.mau.*` keys.
+//! A short video without sound plays as a GIF. Giphy and Telegram send GIFs
+//! as silent MP4s, and mautrix bridges flag them with the same `fi.mau.*` keys.
 
 use std::io::Cursor;
 
 use matroska_demuxer::{MatroskaFile, TrackType};
 use mp4_atom::{Atom, Buf, Decode, FourCC, Hdlr, Header, Mdia, Moov, Trak};
 
-/// Past this, a silent video is more likely a screen recording than a GIF.
+/// Past these, a silent video is more likely a screen recording than a GIF.
+/// Telegram Desktop uses the same size limit.
 const GIF_MAX_DURATION_MS: u32 = 60_000;
+const GIF_MAX_BYTES: usize = 10 * 1024 * 1024;
 const EBML_MAGIC: [u8; 4] = [0x1a, 0x45, 0xdf, 0xa3];
 
 pub(crate) fn plays_as_gif(bytes: &[u8], duration_ms: Option<u32>) -> bool {
-    duration_ms.is_some_and(|ms| ms <= GIF_MAX_DURATION_MS)
+    bytes.len() <= GIF_MAX_BYTES
+        && duration_ms.is_some_and(|ms| ms <= GIF_MAX_DURATION_MS)
         && tracks(bytes).is_some_and(|tracks| tracks.video && !tracks.audio)
 }
 
@@ -19,14 +22,6 @@ pub(crate) fn plays_as_gif(bytes: &[u8], duration_ms: Option<u32>) -> bool {
 struct Tracks {
     video: bool,
     audio: bool,
-}
-
-impl Tracks {
-    const fn add(mut self, video: bool, audio: bool) -> Self {
-        self.video |= video;
-        self.audio |= audio;
-        self
-    }
 }
 
 fn tracks(bytes: &[u8]) -> Option<Tracks> {
@@ -40,18 +35,17 @@ fn tracks(bytes: &[u8]) -> Option<Tracks> {
 }
 
 fn mp4_tracks(bytes: &[u8]) -> Option<Tracks> {
-    let moov = child(bytes, Moov::KIND)?;
-    boxes(moov)?
-        .into_iter()
-        .filter(|(kind, _)| *kind == Trak::KIND)
-        .try_fold(Tracks::default(), |tracks, (_, trak)| {
-            let mut hdlr = child(child(trak, Mdia::KIND)?, Hdlr::KIND)?;
-            let handler = Hdlr::decode_body(&mut hdlr).ok()?.handler;
-            Some(tracks.add(
-                handler == FourCC::new(b"vide"),
-                handler == FourCC::new(b"soun"),
-            ))
-        })
+    let mut tracks = Tracks::default();
+    for (kind, trak) in boxes(child(bytes, Moov::KIND)?)? {
+        if kind != Trak::KIND {
+            continue;
+        }
+        let mut hdlr = child(child(trak, Mdia::KIND)?, Hdlr::KIND)?;
+        let handler = Hdlr::decode_body(&mut hdlr).ok()?.handler;
+        tracks.video |= handler == FourCC::new(b"vide");
+        tracks.audio |= handler == FourCC::new(b"soun");
+    }
+    Some(tracks)
 }
 
 /// Only headers are decoded, so a box this crate cannot parse elsewhere in the
@@ -75,14 +69,12 @@ fn child(buf: &[u8], kind: FourCC) -> Option<&[u8]> {
 
 fn matroska_tracks(bytes: &[u8]) -> Option<Tracks> {
     let file = MatroskaFile::open(Cursor::new(bytes)).ok()?;
-    Some(
-        file.tracks()
-            .iter()
-            .fold(Tracks::default(), |tracks, track| {
-                let kind = track.track_type();
-                tracks.add(kind == TrackType::Video, kind == TrackType::Audio)
-            }),
-    )
+    let mut tracks = Tracks::default();
+    for track in file.tracks() {
+        tracks.video |= track.track_type() == TrackType::Video;
+        tracks.audio |= track.track_type() == TrackType::Audio;
+    }
+    Some(tracks)
 }
 
 #[cfg(test)]
@@ -123,6 +115,14 @@ mod tests {
         assert!(!plays_as_gif(clip!("sound.mp4"), Some(300)));
         assert!(!plays_as_gif(clip!("silent.mp4"), Some(60_001)));
         assert!(!plays_as_gif(clip!("silent.mp4"), None));
+    }
+
+    #[test]
+    fn a_large_silent_video_stays_a_video() {
+        let mut large = clip!("silent.mp4").to_vec();
+        large.extend_from_slice(b"\0\0\0\x08free");
+        large.resize(10 * 1024 * 1024 + 1, 0);
+        assert!(!plays_as_gif(&large, Some(300)));
     }
 
     #[test]
