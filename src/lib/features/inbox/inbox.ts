@@ -100,6 +100,17 @@ export function countNotifications(
     .reduce((total, room) => total + notificationCount(unreadFor(room)), 0);
 }
 
+export function countNotificationsElsewhere(
+  rooms: readonly RoomListItemView[],
+  roomId: string,
+  unreadFor: RoomUnread = roomUnread
+): number {
+  return countNotifications(
+    rooms.filter((room) => room.room_id !== roomId),
+    unreadFor
+  );
+}
+
 export function unlistedNotifications(
   rooms: readonly RoomListItemView[],
   filter: NotificationFilter,

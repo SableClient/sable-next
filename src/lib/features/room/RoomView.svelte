@@ -10,7 +10,7 @@
   import { page } from '$app/state';
 
   import { InboxFeed } from '#lib/features/inbox/inbox-feed.svelte.js';
-  import { timelineMentions } from '#lib/features/inbox/inbox.js';
+  import { countNotificationsElsewhere, timelineMentions } from '#lib/features/inbox/inbox.js';
   import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -426,6 +426,9 @@
     roomList.rooms
       .filter((room) => room.state === 'joined' && room.room_kind !== 'space')
       .reduce((total, room) => total + roomList.notificationsFor(room).highlight, 0)
+  );
+  let backUnread = $derived(
+    countNotificationsElsewhere(roomList.rooms, resolvedRoomId, roomList.badgeUnreadFor)
   );
   let pageTitle = $derived(mentionCount > 0 ? `(${mentionCount}) ${roomName}` : roomName);
   const appLayout = new AppLayout();
@@ -1025,6 +1028,7 @@
     chatOpen={voiceChat.open}
     chatBeside={desktop}
     onBack={backToRoomList}
+    {backUnread}
     onMembers={toggleMembers}
     onSearch={openSearch}
     onTopic={() => (topicOpen = true)}

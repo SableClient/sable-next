@@ -35,6 +35,7 @@
     OpenMessageMenu,
     provideMessageMenu,
   } from '#lib/features/room/messages/message-menu-open.svelte.js';
+  import { countNotificationsElsewhere } from '#lib/features/inbox/inbox.js';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -81,6 +82,9 @@
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
+  let backUnread = $derived(
+    countNotificationsElsewhere(roomList.rooms, resolvedRoomId, roomList.badgeUnreadFor)
+  );
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
   let threadRootId = $derived.by<string | null>(() => {
     void resolvedRoomId;
@@ -383,6 +387,7 @@
       {roomName}
       {roomAvatar}
       onBack={backToRoomList}
+      {backUnread}
       onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
       onEventTimeline={preferences.developerTools
         ? () => {

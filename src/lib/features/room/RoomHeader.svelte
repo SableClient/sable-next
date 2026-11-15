@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { i18n } from '#lib/i18n.js';
-  import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import BugIcon from 'phosphor-svelte/lib/BugIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
@@ -22,6 +21,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 
   import { memberIdentity } from './members/members.js';
+  import RoomBackButton from './RoomBackButton.svelte';
 
   const MAX_FACES = 3;
 
@@ -42,6 +42,7 @@
     chatOpen?: boolean;
     chatBeside?: boolean;
     onBack: () => void;
+    backUnread?: number;
     onMembers: () => void;
     onSearch: () => void;
     onTopic?: (() => void) | null;
@@ -68,6 +69,7 @@
     chatOpen = false,
     chatBeside = false,
     onBack,
+    backUnread = 0,
     onMembers,
     onSearch,
     onTopic = null,
@@ -98,9 +100,7 @@
 
 <PanelHeader class="room-header" suffixToolbarLabel={i18n.t('room.actionsLabel')}>
   {#snippet prefix()}
-    <PanelHeaderButton class="back-button" label={i18n.t('timeline.back')} onclick={onBack}>
-      <BackIcon class="mirror-rtl" />
-    </PanelHeaderButton>
+    <RoomBackButton {onBack} unread={backUnread} />
 
     <span class="room-avatar">
       <Avatar id={roomId} src={roomAvatar} openable={true} name={roomName} size="small" />

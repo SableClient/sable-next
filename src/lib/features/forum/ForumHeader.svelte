@@ -1,5 +1,4 @@
 <script lang="ts">
-  import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 
@@ -7,24 +6,32 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import RoomBackButton from '#lib/features/room/RoomBackButton.svelte';
 
   interface Props {
     roomId: string;
     roomName: string;
     roomAvatar: string | null;
     onBack: () => void;
+    backUnread?: number;
     onSearch: () => void;
     onEventTimeline?: () => void;
   }
 
-  let { roomId, roomName, roomAvatar, onBack, onSearch, onEventTimeline }: Props = $props();
+  let {
+    roomId,
+    roomName,
+    roomAvatar,
+    onBack,
+    backUnread = 0,
+    onSearch,
+    onEventTimeline,
+  }: Props = $props();
 </script>
 
 <PanelHeader class="forum-header" title={roomName} titleSize="h1">
   {#snippet prefix()}
-    <PanelHeaderButton class="back-button" label={i18n.t('timeline.back')} onclick={onBack}>
-      <BackIcon class="mirror-rtl" />
-    </PanelHeaderButton>
+    <RoomBackButton {onBack} unread={backUnread} />
     <Avatar class="forum-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
   {/snippet}
   {#snippet suffix()}

@@ -1103,6 +1103,8 @@
     "label": "Timeline",
     "eventTimeline": "Event timeline",
     "back": "Back to rooms",
+    "backUnread_one": "Back to rooms, {{count, number}} unread notification",
+    "backUnread_other": "Back to rooms, {{count, number}} unread notifications",
     "loading": "Loading messages…",
     "loadingHistory": "Loading older messages…",
     "loadingNewer": "Loading newer messages…",

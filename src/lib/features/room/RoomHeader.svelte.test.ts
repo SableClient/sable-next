@@ -50,6 +50,7 @@ function mountHeader(props: {
   encrypted?: boolean | null;
   presence?: PresenceView | null;
   phone?: boolean;
+  backUnread?: number;
 }) {
   return render(
     RoomHeader,
@@ -206,4 +207,18 @@ test('updates DM presence beside the title on mobile', async () => {
 
   await rerender({ presence: null });
   expect(title.parentElement?.querySelector('.presence-dot')).not.toBeInTheDocument();
+});
+
+test('the back button counts notifications waiting in other rooms', () => {
+  mountHeader({ isVoice: false, callParticipants: [], backUnread: 3 });
+
+  const back = screen.getByRole('button', { name: 'Back to rooms, 3 unread notifications' });
+  expect(back.querySelector('.unread-badge')).toHaveTextContent('3');
+});
+
+test('the back button carries no badge when nothing is waiting', () => {
+  mountHeader({ isVoice: false, callParticipants: [] });
+
+  const back = screen.getByRole('button', { name: 'Back to rooms' });
+  expect(back.querySelector('.unread-badge')).not.toBeInTheDocument();
 });
