@@ -82,7 +82,7 @@
   {/if}
 </section>
 
-<p class="announce" aria-live="polite">
+<p class="screen-reader-only" aria-live="polite">
   {#if announced}
     {#key announced.revision}
       <span>
@@ -96,15 +96,6 @@
 </p>
 
 <style>
-  .announce {
-    clip-path: inset(50%);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
-  }
-
   .banners {
     display: grid;
     inset-inline: calc(var(--space-300) + var(--safe-left))
