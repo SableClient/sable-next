@@ -73,12 +73,8 @@ test('starts muted and ignores unmute after stopping', async () => {
   audio.start({ kind: 'system', exclude: ['Spotify'] });
   expect(native.link).toHaveBeenCalledWith({
     mute: true,
-    exclude: [
-      { 'application.process.id': '42' },
-      { 'media.class': 'Stream/Input/Audio' },
-      { 'application.name': 'Spotify' },
-    ],
-    only_speakers: false,
+    include: [{ 'media.class': 'Stream/Output/Audio' }],
+    exclude: [{ 'application.process.id': '42' }, { 'application.name': 'Spotify' }],
     workaround: [],
   });
   expect(native.unmute).not.toHaveBeenCalled();
@@ -104,13 +100,9 @@ test('uses Audiofox names for system exclusions and rejects malformed legacy sou
   const audio = await import('./screen-audio');
   audio.start({ kind: 'system', exclude: ['audiofox:music'] });
   expect(native.link).toHaveBeenCalledWith({
-    exclude: [
-      { 'application.process.id': '42' },
-      { 'media.class': 'Stream/Input/Audio' },
-      { 'node.name': 'music' },
-    ],
+    include: [{ 'media.class': 'Stream/Output/Audio' }],
+    exclude: [{ 'application.process.id': '42' }, { 'node.name': 'music' }],
     mute: true,
-    only_speakers: false,
     workaround: [],
   });
   expect(() => audio.start({ kind: 'system', exclude: ['pipewire:{}'] })).toThrow(

@@ -14,12 +14,7 @@ type Selection =
 type Node = Partial<Record<string, string>>;
 
 interface PatchBay {
-  link(data: {
-    exclude?: Node[];
-    mute?: boolean;
-    only_speakers?: boolean;
-    workaround?: Node[];
-  }): boolean;
+  link(data: { include?: Node[]; exclude?: Node[]; mute?: boolean; workaround?: Node[] }): boolean;
   unmute(): void;
   unlink(): void;
 }
@@ -108,12 +103,11 @@ export function start(value: unknown): string {
   const bay = venmic();
   if (selection?.kind !== 'system' || !bay) throw new Error('screen audio is unavailable');
 
-  const exclude = [ownAudio(), { 'media.class': 'Stream/Input/Audio' }];
   const workaround = selection.workaround ? [{ ...ownAudio(), 'media.name': 'RecordStream' }] : [];
   linked = bay.link({
-    exclude: [...exclude, ...nodesFor(selection.exclude)],
+    include: [{ 'media.class': 'Stream/Output/Audio' }],
+    exclude: [ownAudio(), ...nodesFor(selection.exclude)],
     mute: true,
-    only_speakers: false,
     workaround,
   });
   if (!linked) {
