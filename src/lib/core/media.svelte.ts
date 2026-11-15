@@ -1,4 +1,8 @@
-import { type PerMessageProfileView, createRpc } from '#src/generated/protocol';
+import {
+  type AttachmentInfoView,
+  type PerMessageProfileView,
+  createRpc,
+} from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
 import { withResolvedMime } from '#lib/platform/files.js';
 import { formatByteSize } from '#lib/ui/byte-size.js';
@@ -14,11 +18,30 @@ export type SendAttachmentOptions = {
   threadRoot?: string | null;
   persona?: PerMessageProfileView | null;
   spoiler?: boolean;
+  /** Unset lets the core decide from the file. */
+  gif?: boolean;
 };
 
-export type SendGalleryOptions = Omit<SendAttachmentOptions, 'spoiler'> & {
+export type SendGalleryOptions = Omit<SendAttachmentOptions, 'spoiler' | 'gif'> & {
   spoilers?: readonly boolean[];
+  gifs?: readonly (boolean | undefined)[];
 };
+
+function withGif(info: AttachmentInfoView | null, gif: boolean | undefined) {
+  if (gif === undefined) return info;
+  return {
+    width: null,
+    height: null,
+    duration_ms: null,
+    animated: null,
+    blurhash: null,
+    waveform: null,
+    voice: false,
+    audio_metadata: null,
+    ...info,
+    gif,
+  };
+}
 
 /** Moves bytes: uploads, attachments and media reads, which the RPC router does not carry. */
 export function createMedia(transport: () => Transport) {
@@ -37,7 +60,8 @@ export function createMedia(transport: () => Transport) {
       picked: File,
       dueTs: number,
       spoiler = false,
-      persona: PerMessageProfileView | null = null
+      persona: PerMessageProfileView | null = null,
+      gif?: boolean
     ): Promise<string> {
       const file = withResolvedMime(picked);
       await validateAttachments([file]);
@@ -54,7 +78,7 @@ export function createMedia(transport: () => Transport) {
         mime: file.type || 'application/octet-stream',
         url,
         size: file.size,
-        info: measured.info,
+        info: withGif(measured.info, gif),
         spoiler,
         persona: $state.snapshot(persona),
         delay_ms: Math.max(0, dueTs - Date.now()),
@@ -81,7 +105,7 @@ export function createMedia(transport: () => Transport) {
         mentionsRoom: options.mentions?.room ?? false,
         inReplyTo: options.inReplyTo ?? null,
         silentReply: options.silentReply ?? false,
-        info: measured.info,
+        info: withGif(measured.info, options.gif),
         thumbnail: measured.thumbnail,
         threadRoot: options.threadRoot ?? null,
         persona: $state.snapshot(options.persona ?? null),
@@ -103,7 +127,7 @@ export function createMedia(transport: () => Transport) {
             filename: file.name,
             mime: file.type || 'application/octet-stream',
             bytes: new Uint8Array(await file.arrayBuffer()),
-            info: measured.info,
+            info: withGif(measured.info, options.gifs?.[index]),
             thumbnail: measured.thumbnail,
             spoiler: options.spoilers?.[index] ?? false,
           };

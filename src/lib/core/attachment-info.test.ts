@@ -69,6 +69,7 @@ test('an image reports the decoded dimensions', async () => {
       waveform: null,
       voice: false,
       audio_metadata: null,
+      gif: null,
     },
     thumbnail: null,
   });
@@ -143,6 +144,7 @@ test('a video reports dimensions and a duration in milliseconds', async () => {
       waveform: null,
       voice: false,
       audio_metadata: null,
+      gif: null,
     },
     thumbnail: null,
   });
@@ -205,6 +207,7 @@ test('audio reports a duration and no dimensions', async () => {
       waveform: null,
       voice: false,
       audio_metadata: null,
+      gif: null,
     },
     thumbnail: null,
   });
@@ -237,6 +240,7 @@ test('a file marked as a voice recording carries its waveform', async () => {
       waveform: [0, 0.5, 1],
       voice: true,
       audio_metadata: null,
+      gif: null,
     },
     thumbnail: null,
   });

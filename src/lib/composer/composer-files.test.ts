@@ -7,6 +7,7 @@ import {
   previewKind,
   replaceFile,
   restoreFile,
+  setGif,
   stageFiles,
   toggleSpoiler,
   unstageFile,
@@ -121,4 +122,13 @@ test('a cropped file replaces the staged one and keeps its options', () => {
   expect(replaced[0]).toEqual({ ...staged[0], file: cropped });
   expect(replaced[1]).toBe(staged[1]);
   expect(replaceFile(staged, 99, cropped)).toEqual(staged);
+});
+
+test('a GIF choice applies to one staged file and clears back to automatic', () => {
+  let id = 1;
+  const staged = stageFiles([], [file('one.mp4'), file('two.mp4')], () => id++);
+
+  const chosen = setGif(staged, 1, true);
+  expect(chosen.map((item) => item.gif)).toEqual([true, undefined]);
+  expect(setGif(chosen, 1, undefined)[0]?.gif).toBeUndefined();
 });

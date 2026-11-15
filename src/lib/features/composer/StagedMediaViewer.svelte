@@ -30,6 +30,7 @@
 
   import { objectSource, previewKind, type StagedFile } from '#lib/composer/composer-files.js';
   import StagedImageOptions from './StagedImageOptions.svelte';
+  import StagedVideoOptions from './StagedVideoOptions.svelte';
   import { canStrip } from './strip-metadata';
 
   interface Props {
@@ -39,11 +40,20 @@
     onRemove: (id: number) => void;
     onToggleSpoiler: (id: number) => void;
     onSetMetadata: (id: number, metadata: ImageMetadata) => void;
+    onSetGif: (id: number, gif: boolean | undefined) => void;
     onReplace: (id: number, file: File) => void;
   }
 
-  let { files, selectedId, onClose, onRemove, onToggleSpoiler, onSetMetadata, onReplace }: Props =
-    $props();
+  let {
+    files,
+    selectedId,
+    onClose,
+    onRemove,
+    onToggleSpoiler,
+    onSetMetadata,
+    onSetGif,
+    onReplace,
+  }: Props = $props();
 
   let currentId = $state(untrack(() => selectedId));
   let index = $derived(
@@ -301,6 +311,20 @@
                 </Button>
               {/snippet}
             </StagedImageOptions>
+          {:else if kind === 'video'}
+            <StagedVideoOptions {item} {onSetGif}>
+              {#snippet trigger({ props })}
+                <Button
+                  {...props}
+                  variant="ghost"
+                  class={[item.gif !== undefined && 'staged-viewer-spoiler-on']}
+                  aria-label={i18n.t('composer.imageOptions', { name: item.file.name })}
+                >
+                  <SlidersHorizontalIcon aria-hidden="true" />
+                  {i18n.t('composer.options')}
+                </Button>
+              {/snippet}
+            </StagedVideoOptions>
           {/if}
           <Button
             variant="ghost"

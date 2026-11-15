@@ -26,6 +26,7 @@ export async function measureAttachment(
               waveform: null,
               voice: false,
               audio_metadata: null,
+              gif: null,
             },
       thumbnail: null,
     };
@@ -45,6 +46,7 @@ export async function measureAttachment(
           waveform: [...recorded.waveform],
           voice: true,
           audio_metadata: null,
+          gif: null,
         },
         thumbnail: null,
       };
@@ -62,6 +64,7 @@ export async function measureAttachment(
         waveform: null,
         voice: false,
         audio_metadata: tags,
+        gif: null,
       },
       thumbnail: metadata.thumbnail,
     };

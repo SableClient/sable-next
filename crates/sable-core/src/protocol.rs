@@ -1915,6 +1915,8 @@ pub struct AttachmentInfoView {
     #[serde(default)]
     pub voice: bool,
     pub audio_metadata: Option<AudioMetadataView>,
+    /// The sender's choice to play a video as a GIF. Unset, the core decides from the file.
+    pub gif: Option<bool>,
 }
 
 /// MSC4144 per-message profile, letting one account send under several

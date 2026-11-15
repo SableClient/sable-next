@@ -2337,16 +2337,14 @@ async fn videos_and_galleries_upload_their_thumbnails() {
 }
 
 #[tokio::test]
-async fn a_silent_clip_is_sent_as_a_gif() {
-    for (clip, gif) in [
-        (
-            include_bytes!("../tests/fixtures/clips/silent.mp4").as_slice(),
-            true,
-        ),
-        (
-            include_bytes!("../tests/fixtures/clips/sound.mp4").as_slice(),
-            false,
-        ),
+async fn a_silent_clip_is_sent_as_a_gif_unless_the_sender_chose() {
+    let silent = include_bytes!("../tests/fixtures/clips/silent.mp4").as_slice();
+    let sound = include_bytes!("../tests/fixtures/clips/sound.mp4").as_slice();
+    for (clip, choice, gif) in [
+        (silent, None, true),
+        (sound, None, false),
+        (silent, Some(false), false),
+        (sound, Some(true), true),
     ] {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
@@ -2369,7 +2367,7 @@ async fn a_silent_clip_is_sent_as_a_gif() {
             core.send_attachment(
                 serde_json::from_value(json!({
                     "room_id": room_id, "filename": "clip.mp4", "mime": "video/mp4",
-                    "info": {"duration_ms": 300},
+                    "info": {"duration_ms": 300, "gif": choice},
                 }))
                 .unwrap(),
                 attachment_bytes(clip),

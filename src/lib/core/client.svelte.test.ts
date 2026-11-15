@@ -743,6 +743,7 @@ test.each(['attachment', 'gallery'] as const)(
       waveform: null,
       voice: false,
       audio_metadata: null,
+      gif: null,
     };
     const thumbnail = { bytes: new Uint8Array([255, 216, 255]), width: 800, height: 450 };
     const measure = vi
@@ -774,6 +775,38 @@ test.each(['attachment', 'gallery'] as const)(
     }
   }
 );
+
+test('a GIF choice rides in the attachment info, even when the file could not be measured', async () => {
+  const measure = vi
+    .spyOn(attachmentInfo, 'measureAttachment')
+    .mockResolvedValue({ info: null, thumbnail: null });
+  try {
+    const fake = fakeTransport();
+    const sent: GalleryAttachment[] = [];
+    fake.transport.sendAttachment = (attachment) => {
+      sent.push(attachment);
+      return Promise.resolve();
+    };
+    fake.transport.sendGallery = (gallery) => {
+      sent.push(...gallery.attachments);
+      return Promise.resolve();
+    };
+    const core = createCoreClient(() => fake.transport);
+    const file = new File(['video'], 'video.mp4', { type: 'video/mp4' });
+    await core.media.sendAttachment('!room:example.org', file);
+    await core.media.sendAttachment('!room:example.org', file, { gif: true });
+    await core.media.sendGallery('!room:example.org', [file, file], { gifs: [false, undefined] });
+
+    expect(sent.map((attachment) => attachment.info?.gif)).toEqual([
+      undefined,
+      true,
+      false,
+      undefined,
+    ]);
+  } finally {
+    measure.mockRestore();
+  }
+});
 
 test('scheduling an attachment uploads it before creating its delayed event', async () => {
   const fake = fakeTransport({

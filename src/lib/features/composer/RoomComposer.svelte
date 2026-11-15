@@ -84,6 +84,7 @@
     restoreFile,
     stageFiles,
     replaceFile,
+    setGif,
     setMetadata,
     toggleSpoiler,
     unstageFile,
@@ -926,6 +927,7 @@
             formattedCaption: message.formatted,
             mentions: message.mentions,
             spoilers: unsent.map((item) => item.spoiler),
+            gifs: unsent.map((item) => item.gif),
           });
           unsent = [];
           return;
@@ -942,8 +944,9 @@
                   formattedCaption: message.formatted,
                   mentions: message.mentions,
                   spoiler: next.spoiler,
+                  gif: next.gif,
                 }
-              : { spoiler: next.spoiler }
+              : { spoiler: next.spoiler, gif: next.gif }
           );
           unsent = rest;
         }
@@ -1013,7 +1016,8 @@
               personas,
               target,
               personaSpaces(roomList.rooms, target, undefined).order
-            ).persona
+            ).persona,
+            attachment.gif
           )
         );
       }
@@ -1524,6 +1528,9 @@
             }}
             onSetMetadata={(id: number, metadata: ImageMetadata) => {
               staged = setMetadata(staged, id, metadata);
+            }}
+            onSetGif={(id: number, gif: boolean | undefined) => {
+              staged = setGif(staged, id, gif);
             }}
             onReplace={(id: number, file: File) => {
               staged = replaceFile(staged, id, file);

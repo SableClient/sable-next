@@ -28,6 +28,8 @@ export type AttachmentInfoView = {
 	waveform: number[] | null,
 	voice: boolean,
 	audio_metadata: AudioMetadataView | null,
+	/**  The sender's choice to play a video as a GIF. Unset, the core decides from the file. */
+	gif: boolean | null,
 };
 
 /**  MSC4549 track details from an `m.audio` event's `info`. */

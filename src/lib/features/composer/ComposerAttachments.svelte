@@ -21,6 +21,7 @@
   import { canStrip } from './strip-metadata';
   import StagedMediaViewer from './StagedMediaViewer.svelte';
   import StagedThumbnail from './StagedThumbnail.svelte';
+  import StagedVideoOptions from './StagedVideoOptions.svelte';
 
   interface Props {
     files: readonly StagedFile[];
@@ -28,6 +29,7 @@
     onRemove: (id: number) => void;
     onToggleSpoiler: (id: number) => void;
     onSetMetadata: (id: number, metadata: ImageMetadata) => void;
+    onSetGif: (id: number, gif: boolean | undefined) => void;
     onReplace: (id: number, file: File) => void;
   }
 
@@ -37,6 +39,7 @@
     onRemove,
     onToggleSpoiler,
     onSetMetadata,
+    onSetGif,
     onReplace,
   }: Props = $props();
 
@@ -57,6 +60,7 @@
             file={item.file}
             {kind}
             spoiler={item.spoiler}
+            gif={item.gif === true}
             onOpen={() => {
               viewing = item.id;
             }}
@@ -93,6 +97,24 @@
                 </IconButton>
               {/snippet}
             </StagedImageOptions>
+          {:else if kind === 'video'}
+            <StagedVideoOptions {item} {onSetGif}>
+              {#snippet trigger({ props })}
+                <IconButton
+                  {...props}
+                  variant="ghost"
+                  size="small"
+                  class={[
+                    'staged-control staged-video-options',
+                    item.gif !== undefined && 'staged-spoiler-on',
+                  ]}
+                  {disabled}
+                  label={i18n.t('composer.imageOptions', { name: item.file.name })}
+                >
+                  <SlidersHorizontalIcon />
+                </IconButton>
+              {/snippet}
+            </StagedVideoOptions>
           {/if}
         {:else}
           <span class="staged-icon" aria-hidden="true"><FileIcon /></span>
@@ -147,6 +169,7 @@
     {onRemove}
     {onToggleSpoiler}
     {onSetMetadata}
+    {onSetGif}
     {onReplace}
   />
 {/if}
@@ -267,6 +290,11 @@
   .staged-item :global(.staged-options) {
     inset-block-start: var(--radius-padding);
     inset-inline-start: var(--radius-padding);
+  }
+
+  .staged-item :global(.staged-video-options) {
+    inset-block-end: var(--radius-padding);
+    inset-inline-end: var(--radius-padding);
   }
 
   .staged-media :global(.staged-control) {

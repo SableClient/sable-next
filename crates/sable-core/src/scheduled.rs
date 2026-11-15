@@ -14,6 +14,7 @@ use crate::Core;
 use crate::ResultExt;
 use crate::delayed_events::{self, DelayedEvent, DelayedEventsSupport};
 use crate::protocol::{AttachmentInfoView, RpcCode, RpcError, ScheduledMessageView};
+use crate::silent_clip::gif_flags;
 use crate::view::SPOILER_PROPERTY;
 
 #[derive(Serialize)]
@@ -31,6 +32,8 @@ struct MediaInfoOut {
         skip_serializing_if = "Option::is_none"
     )]
     blurhash: Option<String>,
+    #[serde(flatten)]
+    playback: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -82,6 +85,11 @@ fn attachment_content(
             height: info.height,
             duration_ms: info.duration_ms,
             blurhash: info.blurhash,
+            playback: if mime.type_() == mime::VIDEO && info.gif == Some(true) {
+                gif_flags()
+            } else {
+                serde_json::Map::new()
+            },
         },
         extra: spoiler
             .then(|| (SPOILER_PROPERTY.to_owned(), serde_json::Value::Bool(true)))
@@ -297,6 +305,39 @@ mod tests {
                 },
                 "page.codeberg.everypizza.msc4193.spoiler": true
             })
+        );
+    }
+
+    #[test]
+    fn only_a_video_chosen_as_a_gif_is_scheduled_as_one() {
+        let url = OwnedMxcUri::from("mxc://example.org/abc");
+        let content = |mime: &str, gif| {
+            let mime: Mime = mime.parse().expect("mime");
+            let info = AttachmentInfoView {
+                gif,
+                ..AttachmentInfoView::default()
+            };
+            serde_json::to_value(attachment_content(
+                "clip".to_owned(),
+                &mime,
+                url.clone(),
+                7,
+                info,
+                false,
+            ))
+            .unwrap()
+        };
+
+        assert_eq!(content("video/mp4", Some(true))["info"]["fi.mau.gif"], true);
+        assert!(
+            content("video/mp4", None)["info"]
+                .get("fi.mau.gif")
+                .is_none()
+        );
+        assert!(
+            content("image/png", Some(true))["info"]
+                .get("fi.mau.gif")
+                .is_none()
         );
     }
 

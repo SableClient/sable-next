@@ -12,6 +12,20 @@ const GIF_MAX_DURATION_MS: u32 = 60_000;
 const GIF_MAX_BYTES: usize = 10 * 1024 * 1024;
 const EBML_MAGIC: [u8; 4] = [0x1a, 0x45, 0xdf, 0xa3];
 
+/// The mautrix keys that make a video autoplay and loop without controls.
+pub(crate) fn gif_flags() -> serde_json::Map<String, serde_json::Value> {
+    [
+        "fi.mau.gif",
+        "fi.mau.loop",
+        "fi.mau.autoplay",
+        "fi.mau.hide_controls",
+        "fi.mau.no_audio",
+    ]
+    .into_iter()
+    .map(|key| (key.to_owned(), serde_json::Value::Bool(true)))
+    .collect()
+}
+
 pub(crate) fn plays_as_gif(bytes: &[u8], duration_ms: Option<u32>) -> bool {
     bytes.len() <= GIF_MAX_BYTES
         && duration_ms.is_some_and(|ms| ms <= GIF_MAX_DURATION_MS)

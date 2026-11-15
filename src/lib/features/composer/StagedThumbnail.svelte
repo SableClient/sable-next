@@ -11,10 +11,11 @@
     file: File;
     kind: PreviewKind;
     spoiler: boolean;
+    gif?: boolean;
     onOpen: () => void;
   }
 
-  let { file, kind, spoiler, onOpen }: Props = $props();
+  let { file, kind, spoiler, gif = false, onOpen }: Props = $props();
 
   let failed = $state(false);
   let duration = $state<number | null>(null);
@@ -53,8 +54,12 @@
       onerror={() => (failed = true)}
     ></video>
     <span class="thumb-badge" aria-hidden="true">
-      <PlayIcon weight="fill" />
-      {#if duration !== null}{formatClockDuration(duration)}{/if}
+      {#if gif}
+        {i18n.t('composer.gifBadge')}
+      {:else}
+        <PlayIcon weight="fill" />
+        {#if duration !== null}{formatClockDuration(duration)}{/if}
+      {/if}
     </span>
   {/if}
 </button>

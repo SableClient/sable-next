@@ -465,6 +465,7 @@ test('sends multiple staged files as one gallery', async () => {
     formattedCaption: null,
     mentions: { user_ids: [], room: false },
     spoilers: [false, false],
+    gifs: [undefined, undefined],
   });
   expect(attachment).not.toHaveBeenCalled();
 });

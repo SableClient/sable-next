@@ -29,7 +29,7 @@ use crate::protocol::{
     AttachmentInfoView, AudioMetadataView, CoreEvent, PerMessageProfileView, RpcCode, RpcError,
     SendAttachmentRequest, SendGalleryRequest,
 };
-use crate::silent_clip::plays_as_gif;
+use crate::silent_clip::{gif_flags, plays_as_gif};
 use crate::view::SPOILER_PROPERTY;
 
 use crate::{Core, MatrixClient};
@@ -498,7 +498,10 @@ impl Core {
             .audio_metadata
             .clone()
             .filter(|_| mime.type_() == mime::AUDIO);
-        let gif = mime.type_() == mime::VIDEO && plays_as_gif(&bytes, info.duration_ms);
+        let gif = mime.type_() == mime::VIDEO
+            && info
+                .gif
+                .unwrap_or_else(|| plays_as_gif(&bytes, info.duration_ms));
 
         let config = AttachmentConfig {
             caption: attachment_caption(caption, formatted_caption),
@@ -582,7 +585,10 @@ impl Core {
             let mime: Mime = item.mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
             let view = item.info.unwrap_or_default();
             let info = attachment_info(&mime, &view, bytes.len());
-            let gif = mime.type_() == mime::VIDEO && plays_as_gif(&bytes, view.duration_ms);
+            let gif = mime.type_() == mime::VIDEO
+                && view
+                    .gif
+                    .unwrap_or_else(|| plays_as_gif(&bytes, view.duration_ms));
             gallery = gallery.add_item(GalleryItemInfo {
                 filename: item.filename,
                 content_type: mime,
@@ -710,16 +716,7 @@ fn attachment_extra_content(
         extra.extend(audio_metadata_content(audio));
     }
     if gif {
-        extra.insert(
-            "info".to_owned(),
-            serde_json::json!({
-                "fi.mau.gif": true,
-                "fi.mau.loop": true,
-                "fi.mau.autoplay": true,
-                "fi.mau.hide_controls": true,
-                "fi.mau.no_audio": true,
-            }),
-        );
+        extra.insert("info".to_owned(), serde_json::Value::Object(gif_flags()));
     }
     if spoiler {
         extra.insert(SPOILER_PROPERTY.to_owned(), serde_json::Value::Bool(true));
@@ -1114,6 +1111,7 @@ mod tests {
             waveform: None,
             voice: false,
             audio_metadata: None,
+            gif: None,
         }
     }
 

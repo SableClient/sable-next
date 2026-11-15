@@ -5,6 +5,8 @@ export interface StagedFile {
   file: File;
   spoiler: boolean;
   metadata: ImageMetadata;
+  /** Play a video as a GIF. Unset lets the core decide from the file. */
+  gif?: boolean;
 }
 
 export function filesFrom(transfer: DataTransfer | null): File[] {
@@ -68,6 +70,14 @@ export function setMetadata(
   metadata: ImageMetadata
 ): StagedFile[] {
   return staged.map((item) => (item.id === id ? { ...item, metadata } : item));
+}
+
+export function setGif(
+  staged: readonly StagedFile[],
+  id: number,
+  gif: boolean | undefined
+): StagedFile[] {
+  return staged.map((item) => (item.id === id ? { ...item, gif } : item));
 }
 
 export function replaceFile(staged: readonly StagedFile[], id: number, file: File): StagedFile[] {
