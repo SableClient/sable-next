@@ -1837,18 +1837,13 @@
 
   /* Kept empty while the control is away so the mention control never moves. */
   .jump-to-latest-slot {
+    display: flex;
     height: var(--timeline-indicator-size);
-    position: relative;
-    width: var(--timeline-indicator-size);
+    min-width: var(--timeline-indicator-size);
   }
 
-  /* The labelled Back control grows past the slot, away from the mention control. */
   .jump-to-latest-motion {
-    inset-block-start: 0;
-    inset-inline-start: 0;
     pointer-events: auto;
-    position: absolute;
-    width: max-content;
   }
 
   .jump-to-mention-motion :global(.mention-count) {
@@ -1871,7 +1866,8 @@
     box-shadow: var(--shadow-float);
   }
 
-  :global(button.jump-back) {
+  :global(button.btn.jump-back) {
     border-radius: var(--radii-pill);
+    border-width: var(--border-width);
   }
 </style>
