@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::now_ms;
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
@@ -242,6 +244,8 @@ pub(crate) struct KeyDistributor {
     identity: String,
     outbound: Option<OutboundKey>,
     last_sent_ms: u64,
+    /// Paces the server query for a device that stays unknown across roster refreshes.
+    device_queries: BTreeMap<OwnedUserId, u64>,
     wire: super::membership::RtcWire,
 }
 
@@ -261,6 +265,7 @@ impl KeyDistributor {
             identity,
             outbound: None,
             last_sent_ms: 0,
+            device_queries: BTreeMap::new(),
             wire: super::membership::RtcWire::Deployed,
         }
     }
@@ -377,8 +382,19 @@ impl KeyDistributor {
         }
     }
 
+    fn device_query_due(&mut self, user_id: &OwnedUserId, now_ms: u64) -> bool {
+        let due = self
+            .device_queries
+            .get(user_id)
+            .is_none_or(|asked| now_ms.saturating_sub(*asked) >= RESHARE_INTERVAL_MS);
+        if due {
+            self.device_queries.insert(user_id.clone(), now_ms);
+        }
+        due
+    }
+
     async fn send(
-        &self,
+        &mut self,
         room: &Room,
         key: &OutboundKey,
         targets: &[CallMember],
@@ -386,7 +402,7 @@ impl KeyDistributor {
         let encryption = room.client().encryption();
         let mut devices = Vec::new();
         let mut reached = Vec::new();
-        let mut queried = Vec::new();
+        let now = now_ms();
         for target in targets {
             if target.is_own(&self.user_id, &self.device_id) {
                 reached.push(target.clone());
@@ -396,8 +412,7 @@ impl KeyDistributor {
                 continue;
             };
             let mut device = encryption.get_device(&target.user_id, device_id).await;
-            if matches!(device, Ok(None)) && !queried.contains(&target.user_id) {
-                queried.push(target.user_id.clone());
+            if matches!(device, Ok(None)) && self.device_query_due(&target.user_id, now) {
                 if let Err(error) = encryption.request_user_identity(&target.user_id).await {
                     tracing::warn!(?error, "could not query a call member's devices");
                 }
@@ -408,12 +423,29 @@ impl KeyDistributor {
                     devices.push(device);
                     reached.push(target.clone());
                 }
-                Ok(None) => tracing::warn!(
-                    reported = true,
-                    user_id = %target.user_id,
-                    device_id = %device_id,
-                    "call member device is unknown, cannot send it a media key"
-                ),
+                Ok(None) => {
+                    let retried = self.outbound.as_ref().is_some_and(|outbound| {
+                        outbound
+                            .failed
+                            .iter()
+                            .any(|failed| failed.same_generation(target))
+                    });
+                    // Reporting follows the field, not its value.
+                    if retried {
+                        tracing::debug!(
+                            user_id = %target.user_id,
+                            device_id = %device_id,
+                            "call member device is still unknown"
+                        );
+                    } else {
+                        tracing::warn!(
+                            reported = true,
+                            user_id = %target.user_id,
+                            device_id = %device_id,
+                            "call member device is unknown, cannot send it a media key"
+                        );
+                    }
+                }
                 Err(error) => tracing::warn!(?error, "could not look up a call member device"),
             }
         }
@@ -989,6 +1021,23 @@ mod sdk_tests {
             Rolled::Rotated { .. }
         ));
         assert!(distributor.outbound.as_ref().unwrap().created_ts >= start + 250);
+    }
+
+    #[test]
+    fn a_member_with_an_unknown_device_is_queried_once_per_interval() {
+        let mut distributor = KeyDistributor::new(
+            owned_room_id!("!call:example.org"),
+            owned_user_id!("@alice:example.org"),
+            "ALICE".into(),
+            "@alice:example.org:ALICE".to_owned(),
+            "@alice:example.org:ALICE".to_owned(),
+        );
+        let bob = owned_user_id!("@bob:example.org");
+
+        assert!(distributor.device_query_due(&bob, 1_000));
+        assert!(!distributor.device_query_due(&bob, 1_000 + RESHARE_INTERVAL_MS - 1));
+        assert!(distributor.device_query_due(&owned_user_id!("@carol:example.org"), 2_000));
+        assert!(distributor.device_query_due(&bob, 1_000 + RESHARE_INTERVAL_MS));
     }
 
     #[tokio::test]
