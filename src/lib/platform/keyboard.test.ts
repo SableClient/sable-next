@@ -345,3 +345,21 @@ test('taps without a focused field outside the timeline are left alone', async (
   field.blur();
   expect(tap(node).defaultPrevented).toBe(false);
 });
+
+test('on Android a tap blurs the composer once its keyboard was dismissed', async () => {
+  document.documentElement.dataset.tauriOs = 'android';
+  vi.stubGlobal('innerWidth', 400);
+  vi.stubGlobal('innerHeight', 800);
+  const { node, tap } = await tapKeyboardHarness();
+  vi.stubGlobal('innerHeight', 450);
+  expect(tap(node).defaultPrevented).toBe(true);
+  vi.stubGlobal('innerHeight', 800);
+  expect(tap(node).defaultPrevented).toBe(false);
+});
+
+test('on iOS a tap blurs the composer once its keyboard was dismissed', async () => {
+  vi.stubGlobal('innerHeight', 800);
+  vi.stubGlobal('visualViewport', { height: 800, offsetTop: 0, scale: 1 });
+  const { node, tap } = await tapKeyboardHarness();
+  expect(tap(node).defaultPrevented).toBe(false);
+});
