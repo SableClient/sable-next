@@ -126,8 +126,9 @@
     currentUserId?: string | null;
     roomId?: string;
     members?: readonly MemberView[];
-    onJumpToEvent?: (eventId: string) => void;
+    onJumpToEvent?: (eventId: string, origin?: string | null) => void;
     onJumpToLive?: () => void;
+    onReturnToPosition?: () => void;
     onOpenMedia?: (eventId: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
@@ -186,6 +187,7 @@
     members = [],
     onJumpToEvent,
     onJumpToLive,
+    onReturnToPosition,
     onOpenMedia,
     onVotePoll,
     onEndPoll,
@@ -1146,6 +1148,22 @@
     return true;
   }
 
+  export function capturePosition(
+    preferredEventId?: string | null
+  ): { eventId: string | null } | null {
+    if (!controller || !opened) return null;
+    if (preferredEventId != null && entryFor(preferredEventId))
+      return { eventId: preferredEventId };
+    if (windowState.pinned && live) return { eventId: null };
+    const first = windowState.firstVisible;
+    if (first === null) return null;
+    for (const row of windowState.rows) {
+      if (row.index >= first && row.value.item.event_id)
+        return { eventId: row.value.item.event_id };
+    }
+    return null;
+  }
+
   export function stepReply(direction: ReplyDirection): string | null {
     const target = replyTarget(eventItems, replyEventId, direction, preferences.showHiddenEvents);
     const key = entryFor(target)?.key;
@@ -1163,7 +1181,7 @@
   }
   function jumpFrom(origin: string | null, target: string): void {
     if (origin !== null) returnStack = [origin, ...returnStack];
-    onJumpToEvent?.(target);
+    onJumpToEvent?.(target, origin);
   }
   function jumpDown(): void {
     const eventId = returnEventId;
@@ -1466,6 +1484,9 @@
         description={i18n.t('timeline.focusFailedHint')}
       >
         {#snippet actions()}
+          {#if onReturnToPosition}
+            <Button type="button" onclick={onReturnToPosition}>{i18n.t('common.back')}</Button>
+          {/if}
           {#if onJumpToLive}
             <Button type="button" onclick={onJumpToLive}>{i18n.t('timeline.jumpToLatest')}</Button>
           {/if}
