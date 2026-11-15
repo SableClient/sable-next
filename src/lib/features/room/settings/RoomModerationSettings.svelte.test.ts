@@ -174,3 +174,29 @@ test('members without the role see the setup but cannot change it', async () => 
   expect(screen.queryByRole('button', { name: 'room.moderationProtect' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'room.moderationUnwatch:first' })).toBeNull();
 });
+
+test('a room can be protected by pasting its ID into the picker', async () => {
+  const user = userEvent.setup();
+  render(RoomModerationSettings, { room, permissions: admin, levels });
+
+  await user.click(await screen.findByRole('button', { name: 'room.moderationProtect' }));
+  const dialog = await screen.findByRole('dialog');
+  await user.type(
+    within(dialog).getByRole('textbox', { name: 'room.moderationProtectSearch' }),
+    '!new:example.org'
+  );
+  await user.click(
+    within(dialog).getByRole('button', { name: 'room.moderationProtectId:!new:example.org' })
+  );
+
+  await vi.waitFor(() => {
+    expect(sendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_type: 'fi.mau.meowlnir.protected_rooms',
+        content: expect.objectContaining({
+          rooms: ['!lobby:example.org', '!new:example.org'],
+        }),
+      })
+    );
+  });
+});

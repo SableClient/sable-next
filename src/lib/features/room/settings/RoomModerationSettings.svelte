@@ -53,6 +53,7 @@
     type WatchedList,
   } from '#lib/rooms/meowlnir-config.js';
   import ModerationListRules from './ModerationListRules.svelte';
+  import ProtectRoomsDialog from './ProtectRoomsDialog.svelte';
   import { canSendState } from './permission-groups';
 
   import '#lib/ui/primitives/settings-row.css';
@@ -100,7 +101,7 @@
   let lists = $derived(watchedLists(config?.watchedLists ?? null));
   let strangers = $derived(unknownProtections(config?.protectedRooms ?? null));
 
-  let roomDraft = $state({ choice: '', id: '' });
+  let protecting = $state(false);
   let listDraft = $state({ choice: '', id: '', shortcode: '' });
   let openList = $state<string | null>(null);
   let pendingRemoval = $state<Removal | null>(null);
@@ -157,12 +158,10 @@
     });
   }
 
-  function protect(event: SubmitEvent): void {
-    event.preventDefault();
-    const id = chosen(roomDraft);
-    if (!id) return;
-    save(PROTECTED_ROOMS_EVENT, (content) => addProtectedRoom(content, id));
-    roomDraft = { choice: '', id: '' };
+  function protect(roomIds: string[]): void {
+    save(PROTECTED_ROOMS_EVENT, (content) =>
+      roomIds.reduce((next, id) => addProtectedRoom(next, id), content)
+    );
   }
 
   function watch(event: SubmitEvent): void {
@@ -281,18 +280,11 @@
         <p class="settings-note settings-form">{i18n.t('room.moderationRoomsEmpty')}</p>
       {/if}
       {#if canEdit}
-        <form class="settings-form add" onsubmit={protect}>
-          {@render roomChooser(
-            roomDraft,
-            rooms.map((entry) => entry.roomId),
-            'room-moderation-protect'
-          )}
+        <div class="settings-form add">
           <div class="actions">
-            <Button type="submit" disabled={chosen(roomDraft) === null}>
-              {i18n.t('room.moderationProtect')}
-            </Button>
+            <Button onclick={() => (protecting = true)}>{i18n.t('room.moderationProtect')}</Button>
           </div>
-        </form>
+        </div>
       {/if}
     </SettingsSection>
 
@@ -544,6 +536,15 @@
   confirmLabel={i18n.t('common.remove')}
   onConfirm={confirmRemoval}
 />
+
+{#if roomId}
+  <ProtectRoomsDialog
+    bind:open={protecting}
+    {roomId}
+    protectedIds={rooms.map((entry) => entry.roomId)}
+    onProtect={protect}
+  />
+{/if}
 
 <style>
   .section {
