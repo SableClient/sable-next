@@ -13,7 +13,10 @@ const system = vi.hoisted(() => ({
   play: vi.fn<() => Promise<{ stop: () => void }>>(() => Promise.resolve({ stop: vi.fn() })),
 }));
 
-vi.mock('#lib/platform/os.js', () => ({ isAndroid: () => system.platform === 'android' }));
+vi.mock('#lib/platform/os.js', () => ({
+  isAndroid: () => system.platform === 'android',
+  isNativeMobile: () => false,
+}));
 
 vi.mock('#lib/platform/calls.js', () => ({
   reportIncomingSystemCall: system.report,

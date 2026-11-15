@@ -40,7 +40,10 @@ const plugin = {
 const platform = vi.hoisted(() => ({ android: true }));
 
 vi.mock('#lib/platform/calls.js', () => ({ loadNativeCalls: () => Promise.resolve(plugin) }));
-vi.mock('#lib/platform/os.js', () => ({ isAndroid: () => platform.android }));
+vi.mock('#lib/platform/os.js', () => ({
+  isAndroid: () => platform.android,
+  isNativeMobile: () => false,
+}));
 
 const { createNativeTransport } = await import('./native-transport');
 

@@ -2398,3 +2398,27 @@ async fn native_rtc_invites_use_validated_receiver_presentation() {
     }
     assert_eq!(event["content"]["notification_type"], "ring");
 }
+
+#[test]
+fn only_mentions_and_direct_messages_want_a_banner() {
+    let view = |event: bool, mention: bool, is_direct: bool| crate::protocol::NotificationView {
+        user_id: user_id!("@ada:example.org").to_owned(),
+        room_id: room_id!("!room:example.org").to_owned(),
+        event_id: event.then(|| event_id!("$event").to_owned()),
+        room_name: "Room".to_owned(),
+        room_avatar_url: None,
+        is_direct,
+        encrypted: false,
+        sender: user_id!("@bob:example.org").to_owned(),
+        sender_name: None,
+        sender_avatar_url: None,
+        body: "hi".to_owned(),
+        mention,
+        noisy: None,
+    };
+
+    assert!(view(true, true, false).wants_banner());
+    assert!(view(true, false, true).wants_banner());
+    assert!(!view(true, false, false).wants_banner());
+    assert!(!view(false, true, true).wants_banner());
+}

@@ -209,6 +209,7 @@ export interface PushContentPolicy {
   notifyOnce: boolean;
   clearOnRead: boolean;
   quietWhenActiveElsewhere: boolean;
+  inAppBanners: boolean;
 }
 
 const POLICY_KEY = '\u0000push-content-policy';
@@ -232,6 +233,7 @@ export async function pushContentPolicy(): Promise<PushContentPolicy> {
       notifyOnce: stored?.notifyOnce === true,
       clearOnRead: stored?.clearOnRead !== false,
       quietWhenActiveElsewhere: stored?.quietWhenActiveElsewhere === true,
+      inAppBanners: stored?.inAppBanners === true,
     };
   } catch (error) {
     console.debug('[sable notifications] push content policy unreadable', error);
@@ -241,6 +243,7 @@ export async function pushContentPolicy(): Promise<PushContentPolicy> {
       notifyOnce: false,
       clearOnRead: true,
       quietWhenActiveElsewhere: false,
+      inAppBanners: false,
     };
   }
 }

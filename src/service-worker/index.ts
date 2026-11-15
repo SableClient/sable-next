@@ -350,6 +350,10 @@ async function present(
     await record('ACTIVE_ELSEWHERE', trace);
     return;
   }
+  if (policy.inAppBanners && !showing.ring && !showing.invite && (await appVisible())) {
+    await record('IN_APP', trace);
+    return;
+  }
 
   const alertedAt = await alertedAtFor(showing.room_id, payload.user_id ?? undefined);
   const now = Date.now();
@@ -407,6 +411,12 @@ async function present(
   }
   await worker.registration.showNotification(showing.title, options);
   await record('POSTED', trace);
+}
+
+/** A visible tab is syncing and alerts on its own, with a banner or a notification. */
+async function appVisible(): Promise<boolean> {
+  const windows = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  return windows.some((client) => client.visibilityState === 'visible');
 }
 
 async function inUseElsewhere(userId: string | undefined): Promise<boolean> {

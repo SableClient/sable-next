@@ -506,6 +506,7 @@ pub struct SetOptionsParams {
     pub encrypted_content: bool,
     pub sounds: bool,
     pub notify_once: bool,
+    pub in_app_banners: bool,
 }
 
 impl Handler for SetOptionsParams {
@@ -521,6 +522,8 @@ impl Handler for SetOptionsParams {
         core.notification_sounds
             .store(self.sounds, Ordering::Relaxed);
         core.notify_once.store(self.notify_once, Ordering::Relaxed);
+        core.in_app_banners
+            .store(self.in_app_banners, Ordering::Relaxed);
 
         std::future::ready(Ok(()))
     }

@@ -150,6 +150,7 @@
   import { clearPushFailure, recordPushFailure } from '#lib/features/notifications/push-failure.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
   import ToastRegion from '#lib/ui/ToastRegion.svelte';
+  import InAppBanners from '#lib/features/notifications/InAppBanners.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import ShareTargetSheet from '#lib/features/share/ShareTargetSheet.svelte';
   import { ShareInbox, watchSharedContent } from '#lib/features/share/share-inbox.svelte.js';
@@ -535,6 +536,7 @@
         encrypted_content: preferences.notificationEncryptedContent,
         sounds: preferences.notificationSounds,
         notify_once: preferences.notifyOnce,
+        in_app_banners: preferences.inAppBanners,
       })
       .catch((error: unknown) => {
         console.warn('[sable notifications] notification settings not applied', error);
@@ -549,6 +551,7 @@
       clearOnRead: preferences.clearNotificationsOnRead,
       privateReceipts: readReceiptIsPrivate(),
       quietWhenActiveElsewhere,
+      inAppBanners: preferences.inAppBanners,
     }).catch((error: unknown) => {
       console.debug('[sable notifications] native content policy not applied', error);
     });
@@ -559,6 +562,7 @@
       notifyOnce: preferences.notifyOnce,
       clearOnRead: preferences.clearNotificationsOnRead,
       quietWhenActiveElsewhere,
+      inAppBanners: preferences.inAppBanners,
     });
   });
 
@@ -1346,6 +1350,7 @@
     <ShortcutsHelpDialog bind:open={shortcutsHelpState.open} />
     <ShareTargetSheet inbox={shareInbox} />
     <ToastRegion dismissLabel={i18n.t('common.dismiss')} />
+    <InAppBanners />
     {#if preferences.showAlertZoo}
       <ZooAlertControls />
     {/if}

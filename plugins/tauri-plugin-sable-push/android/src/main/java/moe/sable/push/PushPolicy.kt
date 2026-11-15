@@ -38,6 +38,10 @@ internal class PushPolicy(context: Context) {
         get() = prefs.getBoolean("quiet-when-active-elsewhere", false)
         set(value) = prefs.edit().putBoolean("quiet-when-active-elsewhere", value).apply()
 
+    var inAppBanners: Boolean
+        get() = prefs.getBoolean("in-app-banners", false)
+        set(value) = prefs.edit().putBoolean("in-app-banners", value).apply()
+
     var accounts: Map<String, String>
         get() = runCatching {
             val stored = JSONObject(prefs.getString("accounts", "{}") ?: "{}")

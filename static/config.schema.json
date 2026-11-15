@@ -1237,6 +1237,11 @@
           "type": "boolean",
           "default": true
         },
+        "inAppBanners": {
+          "title": "In-app banners",
+          "type": "boolean",
+          "default": false
+        },
         "badgeDefaultDirect": {
           "enum": [
             "all",
@@ -2715,6 +2720,11 @@
           "title": "System alerts",
           "type": "boolean",
           "default": true
+        },
+        "inAppBanners": {
+          "title": "In-app banners",
+          "type": "boolean",
+          "default": false
         },
         "badgeDefaultDirect": {
           "enum": [

@@ -2763,6 +2763,13 @@ pub struct NotificationView {
     pub noisy: Option<bool>,
 }
 
+impl NotificationView {
+    #[must_use]
+    pub const fn wants_banner(&self) -> bool {
+        self.event_id.is_some() && (self.mention || self.is_direct)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PushEventView {

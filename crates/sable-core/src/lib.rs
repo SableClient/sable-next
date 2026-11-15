@@ -203,6 +203,7 @@ pub struct Core {
     private_receipts: AtomicBool,
     widget_feed: AtomicBool,
     notifications_enabled: AtomicBool,
+    in_app_banners: AtomicBool,
     search_crawler_enabled: AtomicBool,
     search_sharing: search::SearchSharing,
     rtc: rtc::RtcSessions,
@@ -324,6 +325,7 @@ impl Core {
             private_receipts: AtomicBool::new(true),
             widget_feed: AtomicBool::new(false),
             notifications_enabled: AtomicBool::new(true),
+            in_app_banners: AtomicBool::new(false),
             search_crawler_enabled: AtomicBool::new(true),
             search_sharing: search::SearchSharing::default(),
             rtc: rtc::RtcSessions::default(),
@@ -440,6 +442,12 @@ impl Core {
     #[must_use]
     pub fn notifications_enabled(&self) -> bool {
         self.notifications_enabled.load(Ordering::Relaxed)
+    }
+
+    /// The open app shows this alert as an in-app banner, so the OS must not post it too.
+    #[must_use]
+    pub fn shows_banner(&self, view: &protocol::NotificationView) -> bool {
+        self.in_app_banners.load(Ordering::Relaxed) && self.is_app_active() && view.wants_banner()
     }
 
     pub(crate) fn set_read_room(&self, room_id: Option<OwnedRoomId>) {

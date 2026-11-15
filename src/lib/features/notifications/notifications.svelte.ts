@@ -14,6 +14,8 @@ import { loadMediaUrl } from '#lib/ui/media-url.js';
 
 import { parsePushPayload, webPushValidation } from '#lib/notifications/push-payload.js';
 import { isRingingCall, type PresentedAlertData } from './call-alert';
+import { InAppBanners, showsBanner, type Banner } from './in-app-banners.svelte';
+import { performNotificationAction } from './native-actions';
 import { body, enabled, title } from './present';
 import { retireReadAlerts, retireRoomAlerts } from './retire';
 import { playNotificationSound } from './sound';
@@ -31,6 +33,7 @@ type OpenRoom = (roomId: string, eventId: string | null) => void;
 const UNLISTED_GRACE_MS = 60_000;
 
 export class NotificationCenter {
+  readonly banners = new InAppBanners();
   private stopEvents: (() => void) | null = null;
   private stopNativePush: (() => void) | null = null;
   private nativePushGeneration = 0;
@@ -109,6 +112,25 @@ export class NotificationCenter {
     this.unlisted.clear();
     this.invites.clear();
     this.presented.clear();
+    this.banners.clear();
+  }
+
+  openBanner(banner: Banner): void {
+    this.banners.dismiss(banner.roomId);
+    this.open?.(banner.roomId, banner.eventId);
+  }
+
+  async replyToBanner(banner: Banner, text: string): Promise<void> {
+    const core = this.client;
+    if (core?.session?.user_id !== banner.userId) throw new Error('banner account unavailable');
+    await performNotificationAction(core, {
+      actionId: 'sable-reply',
+      userId: banner.userId,
+      roomId: banner.roomId,
+      eventId: banner.eventId,
+      text,
+    });
+    this.banners.dismiss(banner.roomId);
   }
 
   private showCall(event: Extract<CoreEvent, { type: 'incoming_call' }>): void {
@@ -260,6 +282,7 @@ export class NotificationCenter {
   }
 
   private forget(roomId: string): void {
+    this.banners.dismiss(roomId);
     this.unread.delete(roomId);
     this.unlisted.delete(roomId);
     this.retired.add(roomId);
@@ -311,7 +334,12 @@ export class NotificationCenter {
       });
     }
 
-    if (!enabled() || this.reading === view.room_id) return;
+    if (this.reading === view.room_id) return;
+    if (showsBanner(view)) {
+      this.banners.show(view);
+      return;
+    }
+    if (!enabled()) return;
 
     void this.show(view);
   }

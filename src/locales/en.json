@@ -2592,6 +2592,8 @@
     "instagramEmbeds": "Embed Instagram links",
     "notificationsTitle": "Notifications",
     "systemNotifications": "System alerts",
+    "inAppBanners": "In-app banners",
+    "inAppBannersHint": "While {{appName}} is open, mentions and direct messages appear as a banner instead of a system alert.",
     "notificationSounds": "Play notification sounds",
     "notificationSoundVolume": "Sound volume",
     "notifyOnce": "One alert per room",
@@ -4359,5 +4361,23 @@
     "screenshare_stop": "Stop screensharing",
     "call_join": "Call join",
     "call_leave": "Call leave"
+  },
+  "banner": {
+    "region": "New messages",
+    "more_one": "{{count, number}} more conversation",
+    "more_other": "{{count, number}} more conversations",
+    "new_one": "{{count, number}} new",
+    "new_other": "{{count, number}} new",
+    "hiddenMentions_one": "{{count, number}} mention",
+    "hiddenMentions_other": "{{count, number}} mentions",
+    "mention": "Mention",
+    "showLess": "Show less",
+    "dismissAll": "Dismiss all",
+    "announce": "{{room}}: {{message}}",
+    "announceMention": "Mention in {{room}}: {{message}}",
+    "reply": "Reply",
+    "replyTo": "Reply to {{name}}",
+    "send": "Send",
+    "replyFailed": "Reply not sent. Try again."
   }
 }

@@ -45,6 +45,7 @@ beforeEach(() => {
   preferences.notificationSounds = true;
   preferences.notifyOnce = true;
   preferences.clearNotificationsOnRead = true;
+  preferences.inAppBanners = false;
 });
 
 afterEach(() => {
@@ -719,4 +720,163 @@ test('a pending alert is released once the room list moves past its event', () =
   ]);
 
   expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', ['!room:example.org']);
+});
+
+function bannerMessage(overrides: Partial<NotificationView> = {}): NotificationView {
+  return {
+    user_id: '@me:example.org',
+    room_id: '!room:example.org',
+    event_id: '$one',
+    room_name: 'Room',
+    room_avatar_url: null,
+    is_direct: false,
+    encrypted: false,
+    sender: '@bob:example.org',
+    sender_name: 'Bob',
+    sender_avatar_url: null,
+    body: 'hello',
+    mention: false,
+    noisy: true,
+    ...overrides,
+  };
+}
+
+function stubSystemAlerts(): ReturnType<typeof vi.fn> {
+  const show = vi.fn();
+  class BrowserNotification extends EventTarget {
+    static permission = 'granted';
+    constructor(title: string, options: NotificationOptions) {
+      super();
+      show(title, options);
+    }
+    close = vi.fn();
+  }
+  vi.stubGlobal('Notification', BrowserNotification);
+  preferences.systemNotifications = true;
+  preferences.notificationContent = true;
+  return show;
+}
+
+test('mentions and direct messages become one in-app banner per room instead of a system alert', async () => {
+  const show = stubSystemAlerts();
+  preferences.inAppBanners = true;
+  const notifications = center();
+
+  notifications.present(bannerMessage({ mention: true }));
+  notifications.present(bannerMessage({ mention: true, event_id: '$two', body: 'again' }));
+  notifications.present(
+    bannerMessage({ room_id: '!dm:example.org', is_direct: true, event_id: '$dm' })
+  );
+
+  expect(notifications.banners.items.map((banner) => [banner.roomId, banner.count])).toEqual([
+    ['!room:example.org', 2],
+    ['!dm:example.org', 1],
+  ]);
+  expect(notifications.banners.items[0]).toMatchObject({ eventId: '$two', body: 'Bob: again' });
+
+  notifications.present(bannerMessage({ room_id: '!quiet:example.org', event_id: '$plain' }));
+  await vi.waitFor(() => {
+    expect(show).toHaveBeenCalledOnce();
+  });
+  expect(notifications.banners.items).toHaveLength(2);
+  notifications.stop();
+  expect(notifications.banners.items).toEqual([]);
+});
+
+test('reading a room removes its banner', () => {
+  preferences.inAppBanners = true;
+  const notifications = center();
+
+  notifications.present(bannerMessage({ mention: true }));
+  notifications.readRoom('!room:example.org');
+
+  expect(notifications.banners.items).toEqual([]);
+});
+
+test('without in-app banners a mention still raises a system alert', async () => {
+  const show = stubSystemAlerts();
+  const notifications = center();
+
+  notifications.present(bannerMessage({ mention: true }));
+
+  await vi.waitFor(() => {
+    expect(show).toHaveBeenCalledOnce();
+  });
+  expect(notifications.banners.items).toEqual([]);
+  notifications.stop();
+});
+
+test('an unfocused window and an invite keep the system alert', async () => {
+  const show = stubSystemAlerts();
+  preferences.inAppBanners = true;
+  const notifications = center();
+
+  notifications.present(
+    bannerMessage({ event_id: null, mention: true, room_id: '!invite:example.org' })
+  );
+  const focus = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+  notifications.present(bannerMessage({ mention: true }));
+  focus.mockRestore();
+
+  await vi.waitFor(() => {
+    expect(show).toHaveBeenCalledTimes(2);
+  });
+  expect(notifications.banners.items).toEqual([]);
+  notifications.stop();
+});
+
+test('a held banner keeps its place and nothing is dropped', () => {
+  preferences.inAppBanners = true;
+  const notifications = center();
+  const rooms = ['!a:example.org', '!b:example.org', '!c:example.org', '!d:example.org'];
+
+  notifications.present(bannerMessage({ room_id: rooms[0], event_id: '$a', mention: true }));
+  notifications.banners.hold(rooms[0]);
+  for (const room_id of rooms.slice(1)) {
+    notifications.present(bannerMessage({ room_id, event_id: `$${room_id}`, mention: true }));
+  }
+  notifications.present(bannerMessage({ room_id: rooms[0], event_id: '$a2', mention: true }));
+
+  expect(notifications.banners.items.map((banner) => [banner.roomId, banner.count])).toEqual([
+    [rooms[0], 2],
+    [rooms[1], 1],
+    [rooms[2], 1],
+    [rooms[3], 1],
+  ]);
+
+  notifications.banners.release(rooms[0]);
+  notifications.present(bannerMessage({ room_id: rooms[2], event_id: '$c2', mention: true }));
+  expect(notifications.banners.items[0]?.roomId).toBe(rooms[2]);
+  notifications.stop();
+});
+
+test('the screen reader hears each banner once, not the ones left behind', () => {
+  preferences.inAppBanners = true;
+  const notifications = center();
+
+  notifications.present(
+    bannerMessage({ room_id: '!a:example.org', event_id: '$a', mention: true })
+  );
+  notifications.present(
+    bannerMessage({ room_id: '!b:example.org', event_id: '$b', is_direct: true })
+  );
+  const announced = notifications.banners.announced;
+  notifications.banners.dismiss('!b:example.org');
+
+  expect(announced?.roomId).toBe('!b:example.org');
+  expect(notifications.banners.announced).toBe(announced);
+  notifications.banners.dismissAll();
+  expect(notifications.banners.items).toEqual([]);
+  notifications.stop();
+});
+
+test('a banner reply for an account that is not signed in fails instead of vanishing', async () => {
+  preferences.inAppBanners = true;
+  const notifications = center();
+  notifications.present(bannerMessage({ mention: true, user_id: '@other:example.org' }));
+  const [banner] = notifications.banners.items;
+
+  await expect(notifications.replyToBanner(banner, 'hi')).rejects.toThrow();
+  expect(notifications.banners.items).toHaveLength(1);
+  notifications.stop();
 });

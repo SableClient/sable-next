@@ -180,6 +180,7 @@ except those marked deployment only.
 ## Notifications
 
 - `systemNotifications` (System alerts): `true` or `false`. Default `true`. Deployment only.
+- `inAppBanners` (In-app banners): `true` or `false`. Default `false`. Deployment only.
 - `notificationSounds` (Play notification sounds): `true` or `false`. Default `true`. Deployment only.
 - `notifyOnce` (One alert per room): `true` or `false`. Default `true`.
 - `pushInactiveTimeout` (Alert other devices after): One of `off`, `1`, `5`, `10`, `15`, `30`. Default `1`. Deployment only.

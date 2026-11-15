@@ -3092,6 +3092,7 @@ export type Rpc = {
 	encrypted_content: boolean,
 	sounds: boolean,
 	notify_once: boolean,
+	in_app_banners: boolean,
 }) => Promise<null>;
     pushRules: (params?: Record<string, never>) => Promise<unknown>;
     setPushRuleEnabled: (params: {

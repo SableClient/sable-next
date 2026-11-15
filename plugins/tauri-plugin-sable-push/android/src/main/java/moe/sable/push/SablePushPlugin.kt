@@ -68,6 +68,7 @@ class PolicyArgs {
     var clearOnRead: Boolean = true
     var privateReceipts: Boolean = false
     var quietWhenActiveElsewhere: Boolean = false
+    var inAppBanners: Boolean = false
 }
 
 @InvokeArg
@@ -169,6 +170,7 @@ class SablePushPlugin(private val activity: Activity) : Plugin(activity) {
         policy.clearOnRead = args.clearOnRead
         policy.privateReceipts = args.privateReceipts
         policy.quietWhenActiveElsewhere = args.quietWhenActiveElsewhere
+        policy.inAppBanners = args.inAppBanners
         if (!args.enabled || !args.content) dismissAll()
         invoke.resolve()
     }

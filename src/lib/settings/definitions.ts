@@ -11,6 +11,7 @@ import { SYSTEM_TIME_ZONE, timeZoneValues } from '#lib/ui/time-zones.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { isNightlyBuild } from '#lib/platform/build-channel.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
+import { isNativeMobile } from '#lib/platform/os.js';
 import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
 
 export type { BadgeNotificationMode };
@@ -449,6 +450,7 @@ const SETTINGS = {
   instagramEmbeds: toggle(false),
 
   systemNotifications: toggle(true, { device: true }),
+  inAppBanners: toggle(isNativeMobile(), { device: true }),
   badgeDefaultDirect: choice<BadgeNotificationMode>(['all', 'mentions', 'quiet'], 'all', {
     account: true,
   }),

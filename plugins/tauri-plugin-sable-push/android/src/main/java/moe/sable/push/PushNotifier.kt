@@ -1,5 +1,6 @@
 package moe.sable.push
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -181,8 +182,8 @@ object PushNotifier {
                 PushNotificationGate.post(context, id, revision) { postIncomingCall(context, notification, notification) }
                 return
             }
-            if (quietForActiveElsewhere(context, store, notification)) {
-                PushDiagnostics.record(context, PushOutcome.ACTIVE_ELSEWHERE, trace)
+            quietOutcome(context, store, notification)?.let {
+                PushDiagnostics.record(context, it, trace)
                 return
             }
             val previews = store.showContent &&
@@ -208,8 +209,8 @@ object PushNotifier {
             is PushDecryptResult.Success -> {
                 PushDiagnostics.record(context, PushOutcome.DECRYPTED, trace)
                 val clear = runCatching { JSONObject(local.clearEventJson) }.getOrNull()
-                if (clear == null && quietForActiveElsewhere(context, store, notification)) {
-                    PushDiagnostics.record(context, PushOutcome.ACTIVE_ELSEWHERE, trace)
+                if (clear == null) quietOutcome(context, store, notification)?.let {
+                    PushDiagnostics.record(context, it, trace)
                     return
                 }
                 if (clear == null) {
@@ -232,13 +233,26 @@ object PushNotifier {
             showDecrypted(context, notification, clear, id, revision)
         } else if (!quietly && outcome != PushOutcome.DISCARDED && outcome != PushOutcome.RULES_UNEVALUATED) {
             if (dismissReadUpdate(context, notification, id)) return
-            if (quietForActiveElsewhere(context, store, notification)) {
-                PushDiagnostics.record(context, PushOutcome.ACTIVE_ELSEWHERE, trace)
+            quietOutcome(context, store, notification)?.let {
+                PushDiagnostics.record(context, it, trace)
                 return
             }
             attachMedia(context, notification, roomId, content = null)
             PushNotificationGate.post(context, id, revision) { post(context, notification, "Encrypted message") }
         }
+    }
+
+    /** The open app shows messages as in-app banners and posts the rest itself. */
+    private fun quietOutcome(context: Context, store: PushPolicy, notification: JSONObject): PushOutcome? = when {
+        !isInvite(notification) && store.inAppBanners && appInForeground() -> PushOutcome.IN_APP
+        quietForActiveElsewhere(context, store, notification) -> PushOutcome.ACTIVE_ELSEWHERE
+        else -> null
+    }
+
+    private fun appInForeground(): Boolean {
+        val state = ActivityManager.RunningAppProcessInfo()
+        ActivityManager.getMyMemoryState(state)
+        return state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
 
     private fun quietForActiveElsewhere(context: Context, store: PushPolicy, notification: JSONObject): Boolean {
@@ -282,8 +296,8 @@ object PushNotifier {
             }
             return
         }
-        if (quietForActiveElsewhere(context, store, notification)) {
-            PushDiagnostics.record(context, PushOutcome.ACTIVE_ELSEWHERE, traceOf(notification))
+        quietOutcome(context, store, notification)?.let {
+            PushDiagnostics.record(context, it, traceOf(notification))
             return
         }
         if (clear.optBoolean(NOISY_KEY)) notification.put(NOISY_KEY, true)

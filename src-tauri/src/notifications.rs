@@ -41,7 +41,7 @@ pub(crate) async fn show<R: Runtime>(
     core: &sable_core::Core,
     view: &NotificationView,
 ) {
-    if !core.notifications_enabled() {
+    if !core.notifications_enabled() || core.shows_banner(view) {
         return;
     }
     #[cfg(target_os = "android")]
