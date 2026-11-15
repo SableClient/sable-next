@@ -286,6 +286,27 @@ test('a tall row leaving the window keeps the scroll height and the rows below i
   expect(rowTop('Room 30')).toBe(before);
 });
 
+test('scrolling up through rows taller than the estimate keeps the visible rows still', async () => {
+  directRooms(1000, (index) => (index % 3 === 0 ? { topic: `Topic ${String(index)}` } : {}));
+  const scroller = await mountShortNav();
+
+  scroller.scrollTop = scroller.scrollHeight;
+  await expect.poll(() => rowTop('Room 999')).toBeDefined();
+  await settle();
+  const topOf = (key: string) =>
+    document.querySelector(`[data-row-key="${key}"]`)?.getBoundingClientRect().top;
+  for (let step = 0; step < 40; step++) {
+    const anchor = [...document.querySelectorAll<HTMLElement>('.room-list [data-row-key]')].find(
+      (row) => row.getBoundingClientRect().top >= scroller.getBoundingClientRect().top
+    );
+    const key = anchor?.dataset.rowKey ?? '';
+    const before = topOf(key) ?? 0;
+    scroller.scrollTop -= 100;
+    await settle();
+    expect(Math.abs((topOf(key) ?? 0) - before - 100)).toBeLessThan(1);
+  }
+});
+
 test('arrow keys walk past the initial window and back without losing focus', async () => {
   directRooms(1000);
   await mountShortNav();

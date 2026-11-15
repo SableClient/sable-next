@@ -1,3 +1,4 @@
+import { flushSync } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
 
 const OVERSCAN_ROWS = 10;
@@ -88,7 +89,13 @@ export class ListWindow {
     const schedule = () => {
       frame ||= requestAnimationFrame(() => {
         frame = 0;
+        const anchor = this.#firstVisibleRow(list, scroller);
+        const top = anchor?.getBoundingClientRect().top;
         this.#measure(list, scroller);
+        flushSync();
+        const shift = anchor?.isConnected ? anchor.getBoundingClientRect().top - (top ?? 0) : 0;
+        // Setting scrollTop stops momentum scrolling on WebKit, so leave it alone when nothing moved.
+        if (shift !== 0) scroller.scrollTop += shift;
       });
     };
     this.#measure(list, scroller);
@@ -116,6 +123,12 @@ export class ListWindow {
       else high = middle - 1;
     }
     return Math.max(0, low);
+  }
+
+  #firstVisibleRow(list: HTMLElement, scroller: HTMLElement): HTMLElement | undefined {
+    const top = scroller.getBoundingClientRect().top;
+    const rows = list.parentElement?.querySelectorAll<HTMLElement>(ROW) ?? [];
+    return [...rows].find((row) => row.getBoundingClientRect().bottom > top);
   }
 
   #listTop(list: HTMLElement, scroller: HTMLElement): number {

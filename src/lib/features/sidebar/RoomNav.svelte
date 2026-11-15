@@ -1142,6 +1142,7 @@
     flex: 1;
     min-height: 0;
     overflow: hidden auto;
+    overflow-anchor: none;
   }
 
   .rooms-heading {
