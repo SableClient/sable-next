@@ -66,6 +66,16 @@ test.each(['root', 'reply'])('a forum permalink to a %s uses the forum view', (e
   expect(rendered).toEqual(['forum']);
 });
 
+test('a notification in a forum opens the forum view', () => {
+  page.state.notified = '$reply';
+  onTestFinished(() => {
+    delete page.state.notified;
+  });
+  visit('/rooms/!forum:example.org', { roomId: '!forum:example.org' });
+  render(RoomOrForumPage);
+  expect(rendered).toEqual(['forum']);
+});
+
 test('an explicit event timeline still takes precedence over a forum permalink', () => {
   visit('/rooms/!forum:example.org?timeline=events&event=%24reply', {
     roomId: '!forum:example.org',

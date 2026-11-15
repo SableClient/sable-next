@@ -19,8 +19,8 @@
   let eventTimeline = $derived(page.url.searchParams.get('timeline') === 'events');
   let roomTimeline = $derived(
     eventTimeline ||
-      (room?.room_kind !== 'forum' && page.url.searchParams.has('event')) ||
-      Boolean(page.state.notified)
+      (room?.room_kind !== 'forum' &&
+        (page.url.searchParams.has('event') || Boolean(page.state.notified)))
   );
   let userId = $derived(core.session?.user_id ?? null);
   let openRoomId = $derived(appLayout.drawerCovers(page.state) ? null : (room?.room_id ?? null));

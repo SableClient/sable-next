@@ -90,7 +90,7 @@
     void resolvedRoomId;
     return null;
   });
-  let linkedEventId = $derived(page.url.searchParams.get('event'));
+  let linkedEventId = $derived(page.url.searchParams.get('event') ?? page.state.notified ?? null);
   let threadEventId = $state<string | null>(null);
   const sidePanels = new MediaQuery(BREAKPOINTS.sidePanels);
   let threadInPanel = $derived(sidePanels.current && preferences.threadPresentation === 'panel');
@@ -288,7 +288,7 @@
   }
 
   function clearLinkedEvent(): Promise<void> | undefined {
-    if (!page.url.searchParams.has('event')) return;
+    if (!page.url.searchParams.has('event') && !page.state.notified) return;
     const url = new URL(page.url.href);
     url.searchParams.delete('event');
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
