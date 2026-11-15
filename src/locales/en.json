@@ -2559,6 +2559,7 @@
     "mediaAutoLoadPrivate": "Private rooms",
     "autoplayGifs": "Autoplay animated images",
     "pauseAnimationsWhenInactive": "Pause animations when the window is inactive",
+    "autoplayGifsHint": "Avatars play on hover in lists, and always on profiles.",
     "autoplayStickers": "Autoplay stickers and emoji",
     "gifProvider": "GIF search provider",
     "gifProviderDefault": "Client default",

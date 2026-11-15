@@ -165,6 +165,7 @@
           id={userId}
           color={heroColor ? undefined : color}
           original
+          autoplay
         />
       {/snippet}
       {#if onAvatarEdit}

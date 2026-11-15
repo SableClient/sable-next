@@ -713,6 +713,7 @@
       name={space?.name ?? ''}
       size="large"
       uniform
+      autoplay
     />
     <h1>{space?.name ?? i18n.t('nav.space')}</h1>
     {#if space?.topic}

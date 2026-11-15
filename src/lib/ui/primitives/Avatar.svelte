@@ -9,7 +9,9 @@
 
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { animatedImage } from '#lib/ui/media-url.js';
+  import { shouldReduceMotion } from '#lib/ui/motion.js';
   import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import { identityColor } from './identity-color.js';
   import { toInitials } from './initials.js';
@@ -33,6 +35,7 @@
     recolor?: boolean;
     original?: boolean;
     refreshOnResume?: boolean;
+    autoplay?: boolean;
     class?: ClassValue;
     children?: Snippet;
   };
@@ -52,6 +55,7 @@
     recolor = false,
     original = false,
     refreshOnResume = false,
+    autoplay = false,
     class: className = '',
     children,
   }: Props = $props();
@@ -65,9 +69,15 @@
   let plate = $derived(color ?? (id === null ? undefined : identityColor(id)));
   let tint = $derived(paintedSrc === src ? undefined : plate);
   let hovered = $state(false);
+  let autoplaying = $derived(autoplay && preferences.autoplayGifs && !shouldReduceMotion());
+  let animating = $derived(hovered || autoplaying);
   let animatedSrc = $state<string | null>(null);
   let overlaySrc = $state<string | null>(null);
-  let playing = $derived(hovered && overlaySrc === src && animatedSrc === src);
+  let playing = $derived(animating && overlaySrc === src && animatedSrc === src);
+
+  $effect(() => {
+    if (!animating) overlaySrc = null;
+  });
 
   async function checkAnimated(source: string, url: string | null): Promise<void> {
     if (!url) return;
@@ -88,7 +98,6 @@
     });
     const stopLeave = on(scope, 'pointerleave', () => {
       hovered = false;
-      overlaySrc = null;
     });
     return () => {
       stopEnter();
@@ -116,7 +125,7 @@
         {uniform}
         tint={recolor}
         {original}
-        freeze={!original || !hovered}
+        freeze={!original || !animating}
         autoplay
         {refreshOnResume}
         pixelate={false}
@@ -126,7 +135,7 @@
         }}
         onfailed={(source) => (failedSrc = source)}
       />
-      {#if hovered && !original}
+      {#if animating && !original}
         <MediaImage
           class="avatar-image"
           style={playing ? undefined : 'opacity: 0'}
@@ -152,7 +161,7 @@
         onload={() => (paintedSrc = src)}
         onerror={() => (failedSrc = src)}
         {@attach (image) => {
-          if (paintedSrc === src) holdStillFrame(image, !hovered || animationsPaused());
+          if (paintedSrc === src) holdStillFrame(image, !animating || animationsPaused());
         }}
       />
     {/if}

@@ -7,6 +7,12 @@ vi.mock('#lib/core/context.js', async () => {
   return { useCoreClient: () => core };
 });
 
+const motion = vi.hoisted(() => ({ reduce: false }));
+vi.mock('#lib/ui/motion.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/ui/motion.js')>()),
+  shouldReduceMotion: () => motion.reduce,
+}));
+
 import { core } from '#lib/core/__mocks__/context.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -23,6 +29,7 @@ const GIF = Uint8Array.from(
 afterEach(() => {
   core.fetchMedia.mockReset();
   preferences.autoplayGifs = true;
+  motion.reduce = false;
   vi.restoreAllMocks();
 });
 
@@ -89,3 +96,41 @@ test.each(['thumbnail', 'encrypted', 'local', 'original', 'named-gif'])(
     }
   }
 );
+
+test('autoplay avatars animate without hover while autoplay is on', async () => {
+  core.fetchMedia.mockResolvedValue(GIF);
+  const screen = await render(Avatar, {
+    src: 'mxc://example.org/browser-autoplay-avatar',
+    name: 'Sable',
+    autoplay: true,
+  });
+  const root = screen.container.querySelector<HTMLElement>('.avatar-root');
+  if (!root) throw new Error('avatar not rendered');
+  await vi.waitFor(() => {
+    const images = root.querySelectorAll('img');
+    expect(images).toHaveLength(2);
+    expect(images[0].closest<HTMLElement>('.avatar-image')?.style.opacity).toBe('0');
+    expect(images[1].closest<HTMLElement>('.avatar-image')?.style.opacity).toBe('');
+  });
+});
+
+test.each([
+  ['autoplay is off', false, false],
+  ['reduce motion is on', true, true],
+])('autoplay avatars stay still while %s', async (_, autoplayGifs, reduce) => {
+  core.fetchMedia.mockResolvedValue(GIF);
+  preferences.autoplayGifs = autoplayGifs;
+  motion.reduce = reduce;
+  const stills = recordStills();
+  const screen = await render(Avatar, {
+    src: `mxc://example.org/browser-autoplay-still-${String(reduce)}-avatar`,
+    name: 'Sable',
+    autoplay: true,
+  });
+  const root = screen.container.querySelector<HTMLElement>('.avatar-root');
+  if (!root) throw new Error('avatar not rendered');
+  await vi.waitFor(() => {
+    expect(stills.has(root.querySelector('img')?.getAttribute('src') ?? '')).toBe(true);
+  });
+  expect(root.querySelectorAll('img')).toHaveLength(1);
+});

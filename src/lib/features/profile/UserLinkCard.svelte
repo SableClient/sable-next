@@ -101,7 +101,7 @@
   {#if !loaded}
     <div role="status"><Spinner /></div>
   {:else}
-    <Avatar id={userId} src={avatar_url} openable={true} {name} size="large" />
+    <Avatar id={userId} src={avatar_url} openable={true} {name} size="large" autoplay />
     <h1 id="user-link-title">{name}</h1>
     <p class="user-link-id">{userId}</p>
     {#if failed}

@@ -49,6 +49,7 @@ export const mediaCategory: SettingsCategory = {
       section: 'playback',
       icon: FilmStripIcon,
       name: 'settings.autoplayGifs',
+      description: 'settings.autoplayGifsHint',
       terms: ['settings.terms.autoplayGifs'],
       type: 'boolean',
     },
