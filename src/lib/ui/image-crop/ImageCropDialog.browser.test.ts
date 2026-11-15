@@ -83,7 +83,7 @@ test('a turned attachment keeps the original shape, sideways', async () => {
   await render(ImageCropHost);
   const result = requestCrop(await png(800, 400), 'attachment');
   await expect.element(page.getByRole('button', { name: 'Apply' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Rotate' }).click();
+  await page.getByRole('button', { name: 'Rotate right' }).click();
   await page.getByRole('button', { name: 'Apply' }).click();
 
   expect(await size((await result) as File)).toEqual({
@@ -96,12 +96,28 @@ test('a fourth turn keeps spinning forward', async () => {
   await render(ImageCropHost);
   void requestCrop(await png(800, 400), 'attachment');
   await expect.element(page.getByRole('button', { name: 'Apply' })).toBeEnabled();
-  const rotate = page.getByRole('button', { name: 'Rotate' });
+  const rotate = page.getByRole('button', { name: 'Rotate right' });
   for (let turn = 0; turn < 4; turn += 1) await rotate.click();
 
   expect(document.querySelector<HTMLElement>('.crop-image')?.style.transform).toContain(
     'rotate(360deg)'
   );
+});
+
+test('a left turn from upright crops like three right turns', async () => {
+  await render(ImageCropHost);
+  const result = requestCrop(await png(800, 400), 'attachment');
+  await expect.element(page.getByRole('button', { name: 'Apply' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Rotate left' }).click();
+
+  expect(document.querySelector<HTMLElement>('.crop-image')?.style.transform).toContain(
+    'rotate(-90deg)'
+  );
+  await page.getByRole('button', { name: 'Apply' }).click();
+  expect(await size((await result) as File)).toEqual({
+    width: 400,
+    height: 800,
+  });
 });
 
 test('cancel and use original settle without cropping', async () => {

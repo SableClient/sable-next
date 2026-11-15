@@ -3,6 +3,7 @@
   import { untrack } from 'svelte';
   import type { Attachment } from 'svelte/attachments';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
+  import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
   import MagnifyingGlassMinusIcon from 'phosphor-svelte/lib/MagnifyingGlassMinusIcon';
   import MagnifyingGlassPlusIcon from 'phosphor-svelte/lib/MagnifyingGlassPlusIcon';
@@ -71,7 +72,7 @@
   );
   let aspect = $state<string>(untrack(() => PRESETS[preset].aspects[0]));
   let turns = $state(0);
-  let rotation = $derived(((turns % 4) * 90) as Rotation);
+  let rotation = $derived(((((turns % 4) + 4) % 4) * 90) as Rotation);
   let natural = $state.raw<Size | null>(null);
   let stage = $state.raw<Size | null>(null);
   let frame = $state.raw<Rect>({ x: 0, y: 0, width: 0, height: 0 });
@@ -122,8 +123,8 @@
     if (key !== 'free') layout();
   }
 
-  function rotate(): void {
-    turns += 1;
+  function rotate(direction: 1 | -1): void {
+    turns += direction;
     layout(aspect === 'free' ? imageRatio() : undefined);
   }
 
@@ -191,7 +192,8 @@
     else if (event.key === '+' || event.key === '=') zoomTo(view.scale * KEY_ZOOM);
     else if (event.key === '-') zoomTo(view.scale / KEY_ZOOM);
     else if (event.key === '0') view = fitView(image, frame);
-    else if (event.key === 'r' || event.key === 'R') rotate();
+    else if (event.key === 'r') rotate(1);
+    else if (event.key === 'R') rotate(-1);
     else if (event.key === 'Enter') void apply();
     else return;
     event.preventDefault();
@@ -313,10 +315,18 @@
           <MagnifyingGlassPlusIcon aria-hidden="true" />
         </div>
         <IconButton
-          label={i18n.t('crop.rotate')}
+          label={i18n.t('crop.rotateLeft')}
           variant="ghost"
           disabled={!ready}
-          onclick={rotate}
+          onclick={() => rotate(-1)}
+        >
+          <ArrowCounterClockwiseIcon />
+        </IconButton>
+        <IconButton
+          label={i18n.t('crop.rotateRight')}
+          variant="ghost"
+          disabled={!ready}
+          onclick={() => rotate(1)}
         >
           <ArrowClockwiseIcon />
         </IconButton>
