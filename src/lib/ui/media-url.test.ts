@@ -14,7 +14,11 @@ import {
   retryMediaUrl,
 } from './media-url.js';
 
+const heicTo = vi.hoisted(() => vi.fn());
+vi.mock('heic-to/csp', () => ({ heicTo }));
+
 afterEach(() => {
+  heicTo.mockReset();
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -589,4 +593,40 @@ test('only an animatable image small enough to copy is checked for frames', () =
   expect(animatedImage('image/gif', gif)).toBe(true);
   expect(animatedImage('video/mp4', gif)).toBeNull();
   expect(animatedImage('image/gif', new Uint8Array(16 * 1024 * 1024 + 1))).toBeNull();
+});
+
+test('a heic the engine cannot decode is shown as a jpeg', async () => {
+  const shown = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:heic');
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(() => Promise.reject(new Error('unsupported')))
+  );
+  heicTo.mockResolvedValue(new Blob([new Uint8Array([0xff, 0xd8])], { type: 'image/jpeg' }));
+  const heic = new Uint8Array([0, 0, 0, 24, ...Buffer.from('ftypheic'), 0, 0, 0, 0]);
+  const core = {
+    session: session('account-heic', '@a:example.org', 'device-a'),
+    media: { fetchMedia: vi.fn(() => Promise.resolve(heic)) },
+  };
+
+  await loadMediaUrl(core, 'mxc://example.org/heic', 0, 0, 'image/heic');
+
+  expect(shown).toHaveBeenCalledWith(expect.objectContaining({ type: 'image/jpeg' }));
+});
+
+test('a heic the engine decodes is shown untouched', async () => {
+  const shown = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:heic-native');
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(() => Promise.resolve({ width: 4, height: 3, close: vi.fn() }))
+  );
+  const heic = new Uint8Array([0, 0, 0, 24, ...Buffer.from('ftypheic'), 0, 0, 0, 0]);
+  const core = {
+    session: session('account-heic-native', '@a:example.org', 'device-a'),
+    media: { fetchMedia: vi.fn(() => Promise.resolve(heic)) },
+  };
+
+  await loadMediaUrl(core, 'mxc://example.org/heic-native', 0, 0, 'image/heic');
+
+  expect(shown).toHaveBeenCalledWith(expect.objectContaining({ type: 'image/heic' }));
+  expect(heicTo).not.toHaveBeenCalled();
 });

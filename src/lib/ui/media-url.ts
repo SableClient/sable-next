@@ -2,7 +2,7 @@ import QuickLRU from 'quick-lru';
 
 import { CoreError, isCoreError } from '#src/transport';
 import { mediaFailureHold } from '#lib/ui/media-retry.js';
-import { mediaMime } from '#lib/media-signatures.js';
+import { imageMime, mediaMime } from '#lib/media-signatures.js';
 import { imageIsAnimated } from '#lib/model/model.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { CoreMedia } from '#lib/core/media.svelte.js';
@@ -90,6 +90,21 @@ export function animatedImage(type: string, bytes: Uint8Array): boolean | null {
 function blobType(mime: string | null | undefined, bytes: Uint8Array): string {
   if (mime && mime !== 'application/octet-stream') return mime;
   return mediaMime(bytes) ?? '';
+}
+
+async function decodableHeic(blob: Blob): Promise<Blob> {
+  try {
+    (await createImageBitmap(blob)).close();
+    return blob;
+  } catch {
+    try {
+      const { heicTo } = await import('heic-to/csp');
+      return await heicTo({ blob, type: 'image/jpeg', quality: 0.92 });
+    } catch (error) {
+      console.debug('[sable media] the heic could not be decoded', error);
+      return blob;
+    }
+  }
 }
 
 function measure(key: string, type: string, blob: Blob): Promise<void> | null {
@@ -288,9 +303,13 @@ export function loadMediaUrl(
   if (joined !== undefined) return joined;
   const request = core.media
     .fetchMedia(source, width, height)
-    .then((bytes) => {
-      const type = blobType(mime, bytes);
-      const blob = new Blob([bytes], { type });
+    .then(async (bytes) => {
+      const fetched = new Blob([bytes], { type: blobType(mime, bytes) });
+      const heic = imageMime(bytes) === 'image/heic';
+      return { bytes, blob: heic ? await decodableHeic(fetched) : fetched };
+    })
+    .then(({ bytes, blob }) => {
+      const type = blob.type;
       const publish = (): string => {
         const objectUrl = URL.createObjectURL(blob);
         const previous = objectUrls.get(key);
