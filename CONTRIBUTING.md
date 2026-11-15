@@ -42,7 +42,7 @@ submit. For AI-generated output that status is ill-defined: training material is
 often under restrictive terms, and open source terms are not all AGPL-3.0
 compatible.
 
-We kindly ask contributors to join [#next:sable.moe](https://matrix.to/#/%23next%3Asable.moe)
+We kindly ask contributors to join [#next:sable.moe](https://link.sable.moe/#/%23next%3Asable.moe)
 if they need help with the codebase instead of relying on the output of AI models.
 We're always happy to support new contributors in creating their first PRs,
 especially for [issues tagged "good-first-issue"](https://git.sable.moe/SableClient/sable-next/issues?q=&type=all&sort=relevance&state=open&labels=7&milestone=0&project=0&assignee=0&poster=0&archived=false).

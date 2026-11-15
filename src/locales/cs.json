@@ -143,7 +143,7 @@
     "joinExamplesLabel": "Příklady adres:",
     "joinAddressLabel": "Adresa",
     "joinAddressPlaceholder": "#mistnost:server",
-    "joinInvalid": "Toto není platná adresa místnosti ani matrix.to odkaz.",
+    "joinInvalid": "Toto není platná adresa místnosti ani link.sable.moe odkaz.",
     "settingsTitle": "Nastavení místnosti",
     "settingsOpen": "Nastavení místnosti"
   },

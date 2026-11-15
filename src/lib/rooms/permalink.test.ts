@@ -213,19 +213,19 @@ test('via inside the fragment does not leak into the room id', () => {
    servers; a canonical alias carries its own and must not. */
 test('a room id link advertises its via servers', () => {
   expect(matrixToUrl('!somewhere:example.org', ['elsewhere.ca'])).toBe(
-    'https://matrix.to/#/!somewhere%3Aexample.org?via=elsewhere.ca'
+    'https://link.sable.moe/#/!somewhere%3Aexample.org?via=elsewhere.ca'
   );
 });
 
 test('an alias link carries no via, being routable already', () => {
   expect(matrixToUrl('#lobby:example.org', ['elsewhere.ca'])).toBe(
-    'https://matrix.to/#/%23lobby%3Aexample.org'
+    'https://link.sable.moe/#/%23lobby%3Aexample.org'
   );
 });
 
 test('an event link nests the event under the room', () => {
   expect(matrixToUrl('!somewhere:example.org', ['a.example', 'b.example'], '$event')).toBe(
-    'https://matrix.to/#/!somewhere%3Aexample.org/%24event?via=a.example&via=b.example'
+    'https://link.sable.moe/#/!somewhere%3Aexample.org/%24event?via=a.example&via=b.example'
   );
 });
 
@@ -310,7 +310,7 @@ test('copying an aliased room link skips the via lookup', async () => {
   await copyRoomLink(core, { room_id: '!room:example.org', canonical_alias: '#lobby:example.org' });
 
   expect(roomViaServers).not.toHaveBeenCalled();
-  expect(writeText).toHaveBeenCalledWith('https://matrix.to/#/%23lobby%3Aexample.org');
+  expect(writeText).toHaveBeenCalledWith('https://link.sable.moe/#/%23lobby%3Aexample.org');
 });
 
 test('a failed room link copy reports false instead of throwing', async () => {
@@ -323,15 +323,15 @@ test('a failed room link copy reports false instead of throwing', async () => {
 });
 
 test.each([
-  ['https://matrix.to/#/@alice:example.org', '/to/%40alice%3Aexample.org'],
+  ['https://link.sable.moe/#/@alice:example.org', '/to/%40alice%3Aexample.org'],
   ['matrix:u/alice:example.org', '/to/%40alice%3Aexample.org'],
-  ['https://matrix.to/#/%23lobby%3Aexample.org', '/to/%23lobby%3Aexample.org'],
+  ['https://link.sable.moe/#/%23lobby%3Aexample.org', '/to/%23lobby%3Aexample.org'],
   [
     'matrix:roomid/room:example.org/e/event?via=a.example&via=b.example',
     '/to/!room%3Aexample.org/%24event?via=a.example&via=b.example',
   ],
   [
-    'https://matrix.to/#/!room:example.org/$event?via=a.example&via=b.example',
+    'https://link.sable.moe/#/!room:example.org/$event?via=a.example&via=b.example',
     '/to/!room%3Aexample.org/%24event?via=a.example&via=b.example',
   ],
 ])('routes incoming %s through the permalink page', (href, expected) => {
@@ -342,7 +342,7 @@ test.each([
 
 test.each([
   'https://example.org/#/!room:example.org',
-  'https://matrix.to/#/',
+  'https://link.sable.moe/#/',
   'moe.sable.next:/login?code=a',
 ])('ignores non-Matrix deep link %s', (href) => {
   expect(matrixLinkPath(href)).toBeNull();
@@ -350,7 +350,7 @@ test.each([
 
 test('incoming event links preserve the event and routing servers through /to', () => {
   const path = matrixLinkPath(
-    'https://matrix.to/#/!room:example.org/$event?via=a.example&via=b.example'
+    'https://link.sable.moe/#/!room:example.org/$event?via=a.example&via=b.example'
   );
   assert(path !== null);
   const url = new URL(path, 'https://sable.invalid');

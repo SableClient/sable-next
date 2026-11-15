@@ -5,7 +5,8 @@ import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
 import { canonicalDatetime, isOpaqueMatrixColor, utcFallbackLabel } from '../time-markup';
 
-export const matrixTo = 'https://matrix.to/#/';
+export const matrixTo = 'https://link.sable.moe/#/';
+const mentionPrefixes = [matrixTo, 'https://matrix.to/#/'];
 
 const notExplicit = ':not([data-mx-link]):not([data-org\\.matrix\\.msc4550\\.link])';
 
@@ -213,14 +214,16 @@ export const composerSchema = new Schema({
       attrs: { userId: {}, name: {}, via: { default: [] as string[] } },
       parseDOM: [
         {
-          tag: ['@', '#', '!']
-            .map((sigil) => `a[href^="${matrixTo}${sigil}"]${notExplicit}`)
+          tag: mentionPrefixes
+            .flatMap((prefix) =>
+              ['@', '#', '!'].map((sigil) => `a[href^="${prefix}${sigil}"]${notExplicit}`)
+            )
             .join(', '),
           priority: 60,
           getAttrs: (dom) => {
             const { href, via } = splitVia(dom.getAttribute('href') ?? '');
             return {
-              userId: decodeURIComponent(href.slice(matrixTo.length)),
+              userId: decodeURIComponent(href.slice(href.indexOf('#/') + 2)),
               name: dom.textContent,
               via,
             };

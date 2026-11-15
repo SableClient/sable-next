@@ -11,7 +11,9 @@ export function deepLinksIn(argv: string[], schemes: string[]): string[] {
       const url = new URL(arg);
       return (
         schemes.includes(url.protocol.slice(0, -1)) ||
-        (url.protocol === 'https:' && url.host === 'matrix.to' && url.hash.startsWith('#/'))
+        (url.protocol === 'https:' &&
+          ['link.sable.moe', 'matrix.to'].includes(url.host) &&
+          url.hash.startsWith('#/'))
       );
     } catch {
       return false;

@@ -62,9 +62,8 @@ describe('previewableLinks', () => {
     expect(previewableLinks(html)).toEqual(['https://example.org/visible']);
   });
 
-  it('skips a matrix.to permalink', () => {
-    const html =
-      '<a href="https://matrix.to/#/%23room:example.org">room</a> <a href="https://example.org/x">x</a>';
+  it.each(['link.sable.moe', 'matrix.to'])('skips a %s permalink', (host) => {
+    const html = `<a href="https://${host}/#/%23room:example.org">room</a> <a href="https://example.org/x">x</a>`;
     expect(previewableLinks(html)).toEqual(['https://example.org/x']);
   });
 

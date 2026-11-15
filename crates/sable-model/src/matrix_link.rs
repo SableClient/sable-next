@@ -29,6 +29,13 @@ pub struct ViaSplit {
 
 #[must_use]
 pub fn parse_matrix_link(href: &str) -> Option<MatrixLink> {
+    let normalized;
+    let href = if let Some(fragment) = href.strip_prefix("https://link.sable.moe/#/") {
+        normalized = format!("https://matrix.to/#/{fragment}");
+        normalized.as_str()
+    } else {
+        href
+    };
     let path = href.split(['?', '#']).next().unwrap_or(href);
     let identifier = href
         .find('#')
@@ -251,6 +258,35 @@ mod tests {
             ),
         ] {
             assert_eq!(parse_matrix_link(href), Some(expected), "{href}");
+        }
+    }
+
+    #[test]
+    fn sable_links_support_the_same_ids_and_routing_as_matrix_to() {
+        for fragment in [
+            "@alice:example.org",
+            "%23lobby%3Aexample.org",
+            "!room:example.org/$event?via=a.example&via=b.example",
+            "!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe",
+        ] {
+            let sable = format!("https://link.sable.moe/#/{fragment}");
+            let legacy = format!("https://matrix.to/#/{fragment}");
+            let expected = parse_matrix_link(&legacy);
+            assert!(expected.is_some(), "{legacy}");
+            assert_eq!(parse_matrix_link(&sable), expected, "{sable}");
+            assert_eq!(parse_join_address(&sable), parse_join_address(&legacy));
+        }
+        for href in [
+            "https://link.sable.moe/#/",
+            "https://link.sable.moe/#/%E0%A4%A",
+            "https://link.sable.moe/#/@alice:example.org/extra",
+            "https://link.sable.moe.evil/#/@alice:example.org",
+            "https://link.sable.moe/other/#/@alice:example.org",
+            "https://user@link.sable.moe/#/@alice:example.org",
+            "https://link.sable.moe:8443/#/@alice:example.org",
+            "http://link.sable.moe/#/@alice:example.org",
+        ] {
+            assert_eq!(parse_matrix_link(href), None, "{href}");
         }
     }
 

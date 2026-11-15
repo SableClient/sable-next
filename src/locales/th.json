@@ -149,7 +149,7 @@
     "joinExamplesLabel": "รูปแบบของที่อยู่เป็นดังนี้:",
     "joinAddressLabel": "ที่อยู่",
     "joinAddressPlaceholder": "#room:server",
-    "joinInvalid": "นั่นดูไม่เหมือนที่อยู่ห้องหรือลิงก์ matrix.to เลย",
+    "joinInvalid": "นั่นดูไม่เหมือนที่อยู่ห้องหรือลิงก์ link.sable.moe เลย",
     "directorySearch": "ค้นหา"
   },
   "timeline": {

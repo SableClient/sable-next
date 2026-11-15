@@ -247,7 +247,7 @@ test('a mention pill stands in for the user id a command asks for', async () => 
 
   await runSlash('/headpat @Kris', {
     ...context(commands),
-    formatted: '/headpat <a href="https://matrix.to/#/@kris:example.org">@Kris</a>',
+    formatted: '/headpat <a href="https://link.sable.moe/#/@kris:example.org">@Kris</a>',
   });
 
   expect(commands.sendGesture).toHaveBeenCalledWith({
@@ -372,7 +372,10 @@ test('/join takes an address and its routing servers', async () => {
   const commands = fakeCommands();
 
   await expect(
-    runSlash('/join https://matrix.to/#/%23room%3Aexample.org?via=other.org', context(commands))
+    runSlash(
+      '/join https://link.sable.moe/#/%23room%3Aexample.org?via=other.org',
+      context(commands)
+    )
   ).resolves.toEqual({ kind: 'done' });
   expect(commands.joinRoom).toHaveBeenCalledWith({
     address: '#room:example.org',
@@ -386,7 +389,10 @@ test('/join hands a knock room over to the ask to join page', async () => {
   commands.previewRoom.mockResolvedValue({ join_rule: 'knock' } as RoomPreviewView);
 
   await expect(
-    runSlash('/join https://matrix.to/#/%23room%3Aexample.org?via=other.org', context(commands))
+    runSlash(
+      '/join https://link.sable.moe/#/%23room%3Aexample.org?via=other.org',
+      context(commands)
+    )
   ).resolves.toEqual({ kind: 'knock', address: '#room:example.org', via: ['other.org'] });
 });
 

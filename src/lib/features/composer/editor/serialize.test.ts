@@ -342,8 +342,8 @@ test('a plain-mode edit rebuilds the source when the body would not reproduce th
 
 test('a plain-mode edit keeps pills between markdown and across paragraphs', () => {
   const html =
-    '<p><strong>hey</strong> <a href="https://matrix.to/#/@one:example.org">@_one</a></p>' +
-    '<p><a href="https://matrix.to/#/!room:example.org?via=example.org">#Room</a> ' +
+    '<p><strong>hey</strong> <a href="https://link.sable.moe/#/@one:example.org">@_one</a></p>' +
+    '<p><a href="https://link.sable.moe/#/!room:example.org?via=example.org">#Room</a> ' +
     '<img data-mx-emoticon="" src="mxc://other.org/wave" alt="wave" title="wave" height="32"></p>';
   const edited = plainEditDoc('**hey** @_one\n\n#Room :wave:', html);
 
@@ -554,7 +554,7 @@ test('a mention keeps its name in the body and links in the formatted body', () 
 
   expect(message.body).toBe('hey Member One');
   expect(message.formatted).toBe(
-    'hey <a href="https://matrix.to/#/@one:example.org">Member One</a>'
+    'hey <a href="https://link.sable.moe/#/@one:example.org">Member One</a>'
   );
 });
 
@@ -565,7 +565,7 @@ test('a room mention keeps its # name in the body and links in the formatted bod
 
   expect(message).toEqual({
     body: '#General',
-    formatted: '<a href="https://matrix.to/#/#general:example.org">#General</a>',
+    formatted: '<a href="https://link.sable.moe/#/#general:example.org">#General</a>',
     mentions: { user_ids: [], room: false },
   });
 });
@@ -642,12 +642,12 @@ test('a soft break keeps its formatting and leaves no escape in the body', () =>
 });
 
 describe('plain text mode', () => {
-  test('a mention keeps its user id and renders as a matrix.to link', () => {
+  test('a mention keeps its user id and renders as a Sable link', () => {
     const who = mention.create({ userId: '@amp:example.org', name: 'amp' });
     const message = serializePlain(docOf(para([who, composerSchema.text(' hi')])));
 
     expect(message.mentions.user_ids).toEqual(['@amp:example.org']);
-    expect(message.formatted).toContain('https://matrix.to/#/@amp:example.org');
+    expect(message.formatted).toContain('https://link.sable.moe/#/@amp:example.org');
   });
 
   test.each([
@@ -676,7 +676,7 @@ describe('plain text mode', () => {
     );
 
     expect(message.formatted).toBe(
-      '<code>@someone:server</code> hi <a href="https://matrix.to/#/@someone:server">@someone:server</a>'
+      '<code>@someone:server</code> hi <a href="https://link.sable.moe/#/@someone:server">@someone:server</a>'
     );
     expect(message.mentions.user_ids).toEqual(['@someone:server']);
   });
@@ -1077,7 +1077,7 @@ describe('clipboard slices', () => {
 
 test('a table cell keeps its line breaks and pills in the body', () => {
   const doc = parseMatrixHtml(
-    '<table><tr><th>h</th></tr><tr><td>a<br>b <a href="https://matrix.to/#/@alice:example.org">Alice</a></td></tr></table>'
+    '<table><tr><th>h</th></tr><tr><td>a<br>b <a href="https://link.sable.moe/#/@alice:example.org">Alice</a></td></tr></table>'
   );
 
   expect(serializeComposer(doc).body).toBe('| h |\n| --- |\n| a b Alice |');

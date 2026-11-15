@@ -207,7 +207,7 @@
     "joinExamplesLabel": "Adressen haben folgendes Format:",
     "joinAddressLabel": "Adresse",
     "joinAddressPlaceholder": "#raum:server",
-    "joinInvalid": "Das sieht nicht wie die Adresse eines Raums oder ein matrix.to-Link aus.",
+    "joinInvalid": "Das sieht nicht wie die Adresse eines Raums oder ein link.sable.moe-Link aus.",
     "settingsTitle": "Raumeinstellungen",
     "settingsOpen": "Raumeinstellungen",
     "settingsClose": "Raumeinstellungen schließen",

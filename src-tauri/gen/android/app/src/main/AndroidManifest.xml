@@ -110,6 +110,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" />
+                <data android:host="link.sable.moe" />
                 <data android:host="matrix.to" />
                 
                 

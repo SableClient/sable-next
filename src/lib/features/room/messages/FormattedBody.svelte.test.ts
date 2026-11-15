@@ -62,27 +62,30 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('opens Matrix links through the room-level handler', async () => {
-  const onMatrixLink = vi.fn();
-  const onDocumentClick = vi.fn();
-  document.addEventListener('click', onDocumentClick);
-  render(FormattedBody, {
-    props: {
-      html: '<a href="https://matrix.to/#/!room:example.org/$event">Message</a>',
-      onMatrixLink,
-    },
-  });
-  await tick();
+test.each(['link.sable.moe', 'matrix.to'])(
+  'opens %s links through the room-level handler',
+  async (host) => {
+    const onMatrixLink = vi.fn();
+    const onDocumentClick = vi.fn();
+    document.addEventListener('click', onDocumentClick);
+    render(FormattedBody, {
+      props: {
+        html: `<a href="https://${host}/#/!room:example.org/$event">Message</a>`,
+        onMatrixLink,
+      },
+    });
+    await tick();
 
-  await user.click(link());
+    await user.click(link());
 
-  expect(onMatrixLink).toHaveBeenCalledWith(
-    { kind: 'event', room_id: '!room:example.org', event_id: '$event' },
-    expect.any(HTMLAnchorElement)
-  );
-  expect(onDocumentClick).not.toHaveBeenCalled();
-  document.removeEventListener('click', onDocumentClick);
-});
+    expect(onMatrixLink).toHaveBeenCalledWith(
+      { kind: 'event', room_id: '!room:example.org', event_id: '$event' },
+      expect.any(HTMLAnchorElement)
+    );
+    expect(onDocumentClick).not.toHaveBeenCalled();
+    document.removeEventListener('click', onDocumentClick);
+  }
+);
 
 test.each([
   '<a href="matrix:u/ana:example.org">Ana</a>',

@@ -21,11 +21,12 @@ test('stable iOS bundles keep v1 identity and callback schemes, and preparation 
       'sable',
       'matrix',
     ]);
-    assert.ok(
-      config.plugins['deep-link'].mobile.some(
-        (domain) => domain.host === 'matrix.to' && domain.appLink === false
-      )
-    );
+    for (const host of ['link.sable.moe', 'matrix.to'])
+      assert.ok(
+        config.plugins['deep-link'].mobile.some(
+          (domain) => domain.host === host && domain.appLink === false
+        )
+      );
     const plist = readFileSync(join(root, 'src-tauri/ios-project.yml'), 'utf8');
     assert.ok(plist.includes('- moe.sable.app') && !plist.includes('- moe.sable.next'));
     assert.ok(plist.includes('- matrix'));

@@ -51,13 +51,22 @@ test('rejects invalid URLs and other flavors', () => {
   expect(deepLinksIn(argv, deepLinkSchemes('moe.sable.next.nightly'))).toEqual([argv[2]]);
 });
 
-test('accepts incoming Matrix URIs and matrix.to URLs', () => {
+test('accepts incoming Matrix URIs and permalink URLs', () => {
   const urls = [
     'matrix:u/alice:example.org',
     'https://matrix.to/#/!room:example.org/$event?via=example.org',
+    'https://link.sable.moe/#/!room:example.org/$event?via=example.org',
   ];
   expect(deepLinksIn(urls, deepLinkSchemes('moe.sable.client'))).toEqual(urls);
   expect(
-    deepLinksIn(['https://matrix.to.evil/#/!room:example.org', 'https://matrix.to/'], ['matrix'])
+    deepLinksIn(
+      [
+        'https://matrix.to.evil/#/!room:example.org',
+        'https://matrix.to/',
+        'https://link.sable.moe.evil/#/!room:example.org',
+        'https://link.sable.moe/',
+      ],
+      ['matrix']
+    )
   ).toEqual([]);
 });

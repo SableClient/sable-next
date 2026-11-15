@@ -310,7 +310,7 @@
     "joinDescription": "Введите публичный адрес, чтобы присоединиться к комнате или пространству.",
     "joinExamplesLabel": "Примеры адресов:",
     "joinAddressLabel": "Адрес",
-    "joinInvalid": "Не похоже на адрес комнаты или ссылку matrix.to.",
+    "joinInvalid": "Не похоже на адрес комнаты или ссылку link.sable.moe.",
     "settingsTitle": "Настройки комнаты",
     "settingsNameLabel": "Название",
     "settingsAvatarLabel": "Аватар комнаты",

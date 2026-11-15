@@ -56,7 +56,7 @@
     "joinDescription": "Введіть публічну адресу, щоб приєднатися до кімнати або простору.",
     "joinExamplesLabel": "Адреси мають такий вигляд:",
     "joinAddressLabel": "Адреса",
-    "joinInvalid": "Це не схоже на адресу кімнати або посилання matrix.to.",
+    "joinInvalid": "Це не схоже на адресу кімнати або посилання link.sable.moe.",
     "settingsTitle": "Налаштування кімнати",
     "settingsClose": "Закрити налаштування кімнати",
     "settingsGeneral": "Загальні",

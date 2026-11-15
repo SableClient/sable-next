@@ -416,7 +416,7 @@
     "directoryEmptyBody": "请尝试其他搜索词，或浏览其他服务器。",
     "directoryTotal_other": "{{count, number}} 个房间",
     "joinTitle": "通过地址加入",
-    "joinInvalid": "这看起来不像房间地址或 matrix.to 链接。",
+    "joinInvalid": "这看起来不像房间地址或 link.sable.moe 链接。",
     "settingsTitle": "房间设置",
     "settingsClose": "关闭房间设置",
     "settingsGeneral": "常规",

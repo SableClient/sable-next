@@ -118,6 +118,13 @@
           "scheme": [
             "https"
           ],
+          "host": "link.sable.moe",
+          "appLink": false
+        },
+        {
+          "scheme": [
+            "https"
+          ],
           "host": "matrix.to",
           "appLink": false
         }

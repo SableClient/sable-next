@@ -72,7 +72,7 @@ will be handled thoughtfully and as privately as we reasonably can.
 
 If your report is about a moderator, email
 [conduct@sable.moe](mailto:conduct@sable.moe) or contact 7w1 directly at
-[`@seven:sable.moe`](https://matrix.to/#/@seven:sable.moe).
+[`@seven:sable.moe`](https://link.sable.moe/#/@seven:sable.moe).
 
 Send whatever context you have. You do not need to build a case first.
 We will limit access to people who need it to handle the report. We will not

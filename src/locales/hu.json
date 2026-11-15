@@ -340,7 +340,7 @@
     "joinExamplesLabel": "A címek így néznek ki:",
     "joinAddressLabel": "Cím",
     "joinAddressPlaceholder": "#szoba:szerver",
-    "joinInvalid": "Ez nem tűnik szobacímnek vagy matrix.to hivatkozásnak.",
+    "joinInvalid": "Ez nem tűnik szobacímnek vagy link.sable.moe hivatkozásnak.",
     "settingsTitle": "Szobabeállítások",
     "settingsOpen": "Szobabeállítások",
     "settingsClose": "Szobabeállítások bezárása",

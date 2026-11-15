@@ -3,7 +3,7 @@
 An almost stable Matrix client, written from scratch in Rust and Svelte.  
 Trying to be feature-complete while enhancing the user experience with quality-of-life features, cosmetics, utilities and sheer usability.
 
-Join the Matrix space at [#sable:sable.moe](https://matrix.to/#/#sable:sable.moe) for project & feature discussions, help with issues, and meowing.
+Join the Matrix space at [#sable:sable.moe](https://link.sable.moe/#/#sable:sable.moe) for project & feature discussions, help with issues, and meowing.
 
 The **web build** is deployed to [app.sable.moe](https://app.sable.moe/) and the nightly beta is at [dev.sable.moe](https://dev.sable.moe/). Read on for installation instructions.
 

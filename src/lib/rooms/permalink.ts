@@ -125,9 +125,7 @@ export async function joinVia(
   return [...via, ...(await core.rpc.rooms.viaServers({ room_id: parentId }))];
 }
 
-/**
- * A matrix.to link others can follow; a room id needs `via` to be routable.
- */
+/** Room ids need `via` to be routable; aliases resolve on their own. */
 export function matrixToUrl(
   address: string,
   via: readonly string[],
@@ -141,7 +139,7 @@ export function matrixToUrl(
   const query = new URLSearchParams(
     viaFor(address, via).map((server) => ['via', server])
   ).toString();
-  return `https://matrix.to/#/${path}${query === '' ? '' : `?${query}`}`;
+  return `https://link.sable.moe/#/${path}${query === '' ? '' : `?${query}`}`;
 }
 
 export async function copyRoomLink(
@@ -167,7 +165,7 @@ export async function copyRoomLink(
 export type PermalinkTarget = { kind: 'room'; path: string } | { kind: 'user'; userId: string };
 
 /**
- * Resolves the tail of a `/to/...` URL, still percent-encoded so the matrix.to parser decodes it.
+ * Resolves the tail of a `/to/...` URL, still percent-encoded so the permalink parser decodes it.
  */
 export function permalinkTarget(
   rooms: readonly RoomListItemView[],
@@ -175,7 +173,7 @@ export function permalinkTarget(
 ): PermalinkTarget | null {
   // `?via=` sits inside the fragment, where it would otherwise be parsed as
   // part of the last id.
-  const { href, via } = splitVia(`https://matrix.to/#/${encodedFragment}`);
+  const { href, via } = splitVia(`https://link.sable.moe/#/${encodedFragment}`);
   const link = parseMatrixLink(href);
   if (link === null) return null;
   if (link.kind === 'user') return { kind: 'user', userId: link.user_id };

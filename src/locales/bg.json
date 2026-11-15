@@ -131,7 +131,7 @@
     "directoryEmptyTitle": "Няма намерени стаи",
     "directoryJoinByAddress": "Присъедини се чрез адрес",
     "joinAddressPlaceholder": "#стая:сървър",
-    "joinInvalid": "Не изглежда да е адрес на стая или „matrix.to“ връзка.",
+    "joinInvalid": "Не изглежда да е адрес на стая или „link.sable.moe“ връзка.",
     "settingsClose": "Затвори настройките на стаята",
     "createSpaceDescription": "Пространствата събират стаи и други пространства накуп.",
     "createParentNone": "Няма пространство",

@@ -206,7 +206,7 @@
     "joinExamplesLabel": "Les adresses ressemblent à :",
     "joinAddressLabel": "Adresse",
     "joinAddressPlaceholder": "#salon:serveur",
-    "joinInvalid": "Cela ne ressemble pas à une adresse de salon ni à un lien matrix.to.",
+    "joinInvalid": "Cela ne ressemble pas à une adresse de salon ni à un lien link.sable.moe.",
     "settingsTitle": "Paramètres du salon",
     "settingsOpen": "Paramètres du salon",
     "settingsClose": "Fermer les paramètres du salon",

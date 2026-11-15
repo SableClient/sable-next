@@ -3,7 +3,7 @@ import { Fragment, Slice, type Node as ProseMirrorNode } from 'prosemirror-model
 import { composerSchema } from './schema';
 
 const USER_ID =
-  /(^|[\s(])(?:https:\/\/matrix\.to\/#\/)?(@[\w.=\-/+]+:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?::\d{1,5})?)(?![\w:])/gu;
+  /(^|[\s(])(?:https:\/\/(?:link\.sable\.moe|matrix\.to)\/#\/)?(@[\w.=\-/+]+:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?::\d{1,5})?)(?![\w:])/gu;
 
 export type MentionName = (userId: string) => string | null;
 

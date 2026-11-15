@@ -20,7 +20,7 @@ function parse(source: string): ProseMirrorNode {
 
 const { paragraph, mention, emoticon } = composerSchema.nodes;
 
-test('a mention serialises to the matrix.to anchor the timeline already parses', () => {
+test('a mention serialises to a Sable link', () => {
   const doc = composerSchema.node('doc', null, [
     paragraph.create(null, [
       composerSchema.text('hey '),
@@ -29,31 +29,36 @@ test('a mention serialises to the matrix.to anchor the timeline already parses',
   ]);
 
   expect(html(doc)).toBe(
-    '<p>hey <a href="https://matrix.to/#/@one:example.org">Member One</a></p>'
+    '<p>hey <a href="https://link.sable.moe/#/@one:example.org">Member One</a></p>'
   );
 });
 
-test('a room mention serialises to a room matrix.to anchor', () => {
+test('a room mention serialises to a Sable link', () => {
   const doc = composerSchema.node('doc', null, [
     paragraph.create(null, [mention.create({ userId: '#general:example.org', name: '#General' })]),
   ]);
 
-  expect(html(doc)).toBe('<p><a href="https://matrix.to/#/#general:example.org">#General</a></p>');
+  expect(html(doc)).toBe(
+    '<p><a href="https://link.sable.moe/#/#general:example.org">#General</a></p>'
+  );
 });
 
-test('a room matrix.to anchor becomes a mention when pasted', () => {
-  const doc = parse('<p><a href="https://matrix.to/#/#general:example.org">#General</a></p>');
+test.each(['link.sable.moe', 'matrix.to'])(
+  'a room %s anchor becomes a mention when pasted',
+  (host) => {
+    const doc = parse(`<p><a href="https://${host}/#/#general:example.org">#General</a></p>`);
 
-  expect(doc.firstChild?.firstChild?.attrs).toEqual({
-    userId: '#general:example.org',
-    name: '#General',
-    via: [],
-  });
-});
+    expect(doc.firstChild?.firstChild?.attrs).toEqual({
+      userId: '#general:example.org',
+      name: '#General',
+      via: [],
+    });
+  }
+);
 
 test('a room permalink with via servers keeps them out of the room id', () => {
   const doc = parse(
-    '<p><a href="https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe">#Sable</a></p>'
+    '<p><a href="https://link.sable.moe/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe">#Sable</a></p>'
   );
 
   expect(doc.firstChild?.firstChild?.attrs).toEqual({
@@ -75,7 +80,7 @@ test('a room id mention serialises with the via servers that make it routable', 
   ]);
 
   expect(html(doc)).toBe(
-    '<p><a href="https://matrix.to/#/!abc:example.org?via=sable.moe&amp;via=a.example">#Sable</a></p>'
+    '<p><a href="https://link.sable.moe/#/!abc:example.org?via=sable.moe&amp;via=a.example">#Sable</a></p>'
   );
 });
 
@@ -86,7 +91,9 @@ test('an alias mention takes no via, since it resolves through its own domain', 
     ]),
   ]);
 
-  expect(html(doc)).toBe('<p><a href="https://matrix.to/#/#general:example.org">#General</a></p>');
+  expect(html(doc)).toBe(
+    '<p><a href="https://link.sable.moe/#/#general:example.org">#General</a></p>'
+  );
 });
 
 test('an emote serialises to the MSC2545 image the sanitiser allows', () => {
@@ -101,7 +108,7 @@ test('an emote serialises to the MSC2545 image the sanitiser allows', () => {
 
 test('both atoms survive a clipboard round trip', () => {
   const source =
-    '<p>hey <a href="https://matrix.to/#/@one:example.org">Member One</a> ' +
+    '<p>hey <a href="https://link.sable.moe/#/@one:example.org">Member One</a> ' +
     '<img data-mx-emoticon src="mxc://example.org/wave" alt="wave"></p>';
   const doc = parse(source);
   const kinds = [...Array(doc.firstChild?.childCount ?? 0).keys()].map(
@@ -220,9 +227,9 @@ test('an emote whose description is its own address is sent with its shortcode',
   expect(html(doc)).toContain('alt="wave" title="wave"');
 });
 
-test('an explicit matrix.to link stays a link and is re-marked on serialise', () => {
+test('an explicit Sable link keeps its marker on serialise', () => {
   const doc = parse(
-    '<a data-org.matrix.msc4550.link href="https://matrix.to/#/@alice:example.org">DM me</a>'
+    '<a data-org.matrix.msc4550.link href="https://link.sable.moe/#/@alice:example.org">DM me</a>'
   );
   let mentions = 0;
   doc.descendants((node) => {
@@ -232,8 +239,8 @@ test('an explicit matrix.to link stays a link and is re-marked on serialise', ()
   expect(html(doc)).toContain('data-org.matrix.msc4550.link');
 });
 
-test('a bare matrix.to link is not marked explicit on serialise', () => {
-  const href = 'https://matrix.to/#/!room:example.org/$event';
+test('a bare Sable link is not marked explicit on serialise', () => {
+  const href = 'https://link.sable.moe/#/!room:example.org/$event';
   const doc = parse(`<a href="${href}">${href}</a>`);
   expect(html(doc)).not.toContain('msc4550');
 });

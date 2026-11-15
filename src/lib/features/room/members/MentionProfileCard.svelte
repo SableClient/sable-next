@@ -271,7 +271,7 @@
       .sort((left, right) => right - left)
       .map((level) => ({ level, label: powerTag(level, i18n.t, powerTags ?? {}).name }))
   );
-  let profileLink = $derived(`https://matrix.to/#/${userId}`);
+  let profileLink = $derived(`https://link.sable.moe/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
   const relations = new MemberProfileRelations(core);
   const profileActions = new MemberProfileActions(core);

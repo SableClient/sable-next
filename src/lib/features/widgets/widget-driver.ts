@@ -28,7 +28,7 @@ import { sleep } from '#lib/sleep.js';
 export type CapabilityApproval = (requested: Set<Capability>) => Promise<Set<Capability>>;
 
 const REDACTION_EVENT_TYPE = 'm.room.redaction';
-const MATRIX_TO_PREFIX = 'https://matrix.to/#/';
+const MATRIX_LINK_PREFIXES = ['https://link.sable.moe/#/', 'https://matrix.to/#/'];
 const TURN_REFRESH_FRACTION = 0.9;
 const TURN_MIN_REFRESH_MS = 30_000;
 
@@ -334,8 +334,9 @@ export class SableWidgetDriver extends WidgetDriver {
   }
 
   override async navigate(uri: string): Promise<void> {
-    if (!uri.startsWith(MATRIX_TO_PREFIX)) throw new Error('Invalid matrix.to URI');
-    await this.#navigate(uri.slice(MATRIX_TO_PREFIX.length));
+    const prefix = MATRIX_LINK_PREFIXES.find((prefix) => uri.startsWith(prefix));
+    if (!prefix) throw new Error('Invalid Matrix URI');
+    await this.#navigate(uri.slice(prefix.length));
   }
 
   override async *getTurnServers(): AsyncGenerator<ITurnServer> {
