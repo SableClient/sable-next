@@ -368,13 +368,19 @@
   }
 
   .profile-card-cover.has-banner {
-    --profile-cover-height: 7rem;
+    height: auto;
   }
 
   /* Both dimensions, so the ratio MediaImage sets inline stops applying. */
   .profile-card-cover :global(.banner-image) {
     height: 100%;
     width: 100%;
+  }
+
+  .profile-card-cover.has-banner :global(.banner-image) {
+    height: auto;
+    max-height: 14rem;
+    min-height: 4rem;
   }
 
   .profile-card-cover :global(.banner-image img) {

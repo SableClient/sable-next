@@ -76,7 +76,7 @@
 
 <div class="room-nav-top">
   {#if bannerShown && banner}
-    <div class="room-banner" style:height={`${preferences.roomBannerHeight}px`}>
+    <div class="room-banner" style:--room-banner-max={`${preferences.roomBannerHeight}px`}>
       <Banner source={banner} name={bannerName} width={640} height={190} />
       <ResizeHandle
         value={preferences.roomBannerHeight}
@@ -173,13 +173,14 @@
     z-index: 1;
   }
 
-  .room-banner :global(.room-banner-image),
-  .room-banner :global(.banner-button),
-  .room-banner :global(img) {
+  .room-banner :global(.banner-button) {
     display: block;
-    height: 100%;
-    object-fit: cover;
-    width: 100%;
+  }
+
+  .room-banner :global(.banner-image) {
+    height: auto;
+    max-height: var(--room-banner-max);
+    min-height: var(--header-height);
   }
 
   .room-nav-header {

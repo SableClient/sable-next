@@ -667,8 +667,12 @@
   }
 
   .profile-card-cover {
-    height: 7rem;
     overflow: hidden;
+  }
+
+  .profile-card-cover :global(.profile-card-banner) {
+    max-height: 14rem;
+    min-height: 4rem;
   }
 
   .profile-card-cover :global(.profile-card-banner img) {
