@@ -1,0 +1,2 @@
+- Calls settings now have a microphone volume slider to make yourself louder or quieter, from 0 to 200%. It applies right away during a call and to the microphone test.
+- Exporting debug logs, settings, persona backups, emote packs, room keys or room data on Android and iOS now confirms the file was saved, as media downloads already did. On Android the file lands in Downloads with no dialog, so before the button seemed to do nothing.

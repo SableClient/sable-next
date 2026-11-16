@@ -1,5 +1,23 @@
 # Sable Changelog
 
+## 26.11.1 (2026-11-16)
+
+### Features
+
+* Calls settings now have a microphone volume slider to make yourself louder or quieter, from 0 to 200%. It applies right away during a call and to the microphone test.
+
+### Fixes
+
+* Exporting debug logs, settings, persona backups, emote packs, room keys or room data on Android and iOS now confirms the file was saved, as media downloads already did. On Android the file lands in Downloads with no dialog, so before the button seemed to do nothing.
+* The speaking indicator in calls now lights up as soon as someone talks instead of a couple of seconds later.
+* A direct chat that has grown past two people is now named and notified as a group instead of after one member.
+* On iOS the message list no longer stays cut off halfway after the keyboard closes.
+* Mentions now link with matrix: URIs so other clients show them as pills, and room mentions name at most three servers.
+* In-app mention notifications no longer look see-through with themes that use a translucent accent colour.
+* Saving room rules no longer locks Room Settings behind your own acceptance prompt, and the Rules page no longer shows unsaved changes when opened. Updated rules have a View button in the timeline, and rooms in a space follow its rules.
+* Room settings no longer stop responding after leaving the Rules section before it finished loading.
+* Opening a link to a user from a room now shows their card centred with the avatar above the name, instead of a narrow column with the avatar stuck to the side.
+
 ## 26.11.0 (2026-11-15)
 
 ### Features
