@@ -8,6 +8,7 @@
   import { invalidatePacks } from '#lib/emoji/load-packs.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import { confirmSaved } from '#lib/ui/download.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
@@ -134,7 +135,9 @@
     busy = true;
     failed = false;
     try {
-      if ((await exportPacks(core, roomsPacks.map(packDraft))) === 'failed') failed = true;
+      const outcome = await exportPacks(core, roomsPacks.map(packDraft));
+      if (outcome === 'failed') failed = true;
+      if (outcome === 'saved') confirmSaved();
     } catch (error) {
       console.warn('[sable emotes] the room packs could not be exported', error);
       failed = true;

@@ -9,6 +9,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { pickFiles, saveBytes } from '#lib/platform/files.js';
+  import { confirmSaved } from '#lib/ui/download.js';
   import { importPersonaAvatar } from '#lib/platform/persona-avatar.js';
   import { i18n } from '#lib/i18n.js';
   import { backupFileName } from '#lib/personas/backup.js';
@@ -206,9 +207,9 @@
     error = null;
     try {
       const bytes = new TextEncoder().encode(await core.rpc.personas.backup());
-      if ((await saveBytes(bytes, backupFileName(), 'application/json')) === 'failed') {
-        error = i18n.t('personas.backupFailed');
-      }
+      const outcome = await saveBytes(bytes, backupFileName(), 'application/json');
+      if (outcome === 'failed') error = i18n.t('personas.backupFailed');
+      if (outcome === 'saved') confirmSaved();
     } catch (cause) {
       console.warn('[sable personas] the backup failed', cause);
       error = i18n.t('personas.backupFailed');

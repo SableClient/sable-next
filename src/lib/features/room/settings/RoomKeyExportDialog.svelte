@@ -2,6 +2,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n, t } from '#lib/i18n.js';
   import { saveRoomKeys } from '#lib/features/settings/room-key-export.js';
+  import { confirmSaved } from '#lib/ui/download.js';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -39,6 +40,7 @@
       );
       if (outcome === 'failed') failed = true;
       else if (outcome === 'saved') {
+        confirmSaved();
         open = false;
         reset();
       }

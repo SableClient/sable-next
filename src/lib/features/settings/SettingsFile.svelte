@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import { pickFiles, saveBytes } from '#lib/platform/files.js';
+  import { confirmSaved } from '#lib/ui/download.js';
   import { customThemes, replaceCustomThemes } from '#lib/settings/custom-themes.svelte.js';
   import {
     applyPreferences,
@@ -29,9 +30,9 @@
     error = null;
     try {
       const bytes = new TextEncoder().encode(settingsFileJson(preferences, customThemes));
-      if ((await saveBytes(bytes, settingsFileName(), 'application/json')) === 'failed') {
-        error = i18n.t('settings.settingsExportFailed');
-      }
+      const outcome = await saveBytes(bytes, settingsFileName(), 'application/json');
+      if (outcome === 'failed') error = i18n.t('settings.settingsExportFailed');
+      if (outcome === 'saved') confirmSaved();
     } finally {
       exporting = false;
     }

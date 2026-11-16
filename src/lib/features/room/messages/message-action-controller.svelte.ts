@@ -5,7 +5,8 @@ import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
 import { t } from '#lib/i18n.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
-import { saveBytes, savesNatively, saveVideoToPhotos } from '#lib/platform/files.js';
+import { saveBytes, saveVideoToPhotos } from '#lib/platform/files.js';
+import { confirmSaved, reportSave } from '#lib/ui/download.js';
 import { favoriteGifs, isFavorite, toggleFavorite } from '#lib/gif/favorites.svelte.js';
 import { isNativeMobile, isAndroid } from '#lib/platform/os.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -159,8 +160,7 @@ export class MessageActionExecutor {
           media.mime ?? 'application/octet-stream',
           preferences.askDownloadLocation
         );
-        if (outcome === 'saved' && savesNatively()) toasts.info(t('viewer.saved'));
-        if (outcome === 'failed') toasts.error(t('errors.actionFailed'));
+        reportSave(outcome);
       } catch (error) {
         console.warn('[sable timeline] media download failed', error);
         toasts.error(t('errors.actionFailed'));
@@ -199,9 +199,9 @@ export class MessageActionExecutor {
 
     async function downloadEmotes(): Promise<void> {
       try {
-        if ((await downloadCandidates(core, stealable)) === 'failed') {
-          toasts.error(t('errors.actionFailed'));
-        }
+        const outcome = await downloadCandidates(core, stealable);
+        if (outcome === 'failed') toasts.error(t('errors.actionFailed'));
+        if (outcome === 'saved') confirmSaved();
       } catch (error) {
         console.warn('[sable timeline] emote download failed', error);
         toasts.error(t('errors.actionFailed'));

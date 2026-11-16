@@ -17,6 +17,7 @@
   import { exportDiagnosticsBundle } from '#lib/observability/export-diagnostics.js';
   import '#lib/ui/primitives/settings-row.css';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { reportSave } from '#lib/ui/download.js';
 
   const categories: DebugLogCategory[] = [
     'sync',
@@ -42,7 +43,7 @@
   );
 
   async function download(entries = filtered): Promise<void> {
-    await exportDiagnosticsBundle(entries);
+    reportSave(await exportDiagnosticsBundle(entries));
   }
 
   async function copy(entries = filtered): Promise<void> {

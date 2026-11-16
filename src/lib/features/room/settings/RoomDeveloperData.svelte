@@ -8,6 +8,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { saveBytes } from '#lib/platform/files.js';
+  import { confirmSaved } from '#lib/ui/download.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
@@ -57,9 +58,9 @@
     failed = false;
     const filename = `sable-${room.room_kind === 'space' ? 'space' : 'room'}-data-${String(Date.now())}.json`;
     try {
-      failed =
-        (await saveBytes(new TextEncoder().encode(data), filename, 'application/json')) ===
-        'failed';
+      const outcome = await saveBytes(new TextEncoder().encode(data), filename, 'application/json');
+      failed = outcome === 'failed';
+      if (outcome === 'saved') confirmSaved();
     } catch (error) {
       console.warn('[sable room] saving debug data failed', error);
       failed = true;
