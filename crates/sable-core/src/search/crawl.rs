@@ -493,7 +493,11 @@ impl Core {
                     .lock()
                     .await
                     .enter(SearchCrawlPhase::Paused);
-                matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
+                if self.activity.app_active() {
+                    matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
+                } else {
+                    self.wait_until_active().await;
+                }
                 continue;
             }
 

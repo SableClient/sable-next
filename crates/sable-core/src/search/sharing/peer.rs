@@ -547,6 +547,7 @@ impl Core {
                 loop {
                     matrix_sdk::sleep::sleep(Duration::from_secs(1)).await;
                     let Some(core) = weak.upgrade() else { return };
+                    core.wait_until_active().await;
                     if !core.is_current(generation) {
                         return;
                     }

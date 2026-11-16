@@ -44,6 +44,7 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 loop {
+                    core.wait_until_active().await;
                     let pending = core.search_index.lock().await.chinese_pending();
                     if pending
                         && core.search_crawl_active()
