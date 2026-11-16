@@ -629,6 +629,8 @@ impl Core {
         if write(bytes).await.is_ok() {
             let mut inbox = self.inbox.lock().await;
             inbox.saved = inbox.saved.max(revision);
+        } else {
+            self.inbox_changed.notify_one();
         }
     }
 
