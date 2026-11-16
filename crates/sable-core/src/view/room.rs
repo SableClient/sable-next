@@ -548,7 +548,20 @@ pub(crate) async fn room_avatar_url(room: &Room) -> Option<String> {
     }
 }
 
+/// An `m.direct` room that grew past two people is a group, even if the
+/// `m.direct` entry still names one of them.
+pub(crate) fn is_one_to_one(room: &Room) -> bool {
+    let service = room.active_service_members_count().unwrap_or_else(|| {
+        room.service_members()
+            .map_or(0, |members| members.len() as u64)
+    });
+    room.active_members_count().saturating_sub(service) <= 2
+}
+
 async fn direct_peer(room: &Room) -> Option<RoomMember> {
+    if !is_one_to_one(room) {
+        return None;
+    }
     let service_members = room.service_members().unwrap_or_default();
     let targets: Vec<OwnedUserId> = room
         .direct_targets()

@@ -880,6 +880,34 @@ async fn a_bridged_dm_uses_the_group_defaults_like_the_server() {
 }
 
 #[tokio::test]
+async fn a_direct_room_that_grew_is_named_as_a_group() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!grown:example.org");
+    let own = client.user_id().unwrap().to_owned();
+    let founder = user_id!("@founder:example.org");
+    let guest = user_id!("@guest:example.org");
+    let factory = EventFactory::new().room(room_id);
+    let members = [own.as_ref(), founder, guest];
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_bulk(members.iter().map(|member| factory.member(*member).into()))
+                    .set_joined_members_count(3),
+            );
+            builder.add_global_account_data(factory.direct().add_user(founder.to_owned(), room_id));
+        })
+        .await;
+    let room = client.get_room(room_id).unwrap();
+
+    assert!(room.is_direct().await.unwrap());
+    assert!(!crate::view::is_one_to_one(&room));
+    assert_eq!(crate::view::direct_peer_name(&room).await, None);
+}
+
+#[tokio::test]
 async fn a_two_member_room_not_marked_direct_uses_the_direct_defaults() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

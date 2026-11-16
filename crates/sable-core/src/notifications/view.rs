@@ -191,7 +191,7 @@ pub async fn notification(
         Ok(NotificationStatus::Event(item)) if item.actions.as_deref().is_some_and(notifies) => {
             let mut view = view(client.user_id()?.to_owned(), room_id, event_id, *item);
             if let Some(room) = client.get_room(room_id) {
-                apply_direct_name(&room, &mut view.room_name, view.is_direct).await;
+                apply_direct(&room, &mut view).await;
             }
             Some(view)
         }
@@ -218,7 +218,7 @@ pub(crate) async fn foreground_notification(
                 event_id,
                 *item,
             );
-            apply_direct_name(room, &mut view.room_name, view.is_direct).await;
+            apply_direct(room, &mut view).await;
             Some(view)
         }
         _ => None,
@@ -235,6 +235,11 @@ fn still_encrypted(event: &NotificationEvent) -> bool {
 
 pub(crate) fn raw_is_encrypted(raw: &Raw<AnySyncTimelineEvent>) -> bool {
     raw.get_field::<String>("type").ok().flatten().as_deref() == Some("m.room.encrypted")
+}
+
+async fn apply_direct(room: &matrix_sdk::Room, view: &mut NotificationView) {
+    view.is_direct = view.is_direct && crate::view::is_one_to_one(room);
+    apply_direct_name(room, &mut view.room_name, view.is_direct).await;
 }
 
 async fn apply_direct_name(room: &matrix_sdk::Room, name: &mut String, is_direct: bool) {
@@ -257,7 +262,7 @@ pub(crate) async fn invite_notification(
         event_id: None,
         room_name: room.display_name().await.ok()?.to_string(),
         room_avatar_url: room.avatar_url().map(|url| url.to_string()),
-        is_direct: room.is_direct().await.unwrap_or(false),
+        is_direct: room.is_direct().await.unwrap_or(false) && crate::view::is_one_to_one(room),
         encrypted: room.encryption_state().is_encrypted(),
         sender: invite.inviter_id,
         sender_name: invite.inviter.as_ref().and_then(|member| {

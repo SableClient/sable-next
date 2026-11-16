@@ -29,7 +29,7 @@ pub(crate) use room::room_avatar_url;
 pub use room::{
     RoomInfo, enrich_room_batch, listless_room_list_item, predecessor, room_counts, room_list_item,
 };
-pub(crate) use room::{apply_avatar_override, direct_peer_name};
+pub(crate) use room::{apply_avatar_override, direct_peer_name, is_one_to_one};
 pub use search::prime_display_names;
 pub use space::{hierarchy_child_edges, listing_spaces, restricted_parents, space_hierarchy_room};
 
