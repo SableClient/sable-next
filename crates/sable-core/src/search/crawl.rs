@@ -841,7 +841,9 @@ impl Core {
                 },
             );
         }
-        let result = room.decrypt_event(event.cast_ref_unchecked(), None).await;
+        let result = room
+            .decrypt_event_without_key_request(event.cast_ref_unchecked())
+            .await;
         if result
             .as_ref()
             .is_ok_and(|decrypted| decrypted.kind.is_utd())
