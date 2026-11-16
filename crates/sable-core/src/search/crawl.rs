@@ -477,49 +477,7 @@ impl Core {
         loop {
             self.report_coverage(client, &mut reported).await;
 
-            if !self
-                .search_crawler_enabled
-                .load(std::sync::atomic::Ordering::Relaxed)
-            {
-                self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
-                matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
-                continue;
-            }
-
-            self.save_changed_checkpoints(client).await;
-
-            if !self.search_crawl_active() {
-                self.search_crawl
-                    .lock()
-                    .await
-                    .enter(SearchCrawlPhase::Paused);
-                if self.activity.app_active() {
-                    matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
-                } else {
-                    self.wait_until_active().await;
-                }
-                continue;
-            }
-
-            if self.foreground_paginations() > 0 {
-                self.search_crawl
-                    .lock()
-                    .await
-                    .enter(SearchCrawlPhase::Yielding);
-                matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
-                continue;
-            }
-
-            let spent = self.search_crawl.lock().await.spent();
-            let full = self.search_index.lock().await.is_full();
-
-            if spent || full {
-                self.search_crawl.lock().await.enter(if spent {
-                    SearchCrawlPhase::BudgetSpent
-                } else {
-                    SearchCrawlPhase::IndexFull
-                });
-                matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
+            if self.held_back(client).await {
                 continue;
             }
 
@@ -571,6 +529,56 @@ impl Core {
             let pause = self.search_crawl.lock().await.paced(pause);
             matrix_sdk::sleep::sleep(pause).await;
         }
+    }
+
+    /// Waits out whatever keeps the crawler from its next room, and says whether it did.
+    async fn held_back(&self, client: &matrix_sdk::Client) -> bool {
+        if !self
+            .search_crawler_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
+            matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
+            return true;
+        }
+
+        self.save_changed_checkpoints(client).await;
+
+        if !self.search_crawl_active() {
+            self.search_crawl
+                .lock()
+                .await
+                .enter(SearchCrawlPhase::Paused);
+            if self.activity.app_active() {
+                matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
+            } else {
+                self.wait_until_active().await;
+            }
+            return true;
+        }
+
+        if self.foreground_paginations() > 0 {
+            self.search_crawl
+                .lock()
+                .await
+                .enter(SearchCrawlPhase::Yielding);
+            matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
+            return true;
+        }
+
+        let spent = self.search_crawl.lock().await.spent();
+        let full = self.search_index.lock().await.is_full();
+        if spent || full {
+            self.search_crawl.lock().await.enter(if spent {
+                SearchCrawlPhase::BudgetSpent
+            } else {
+                SearchCrawlPhase::IndexFull
+            });
+            matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
+            return true;
+        }
+
+        false
     }
 
     pub(super) async fn save_changed_checkpoints(&self, client: &matrix_sdk::Client) {
