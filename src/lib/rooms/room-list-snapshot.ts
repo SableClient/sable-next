@@ -8,6 +8,7 @@ export interface RoomListSnapshot {
   sections: RoomSectionView[];
   badges: RoomBadgeView[];
   quiet_rooms: string[];
+  app_badge?: number;
 }
 
 function storage(): Storage | null {

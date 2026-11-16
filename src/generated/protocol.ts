@@ -1520,6 +1520,7 @@ export type RoomSectionsUpdate = {
 	removed: string[],
 	badges: RoomBadgeView[] | null,
 	quiet_rooms: string[] | null,
+	app_badge: number | null,
 };
 
 export type RoomSortView = "recent" | "name-asc" | "name-desc";

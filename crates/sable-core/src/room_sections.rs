@@ -24,6 +24,7 @@ pub(crate) struct RoomSections {
     sections: BTreeMap<String, RoomSectionView>,
     badges: Vec<RoomBadgeView>,
     quiet_rooms: Vec<OwnedRoomId>,
+    app_badge: u32,
 }
 
 impl RoomSections {
@@ -54,11 +55,20 @@ impl RoomSections {
                 })
             })
             .collect();
+        let app_badge = rows
+            .iter()
+            .filter(|row| joined(row) && !is_space(row))
+            .map(|row| {
+                let counts = lists.badge(row);
+                counts.notifying.max(counts.highlight)
+            })
+            .fold(0, u32::saturating_add);
 
         Self {
             sections,
             badges,
             quiet_rooms,
+            app_badge,
         }
     }
 
@@ -77,6 +87,7 @@ impl RoomSections {
             .collect();
         let badges = (self.badges != next.badges).then(|| next.badges.clone());
         let quiet_rooms = (self.quiet_rooms != next.quiet_rooms).then(|| next.quiet_rooms.clone());
+        let app_badge = (self.app_badge != next.app_badge).then_some(next.app_badge);
         *self = next;
 
         let update = RoomSectionsUpdate {
@@ -84,6 +95,7 @@ impl RoomSections {
             removed,
             badges,
             quiet_rooms,
+            app_badge,
         };
         (update != RoomSectionsUpdate::default()).then_some(update)
     }

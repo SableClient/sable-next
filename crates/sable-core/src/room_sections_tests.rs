@@ -473,6 +473,23 @@ fn mentions_mode_keeps_unread_and_drops_notifying() {
 }
 
 #[test]
+fn the_app_badge_counts_mentions_in_rooms_that_only_notify_for_mentions() {
+    let mut left = unread(row("left"), 4, 4);
+    left.state = RoomStateView::Left;
+    let sections = RoomSections::build(
+        &[
+            unread(row("mentioned"), 6, 2),
+            unread(row("plain"), 6, 0),
+            unread(direct("dm"), 3, 0),
+            left,
+        ],
+        &group_badges(BadgeModeView::Mentions),
+    );
+
+    assert_eq!(sections.app_badge, 5);
+}
+
+#[test]
 fn quiet_mode_keeps_only_mentions() {
     let sections = RoomSections::build(
         &[unread(row("mentioned"), 6, 2), unread(row("plain"), 6, 0)],

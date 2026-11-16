@@ -1132,6 +1132,7 @@ pub struct RoomSectionsUpdate {
     pub badges: Option<Vec<RoomBadgeView>>,
     #[cfg_attr(feature = "typegen", specta(type = Option<Vec<String>>))]
     pub quiet_rooms: Option<Vec<OwnedRoomId>>,
+    pub app_badge: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

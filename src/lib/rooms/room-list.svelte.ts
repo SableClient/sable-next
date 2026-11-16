@@ -127,6 +127,7 @@ export class RoomList {
   /** In the core's recency order, so a filtered view needs no recency sort of its own. */
   rooms = $derived(this.#source);
   quietRoomIds = $state.raw(quietOf([]));
+  appBadge = $state(0);
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   typingUsers = $state.raw<ReadonlyMap<string, readonly string[]>>(new Map());
 
@@ -266,6 +267,7 @@ export class RoomList {
     this.#sections = sectionsOf([]);
     this.#badges = badgesOf([]);
     this.quietRoomIds = quietOf([]);
+    this.appBadge = 0;
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     this.typingUsers = new Map();
     this.unsubscribeEvents?.();
@@ -343,6 +345,7 @@ export class RoomList {
     this.#sections = sectionsOf(snapshot.sections);
     this.#badges = badgesOf(snapshot.badges);
     this.quietRoomIds = quietOf(snapshot.quiet_rooms);
+    this.appBadge = snapshot.app_badge ?? 0;
   }
 
   /** A painted snapshot is replaced, not patched, by the first live batch. */
@@ -351,15 +354,18 @@ export class RoomList {
     let sections = fresh ? sectionsOf([]) : this.#sections;
     let badges = fresh ? badgesOf([]) : this.#badges;
     let quiet = fresh ? quietOf([]) : this.quietRoomIds;
+    let appBadge = fresh ? 0 : this.appBadge;
     for (const { sections: update } of batches) {
       if (!update) continue;
       sections = applySections(sections, update);
       if (update.badges) badges = badgesOf(update.badges);
       if (update.quiet_rooms) quiet = quietOf(update.quiet_rooms);
+      if (update.app_badge !== null) appBadge = update.app_badge;
     }
     this.#sections = sections;
     this.#badges = badges;
     this.quietRoomIds = quiet;
+    this.appBadge = appBadge;
     const diffs = batches.flatMap((batch) => batch.diffs);
     if (!fresh && diffs.length === 0) {
       this.scheduleSnapshotWrite();
@@ -374,6 +380,7 @@ export class RoomList {
       sections: [...this.#sections.values()],
       badges: [...this.#badges].map(([room_id, counts]) => ({ room_id, counts })),
       quiet_rooms: [...this.quietRoomIds],
+      app_badge: this.appBadge,
     };
   }
 

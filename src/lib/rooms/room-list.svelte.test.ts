@@ -105,9 +105,13 @@ test('inbox counts follow badge defaults, and a mute silences it at once', async
   };
   emit({
     diffs: [],
-    sections: sectionsUpdate([], { badges: [badgeView('!loud', { unread: 2, notifying: 2 })] }),
+    sections: sectionsUpdate([], {
+      badges: [badgeView('!loud', { unread: 2, notifying: 2 })],
+      app_badge: 2,
+    }),
   });
   expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(2);
+  expect(roomList.appBadge).toBe(2);
   expect(
     notifications(roomList.rooms, 'all', roomList.badgeUnreadFor).map((room) => room.room_id)
   ).toEqual(['!loud']);
@@ -115,9 +119,10 @@ test('inbox counts follow badge defaults, and a mute silences it at once', async
   const muted = withCounts({ ...loud, notification: { room: 'mute', default: 'all' } });
   emit({
     diffs: [{ op: 'set', index: 0, value: muted }],
-    sections: sectionsUpdate([], { badges: [] }),
+    sections: sectionsUpdate([], { badges: [], app_badge: 0 }),
   });
   expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(0);
+  expect(roomList.appBadge).toBe(0);
   roomList.stop();
 });
 
@@ -467,6 +472,7 @@ test('persists the live room list for the next launch', async () => {
     sections: [],
     badges: [],
     quiet_rooms: [],
+    app_badge: 0,
   });
 
   roomList.stop();
@@ -504,6 +510,7 @@ test('defers room-list snapshot writes until presentation resumes', async () => 
     sections: [],
     badges: [],
     quiet_rooms: [],
+    app_badge: 0,
   });
 
   roomList.stop();
