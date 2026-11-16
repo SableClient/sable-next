@@ -6,8 +6,6 @@ on:
       - 'packaging/docker/**'
       - '.forgejo/workflows/docker-publish.yml'
 
-
-
 concurrency:
   group: docker-publish-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

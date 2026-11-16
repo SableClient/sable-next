@@ -31,8 +31,6 @@ on:
       - '.forgejo/actions/rust/**'
       - '.forgejo/webdriver.json'
 
-
-
 concurrency:
   group: rust-quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

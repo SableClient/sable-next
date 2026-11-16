@@ -3,8 +3,6 @@ name: DCO
 on:
   pull_request:
 
-
-
 concurrency:
   group: dco-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

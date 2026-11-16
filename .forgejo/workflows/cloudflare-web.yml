@@ -17,8 +17,6 @@ on:
         required: false
         type: string
 
-
-
 concurrency:
   group: cloudflare-web-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

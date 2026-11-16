@@ -11,8 +11,6 @@ on:
         required: false
         type: string
 
-
-
 jobs:
   release:
     name: Create release

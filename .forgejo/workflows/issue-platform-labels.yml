@@ -4,8 +4,6 @@ on:
   issues:
     types: [opened]
 
-
-
 jobs:
   label-platforms:
     runs-on: ubuntu-latest

@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
 
-
-
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
 

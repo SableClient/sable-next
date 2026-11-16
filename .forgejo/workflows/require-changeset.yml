@@ -4,8 +4,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
-
-
 concurrency:
   group: require-changeset-${{ github.ref }}
   cancel-in-progress: true

@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
 
-
-
 concurrency:
   group: docker-server-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
