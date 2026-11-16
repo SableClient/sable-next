@@ -76,6 +76,7 @@
   import { watchNetworkConditions } from '#lib/platform/network-conditions.js';
   import { isNativeMobile } from '#lib/platform/os.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
+  import { notificationCount } from '#lib/features/inbox/inbox.js';
   import { keepStorage } from '#lib/platform/persistent-storage.js';
   import { electronBridge, type ScreenShareCandidate } from '#lib/platform/electron.js';
   import { type FaviconState, faviconState, setFavicon } from '#lib/ui/favicon.js';
@@ -436,7 +437,10 @@
     countedRooms.reduce((total, room) => total + roomList.notificationsFor(room).highlight, 0)
   );
   let notifyingTotal = $derived(
-    countedRooms.reduce((total, room) => total + (roomList.badgeUnreadFor(room).notifying ?? 0), 0)
+    countedRooms.reduce(
+      (total, room) => total + notificationCount(roomList.badgeUnreadFor(room)),
+      0
+    )
   );
 
   $effect(() => {
