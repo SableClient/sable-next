@@ -375,6 +375,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn flatpak_streams_are_told_apart_by_app_id_not_pid() {
         let processes: HashMap<u32, Process> = [
             (
