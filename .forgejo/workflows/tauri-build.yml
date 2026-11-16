@@ -900,6 +900,14 @@ jobs:
         run: |
           command -v fastlane >/dev/null || brew install fastlane
           fastlane ios testflight ipa:"$IPA_PATH" version:"$VERSION"
+      - name: Submit to the App Store
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        env:
+          IPA_PATH: ${{ steps.ipa.outputs.path }}
+          BUILD: ${{ steps.ipa.outputs.build }}
+        run: |
+          notes="$PWD/$(node -e 'import("./scripts/release/release-prep.mjs").then((m) => console.log(m.fastlaneChangelogs(process.argv[1]).at(-1)))' "$VERSION")"
+          fastlane ios app_store ipa:"$IPA_PATH" build:"$BUILD" notes:"$notes"
 
   github-bundles:
     name: Wait for GitHub bundles

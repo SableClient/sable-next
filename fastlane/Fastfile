@@ -15,4 +15,27 @@ platform :ios do
       changelog: "Sable #{options.fetch(:version)}"
     )
   end
+
+  desc "Submit an uploaded build for App Store review and release it once approved"
+  lane :app_store do |options|
+    app_store_connect_api_key(
+      key_id: ENV.fetch("APPLE_API_KEY"),
+      issuer_id: ENV.fetch("APPLE_API_ISSUER"),
+      key_filepath: ENV.fetch("APPLE_API_KEY_PATH")
+    )
+    upload_to_app_store(
+      ipa: options.fetch(:ipa),
+      build_number: options.fetch(:build),
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      # fastlane/metadata only holds the Android folder.
+      ignore_language_directory_validation: true,
+      release_notes: { "en-US" => File.read(options.fetch(:notes)) },
+      submit_for_review: true,
+      automatic_release: true,
+      # Precheck cannot read in-app purchases with an API key and fails the lane.
+      precheck_include_in_app_purchases: false,
+      force: true
+    )
+  end
 end
