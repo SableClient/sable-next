@@ -155,13 +155,21 @@ In the EU, [AltStore PAL](https://altstore.io) installs the same notarized build
 
 The [`altstore-pal.yml`](.forgejo/workflows/altstore-pal.yml) workflow publishes each App Store release once AltStore has processed it.
 
-### AltStore / SideStore
+To add the source manually, paste this URL into AltStore PAL:
 
-iOS builds are unsigned IPAs distributed through [AltStore](https://altstore.io) and [SideStore](https://sidestore.io). Each release publishes its IPA with an `altstore-source.json` that lists it.
+```text
+https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-pal-source.json
+```
+
+If PAL reports a missing `marketplaceID`, check that you used `altstore-pal-source.json`.
+
+### AltStore Classic / SideStore
+
+iOS builds are unsigned IPAs distributed through [AltStore Classic](https://altstore.io) and [SideStore](https://sidestore.io). Each release publishes its IPA with an `altstore-source.json` that lists it.
 
 #### Stable source
 
-<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-source.json"><img alt="Add to AltStore" src="https://img.shields.io/badge/Add_to_AltStore-7C3AED?style=for-the-badge"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-source.json"><img alt="Add to AltStore Classic" src="https://img.shields.io/badge/Add_to_AltStore_Classic-7C3AED?style=for-the-badge"></a>
 &nbsp;
 <a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-source.json"><img alt="Add to SideStore" src="https://img.shields.io/badge/Add_to_SideStore-2563EB?style=for-the-badge"></a>
 &nbsp;
@@ -169,7 +177,7 @@ iOS builds are unsigned IPAs distributed through [AltStore](https://altstore.io)
 
 #### Nightly source
 
-<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/nightly/altstore-source.json"><img alt="Add to AltStore" src="https://img.shields.io/badge/Add_to_AltStore-7C3AED?style=for-the-badge"></a>
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/nightly/altstore-source.json"><img alt="Add to AltStore Classic" src="https://img.shields.io/badge/Add_to_AltStore_Classic-7C3AED?style=for-the-badge"></a>
 &nbsp;
 <a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/nightly/altstore-source.json"><img alt="Add to SideStore" src="https://img.shields.io/badge/Add_to_SideStore-2563EB?style=for-the-badge"></a>
 &nbsp;
@@ -179,7 +187,7 @@ iOS builds are unsigned IPAs distributed through [AltStore](https://altstore.io)
 
 1. Set up [AltStore Classic](https://faq.altstore.io/altstore-classic/altserver) or [SideStore](https://docs.sidestore.io) on your device.
 2. Tap a button above, or add the source manually (swap `latest` for `nightly` in the URL for the nightly channel):
-   - AltStore: `altstore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-source.json`
+   - AltStore Classic: `altstore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-source.json`
    - SideStore: `sidestore://source?url=https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-source.json`
 3. Install Sable v2 from the source. AltStore/SideStore re-sign the unsigned IPA with your personal development certificate at install time, so apps refresh every 7 days on a free account.
 
