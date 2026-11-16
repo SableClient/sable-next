@@ -303,7 +303,7 @@
   {/snippet}
   {#if item.sender && onSenderProfile}
     <button
-      class="avatar-button"
+      class="sender-avatar-button"
       type="button"
       aria-label={i18n.t('timeline.senderProfile', { name: sender.name })}
       onclick={openSenderProfile}
@@ -741,7 +741,7 @@
     }
   }
 
-  .message:not(.layout-compact) > :global(.avatar-button),
+  .message:not(.layout-compact) > :global(.sender-avatar-button),
   .message:not(.layout-compact) > :global(.avatar-root.message-avatar) {
     translate: 0 var(--space-100);
   }
@@ -1136,7 +1136,7 @@
     );
   }
 
-  .message.has-connected-reply:not(.layout-compact) > :global(.avatar-button),
+  .message.has-connected-reply:not(.layout-compact) > :global(.sender-avatar-button),
   .message.has-connected-reply:not(.layout-compact) > :global(.avatar-root.message-avatar) {
     margin-top: var(--space-600);
   }

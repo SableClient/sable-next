@@ -170,7 +170,9 @@ for (const dir of ['ltr', 'rtl'] as const) {
     await mountItem(replyToAlice('centred-reply', '@bob:example.test', 'Bob'));
 
     const reply = document.querySelector('.reply-connected');
-    const avatar = document.querySelector('.message > .avatar-button, .message > .message-avatar');
+    const avatar = document.querySelector(
+      '.message > .sender-avatar-button, .message > .message-avatar'
+    );
     if (!reply || !avatar) throw new Error('missing connected reply parts');
     const box = reply.getBoundingClientRect();
     const line = getComputedStyle(reply, '::before');

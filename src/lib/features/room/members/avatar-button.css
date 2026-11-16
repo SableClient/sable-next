@@ -1,4 +1,4 @@
-.avatar-button {
+.sender-avatar-button {
   align-self: start;
   background: none;
   border: 0;
@@ -9,6 +9,6 @@
   padding: 0;
 }
 
-:global(.compact-user) .avatar-button {
+:global(.compact-user) .sender-avatar-button {
   align-items: center;
 }

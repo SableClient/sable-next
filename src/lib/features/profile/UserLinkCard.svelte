@@ -130,12 +130,18 @@
     align-items: center;
     box-sizing: border-box;
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: var(--space-300);
     justify-content: center;
     min-height: 100%;
     padding: var(--space-700) var(--space-600);
     text-align: center;
+  }
+
+  .user-link > :global(.avatar-button) {
+    height: auto;
+    width: auto;
   }
 
   .user-link h1 {
