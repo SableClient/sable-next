@@ -27,7 +27,9 @@ use sable_model::spaces::{
     self, ChildOrderOverride, HierarchyRoomView, HierarchySection, RoomJoinRuleView, SectionInputs,
     SpaceChildEdge, SuggestedOverride,
 };
-use sable_model::{event_preview, matrix_link, mfm, search_query, shortcodes, slash};
+use sable_model::{
+    event_preview, matrix_link, mfm, search_query, settings_merge, shortcodes, slash,
+};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use wasm_bindgen::prelude::*;
@@ -443,6 +445,21 @@ pub fn reorder_children(
         &decode::<Vec<ChildOrder>>(children)?,
         room_id,
         target_index,
+    ))
+}
+
+#[wasm_bindgen(js_name = mergeSettings)]
+pub fn merge_settings(
+    base: &str,
+    local: &str,
+    remote: &str,
+    version: u32,
+) -> Result<String, JsError> {
+    json(&settings_merge::merge_settings(
+        &decode(base)?,
+        &decode(local)?,
+        &decode(remote)?,
+        version.into(),
     ))
 }
 

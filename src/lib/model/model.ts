@@ -376,6 +376,22 @@ export function reorderChildren(
   ) as ChildOrder[];
 }
 
+export function mergeSettings(
+  base: unknown,
+  local: unknown,
+  remote: unknown,
+  version: number
+): unknown {
+  return JSON.parse(
+    wasm.mergeSettings(
+      JSON.stringify(base ?? null),
+      JSON.stringify(local ?? null),
+      JSON.stringify(remote ?? null),
+      version
+    )
+  ) as unknown;
+}
+
 export function sortEdges(edges: readonly SpaceChildEdge[]): SpaceChildEdge[] {
   return JSON.parse(wasm.sortEdges(JSON.stringify(edges))) as SpaceChildEdge[];
 }

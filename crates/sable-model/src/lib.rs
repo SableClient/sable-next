@@ -30,6 +30,7 @@ pub mod proxy;
 pub mod rtc_invites;
 pub mod search_filter;
 pub mod search_query;
+pub mod settings_merge;
 pub mod shortcodes;
 pub mod sidebar;
 pub mod slash;

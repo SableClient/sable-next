@@ -1,5 +1,6 @@
+import { mergeSettings as mergeSettingsDocuments } from '#lib/model/model.js';
+
 import { isCatalogReference, readThemes, type StoredThemes } from './custom-themes.svelte.js';
-import { fingerprint } from './fingerprint.js';
 import { migrateSettings, SETTINGS_SCHEMA } from './migrations.js';
 import { compressCss, decompressCss } from './theme-compression.js';
 import { NON_SYNCABLE_KEYS, PREFERENCE_KEYS, sanitize } from './definitions.js';
@@ -178,97 +179,6 @@ function mergeThemes(
   };
 }
 
-function pick<T>(base: T | undefined, local: T | undefined, remote: T | undefined): T | undefined {
-  return fingerprint(local) === fingerprint(base) ? remote : local;
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function byId(entries: unknown): Map<string, unknown> {
-  const found = new Map<string, unknown>();
-  if (!Array.isArray(entries)) return found;
-  for (const entry of entries) {
-    const id = record(entry)?.id;
-    if (typeof id === 'string') found.set(id, entry);
-  }
-  return found;
-}
-
-function mergeEntries(base: unknown, local: unknown, remote: unknown): unknown[] {
-  const [before, mine, theirs] = [byId(base), byId(local), byId(remote)];
-  const ids = [...new Set([...theirs.keys(), ...mine.keys()])];
-  return ids.flatMap((id) => {
-    const entry = pick(before.get(id), mine.get(id), theirs.get(id));
-    return entry === undefined ? [] : [entry];
-  });
-}
-
-function mergeIds(base: unknown, local: unknown, remote: unknown): string[] {
-  const list = (value: unknown): string[] =>
-    Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
-  const [before, mine, theirs] = [new Set(list(base)), new Set(list(local)), new Set(list(remote))];
-  const ids = [...new Set([...theirs, ...mine])];
-  return ids.filter((id) => pick(before.has(id), mine.has(id), theirs.has(id)));
-}
-
 export function mergeSettings(base: unknown, local: unknown, remote: unknown): unknown {
-  const [before, mine, theirs] = [record(base), record(local), record(remote)];
-  if (before === null || mine === null || theirs === null) return null;
-  if (mine.v !== SETTINGS_SYNC_VERSION || theirs.v !== SETTINGS_SYNC_VERSION) return null;
-  if (mine.schema !== theirs.schema) return null;
-
-  const [beforeSettings, mineSettings, theirSettings] = [
-    record(before.settings) ?? {},
-    record(mine.settings),
-    record(theirs.settings),
-  ];
-  const [beforeThemes, mineThemes, theirThemes] = [
-    record(before.themes) ?? {},
-    record(mine.themes),
-    record(theirs.themes),
-  ];
-  if (
-    mineSettings === null ||
-    theirSettings === null ||
-    mineThemes === null ||
-    theirThemes === null
-  ) {
-    return null;
-  }
-
-  const settings: Record<string, unknown> = {};
-  const keys = new Set([...Object.keys(theirSettings), ...Object.keys(mineSettings)]);
-  for (const key of keys) {
-    const value = pick(beforeSettings[key], mineSettings[key], theirSettings[key]);
-    if (value !== undefined) settings[key] = value;
-  }
-
-  const themes = mergeEntries(beforeThemes.themes, mineThemes.themes, theirThemes.themes);
-  const tweaks = mergeEntries(beforeThemes.tweaks, mineThemes.tweaks, theirThemes.tweaks);
-  const themeIds = new Set(themes.map((entry) => (entry as { id: string }).id));
-  const tweakIds = new Set(tweaks.map((entry) => (entry as { id: string }).id));
-  const selected = (key: 'lightThemeId' | 'darkThemeId'): string | null => {
-    const id = pick(beforeThemes[key], mineThemes[key], theirThemes[key]);
-    return typeof id === 'string' && themeIds.has(id) ? id : null;
-  };
-
-  return {
-    ...theirs,
-    settings,
-    themes: {
-      themes,
-      tweaks,
-      lightThemeId: selected('lightThemeId'),
-      darkThemeId: selected('darkThemeId'),
-      enabledTweakIds: mergeIds(
-        beforeThemes.enabledTweakIds,
-        mineThemes.enabledTweakIds,
-        theirThemes.enabledTweakIds
-      ).filter((id) => tweakIds.has(id)),
-    },
-  };
+  return mergeSettingsDocuments(base, local, remote, SETTINGS_SYNC_VERSION);
 }

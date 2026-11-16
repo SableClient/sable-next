@@ -4,7 +4,7 @@ import type { StoredThemes } from './custom-themes.svelte';
 import { preferences } from './preferences.svelte';
 import type { Preferences } from './definitions';
 import { fingerprint } from './fingerprint';
-import { applySettings, mergeSettings, prepareSettings } from './sync';
+import { applySettings, prepareSettings } from './sync';
 
 const base: Preferences = { ...preferences };
 
@@ -324,60 +324,5 @@ describe('fingerprint', () => {
 
     expect(JSON.stringify(reordered)).not.toBe(JSON.stringify(content));
     expect(fingerprint(reordered)).toBe(fingerprint(content));
-  });
-});
-
-describe('mergeSettings', () => {
-  const content = (partial: Partial<StoredThemes>, settings: Record<string, unknown> = {}) => ({
-    ...prepareSettings(base, stored(partial)).content,
-    settings,
-  });
-
-  it('keeps a tweak added on each device', () => {
-    const origin = content({ tweaks: [tweak('shared', 'a{}')] });
-    const mine = content({ tweaks: [tweak('shared', 'a{}'), tweak('mine', 'b{}')] });
-    const theirs = content({ tweaks: [tweak('shared', 'a{}'), tweak('theirs', 'c{}')] });
-
-    const merged = mergeSettings(origin, mine, theirs) as typeof origin;
-
-    expect(merged.themes.tweaks.map((entry) => entry.id)).toEqual(['shared', 'theirs', 'mine']);
-  });
-
-  it('applies a removal made on one device and an edit made on the other', () => {
-    const origin = content({ tweaks: [tweak('gone', 'a{}'), tweak('kept', 'b{}')] });
-    const mine = content({ tweaks: [tweak('kept', 'b{}')] });
-    const theirs = content({ tweaks: [tweak('gone', 'a{}'), tweak('kept', 'c{}')] });
-
-    const merged = mergeSettings(origin, mine, theirs) as typeof origin;
-
-    expect(merged.themes.tweaks.map((entry) => entry.id)).toEqual(['kept']);
-    expect(merged.themes.tweaks[0]).toEqual(theirs.themes.tweaks[1]);
-  });
-
-  it('merges which tweaks are enabled and drops ones that no longer exist', () => {
-    const all = [tweak('a', 'a{}'), tweak('b', 'b{}'), tweak('c', 'c{}')];
-    const origin = content({ tweaks: all, enabledTweakIds: ['a'] });
-    const mine = content({ tweaks: all, enabledTweakIds: ['a', 'b'] });
-    const theirs = content({ tweaks: all.slice(0, 2), enabledTweakIds: ['a', 'c'] });
-
-    const merged = mergeSettings(origin, mine, theirs) as typeof origin;
-
-    expect(merged.themes.enabledTweakIds).toEqual(['a', 'b']);
-  });
-
-  it('prefers this device for a setting changed on both and the other for the rest', () => {
-    const origin = content({}, { dateFormat: 'dmy', hour24: false, layout: 'a' });
-    const mine = content({}, { dateFormat: 'ymd', hour24: false, layout: 'a' });
-    const theirs = content({}, { dateFormat: 'mdy', hour24: true, layout: 'a' });
-
-    const merged = mergeSettings(origin, mine, theirs) as typeof origin;
-
-    expect(merged.settings).toEqual({ dateFormat: 'ymd', hour24: true, layout: 'a' });
-  });
-
-  it('declines to merge documents of different schemas', () => {
-    const origin = content({});
-    expect(mergeSettings(origin, origin, { ...origin, schema: origin.schema + 1 })).toBeNull();
-    expect(mergeSettings(origin, origin, { ...origin, v: 99 })).toBeNull();
   });
 });
