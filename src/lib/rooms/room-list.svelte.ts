@@ -64,7 +64,7 @@ function applySections(
   ]);
 }
 
-const SNAPSHOT_WRITE_DELAY_MS = 1_000;
+const SNAPSHOT_WRITE_DELAY_MS = 60_000;
 const WARM_ROOM_LIMIT = 32;
 const WARM_BATCH_MS = 100;
 
@@ -197,8 +197,9 @@ export class RoomList {
   }
 
   setPresentationActive(active: boolean): void {
+    if (this.presentationActive && !active) this.flushSnapshot(true);
     this.presentationActive = active;
-    if (active) this.flushSnapshot();
+    if (active) this.armSnapshotWrite();
   }
 
   typingUserIds(roomId: string): readonly string[] {
@@ -390,7 +391,12 @@ export class RoomList {
 
   private scheduleSnapshotWrite(): void {
     this.snapshotDirty = true;
+    this.armSnapshotWrite();
+  }
+
+  private armSnapshotWrite(): void {
     if (
+      !this.snapshotDirty ||
       !this.presentationActive ||
       this.snapshotAccountId === null ||
       this.snapshotWriteTimer !== undefined

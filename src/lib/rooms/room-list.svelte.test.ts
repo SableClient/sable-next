@@ -465,6 +465,7 @@ test('persists the live room list for the next launch', async () => {
   const roomList = new RoomList(core);
 
   await roomList.start();
+  vi.advanceTimersByTime(59_000);
   expect(stored.has('sable.room-list.v2.acct')).toBe(false);
   vi.advanceTimersByTime(1_000);
   expect(JSON.parse(stored.get('sable.room-list.v2.acct') ?? '{}')).toEqual({
@@ -479,7 +480,7 @@ test('persists the live room list for the next launch', async () => {
   vi.useRealTimers();
 });
 
-test('defers room-list snapshot writes until presentation resumes', async () => {
+test('writes the room-list snapshot once when presentation ends, not on every change', async () => {
   vi.useFakeTimers();
   const stored = stubLocalStorage();
   const room = {
@@ -499,12 +500,11 @@ test('defers room-list snapshot writes until presentation resumes', async () => 
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
 
-  roomList.setPresentationActive(false);
   await roomList.start();
   vi.advanceTimersByTime(1_000);
   expect(stored.has('sable.room-list.v2.acct')).toBe(false);
 
-  roomList.setPresentationActive(true);
+  roomList.setPresentationActive(false);
   expect(JSON.parse(stored.get('sable.room-list.v2.acct') ?? '{}')).toEqual({
     rooms: [room],
     sections: [],
@@ -513,10 +513,14 @@ test('defers room-list snapshot writes until presentation resumes', async () => 
     app_badge: 0,
   });
 
+  stored.delete('sable.room-list.v2.acct');
+  roomList.setPresentationActive(true);
+  vi.advanceTimersByTime(120_000);
+  expect(stored.has('sable.room-list.v2.acct')).toBe(false);
+
   roomList.stop();
   vi.useRealTimers();
 });
-
 test('looks rooms up by id and labels them by what the core shows', () => {
   const roomList = new RoomList({} as CoreClient);
   roomList.rooms = [
