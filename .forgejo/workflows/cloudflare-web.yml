@@ -67,8 +67,6 @@ jobs:
     needs: detect
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
     env:
       RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
@@ -125,8 +123,6 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
     env:
       TF_HTTP_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_ADDRESS_PRODUCTION || secrets.TF_HTTP_ADDRESS }}
       TF_HTTP_LOCK_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_LOCK_ADDRESS_PRODUCTION || secrets.TF_HTTP_LOCK_ADDRESS }}
@@ -175,8 +171,6 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
     env:
       TF_HTTP_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_ADDRESS_PRODUCTION || secrets.TF_HTTP_ADDRESS }}
       TF_HTTP_LOCK_ADDRESS: ${{ needs.detect.outputs.production == 'true' && secrets.TF_HTTP_LOCK_ADDRESS_PRODUCTION || secrets.TF_HTTP_LOCK_ADDRESS }}

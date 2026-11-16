@@ -36,8 +36,6 @@ jobs:
     name: Resolve release target
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
       version: ${{ steps.meta.outputs.version }}
@@ -107,8 +105,6 @@ jobs:
     # Cold, this compiles the workspace for wasm32 in release. Warm, the setup
     # action restores the bindings and only Vite runs.
     timeout-minutes: 60
-    permissions:
-      contents: write
     env:
       RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
@@ -186,9 +182,6 @@ jobs:
             arch: arm64
             runner: docker-arm64
             file: packaging/server/Dockerfile
-    permissions:
-      contents: read
-      packages: write
     env:
       REGISTRY: git.sable.moe
       ARCH: ${{ matrix.arch }}
@@ -257,9 +250,6 @@ jobs:
         image: [web, server]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
-      packages: write
     env:
       REGISTRY: git.sable.moe
       PACKAGES_USER: ${{ secrets.PACKAGES_USER }}
@@ -415,8 +405,6 @@ jobs:
     if: ${{ needs.setup-release.outputs.skip != 'true' && needs.setup-release.outputs.nightly != 'true' }}
     runs-on: docker
     timeout-minutes: 90
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -488,8 +476,6 @@ jobs:
     if: ${{ !cancelled() && needs.setup-release.result == 'success' && needs.android-native.result == 'success' && (needs.android-foss.result == 'success' || (needs.setup-release.outputs.nightly == 'true' && needs.android-foss.result == 'skipped')) }}
     runs-on: docker
     timeout-minutes: 120
-    permissions:
-      contents: write
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -642,8 +628,6 @@ jobs:
     container:
       image: ubuntu:resolute@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
     timeout-minutes: 150
-    permissions:
-      contents: read
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -667,8 +651,6 @@ jobs:
     needs: [setup-release, build-web]
     runs-on: docker
     timeout-minutes: 60
-    permissions:
-      contents: write
     env:
       RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
@@ -747,8 +729,6 @@ jobs:
       run:
         shell: bash
     timeout-minutes: 60
-    permissions:
-      contents: write
     env:
       VERSION: ${{ needs.setup-release.outputs.version }}
       TAG: ${{ needs.setup-release.outputs.tag }}
@@ -826,8 +806,6 @@ jobs:
       run:
         shell: bash
     timeout-minutes: 60
-    permissions:
-      contents: write
     outputs:
       ipa_size: ${{ steps.ipa.outputs.size }}
       ipa_version: ${{ steps.ipa.outputs.version }}
@@ -948,8 +926,6 @@ jobs:
     needs: [setup-release, android, github-bundles]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -968,8 +944,6 @@ jobs:
     needs: [setup-release, ios]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -1028,8 +1002,6 @@ jobs:
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -1075,8 +1047,6 @@ jobs:
     if: ${{ always() && needs.setup-release.outputs.nightly == 'true' && needs.setup-release.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       SHA: ${{ github.sha }}
@@ -1128,8 +1098,6 @@ jobs:
     if: ${{ needs.setup-release.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: write
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       RELEASE_GPG_KEY: ${{ secrets.RELEASE_GPG_KEY }}
@@ -1168,8 +1136,6 @@ jobs:
     needs: [setup-release, electron-linux]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -1241,8 +1207,6 @@ jobs:
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -1305,8 +1269,6 @@ jobs:
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -1344,8 +1306,6 @@ jobs:
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
