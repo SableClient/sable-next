@@ -981,7 +981,7 @@ test('a space marked as bridged carries the network of its rooms', async () => {
   listed.push({
     ...space('!child:example.org', 'Child'),
     room_kind: null,
-    bridge: { network: 'Discord', avatar_url: null },
+    bridge: { network: 'Discord', avatar_url: 'mxc://example.org/discord' },
   });
   setBridgedSpace('!a:example.org', true);
   onTestFinished(() => {

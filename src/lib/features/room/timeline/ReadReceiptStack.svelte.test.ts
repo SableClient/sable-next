@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from 'node:fs';
+
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
@@ -46,10 +48,10 @@ const members = [
 ];
 
 test.each(['article', 'div'])('receipt avatars play only on hover inside <%s>', async (tag) => {
-  const gif = new TextEncoder().encode('GIF89a');
+  const gif = new Uint8Array(readFileSync('crates/sable-model/tests/fixtures/images/animated.gif'));
   core.fetchMedia.mockResolvedValue(gif);
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-    blob: () => Promise.resolve(new Blob([gif])),
+    blob: () => Promise.resolve(new Blob([gif], { type: 'image/gif' })),
   } as Response);
   mockStillFrames(URL.createObjectURL.bind(URL));
   vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(32);
