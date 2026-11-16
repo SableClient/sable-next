@@ -2,6 +2,7 @@ import type { RnnoiseWorkletNode } from '@sapphi-red/web-noise-suppressor';
 import { ignoreError } from './call-transport';
 import { followMicrophoneVolume } from './microphone-volume.svelte';
 import { createVoiceFilterBank, type MicrophoneProcessing } from './voice-filter';
+import { levelOf } from './voice-activity';
 
 type Output = AudioContext & { setSinkId?: (deviceId: string) => Promise<void> };
 
@@ -56,9 +57,7 @@ export async function startInputMeter(
 
   const tick = (): void => {
     analyser.getFloatTimeDomainData(samples);
-    let sum = 0;
-    for (const sample of samples) sum += sample * sample;
-    onLevel(Math.min(Math.sqrt(sum / samples.length) * 4, 1));
+    onLevel(levelOf(samples));
     frame = requestAnimationFrame(tick);
   };
   frame = requestAnimationFrame(tick);

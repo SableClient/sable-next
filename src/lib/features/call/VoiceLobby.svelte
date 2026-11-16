@@ -18,6 +18,7 @@
   import { numberedName, participantKeys } from './participant-keys.js';
   import type { CallMedia } from './call-session.svelte.js';
   import { startInputMeter } from './input-meter';
+  import { SPEAKING_LEVEL } from './voice-activity';
 
   interface Props {
     participants: readonly string[];
@@ -50,8 +51,6 @@
     onJoin,
     onOpenSettings,
   }: Props = $props();
-
-  const SPEAKING_LEVEL = 0.08;
 
   let self = $derived(selfId ? memberIdentity(members, selfId) : null);
   let others = $derived(
