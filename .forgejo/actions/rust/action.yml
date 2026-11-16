@@ -35,7 +35,7 @@ runs:
         targets: ${{ inputs.targets }}
 
     - name: Install sccache
-      uses: https://github.com/taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+      uses: https://github.com/taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
       with:
         tool: sccache@0.18.0
 
@@ -49,9 +49,9 @@ runs:
 
     - name: Set up mise
       if: ${{ inputs.mise == 'true' }}
-      uses: https://github.com/jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      uses: https://github.com/jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       with:
-        version: '2026.11.0'
+        version: '2026.11.5'
         github_token: ''
         cache: true
         env: false
