@@ -26,6 +26,11 @@
   let badge = $derived(
     hideQuietDot(resolveUnreadBadge(counts, preferences, dm), preferences.showUnreadDots)
   );
+  // Read through badge?. since async mode can rerun the {#if label} below on a
+  // branch that is on its way out, after badge has already gone null.
+  let text = $derived(
+    badge?.mode === 'count' ? formatUnreadCount(badge.count, preferences.showEasterEggs) : ''
+  );
 </script>
 
 {#if badge}
@@ -34,17 +39,12 @@
     in:scale={{ start: 0.6, duration: motionMs(MOTION_MS.quick), easing: cubicOut }}
     class={[
       'unread-badge',
-      `unread-badge-${badge.mode}`,
-      badge.highlight && 'unread-badge-highlight',
+      `unread-badge-${badge?.mode}`,
+      badge?.highlight && 'unread-badge-highlight',
       className,
     ]}
-    >{#if label}<span aria-hidden="true"
-        >{badge.mode === 'count'
-          ? formatUnreadCount(badge.count, preferences.showEasterEggs)
-          : ''}</span
-      ><span class="screen-reader-only">{label}</span>{:else}{badge.mode === 'count'
-        ? formatUnreadCount(badge.count, preferences.showEasterEggs)
-        : ''}{/if}</span
+    >{#if label}<span aria-hidden="true">{text}</span><span class="screen-reader-only">{label}</span
+      >{:else}{text}{/if}</span
   >
 {/if}
 
