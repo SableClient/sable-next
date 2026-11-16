@@ -4,6 +4,7 @@ import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 import { startSwipeGesture, updateSwipeGesture, type SwipeGesture } from '#lib/ui/swipe-gesture.js';
 
 import { hasIosKeyboardContextQuirk } from './input.js';
+import { hasIosUserAgent } from './os.js';
 
 export function dismissKeyboardOnScroll(node: HTMLElement): () => void {
   let gesture: SwipeGesture | undefined;
@@ -104,6 +105,41 @@ export function softwareKeyboardShown(): boolean | null {
   if (document.documentElement.dataset.tauriOs === 'android') return null;
   const viewport = window.visualViewport;
   return viewport ? keyboardInset(viewport) > 0 : null;
+}
+
+/**
+ * iOS WebKit can leave part of a scroller unpainted after the viewport grows
+ * back (keyboard dismissed, app resumed), so promote it to a layer for a frame.
+ */
+export function repaintOnIosViewportChange(node: HTMLElement): () => void {
+  if (!hasIosUserAgent()) return () => {};
+  let first = 0;
+  let second = 0;
+  const repaint = (): void => {
+    if (first || second) return;
+    first = requestAnimationFrame(() => {
+      first = 0;
+      node.style.transform = 'translateZ(0)';
+      second = requestAnimationFrame(() => {
+        second = 0;
+        node.style.removeProperty('transform');
+      });
+    });
+  };
+  const resumed = (): void => {
+    if (document.visibilityState === 'visible') repaint();
+  };
+  const viewport = window.visualViewport;
+  const stop = [
+    on(document, 'visibilitychange', resumed),
+    viewport ? on(viewport, 'resize', repaint) : on(window, 'resize', repaint),
+  ];
+  return () => {
+    for (const off of stop) off();
+    cancelAnimationFrame(first);
+    cancelAnimationFrame(second);
+    node.style.removeProperty('transform');
+  };
 }
 
 export function resetDocumentScroll(): void {
