@@ -638,7 +638,7 @@ jobs:
           # The runner mounts the host's zoneinfo read-only, so tzdata cannot unpack there.
           echo 'path-exclude=/usr/share/zoneinfo/*' > /etc/dpkg/dpkg.cfg.d/runner-zoneinfo
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git
+          apt-get install -y --no-install-recommends ca-certificates clang git llvm
           git init -q /shared/workdir/SableClient/sable-next
           cd /shared/workdir/SableClient/sable-next
           git fetch -q --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "refs/tags/$TAG"

@@ -20,8 +20,8 @@ build_tools="$(sed -n 's/^ANDROID_BUILD_TOOLS_VERSION = "\(.*\)"$/\1/p' .mise/co
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends apksigcopier build-essential ca-certificates curl \
-  git openjdk-25-jdk-headless rustup unzip xz-utils
+apt-get install -y --no-install-recommends apksigcopier build-essential ca-certificates clang curl \
+  git llvm openjdk-25-jdk-headless rustup unzip xz-utils
 
 downloads="$(mktemp -d)"
 curl -fsSLo "$downloads/node.tar.xz" \
