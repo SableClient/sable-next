@@ -908,6 +908,45 @@ async fn a_direct_room_that_grew_is_named_as_a_group() {
 }
 
 #[tokio::test]
+async fn a_grown_direct_room_keeps_the_partner_converttodm_chose() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!chosen:example.org");
+    let own = client.user_id().unwrap().to_owned();
+    let partner = user_id!("@partner:example.org");
+    let backup = user_id!("@backup:example.org");
+    let factory = EventFactory::new().room(room_id);
+    let members = [own.as_ref(), partner, backup];
+    let chosen = json!({
+        "type": "moe.sable.direct_partner",
+        "content": { "user_id": partner },
+    });
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_bulk(members.iter().map(|member| factory.member(*member).into()))
+                    .add_account_data(
+                        matrix_sdk::ruma::serde::Raw::new(&chosen)
+                            .unwrap()
+                            .cast_unchecked(),
+                    )
+                    .set_joined_members_count(3),
+            );
+            builder.add_global_account_data(factory.direct().add_user(partner.to_owned(), room_id));
+        })
+        .await;
+    let room = client.get_room(room_id).unwrap();
+
+    assert!(!crate::view::is_one_to_one(&room));
+    assert_eq!(
+        crate::view::direct_peer_name(&room).await.as_deref(),
+        Some("partner")
+    );
+}
+
+#[tokio::test]
 async fn a_two_member_room_not_marked_direct_uses_the_direct_defaults() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

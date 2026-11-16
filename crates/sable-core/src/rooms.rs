@@ -193,17 +193,17 @@ impl Core {
         let client = self.client().await?;
         let room = self.room(room_id).await?;
 
-        if direct {
+        let others = if direct {
             let members = room
                 .members(RoomMemberships::ACTIVE)
                 .await
                 .or_failed(self, "set_direct_members")?;
-            let others = match user_id {
+            match &user_id {
                 Some(user_id)
                     if Some(user_id.as_ref()) != client.user_id()
                         && members.iter().any(|member| member.user_id() == user_id) =>
                 {
-                    vec![user_id]
+                    vec![user_id.clone()]
                 }
                 Some(_) => return Err(RpcCode::Denied.into()),
                 None => members
@@ -211,7 +211,27 @@ impl Core {
                     .map(|member| member.user_id().to_owned())
                     .filter(|user_id| Some(user_id.as_ref()) != client.user_id())
                     .collect(),
-            };
+            }
+        } else {
+            Vec::new()
+        };
+
+        // Written before `m.direct`, whose update is what refreshes the room's name.
+        let partner = user_id.filter(|_| direct);
+        if partner.is_some() || crate::view::chosen_partner(&room).await.is_some() {
+            let content = partner.map_or_else(
+                || serde_json::json!({}),
+                |user_id| serde_json::json!({ "user_id": user_id }),
+            );
+            let raw = matrix_sdk::ruma::serde::Raw::new(&content)
+                .or_failed(self, "set_direct_partner")?
+                .cast_unchecked();
+            room.set_account_data_raw(crate::view::DIRECT_PARTNER_EVENT.into(), raw)
+                .await
+                .or_failed(self, "set_direct_partner")?;
+        }
+
+        if direct {
             client
                 .account()
                 .mark_as_dm(room_id, &others)
@@ -1031,5 +1051,69 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn converting_to_a_chat_with_one_person_remembers_them() {
+        use matrix_sdk::ruma::{room_id, user_id};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_test::JoinedRoomBuilder;
+        use matrix_sdk_test::event_factory::EventFactory;
+        use serde_json::json;
+        use wiremock::matchers::{body_json, method, path_regex};
+        use wiremock::{Mock, ResponseTemplate};
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!chat:example.org");
+        let own = client.user_id().unwrap().to_owned();
+        let partner = user_id!("@partner:example.org");
+        let backup = user_id!("@backup:example.org");
+        let factory = EventFactory::new().room(room_id);
+        let members = [own.as_ref(), partner, backup];
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_bulk(members.iter().map(|member| factory.member(*member).into()))
+                    .set_joined_members_count(3),
+            )
+            .await;
+        let member_events: Vec<_> = members
+            .iter()
+            .map(|member| factory.member(*member).into_raw_timeline())
+            .collect();
+        Mock::given(method("GET"))
+            .and(path_regex(r"/members"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({ "chunk": member_events })),
+            )
+            .mount(server.server())
+            .await;
+        Mock::given(method("PUT"))
+            .and(path_regex(
+                r"/rooms/.*/account_data/moe\.sable\.direct_partner",
+            ))
+            .and(body_json(json!({ "user_id": partner })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(r"/account_data/m\.direct"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(server.server())
+            .await;
+        Mock::given(method("PUT"))
+            .and(path_regex(r"/account_data/m\.direct"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let (core, _events) = crate::test_support::signed_in_core(&server, client.clone()).await;
+
+        core.set_direct(&room_id.to_owned(), true, Some(partner.to_owned()))
+            .await
+            .unwrap();
     }
 }
