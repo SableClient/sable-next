@@ -560,6 +560,7 @@ impl Core {
         stored.cursors.extend(cursors);
         stored.unread_scans.extend(unread_scans);
         inbox.revision += 1;
+        self.inbox_changed.notify_one();
         Ok(added)
     }
 
@@ -637,6 +638,7 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 loop {
+                    core.inbox_changed.notified().await;
                     matrix_sdk::sleep::sleep(INBOX_FLUSH_INTERVAL).await;
                     core.flush_inbox(&client).await;
                 }
