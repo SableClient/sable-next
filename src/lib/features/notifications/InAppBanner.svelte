@@ -331,7 +331,9 @@
   }
 
   .banner.mention {
-    background: var(--primary-container);
+    background:
+      linear-gradient(var(--primary-container), var(--primary-container)),
+      var(--surface-container-hover);
     border-color: var(--primary-container-line);
     color: var(--primary-on-container);
   }
