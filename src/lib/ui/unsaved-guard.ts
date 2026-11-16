@@ -1,5 +1,5 @@
 import { beforeNavigate, goto } from '$app/navigation';
-import { onDestroy } from 'svelte';
+import { onMount } from 'svelte';
 
 export interface UnsavedGuard {
   dirty: () => boolean;
@@ -9,8 +9,6 @@ export interface UnsavedGuard {
 const guards = new Set<UnsavedGuard>();
 
 export function holdUnsaved(guard: UnsavedGuard): void {
-  guards.add(guard);
-
   beforeNavigate((navigation) => {
     const { from, to } = navigation;
     if (navigation.willUnload || !to || from?.url.href === to.url.href) return;
@@ -28,11 +26,14 @@ export function holdUnsaved(guard: UnsavedGuard): void {
   const warn = (event: BeforeUnloadEvent): void => {
     if (guard.dirty()) event.preventDefault();
   };
-  addEventListener('beforeunload', warn);
-
-  onDestroy(() => {
-    guards.delete(guard);
-    removeEventListener('beforeunload', warn);
+  // A component discarded while awaiting never mounts, so onDestroy would never run
+  onMount(() => {
+    guards.add(guard);
+    addEventListener('beforeunload', warn);
+    return () => {
+      guards.delete(guard);
+      removeEventListener('beforeunload', warn);
+    };
   });
 }
 
