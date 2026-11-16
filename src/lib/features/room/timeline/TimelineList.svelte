@@ -441,7 +441,7 @@
     if (unreadInView) unread.observe(unread.firstEventId);
     else if (atLatest && opened && !jumpingUnread && !unread.background) unread.reachLatest();
   });
-  let holdAtLatest = $state(untrack(() => !preferences.openRoomsAtUnread));
+  let holdAtLatest = $state(untrack(() => !preferences.openRoomsAtUnread && hasUnread));
   let hadUnread = untrack(() => hasUnread);
   $effect(() => {
     if (hadUnread && !hasUnread && unread.initialized && !holdAtLatest)

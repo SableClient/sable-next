@@ -782,32 +782,36 @@ test('a timeline with an unread marker reveals on it without waiting for history
   expect(jumps.mock.calls.some(([key]) => key?.includes('marker'))).toBe(true);
 });
 
-test('a read room with a lagging read marker opens at the latest message and moves the marker', async () => {
-  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
-  const roomTimeline = timeline();
-  roomTimeline.items = [item('yesterday'), readMarker('marker'), item('today'), item('latest')];
-  const read = vi.fn().mockResolvedValue(undefined);
-  render(TimelineListHarness, {
-    props: {
-      list: {
-        timeline: roomTimeline,
-        onRequestHistory: () => Promise.resolve(true),
-        onRequestFuture: async () => {},
-        onRead: read,
+test.each([true, false])(
+  'a read room with a lagging read marker moves it with open-at-unread %s',
+  async (openAtUnread) => {
+    setPreference('openRoomsAtUnread', openAtUnread);
+    const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+    const roomTimeline = timeline();
+    roomTimeline.items = [item('yesterday'), readMarker('marker'), item('today'), item('latest')];
+    const read = vi.fn().mockResolvedValue(undefined);
+    render(TimelineListHarness, {
+      props: {
+        list: {
+          timeline: roomTimeline,
+          onRequestHistory: () => Promise.resolve(true),
+          onRequestFuture: async () => {},
+          onRead: read,
+        },
       },
-    },
-  });
+    });
 
-  viewport();
-  await flushed();
-  await runAnimationFrames();
+    viewport();
+    await flushed();
+    await runAnimationFrames();
 
-  expect(jumps).not.toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
-  expect(screen.queryByRole('button', { name: 'Jump to unread' })).not.toBeInTheDocument();
-  await vi.waitFor(() => {
-    expect(read).toHaveBeenCalledWith('$latest', true);
-  });
-});
+    expect(jumps).not.toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
+    expect(screen.queryByRole('button', { name: 'Jump to unread' })).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(read).toHaveBeenCalledWith('$latest', true);
+    });
+  }
+);
 
 test('a notification lands on its event in the live timeline, not on the unread marker', async () => {
   const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
