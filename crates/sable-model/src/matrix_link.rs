@@ -31,13 +31,10 @@ pub struct ViaSplit {
 
 #[must_use]
 pub fn parse_matrix_link(href: &str) -> Option<MatrixLink> {
-    let normalized;
-    let href = if let Some(fragment) = href.strip_prefix("https://link.sable.moe/#/") {
-        normalized = format!("https://matrix.to/#/{fragment}");
-        normalized.as_str()
-    } else {
-        href
-    };
+    let normalized = href
+        .strip_prefix("https://link.sable.moe/#/")
+        .map(|fragment| format!("https://matrix.to/#/{fragment}"));
+    let href = normalized.as_deref().unwrap_or(href);
     let path = href.split(['?', '#']).next().unwrap_or(href);
     let identifier = href
         .find('#')
