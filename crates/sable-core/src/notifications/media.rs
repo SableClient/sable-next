@@ -41,6 +41,7 @@ pub struct PushMedia {
     pub image: Option<PushImage>,
     pub own_name: Option<String>,
     pub own_avatar: Option<String>,
+    pub room_name: Option<String>,
 }
 
 #[cfg(not(target_family = "wasm"))]

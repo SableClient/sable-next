@@ -336,6 +336,7 @@ object PushNotifier {
                 "room" to ROOM_AVATAR_KEY,
                 "own_avatar" to OWN_AVATAR_KEY,
                 "own_name" to OWN_NAME_KEY,
+                "room_name" to "room_name",
             )
         }
         for ((field, key) in fields) {

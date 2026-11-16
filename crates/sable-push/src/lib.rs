@@ -719,17 +719,17 @@ impl Alert<'_> {
             Some(_) => self.sender_name(sender_id.as_deref(), content).await,
             None => sender,
         };
-        let message = self.message(&current, &sender, &room_name);
+        let invite = self.event.as_ref().is_some_and(is_invite);
         let session = self.session.take();
         let active_elsewhere = match &session {
-            Some(session) if !message.invite && current.quiet_when_active_elsewhere => {
+            Some(session) if !invite && current.quiet_when_active_elsewhere => {
                 self.stage.set("active_elsewhere");
                 optional_work(self.optional_deadline, Box::pin(session.active_elsewhere())).await
             }
             _ => false,
         };
         let media = match (sender_id.as_deref(), &session) {
-            (Some(sender), Some(session)) if !message.invite => {
+            (Some(sender), Some(session)) if !invite => {
                 self.stage.set("media");
                 optional_work(
                     self.optional_deadline,
@@ -743,6 +743,8 @@ impl Alert<'_> {
             }
             _ => PushMedia::default(),
         };
+        let room_name = media.room_name.unwrap_or(room_name);
+        let message = self.message(&current, &sender, &room_name);
         let members = session.as_ref().and_then(PushSession::joined_members);
         drop(session);
         let Account {

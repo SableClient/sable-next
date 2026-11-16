@@ -336,6 +336,12 @@ impl PushSession {
                 .map(ToOwned::to_owned)
         });
         let own_url = own.and_then(|member| member.avatar_url().map(ToOwned::to_owned));
+        let room_name = match sender {
+            Some(_) => super::view::direct_name(&room)
+                .await
+                .or_else(|| room.cached_display_name().map(|name| name.to_string())),
+            None => None,
+        };
         let image = match content {
             Some(content) if crate::account_documents::shows_media_previews(&room).await => {
                 message_image(content)
@@ -372,6 +378,7 @@ impl PushSession {
             image: image.map(|(path, mimetype)| PushImage { path, mimetype }),
             own_name,
             own_avatar: own_avatar.map(|(path, _)| path),
+            room_name,
         }
     }
 

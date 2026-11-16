@@ -1327,6 +1327,58 @@ async fn a_direct_chat_without_a_picture_borrows_the_other_persons() {
 }
 
 #[tokio::test]
+async fn a_direct_chat_is_named_after_the_other_person() {
+    let factory = matrix_sdk_test::event_factory::EventFactory::new()
+        .room(room_id!("!cold:example.org"))
+        .sender(user_id!("@sender:example.org"));
+    let room = JoinedRoomBuilder::new(room_id!("!cold:example.org"))
+        .add_state_event(factory.member(user_id!("@alice:example.org")))
+        .add_state_event(
+            factory
+                .member(user_id!("@sender:example.org"))
+                .display_name("Sender"),
+        );
+    let fixture = ColdFixture::new("media-direct-name", room, None).await;
+    fixture
+        .server
+        .mock_sync()
+        .ok_and_run(fixture.client.as_ref().unwrap(), |builder| {
+            builder.add_global_account_data(factory.direct().add_user(
+                user_id!("@sender:example.org").to_owned(),
+                room_id!("!cold:example.org"),
+            ));
+        })
+        .await;
+    mount_thumbnails(&fixture, 0..=2).await;
+
+    let media = media(&fixture, None).await;
+
+    assert_eq!(media.room_name.as_deref(), Some("Sender"));
+
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_group_is_named_as_in_the_room_list() {
+    let fixture = ColdFixture::new("media-group-name", media_room(None), None).await;
+    mount_thumbnails(&fixture, 0..=2).await;
+    let room = fixture
+        .client
+        .as_ref()
+        .unwrap()
+        .get_room(room_id!("!cold:example.org"))
+        .unwrap();
+    let expected = room.cached_display_name().map(|name| name.to_string());
+
+    let media = media(&fixture, None).await;
+
+    assert!(expected.is_some());
+    assert_eq!(media.room_name, expected);
+
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
 async fn a_message_sent_as_a_profile_shows_the_profile_in_its_notification() {
     let fixture = ColdFixture::new("media-profile", media_room(None), None).await;
     let thumbnails = mount_thumbnails(&fixture, 0..=2).await;

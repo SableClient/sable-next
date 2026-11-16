@@ -238,17 +238,23 @@ pub(crate) fn raw_is_encrypted(raw: &Raw<AnySyncTimelineEvent>) -> bool {
 }
 
 async fn apply_direct(room: &matrix_sdk::Room, view: &mut NotificationView) {
-    view.is_direct = view.is_direct && crate::view::is_one_to_one(room);
-    apply_direct_name(room, &mut view.room_name, view.is_direct).await;
+    let is_direct = view.is_direct;
+    view.is_direct = is_direct && crate::view::is_one_to_one(room);
+    apply_direct_name(room, &mut view.room_name, is_direct).await;
 }
 
 async fn apply_direct_name(room: &matrix_sdk::Room, name: &mut String, is_direct: bool) {
-    if is_direct
-        && room.name().is_none()
-        && let Some(peer) = crate::view::direct_peer_name(room).await
-    {
+    if is_direct && let Some(peer) = direct_name(room).await {
         *name = peer;
     }
+}
+
+/// An unnamed direct chat is named after its direct target, as in the room list.
+pub(super) async fn direct_name(room: &matrix_sdk::Room) -> Option<String> {
+    if room.name().is_some() {
+        return None;
+    }
+    crate::view::direct_peer_name(room).await
 }
 
 pub(crate) async fn invite_notification(
