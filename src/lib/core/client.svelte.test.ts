@@ -38,12 +38,17 @@ vi.mock('#lib/deployment/deployment.js', async () => {
   };
 });
 
-const localNetwork = vi.hoisted(() => ({ gated: false, denied: false }));
+const localNetwork = vi.hoisted(() => ({
+  gated: false,
+  denied: false,
+  requestAndroid: vi.fn(() => Promise.resolve(false)),
+}));
 
 vi.mock('#lib/platform/local-network.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/platform/local-network.js')>()),
   browserGatesCoreNetwork: () => localNetwork.gated,
   localNetworkDenied: () => Promise.resolve(localNetwork.denied),
+  requestAndroidLocalNetwork: localNetwork.requestAndroid,
 }));
 
 const session: SessionInfo = {
@@ -1071,6 +1076,7 @@ async function startGated(fetch: () => Promise<unknown>) {
 afterEach(() => {
   localNetwork.gated = false;
   localNetwork.denied = false;
+  localNetwork.requestAndroid.mockClear();
   vi.unstubAllGlobals();
 });
 
@@ -1117,6 +1123,17 @@ test('an offline core the page cannot reach either is just offline', async () =>
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   expect(core.localNetworkBlocked).toBeNull();
+});
+
+test('an offline native core asks Android for local network access', async () => {
+  vi.stubGlobal('navigator', { onLine: true });
+  const fake = fakeTransport({ 'session.restore': session, 'session.list_accounts': [session] });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+
+  fake.emit({ type: 'sync_status', state: 'offline' });
+
+  expect(localNetwork.requestAndroid).toHaveBeenCalledOnce();
 });
 
 test('a cancellation for an unknown verification flow does not open the verification dialog', async () => {

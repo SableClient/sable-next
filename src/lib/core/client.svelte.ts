@@ -49,6 +49,7 @@ import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 import {
   browserGatesCoreNetwork,
   probeFromPage,
+  requestAndroidLocalNetwork,
   localNetworkDenied,
   LocalNetworkBlockedError,
 } from '#lib/platform/local-network.js';
@@ -1205,6 +1206,7 @@ export class CoreClient {
       return;
     }
     if (browserGatesCoreNetwork()) void this.checkLocalNetwork();
+    else if (navigator.onLine) void requestAndroidLocalNetwork();
   }
 
   private async checkLocalNetwork(): Promise<void> {

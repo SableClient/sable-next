@@ -84,7 +84,12 @@ export async function withLocalNetworkAccess(
     await connect();
   } catch (error) {
     const origin = new URL(serviceUrl.replace(/^ws/, 'http'));
-    if (!browserGatesCoreNetwork() || !isLocalNetworkHost(origin.hostname)) throw error;
+    if (!isLocalNetworkHost(origin.hostname)) throw error;
+    if (isAndroid()) {
+      if (!(await requestAndroidLocalNetwork())) throw error;
+      return connect();
+    }
+    if (!browserGatesCoreNetwork()) throw error;
     try {
       await probeFromPage(origin, { mode: 'no-cors' });
     } catch {

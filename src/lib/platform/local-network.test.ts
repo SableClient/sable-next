@@ -107,6 +107,7 @@ test.each([
 });
 
 test('a failed connect to a private call server probes the origin and retries once when granted', async () => {
+  android.value = false;
   const fetchMock = vi.fn().mockResolvedValue({});
   vi.stubGlobal('fetch', fetchMock);
   const connect = vi.fn().mockRejectedValueOnce(new Error('connect')).mockResolvedValue(undefined);
@@ -138,5 +139,29 @@ test('a public call server is never probed', async () => {
 
   await expect(withLocalNetworkAccess('wss://sfu.example.org', connect)).rejects.toBe(failure);
   expect(fetchMock).not.toHaveBeenCalled();
+  expect(connect).toHaveBeenCalledOnce();
+});
+
+test('on Android a failed connect to a private call server asks for access and retries once', async () => {
+  const { invoke } = await fresh();
+  const { withLocalNetworkAccess } = await import('./local-network');
+  invoke.mockResolvedValueOnce({ localNetwork: 'prompt' });
+  invoke.mockResolvedValueOnce({ localNetwork: 'granted' });
+  const connect = vi.fn().mockRejectedValueOnce(new Error('connect')).mockResolvedValue(undefined);
+
+  await withLocalNetworkAccess('wss://192.168.1.20:7880', connect);
+
+  expect(connect).toHaveBeenCalledTimes(2);
+});
+
+test('on Android a refused local network keeps the original call error', async () => {
+  const { invoke } = await fresh();
+  const { withLocalNetworkAccess } = await import('./local-network');
+  invoke.mockResolvedValueOnce({ localNetwork: 'prompt' });
+  invoke.mockResolvedValueOnce({ localNetwork: 'denied' });
+  const failure = new Error('connect');
+  const connect = vi.fn().mockRejectedValue(failure);
+
+  await expect(withLocalNetworkAccess('wss://sfu.local', connect)).rejects.toBe(failure);
   expect(connect).toHaveBeenCalledOnce();
 });
