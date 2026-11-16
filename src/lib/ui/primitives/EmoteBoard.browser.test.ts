@@ -213,3 +213,26 @@ test('search shows matching emotes from different packs with the same shortcode'
     .poll(() => screen.getByRole('button', { name: ':duplicate:' }).elements().length)
     .toBe(2);
 });
+
+test('a board opened while hidden still shows its emoji once visible', async () => {
+  activePacks = [];
+  const host = document.createElement('div');
+  host.style.cssText = 'display: none; height: 600px; width: 400px';
+  document.body.append(host);
+  await render(EmoteBoard, {
+    target: host,
+    props: { roomId: '!room:example.test', unicode: true, onPick: vi.fn() },
+  });
+  await expect.poll(() => host.querySelector('.grids .unicode button')).not.toBeNull();
+
+  host.style.display = 'flex';
+
+  await expect
+    .poll(
+      () =>
+        host.querySelector<HTMLElement>('.grids .unicode')?.closest<HTMLElement>('.virtual-row')
+          ?.offsetHeight
+    )
+    .toBeGreaterThan(0);
+  host.remove();
+});

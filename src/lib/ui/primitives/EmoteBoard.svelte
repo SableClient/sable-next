@@ -427,7 +427,7 @@
     const measuredTab = tab;
     const update = (size?: ResizeObserverSize): void => {
       const cell = list.firstElementChild;
-      if (!(cell instanceof HTMLElement)) return;
+      if (!(cell instanceof HTMLElement) || list.offsetParent === null) return;
       const style = getComputedStyle(list);
       // Measure the row width after space is reserved for the scrollbar.
       const measured = size?.inlineSize ?? Number.parseFloat(style.width);
@@ -754,7 +754,13 @@
                     <div
                       class="row"
                       role="row"
-                      bind:clientHeight={cellRowHeight}
+                      bind:clientHeight={
+                        () => cellRowHeight,
+                        (height) => {
+                          // A board laid out while hidden measures 0 and would collapse every row.
+                          if (height > 0) cellRowHeight = height;
+                        }
+                      }
                       bind:clientWidth={emojiRowWidth}
                       style={`grid-template-columns: repeat(${String(emojiColumns)}, minmax(0, var(--emote-cell)))`}
                     >
