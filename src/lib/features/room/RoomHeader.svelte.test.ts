@@ -48,6 +48,7 @@ function mountHeader(props: {
   searchOpen?: boolean;
   membersOpen?: boolean;
   encrypted?: boolean | null;
+  publicRoom?: boolean;
   presence?: PresenceView | null;
   phone?: boolean;
   backUnread?: number;
@@ -181,6 +182,17 @@ test('the header shows whether the room is end-to-end encrypted', () => {
 
 test('the header claims nothing while encryption is unknown', () => {
   const { container } = mountHeader({ isVoice: false, callParticipants: [], encrypted: null });
+
+  expect(container.querySelector('.encryption-state')).not.toBeInTheDocument();
+});
+
+test('the header does not flag a public room as unencrypted', () => {
+  const { container } = mountHeader({
+    isVoice: false,
+    callParticipants: [],
+    encrypted: false,
+    publicRoom: true,
+  });
 
   expect(container.querySelector('.encryption-state')).not.toBeInTheDocument();
 });

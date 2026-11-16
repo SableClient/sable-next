@@ -31,6 +31,7 @@
     roomAvatar: string | null;
     topic?: string | null;
     encrypted?: boolean | null;
+    publicRoom?: boolean;
     presence?: PresenceView | null;
     isVoice: boolean;
     callParticipants: readonly string[];
@@ -58,6 +59,7 @@
     roomAvatar,
     topic = null,
     encrypted = null,
+    publicRoom = false,
     presence = null,
     isVoice,
     callParticipants,
@@ -89,7 +91,7 @@
       : i18n.t('common.voiceRoom')
   );
   let encryptionLabel = $derived(
-    encrypted === null
+    encrypted === null || (!encrypted && publicRoom)
       ? null
       : encrypted
         ? i18n.t('room.encryptionOn')

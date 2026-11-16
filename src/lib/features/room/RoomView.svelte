@@ -1017,6 +1017,7 @@
     {roomAvatar}
     topic={roomTopic}
     encrypted={resolvedRoom?.encrypted ?? null}
+    publicRoom={resolvedRoom?.join_rule === 'public'}
     presence={dmPresence?.presence ?? null}
     isVoice={resolvedRoom?.room_kind === 'voice'}
     callParticipants={resolvedRoom?.call_participants ?? []}
