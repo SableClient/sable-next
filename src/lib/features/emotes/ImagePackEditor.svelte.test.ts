@@ -64,9 +64,6 @@ async function pickImage(): Promise<void> {
     imageInput(),
     new File([new Uint8Array([1])], 'party.png', { type: 'image/png' })
   );
-  await vi.waitFor(() => {
-    expect(button('Upload')).toBeEnabled();
-  });
 }
 
 async function appliedDraft(applied: PackDraft[]): Promise<PackDraft> {
@@ -84,16 +81,71 @@ test('upload controls appear before the existing images', () => {
   render(ImagePackEditor, { props: { pack: pack(['sticker']), canEdit: true } });
 
   const image = screen.getByText(':wave:');
-  for (const control of [screen.getByRole('textbox', { name: 'Shortcode' }), button('Upload')]) {
-    expect(control.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  }
+  expect(
+    button('Upload').compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+});
+
+test('a picked image waits for its shortcode and uploads on save', async () => {
+  mocks.uploadMedia.mockResolvedValue('mxc://example.org/party');
+  const applied: PackDraft[] = [];
+  render(ImagePackEditor, {
+    props: {
+      pack: pack(['sticker']),
+      canEdit: true,
+      onApply: (draft: PackDraft) => {
+        applied.push(draft);
+        return Promise.resolve();
+      },
+    },
+  });
+
+  await pickImage();
+  const field = screen.getByRole('textbox', { name: 'Shortcode' });
+  expect(field).toHaveValue('party');
+  expect(mocks.uploadMedia).not.toHaveBeenCalled();
+
+  await userEvent.clear(field);
+  await userEvent.type(field, 'parrot');
+  const draft = await appliedDraft(applied);
+
+  expect(mocks.uploadMedia).toHaveBeenCalledOnce();
+  expect(draft.images.map((image) => image.shortcode)).toEqual(['wave', 'parrot']);
+  expect(screen.queryByRole('textbox', { name: 'Shortcode' })).not.toBeInTheDocument();
+});
+
+test('a picked image with a taken or invalid shortcode blocks saving', async () => {
+  render(ImagePackEditor, {
+    props: { pack: pack(['sticker']), canEdit: true, onApply: () => Promise.resolve() },
+  });
+
+  await pickImage();
+  const field = screen.getByRole('textbox', { name: 'Shortcode' });
+  await userEvent.clear(field);
+  await userEvent.type(field, 'wave');
+
+  expect(button('Apply changes')).toBeDisabled();
+  expect(field).toHaveAttribute('aria-invalid', 'true');
+
+  await userEvent.clear(field);
+  await userEvent.type(field, 'bad code');
+  expect(button('Apply changes')).toBeDisabled();
+});
+
+test('resetting drops picked images without uploading them', async () => {
+  render(ImagePackEditor, { props: { pack: pack(['sticker']), canEdit: true } });
+
+  await pickImage();
+  await userEvent.click(button('Reset'));
+
+  expect(screen.queryByRole('textbox', { name: 'Shortcode' })).not.toBeInTheDocument();
+  expect(mocks.uploadMedia).not.toHaveBeenCalled();
 });
 
 test('read-only packs do not show upload controls', () => {
   render(ImagePackEditor, { props: { pack: pack(['sticker']), canEdit: false } });
 
   expect(screen.queryByRole('button', { name: 'Upload' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('textbox', { name: 'Shortcode' })).not.toBeInTheDocument();
 });
 
 test('an image uploaded to a sticker-only pack follows the pack usage', async () => {

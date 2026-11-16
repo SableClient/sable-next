@@ -29,7 +29,6 @@ import type {
   ParsedQuery,
   PushAlert,
   PushContent,
-  PackImageDraftView,
   PermissionGroup,
   PowerLevelLocation,
   PushNotification,
@@ -540,8 +539,8 @@ export function uniqueShortcode(shortcode: string, taken: Iterable<string>): str
 }
 
 export function invalidShortcode(
-  images: readonly PackImageDraftView[],
-  original: readonly PackImageDraftView[]
+  images: readonly { shortcode: string }[],
+  original: readonly { shortcode: string }[]
 ): string | null {
   return (
     wasm.invalidShortcode(

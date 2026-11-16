@@ -4293,7 +4293,6 @@
     "imageCount_other": "{{count, number}} images",
     "noImages": "This pack has no images yet.",
     "shortcode": "Shortcode",
-    "shortcodePlaceholder": "shortcode (optional)",
     "body": "Body",
     "upload": "Upload",
     "rename": "Rename :{{shortcode}}:",

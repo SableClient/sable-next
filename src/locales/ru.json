@@ -1701,7 +1701,6 @@
     "imageCount_few": "{{count, number}} изображения",
     "imageCount_many": "{{count, number}} изображений",
     "noImages": "В этом наборе пока нет изображений.",
-    "shortcodePlaceholder": "код (необязательно)",
     "remove": "Удалить :{{shortcode}}:",
     "leaveTitle": "Сохранить изменения?",
     "leaveStay": "Продолжить редактирование",

@@ -3453,7 +3453,6 @@
     "imageCount_other": "{{count, number}} изображения",
     "noImages": "Този пакет все още няма изображения.",
     "shortcode": "Кратък код",
-    "shortcodePlaceholder": "кратък код (незадължително)",
     "body": "Съдържание",
     "upload": "Качване",
     "rename": "Преименуване на :{{shortcode}}:",

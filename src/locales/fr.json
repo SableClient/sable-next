@@ -2429,7 +2429,6 @@
     "imageCount_other": "{{count, number}} images",
     "noImages": "Ce pack ne contient pas encore d’images.",
     "shortcode": "Shortcode",
-    "shortcodePlaceholder": "shortcode (facultatif)",
     "upload": "Envoyer",
     "rename": "Renommer :{{shortcode}}:",
     "remove": "Supprimer :{{shortcode}}:",

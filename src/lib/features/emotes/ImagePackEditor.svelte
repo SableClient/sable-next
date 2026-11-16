@@ -46,6 +46,13 @@
 
   import '#lib/ui/primitives/settings-row.css';
 
+  interface PendingImage {
+    file: File;
+    preview: string;
+    shortcode: string;
+    url: string | null;
+  }
+
   interface Props {
     pack: ImagePackView | null;
     canEdit: boolean;
@@ -64,14 +71,17 @@
   let renaming = $state<string | null>(null);
   let renameDraft = $state('');
   let bodyDraft = $state('');
-  let shortcode = $state('');
+  let pending = $state<PendingImage[]>([]);
+  let focusPending = $state<string | null>(null);
   let imageInput = $state<HTMLInputElement | null>(null);
   let avatarInput = $state<HTMLInputElement | null>(null);
   let archiveInput = $state<HTMLInputElement | null>(null);
   let transferFailed = $state<'export' | 'import' | null>(null);
 
-  let dirty = $derived(draft !== null);
-  let rejected = $derived(draft === null ? null : invalidShortcode(draft.images, saved.images));
+  let dirty = $derived(draft !== null || pending.length > 0);
+  let rejected = $derived(
+    dirty ? invalidShortcode([...current.images, ...pending], saved.images) : null
+  );
   let leaving = $state.raw<{ proceed: () => void; stay?: () => void } | null>(null);
 
   holdUnsaved({
@@ -88,7 +98,7 @@
   }
 
   function taken(): string[] {
-    return current.images.map((image) => image.shortcode);
+    return [...current.images, ...pending].map((image) => image.shortcode);
   }
 
   function toggleUsage(usage: ImageUsageView, on: boolean): void {
@@ -142,45 +152,64 @@
     commitRename(image);
   }
 
-  async function addImages(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
+  function addImages(event: Event & { currentTarget: HTMLInputElement }): void {
     const files = [...(event.currentTarget.files ?? [])];
     event.currentTarget.value = '';
     if (files.length === 0 || busy) return;
 
-    busy = true;
-    failed = false;
-    try {
-      // pack usage so the per-image usage key is omitted on the wire
-      const packUsage = current.usage;
-      const added: PackImageDraft[] = [];
-      const requested = normalizeShortcode(shortcode);
-      for (const file of files) {
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        const url = await core.media.uploadMedia(file.type || 'image/*', bytes);
-        const wanted =
-          files.length === 1 && requested !== ''
-            ? requested
-            : normalizeShortcode(shortcodeWithoutExtension(file.name));
-        const name = uniqueShortcode(wanted, [
+    const added: PendingImage[] = [];
+    for (const file of files) {
+      added.push({
+        file,
+        preview: URL.createObjectURL(file),
+        shortcode: uniqueShortcode(normalizeShortcode(shortcodeWithoutExtension(file.name)), [
           ...taken(),
-          ...added.map((image) => image.shortcode),
-        ]);
-        added.push({
-          shortcode: name,
-          url,
-          body: null,
-          usage: packUsage,
-          info: await readImageInfo(file),
-        });
-      }
-      shortcode = '';
-      edit({ ...current, images: [...current.images, ...added] });
-    } catch (error) {
-      console.warn('[sable emotes] the image could not be uploaded', error);
-      failed = true;
-    } finally {
-      busy = false;
+          ...added.map((entry) => entry.shortcode),
+        ]),
+        url: null,
+      });
     }
+    pending = [...pending, ...added];
+    focusPending = added[0].preview;
+    failed = false;
+    transferFailed = null;
+  }
+
+  function dropPending(entries: PendingImage[]): void {
+    for (const entry of entries) URL.revokeObjectURL(entry.preview);
+    pending = pending.filter((entry) => !entries.includes(entry));
+  }
+
+  function focusWhenAdded(preview: string) {
+    return (node: HTMLInputElement) => {
+      if (focusPending !== preview) return;
+      focusPending = null;
+      node.select();
+    };
+  }
+
+  $effect(() => () => {
+    for (const entry of pending) URL.revokeObjectURL(entry.preview);
+  });
+
+  async function uploadPending(): Promise<PackImageDraft[]> {
+    // pack usage so the per-image usage key is omitted on the wire
+    const packUsage = current.usage;
+    const uploaded: PackImageDraft[] = [];
+    for (const entry of pending) {
+      entry.url ??= await core.media.uploadMedia(
+        entry.file.type || 'image/*',
+        new Uint8Array(await entry.file.arrayBuffer())
+      );
+      uploaded.push({
+        shortcode: entry.shortcode,
+        url: entry.url,
+        body: null,
+        usage: packUsage,
+        info: await readImageInfo(entry.file),
+      });
+    }
+    return uploaded;
   }
 
   async function setAvatar(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
@@ -270,13 +299,16 @@
   }
 
   async function apply(): Promise<boolean> {
-    if (draft === null || busy) return false;
+    if (!dirty || busy) return false;
 
     busy = true;
     failed = false;
     try {
-      await onApply?.($state.snapshot(draft));
+      const uploaded = await uploadPending();
+      const next = $state.snapshot(current);
+      await onApply?.({ ...next, images: [...next.images, ...uploaded] });
       draft = null;
+      dropPending(pending);
       return true;
     } catch (error) {
       console.warn('[sable emotes] the pack could not be saved', error);
@@ -288,23 +320,24 @@
   }
 
   function stay(): void {
-    const pending = leaving;
+    const asked = leaving;
     leaving = null;
-    pending?.stay?.();
+    asked?.stay?.();
   }
 
   function discardAndLeave(): void {
-    const pending = leaving;
+    const asked = leaving;
     leaving = null;
     draft = null;
-    pending?.proceed();
+    dropPending(pending);
+    asked?.proceed();
   }
 
   async function saveAndLeave(): Promise<void> {
-    const pending = leaving;
+    const asked = leaving;
     if (!(await apply())) return;
     leaving = null;
-    pending?.proceed();
+    asked?.proceed();
   }
 </script>
 
@@ -403,16 +436,9 @@
   >
     {#if canEdit}
       <div class="settings-form">
-        <div class="inline">
-          <TextInput
-            bind:value={shortcode}
-            placeholder={i18n.t('emotes.shortcodePlaceholder')}
-            aria-label={i18n.t('emotes.shortcode')}
-          />
-          <Button disabled={busy} onclick={() => imageInput?.click()}>
-            {i18n.t('emotes.upload')}
-          </Button>
-        </div>
+        <Button disabled={busy} onclick={() => imageInput?.click()}>
+          {i18n.t('emotes.upload')}
+        </Button>
         <input
           bind:this={imageInput}
           use:nativeFilePicker
@@ -422,11 +448,42 @@
           multiple
           tabindex="-1"
           aria-hidden="true"
-          onchange={(event) => {
-            void addImages(event);
-          }}
+          onchange={addImages}
         />
       </div>
+    {/if}
+
+    {#if pending.length > 0}
+      <ul class="settings-rows">
+        {#each pending as entry (entry.preview)}
+          <SettingsRow>
+            {#snippet before()}
+              <img class="pending-preview" src={entry.preview} alt="" width="24" height="24" />
+            {/snippet}
+            <TextInput
+              bind:value={entry.shortcode}
+              aria-label={i18n.t('emotes.shortcode')}
+              aria-invalid={entry.shortcode === rejected}
+              disabled={busy}
+              {@attach focusWhenAdded(entry.preview)}
+              onkeydown={(event: KeyboardEvent) => {
+                if (event.key === 'Enter' && rejected === null) void apply();
+              }}
+            />
+            <IconButton
+              variant="ghost"
+              size="small"
+              label={i18n.t('emotes.remove', { shortcode: entry.shortcode })}
+              disabled={busy}
+              onclick={() => {
+                dropPending([entry]);
+              }}
+            >
+              <TrashIcon />
+            </IconButton>
+          </SettingsRow>
+        {/each}
+      </ul>
     {/if}
 
     {#if current.images.length > 0}
@@ -517,7 +574,7 @@
           </SettingsRow>
         {/each}
       </ul>
-    {:else}
+    {:else if pending.length === 0}
       <p class="status settings-form">{i18n.t('emotes.noImages')}</p>
     {/if}
   </SettingsSection>
@@ -585,6 +642,7 @@
         disabled={!dirty || busy}
         onclick={() => {
           draft = null;
+          dropPending(pending);
           renaming = null;
         }}
       >
@@ -670,10 +728,8 @@
     gap: var(--space-300);
   }
 
-  .inline {
-    display: grid;
-    gap: var(--space-300);
-    grid-template-columns: 1fr auto;
+  .pending-preview {
+    object-fit: contain;
   }
 
   .image-fields {

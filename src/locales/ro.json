@@ -2469,7 +2469,6 @@
     "imageCount_other": "{{count, number}} de imagini",
     "noImages": "Acest pachet încă nu are imagini.",
     "shortcode": "Cod scurt",
-    "shortcodePlaceholder": "cod scurt (opțional)",
     "upload": "Încarcă",
     "rename": "Redenumește :{{shortcode}}:",
     "remove": "Șterge :{{shortcode}}:",

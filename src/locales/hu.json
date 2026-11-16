@@ -3447,7 +3447,6 @@
     "images": "Képek",
     "noImages": "Ebben a csomagban még nincsenek képek.",
     "shortcode": "Rövidkód",
-    "shortcodePlaceholder": "rövidkód (nem kötelező)",
     "body": "Szöveg",
     "upload": "Feltöltés",
     "rename": ":{{shortcode}}: átnevezése",

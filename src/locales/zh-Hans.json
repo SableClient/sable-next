@@ -3663,7 +3663,6 @@
     "images": "图片",
     "noImages": "此表情包还没有图片。",
     "shortcode": "短代码",
-    "shortcodePlaceholder": "短代码（可选）",
     "upload": "上传",
     "rename": "重命名 :{{shortcode}}:",
     "remove": "移除 :{{shortcode}}:",
