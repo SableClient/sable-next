@@ -315,7 +315,11 @@ impl RoomListWorker {
     }
 
     fn emit(&mut self, diffs: Vec<crate::protocol::VectorDiff<RoomListItemView>>) {
-        let next = RoomSections::build(self.rows.rows(), &self.options.borrow_and_update());
+        let next = RoomSections::rebuild(
+            self.rows.rows(),
+            &self.options.borrow_and_update(),
+            &self.sections,
+        );
         let sections = self.sections.update(next);
         if diffs.is_empty() && sections.is_none() {
             return;

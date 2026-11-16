@@ -773,3 +773,27 @@ fn room_spaces_name_each_listed_rooms_spaces_and_ships_only_when_it_changes() {
 
     assert_eq!(sections.update(build(&rows)), None);
 }
+
+#[test]
+fn room_spaces_are_reused_until_the_space_tree_changes() {
+    let options = RoomListOptionsView::default();
+    let rows = [space("root", &["a"]), row("a")];
+    let first = RoomSections::build(&rows, &options);
+
+    let busier = [space("root", &["a"]), unread(row("a"), 3, 1)];
+    let reused = RoomSections::rebuild(&busier, &options, &first);
+    assert!(std::sync::Arc::ptr_eq(
+        &first.room_spaces,
+        &reused.room_spaces
+    ));
+
+    let mut renamed = space("root", &["a"]);
+    renamed.display_name = "Guild".to_owned();
+    let rebuilt = RoomSections::rebuild(&[renamed, row("a")], &options, &reused);
+    let a = rebuilt
+        .room_spaces
+        .iter()
+        .find(|entry| entry.room_id == id("a"))
+        .expect("a listed room");
+    assert_eq!(a.root_name.as_deref(), Some("Guild"));
+}
