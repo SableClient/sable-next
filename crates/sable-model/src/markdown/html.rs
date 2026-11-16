@@ -9,7 +9,7 @@ use crate::mfm::{parse_mfm_color, parse_mfm_unixtime};
 use crate::text::{span, tail};
 
 const MSC4550_LINK: &str = "data-org.matrix.msc4550.link";
-const MATRIX_TO: &str = "https://link.sable.moe/#/";
+const MATRIX_TO: &str = "https://matrix.to/#/";
 
 #[derive(Debug, Clone)]
 enum Node {

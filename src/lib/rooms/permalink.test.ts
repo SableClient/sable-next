@@ -12,6 +12,7 @@ import {
   existingChatPath,
   joinVia,
   matrixLinkPath,
+  matrixEventUri,
   matrixToUrl,
   permalinkTarget,
   roomSectionPath,
@@ -238,6 +239,16 @@ test('a link the app generates parses back to what it named', () => {
   });
 });
 
+test('a message permalink is a matrix: URI that parses back to the event', () => {
+  const uri = matrixEventUri('!room:example.org', '$event', ['a.example']);
+  expect(uri).toBe('matrix:roomid/room%3Aexample.org/e/event?via=a.example');
+  expect(parseMatrixLink(uri)).toEqual({
+    kind: 'event',
+    room_id: '!room:example.org',
+    event_id: '$event',
+  });
+});
+
 test('a user permalink resolves to the user, having no route of its own', () => {
   expect(permalinkTarget([], encodeURIComponent('@alice:example.org'))).toEqual({
     kind: 'user',
@@ -299,7 +310,9 @@ test('copying a room id link asks for via servers and carries the event', async 
   ).resolves.toBe(true);
 
   expect(roomViaServers).toHaveBeenCalledWith({ room_id: '!room:example.org' });
-  expect(writeText).toHaveBeenCalledWith(matrixToUrl('!room:example.org', ['a.example'], '$event'));
+  expect(writeText).toHaveBeenCalledWith(
+    matrixEventUri('!room:example.org', '$event', ['a.example'])
+  );
 });
 
 test('copying an aliased room link skips the via lookup', async () => {

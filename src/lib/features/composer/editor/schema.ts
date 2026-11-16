@@ -6,8 +6,8 @@ import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
 import { canonicalDatetime, isOpaqueMatrixColor, utcFallbackLabel } from '../time-markup';
 
-export const matrixTo = 'https://link.sable.moe/#/';
-const mentionPrefixes = [matrixTo, 'https://matrix.to/#/'];
+export const matrixTo = 'https://matrix.to/#/';
+const mentionPrefixes = [matrixTo, 'https://link.sable.moe/#/'];
 const mentionSchemes = ['matrix:u/', 'matrix:r/', 'matrix:roomid/'];
 
 const notExplicit = ':not([data-mx-link]):not([data-org\\.matrix\\.msc4550\\.link])';

@@ -142,16 +142,27 @@ export function matrixToUrl(
   return `https://link.sable.moe/#/${path}${query === '' ? '' : `?${query}`}`;
 }
 
+export function matrixEventUri(roomId: string, eventId: string, via: readonly string[]): string {
+  const query = new URLSearchParams(via.map((server) => ['via', server])).toString();
+  const path = `roomid/${encodeURIComponent(roomId.slice(1))}/e/${encodeURIComponent(eventId.slice(1))}`;
+  return `matrix:${path}${query === '' ? '' : `?${query}`}`;
+}
+
 export async function copyRoomLink(
   core: Pick<CoreClient, 'rpc'>,
   room: Pick<RoomListItemView, 'room_id' | 'canonical_alias'>,
   eventId?: string | null
 ): Promise<boolean> {
   try {
-    const via = room.canonical_alias
-      ? []
-      : await core.rpc.rooms.viaServers({ room_id: room.room_id });
-    await copyText(matrixToUrl(room.canonical_alias ?? room.room_id, via, eventId));
+    const via =
+      room.canonical_alias && !eventId
+        ? []
+        : await core.rpc.rooms.viaServers({ room_id: room.room_id });
+    await copyText(
+      eventId
+        ? matrixEventUri(room.room_id, eventId, via)
+        : matrixToUrl(room.canonical_alias ?? room.room_id, via)
+    );
   } catch (error) {
     console.debug('[sable room] copy link failed', error);
     toasts.error(t('errors.copyFailed'));

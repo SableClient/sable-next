@@ -1480,7 +1480,7 @@ fn html_text(text: &str) -> String {
 
 fn user_link(sender: &UserId, text: &str) -> String {
     format!(
-        "<a href=\"https://link.sable.moe/#/{}\">{}</a>",
+        "<a href=\"https://matrix.to/#/{}\">{}</a>",
         matrix_to(sender.as_str()),
         html_escape::encode_text(text)
     )
@@ -1500,7 +1500,7 @@ fn original_permalink(
         format!("?{}", via.join("&"))
     };
     Some(format!(
-        "https://link.sable.moe/#/{}/{}{query}",
+        "https://matrix.to/#/{}/{}{query}",
         matrix_to(room.as_str()),
         matrix_to(event.as_str())
     ))
@@ -1694,11 +1694,11 @@ mod tests {
         );
         assert_eq!(
             content["body"],
-            "Forwarded from @alice:x - view original message: https://link.sable.moe/#/!r%3Ax/%24e\nanswer"
+            "Forwarded from @alice:x - view original message: https://matrix.to/#/!r%3Ax/%24e\nanswer"
         );
         assert_eq!(
             content["formatted_body"],
-            "<strong>Forwarded from <a href=\"https://link.sable.moe/#/%40alice%3Ax\">@alice:x</a> - <a href=\"https://link.sable.moe/#/!r%3Ax/%24e\">view original message</a></strong><br><blockquote>answer</blockquote>"
+            "<strong>Forwarded from <a href=\"https://matrix.to/#/%40alice%3Ax\">@alice:x</a> - <a href=\"https://matrix.to/#/!r%3Ax/%24e\">view original message</a></strong><br><blockquote>answer</blockquote>"
         );
         assert_eq!(content["format"], "org.matrix.custom.html");
         assert_eq!(content["m.mentions"], json!({}));
@@ -1830,7 +1830,7 @@ mod tests {
 
         assert_eq!(
             content["body"],
-            "Forwarded message - view original message: https://link.sable.moe/#/!r%3Ax/%24e?via=a.example&via=b.example\nhi"
+            "Forwarded message - view original message: https://matrix.to/#/!r%3Ax/%24e?via=a.example&via=b.example\nhi"
         );
     }
 
@@ -1848,7 +1848,7 @@ mod tests {
         );
         assert_eq!(
             content["formatted_body"],
-            "<strong>Forwarded from <a href=\"https://link.sable.moe/#/%40alice%3Aexample.org\">@alice:example.org</a></strong><br><blockquote><em><strong><a href=\"https://link.sable.moe/#/%40alice%3Aexample.org\">Alice</a></strong> waves</em></blockquote>"
+            "<strong>Forwarded from <a href=\"https://matrix.to/#/%40alice%3Aexample.org\">@alice:example.org</a></strong><br><blockquote><em><strong><a href=\"https://matrix.to/#/%40alice%3Aexample.org\">Alice</a></strong> waves</em></blockquote>"
         );
         assert_eq!(
             content["org.matrix.msc4553.forwarded"]["content"]["msgtype"],
