@@ -3021,6 +3021,18 @@ export type Rpc = {
 	room_id: string,
 	event_id: string,
 }) => Promise<ReactionShortcodeView[]>;
+    reactionEventIds: (params: {
+	room_id: string,
+	event_id: string,
+	key: string,
+	sender: string,
+}) => Promise<string[]>;
+    redactReaction: (params: {
+	room_id: string,
+	event_id: string,
+	key: string,
+	sender: string,
+}) => Promise<null>;
     frequentReactions: (params: {
 	legacy?: unknown | null,
 	recent?: string[],
@@ -3951,6 +3963,8 @@ export type RpcMethods = {
   'messages.send_gesture': Rpc['messages']['sendGesture'];
   'messages.url_preview': Rpc['messages']['urlPreview'];
   'messages.reaction_shortcodes': Rpc['messages']['reactionShortcodes'];
+  'messages.reaction_event_ids': Rpc['messages']['reactionEventIds'];
+  'messages.redact_reaction': Rpc['messages']['redactReaction'];
   'messages.frequent_reactions': Rpc['messages']['frequentReactions'];
   'messages.remember_emoji': Rpc['messages']['rememberEmoji'];
   'messages.set_typing': Rpc['messages']['setTyping'];
@@ -4308,6 +4322,8 @@ export function createRpc(call: RpcCall): Rpc {
       sendGesture: (params) => call('messages.send_gesture', params) as ReturnType<Rpc['messages']['sendGesture']>,
       urlPreview: (params) => call('messages.url_preview', params) as ReturnType<Rpc['messages']['urlPreview']>,
       reactionShortcodes: (params) => call('messages.reaction_shortcodes', params) as ReturnType<Rpc['messages']['reactionShortcodes']>,
+      reactionEventIds: (params) => call('messages.reaction_event_ids', params) as ReturnType<Rpc['messages']['reactionEventIds']>,
+      redactReaction: (params) => call('messages.redact_reaction', params) as ReturnType<Rpc['messages']['redactReaction']>,
       frequentReactions: (params) => call('messages.frequent_reactions', params) as ReturnType<Rpc['messages']['frequentReactions']>,
       rememberEmoji: (params) => call('messages.remember_emoji', params) as ReturnType<Rpc['messages']['rememberEmoji']>,
       setTyping: (params) => call('messages.set_typing', params) as ReturnType<Rpc['messages']['setTyping']>,

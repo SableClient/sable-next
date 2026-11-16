@@ -13,7 +13,6 @@
   import { isCustomReaction, reactionEmoteLabel, reactionText } from './reaction-emote-label.js';
   import TabbedMemberListDialog from '../members/TabbedMemberListDialog.svelte';
   import { memberName } from '../members/members.js';
-  import { fetchReaction, redactReaction } from './redact-reaction.js';
   import type { MessageCallbacks } from './message-action-controller.svelte.js';
 
   interface Props {
@@ -55,7 +54,12 @@
     if (!eventId || !canRemove(sender) || action) return;
     action = { key, sender, action: 'delete' };
     try {
-      await redactReaction(core, roomId, eventId, key, sender);
+      await core.rpc.messages.redactReaction({
+        room_id: roomId,
+        event_id: eventId,
+        key,
+        sender,
+      });
     } catch (error) {
       console.warn('[sable timeline] reaction redaction failed', error);
       toasts.error(i18n.t('errors.actionFailed'));
@@ -72,8 +76,12 @@
     if (!eventId || action) return;
     action = { key, sender, action: 'reply' };
     try {
-      const events = await fetchReaction(core, roomId, eventId, key, sender);
-      const event = events.values().next().value;
+      const [event] = await core.rpc.messages.reactionEventIds({
+        room_id: roomId,
+        event_id: eventId,
+        key,
+        sender,
+      });
       if (event === undefined) {
         throw new Error('failed to fetch reaction event');
       }

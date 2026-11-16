@@ -64,6 +64,8 @@ domain! {
     send_gesture,
     url_preview,
     reaction_shortcodes,
+    reaction_event_ids,
+    redact_reaction,
     frequent_reactions,
     remember_emoji,
     set_typing,
@@ -1181,6 +1183,58 @@ impl Handler for ReactionShortcodesParams {
     async fn run(self, core: &Arc<Core>) -> Result<Vec<ReactionShortcodeView>, RpcError> {
         core.reaction_shortcodes(&self.room_id, &self.event_id)
             .await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct ReactionEventIdsParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+    pub key: String,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub sender: OwnedUserId,
+}
+
+impl Handler for ReactionEventIdsParams {
+    type Ok = Vec<String>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
+        let ids = core
+            .reaction_event_ids(&self.room_id, &self.event_id, &self.key, &self.sender)
+            .await?;
+        Ok(ids.into_iter().map(String::from).collect())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RedactReactionParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+    pub key: String,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub sender: OwnedUserId,
+}
+
+impl Handler for RedactReactionParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        let room = core.room(&self.room_id).await?;
+        for id in core
+            .reaction_event_ids(&self.room_id, &self.event_id, &self.key, &self.sender)
+            .await?
+        {
+            room.redact(&id, None, None)
+                .await
+                .or_failed(core, "redact_reaction")?;
+        }
+        Ok(())
     }
 }
 

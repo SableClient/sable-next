@@ -1,9 +1,9 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId};
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, UserId};
 use sable_model::truncate::truncate_graphemes;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -13,8 +13,10 @@ use crate::Core;
 use crate::ResultExt;
 use crate::api::packs::ListOk;
 use crate::protocol::{ReactionShortcodeView, RpcCode, RpcError};
+use crate::widgets::RelationsFilter;
 
 const MAX_SHORTCODE_BYTES: usize = 100;
+const RELATIONS_PAGE_SIZE: u32 = 100;
 
 #[serde_as]
 #[derive(Default, Deserialize)]
@@ -83,6 +85,55 @@ impl Core {
         }
     }
 
+    /// Every `m.reaction` event `sender` sent to `event_id` with `key`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the relations cannot be fetched or pagination does not advance.
+    pub(crate) async fn reaction_event_ids(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: &OwnedEventId,
+        key: &str,
+        sender: &UserId,
+    ) -> Result<Vec<OwnedEventId>, RpcError> {
+        let mut found = Vec::new();
+        let mut seen_pages = HashSet::new();
+        let mut from: Option<String> = None;
+        loop {
+            let page = self
+                .room_event_relations(
+                    room_id,
+                    event_id,
+                    RelationsFilter {
+                        rel_type: Some("m.annotation"),
+                        event_type: Some("m.reaction"),
+                        from: from.as_deref(),
+                        to: None,
+                        limit: Some(RELATIONS_PAGE_SIZE),
+                        direction: None,
+                    },
+                )
+                .await?;
+            for event in &page.chunk {
+                if let Some(id) = reaction_id(event, event_id, key, sender)
+                    && !found.contains(&id)
+                {
+                    found.push(id);
+                }
+            }
+            let Some(next) = page.next_batch else {
+                return Ok(found);
+            };
+            if !seen_pages.insert(next.clone()) {
+                return Err(
+                    self.failed("reaction_event_ids", "reaction pagination did not advance")
+                );
+            }
+            from = Some(next);
+        }
+    }
+
     /// MSC4027 custom-image reactions, which the timeline's reaction groups omit.
     ///
     /// # Errors
@@ -139,6 +190,22 @@ impl Core {
     }
 }
 
+fn reaction_id(
+    event: &Value,
+    target: &EventId,
+    key: &str,
+    sender: &UserId,
+) -> Option<OwnedEventId> {
+    if event.get("type")?.as_str()? != "m.reaction" || event.get("sender")?.as_str()? != sender {
+        return None;
+    }
+    let relation = event.get("content")?.get("m.relates_to")?;
+    (relation.get("rel_type")?.as_str()? == "m.annotation"
+        && relation.get("event_id")?.as_str()? == target
+        && relation.get("key")?.as_str()? == key)
+        .then(|| event.get("event_id")?.as_str()?.parse().ok())?
+}
+
 fn shortcodes(events: &[TimelineEvent], target: &EventId) -> Vec<ReactionShortcodeView> {
     let mut by_key = BTreeMap::new();
     for event in events {
@@ -174,7 +241,7 @@ fn normalized(shortcode: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use matrix_sdk::deserialized_responses::TimelineEvent;
-    use matrix_sdk::ruma::{event_id, serde::Raw};
+    use matrix_sdk::ruma::{event_id, serde::Raw, user_id};
     use serde_json::json;
 
     use super::{can_annotate, is_redacted, shortcodes};
@@ -208,6 +275,107 @@ mod tests {
             .unwrap();
             assert_eq!(can_annotate(&event), allowed);
         }
+    }
+
+    #[tokio::test]
+    #[cfg(not(target_family = "wasm"))]
+    async fn reaction_ids_follow_pages_and_match_sender_and_key() {
+        use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};
+        use matrix_sdk_test::JoinedRoomBuilder;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path_regex, query_param, query_param_is_missing},
+        };
+
+        let reaction = |id: &str, sender: &str, key: &str, target: &str| {
+            json!({
+                "type": "m.reaction", "event_id": id, "sender": sender,
+                "content": {"m.relates_to": {
+                    "rel_type": "m.annotation", "event_id": target, "key": key,
+                }},
+            })
+        };
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!reactions:example.org");
+        server
+            .sync_room(&client, JoinedRoomBuilder::new(room_id))
+            .await;
+        let relations = "/_matrix/client/v1/rooms/.*/relations/.*/m.annotation";
+        Mock::given(method("GET"))
+            .and(path_regex(relations))
+            .and(query_param_is_missing("from"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "chunk": [
+                    reaction("$mine", "@me:example.org", "👍", "$target"),
+                    reaction("$other_sender", "@you:example.org", "👍", "$target"),
+                    reaction("$other_key", "@me:example.org", "🎉", "$target"),
+                ],
+                "next_batch": "page2",
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(relations))
+            .and(query_param("from", "page2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "chunk": [
+                    reaction("$again", "@me:example.org", "👍", "$target"),
+                    reaction("$other_target", "@me:example.org", "👍", "$elsewhere"),
+                ],
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let core = crate::test_support::signed_in_core(&server, client).await.0;
+
+        let ids = core
+            .reaction_event_ids(
+                &room_id.to_owned(),
+                &event_id!("$target").to_owned(),
+                "👍",
+                user_id!("@me:example.org"),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ids, [event_id!("$mine"), event_id!("$again")]);
+    }
+
+    #[tokio::test]
+    #[cfg(not(target_family = "wasm"))]
+    async fn reaction_pagination_that_repeats_a_token_fails() {
+        use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};
+        use matrix_sdk_test::JoinedRoomBuilder;
+        use wiremock::{Mock, ResponseTemplate, matchers::method, matchers::path_regex};
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!reactions:example.org");
+        server
+            .sync_room(&client, JoinedRoomBuilder::new(room_id))
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(
+                "/_matrix/client/v1/rooms/.*/relations/.*/m.annotation",
+            ))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"chunk": [], "next_batch": "stuck"})),
+            )
+            .mount(server.server())
+            .await;
+        let core = crate::test_support::signed_in_core(&server, client).await.0;
+
+        let result = core
+            .reaction_event_ids(
+                &room_id.to_owned(),
+                &event_id!("$target").to_owned(),
+                "👍",
+                user_id!("@me:example.org"),
+            )
+            .await;
+        result.unwrap_err();
     }
 
     #[tokio::test]
