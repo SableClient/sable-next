@@ -17,8 +17,9 @@
 <span class={['emote-card', { reaction: variant === 'reaction' }]}>
   <span class="emote-card-image">{@render children()}</span>
   <span class="emote-card-text">
-    <span class="emote-card-name">{label}</span>
-    {#if description}<span class="emote-card-description">{description}</span>{/if}
+    <span class="emote-card-name">{label}</span>{#if description}<span
+        class="emote-card-description">{description}</span
+      >{/if}
   </span>
 </span>
 
