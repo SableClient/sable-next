@@ -14,7 +14,7 @@ import type {
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
-  useRoomList: () => ({ rooms: [], labelFor: (id: string) => id }),
+  useRoomList: () => ({ rooms: [], roomSpaces: () => undefined, labelFor: (id: string) => id }),
 }));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';

@@ -82,7 +82,7 @@
   let failed = $state(false);
 
   let delegates = $derived.by(() => {
-    const ids = roomId === null ? [] : ancestorSpaceIds(roomList.rooms, roomId);
+    const ids = roomId === null ? [] : ancestorSpaceIds(roomList.roomSpaces(roomId));
     if (saved.delegate_to !== null && !ids.includes(saved.delegate_to)) ids.push(saved.delegate_to);
     return [
       { value: NO_DELEGATE, label: i18n.t('room.rulesDelegateNone') },

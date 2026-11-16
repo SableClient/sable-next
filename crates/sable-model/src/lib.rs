@@ -33,6 +33,8 @@ pub mod search_query;
 pub mod shortcodes;
 pub mod sidebar;
 pub mod slash;
+pub mod space_graph;
+pub mod space_order;
 pub mod spaces;
 pub mod text;
 pub mod truncate;

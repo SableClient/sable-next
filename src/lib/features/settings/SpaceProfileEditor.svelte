@@ -20,7 +20,6 @@
   import { senderColor } from '../room/timeline/timeline-format';
   import { i18n, t } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { joinedSpaceRooms } from '#lib/rooms/spaces.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -95,7 +94,7 @@
     name_color_light: draft.light || profile.name_color_light,
     name_color_dark: draft.dark || profile.name_color_dark,
   });
-  let applyTargets = $derived(joinedSpaceRooms(space, (id) => roomList.byId(id)));
+  let applyTargets = $derived(space ? (roomList.section(space.room_id)?.descendants ?? []) : []);
 
   const previewCosmetics = $derived<SenderCosmetics>({
     colorOnLight: previewProfile.name_color_light,

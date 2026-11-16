@@ -28,7 +28,7 @@
 
   import '#lib/ui/primitives/settings-row.css';
 
-  import { ancestorSpaceIds, descendantRoomIds } from '#lib/rooms/spaces.js';
+  import { ancestorSpaceIds } from '#lib/rooms/spaces.js';
   import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
   import { FOUNDER_POWER_LEVEL } from '../members/power-tags';
   import ReactionPicker from '../messages/ReactionPicker.svelte';
@@ -122,7 +122,9 @@
   let syncing = $state(false);
   let syncFailed = $state(false);
   let syncSpaceIds = $derived(
-    roomId && room?.room_kind !== 'space' ? ancestorSpaceIds(roomList.rooms, roomId).reverse() : []
+    roomId && room?.room_kind !== 'space'
+      ? ancestorSpaceIds(roomList.roomSpaces(roomId)).reverse()
+      : []
   );
   let syncSpaceId = $derived(
     syncChoice !== null && syncSpaceIds.includes(syncChoice)
@@ -131,7 +133,7 @@
   );
 
   let childIds = $derived(
-    roomId && room?.room_kind === 'space' ? descendantRoomIds(roomList.rooms, roomId) : []
+    roomId && room?.room_kind === 'space' ? (roomList.roomSpaces(roomId)?.descendants ?? []) : []
   );
   let childConfirm = $state(false);
   let childSyncing = $state(false);

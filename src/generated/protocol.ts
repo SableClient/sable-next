@@ -192,6 +192,12 @@ export type CallSupportView = {
 	can_join: boolean,
 };
 
+/**  A child and the order string it carries or should carry. */
+export type ChildOrder = {
+	roomId: string,
+	order: string | null,
+};
+
 export type ChildOrderOverride = {
 	parent_id: string,
 	children: SpaceChildEdge[],
@@ -841,6 +847,11 @@ export type PackTargetView = { kind: "room"; room_id: string; state_key: string 
 export type PaginationDirection = "backward" | "forward";
 
 export type ParameterSchema = { schema_type: "primitive"; type: PrimitiveType } | { schema_type: "literal"; value: LiteralValue } | { schema_type: "union"; variants: ScalarSchema[] } | { schema_type: "array"; items: ItemSchema };
+
+export type ParentSpace = {
+	space_id: string,
+	via: string[],
+};
 
 export type ParsedQuery = {
 	text: string,
@@ -1514,16 +1525,33 @@ export type RoomSectionView = {
 	descendants: string[],
 };
 
-/**  Changed sections only. `badges` and `quiet_rooms` are whole when present. */
+/**  Changed sections only. `badges`, `quiet_rooms` and `room_spaces` are whole when present. */
 export type RoomSectionsUpdate = {
 	sections: RoomSectionView[],
 	removed: string[],
 	badges: RoomBadgeView[] | null,
 	quiet_rooms: string[] | null,
 	app_badge: number | null,
+	room_spaces: RoomSpacesView[] | null,
 };
 
 export type RoomSortView = "recent" | "name-asc" | "name-desc";
+
+/**  Where a room sits in the spaces this account has joined. */
+export type RoomSpacesView = {
+	room_id: string,
+	joined: boolean,
+	/**  The joined spaces above the room, the nearest level first. */
+	levels: string[][],
+	/**  The top-level space the room sits under, which tells apart rooms sharing a name. */
+	root_name: string | null,
+	/**  The first joined space listing the room, and the `via` of its edge. */
+	parent: ParentSpace | null,
+	/**  Every space holding the room at any depth, whatever its state. */
+	containing: string[],
+	/**  Every joined room and subspace below a joined space, nearest first. */
+	descendants: string[],
+};
 
 export type RoomStateEventView = {
 	state_key: string,
@@ -1942,6 +1970,12 @@ export type SpaceHierarchyRoomView = {
 	children: SpaceChildEdge[],
 };
 
+export type SpaceLeaveOrder = {
+	order: string[],
+	room_count: number,
+	subspace_count: number,
+};
+
 export type SpaceNotificationView = {
 	space_id: string,
 	mode: NotificationModeView,
@@ -1955,6 +1989,21 @@ export type SpaceNotificationsView = {
 export type SpaceParentView = {
 	room_id: string,
 	via: string[],
+};
+
+/**  A room as the web page sends it, with what a lobby shows of it. */
+export type SpaceRoomInput = {
+	room_id: string,
+	display_name: string,
+	is_space: boolean,
+	joined: boolean,
+	tombstoned: boolean,
+	children: SpaceChildEdge[],
+	canonical_alias: string | null,
+	name: string | null,
+	topic: string | null,
+	avatar_url: string | null,
+	join_rule: RoomJoinRuleView,
 };
 
 export type SpaceTreeNodeView = { kind: "room"; room_id: string; key: string; depth: number } | { kind: "category"; room_id: string; key: string; depth: number; children: SpaceTreeNodeView[] } | { kind: "link"; room_id: string; key: string; depth: number };

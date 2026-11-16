@@ -119,7 +119,7 @@
     personas,
     timeline: forumThreads.roomTimeline,
     roomId: () => resolvedRoomId,
-    spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
+    spaceIds: (id) => personaSpaces(roomList, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
     publicRoom: () => resolvedRoom?.join_rule === 'public',
     afterSend: (id) => {

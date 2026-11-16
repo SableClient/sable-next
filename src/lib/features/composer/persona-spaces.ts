@@ -1,15 +1,15 @@
 import type { RoomListItemView } from '#src/generated/protocol';
 
-import { ancestorSpaceLevels } from '#lib/rooms/spaces.js';
+import type { RoomSpacesLookup } from '#lib/rooms/spaces.js';
 import { findRoomByPathId } from '#lib/rooms/room-list.svelte.js';
 
 export function personaSpaces(
-  rooms: readonly RoomListItemView[],
+  roomList: { readonly rooms: readonly RoomListItemView[]; readonly roomSpaces: RoomSpacesLookup },
   roomId: string,
   spacePathId: string | undefined
 ): { target: string | null; order: string[] } {
-  const preferred = findRoomByPathId(rooms, spacePathId)?.room_id ?? null;
-  const order = ancestorSpaceLevels(rooms, roomId).flatMap((level) =>
+  const preferred = findRoomByPathId(roomList.rooms, spacePathId)?.room_id ?? null;
+  const order = (roomList.roomSpaces(roomId)?.levels ?? []).flatMap((level) =>
     preferred !== null && level.includes(preferred)
       ? [preferred, ...level.filter((id) => id !== preferred)]
       : level

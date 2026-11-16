@@ -5,7 +5,9 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+use crate::space_order::compare_edges;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum RoomJoinRuleView {
@@ -17,6 +19,7 @@ pub enum RoomJoinRuleView {
     KnockRestricted,
     Private,
     /// Not loaded, or a rule this client has no name for.
+    #[default]
     Unknown,
 }
 
@@ -235,15 +238,7 @@ pub fn merge_hierarchy_rooms(
         };
     }
     for room in &mut merged {
-        room.children.sort_by(|left, right| {
-            match (&left.order, &right.order) {
-                (Some(left), Some(right)) => left.cmp(right),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
-            .then_with(|| left.origin_server_ts.cmp(&right.origin_server_ts))
-        });
+        room.children.sort_by(compare_edges);
     }
     merged
 }

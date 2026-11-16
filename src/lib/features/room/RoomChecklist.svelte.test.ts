@@ -3,10 +3,15 @@
 import { render, screen } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 
-import type { RoomListItemView } from '#src/generated/protocol';
+import type { RoomListItemView, RoomSpacesView } from '#src/generated/protocol';
 
-const roomList = vi.hoisted(() => ({ rooms: [] as RoomListItemView[] }));
+const roomList = vi.hoisted(() => ({
+  rooms: [] as RoomListItemView[],
+  roomSpaces: (_roomId: string) => undefined as RoomSpacesView | undefined,
+}));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => roomList }));
+
+import { roomSpacesLookup } from '#lib/test-support/room-spaces.js';
 
 import RoomChecklist from './RoomChecklist.svelte';
 
@@ -45,6 +50,7 @@ test('rooms with the same name are told apart by the space they are in', () => {
       ],
     } as unknown as RoomListItemView,
   ];
+  roomList.roomSpaces = roomSpacesLookup(roomList.rooms);
   render(RoomChecklist, {
     class: 'targets',
     rooms: [room('!a:one.org', '#general:one.org'), room('!b:two.org', null)],

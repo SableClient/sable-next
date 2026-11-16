@@ -61,7 +61,7 @@
 
   let desktop = $derived(appLayout.current);
   let open = $state(false);
-  let spaces = $derived(personaSpaces(roomList.rooms, roomId, page.params.spaceId));
+  let spaces = $derived(personaSpaces(roomList, roomId, page.params.spaceId));
   let hasSpace = $derived(spaces.target !== null);
 
   let scopeChoice = $derived(preferences.personaSelectionScope === 'picker');

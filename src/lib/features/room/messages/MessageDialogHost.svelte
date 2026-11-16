@@ -124,7 +124,7 @@
             outgoingPersona(
               personaStore,
               toRoomId,
-              personaSpaces(roomList.rooms, toRoomId, undefined).order
+              personaSpaces(roomList, toRoomId, undefined).order
             ).persona
           ),
         })

@@ -31,7 +31,8 @@
             roomList.rooms,
             room.room_id,
             lastRoomSection(session.account_id),
-            preferences.showHome
+            preferences.showHome,
+            (spaceId) => roomList.section(spaceId)?.descendants ?? []
           )
         : preferences.showHome
           ? resolve('/(app)/home')

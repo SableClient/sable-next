@@ -3,7 +3,6 @@
 
   import type { RoomListItemView } from '#src/generated/protocol';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { rootSpaceNames } from '#lib/rooms/spaces.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import '#lib/ui/primitives/menu.css';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
@@ -17,7 +16,6 @@
 
   let { class: className, rooms, selected = $bindable(), label }: Props = $props();
   const roomList = useRoomList();
-  let spaceNames = $derived(rootSpaceNames(roomList.rooms));
 
   function toggle(roomId: string): void {
     selected = selected.includes(roomId)
@@ -29,7 +27,9 @@
 <ul class={className} {@attach scrollHint}>
   {#each rooms as room (room.room_id)}
     {@const checked = selected.includes(room.room_id)}
-    {@const where = [spaceNames.get(room.room_id), room.canonical_alias].filter(Boolean)}
+    {@const where = [roomList.roomSpaces(room.room_id)?.root_name, room.canonical_alias].filter(
+      Boolean
+    )}
     <li>
       <button
         type="button"

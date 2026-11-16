@@ -2,7 +2,6 @@
   import { i18n } from '#lib/i18n.js';
   import { isRoomId } from '#lib/rooms/meowlnir-config.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { rootSpaceNames } from '#lib/rooms/spaces.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -21,7 +20,6 @@
   let search = $state('');
   let selected = $state.raw<string[]>([]);
 
-  let spaceNames = $derived(rootSpaceNames(roomList.rooms));
   let query = $derived(search.trim().toLowerCase());
   let candidates = $derived(
     roomList.rooms.filter(
@@ -35,8 +33,8 @@
   );
   let matches = $derived(
     candidates.filter((room) =>
-      [room.display_name, room.canonical_alias, spaceNames.get(room.room_id)].some((text) =>
-        text?.toLowerCase().includes(query)
+      [room.display_name, room.canonical_alias, roomList.roomSpaces(room.room_id)?.root_name].some(
+        (text) => text?.toLowerCase().includes(query)
       )
     )
   );

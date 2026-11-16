@@ -666,6 +666,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           .map((entry) => ({ room_id: entry.room_id, counts: entry.counts })),
         quiet_rooms: [],
         app_badge: null,
+        room_spaces: null,
       };
     }
 

@@ -11,11 +11,16 @@ import { i18n } from '#lib/i18n.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
 import { notificationModeLabels } from './notification-modes.js';
-import { inheritedNotificationModes } from './spaces.js';
+import { inheritedNotificationModes, type RoomSpacesLookup } from './spaces.js';
 
 export const SPACE_NOTIFICATIONS_EVENT = 'moe.sable.space_notifications';
 
 type Modes = ReadonlyMap<string, NotificationModeView>;
+
+export type SpaceRooms = {
+  readonly rooms: readonly RoomListItemView[];
+  readonly roomSpaces: RoomSpacesLookup;
+};
 
 function byMode(
   entries: readonly [string, NotificationModeView | null][]
@@ -60,13 +65,13 @@ class SpaceNotifications {
     return this.modes.get(spaceId) ?? null;
   }
 
-  inherited(rooms: readonly RoomListItemView[]): Map<string, NotificationModeView> {
-    return inheritedNotificationModes(rooms, this.modes, this.exempt);
+  inherited(roomList: SpaceRooms): Map<string, NotificationModeView> {
+    return inheritedNotificationModes(roomList.roomSpaces, this.modes, this.exempt);
   }
 
   /** The mode each room's space sets, whether or not the room follows it. */
-  spaceModes(rooms: readonly RoomListItemView[]): Map<string, NotificationModeView> {
-    return inheritedNotificationModes(rooms, this.modes);
+  spaceModes(roomList: SpaceRooms): Map<string, NotificationModeView> {
+    return inheritedNotificationModes(roomList.roomSpaces, this.modes);
   }
 
   async setExempt(room: RoomListItemView, exempt: boolean): Promise<void> {
@@ -93,11 +98,9 @@ class SpaceNotifications {
     await core.rpc.notifications.setRoomNotificationMode({ room_id: room.room_id, mode: null });
   }
 
-  custom(
-    rooms: readonly RoomListItemView[]
-  ): { room: RoomListItemView; mode: NotificationModeView }[] {
-    const inherited = this.inherited(rooms);
-    return rooms.flatMap((room) => {
+  custom(roomList: SpaceRooms): { room: RoomListItemView; mode: NotificationModeView }[] {
+    const inherited = this.inherited(roomList);
+    return roomList.rooms.flatMap((room) => {
       if (room.state !== 'joined') return [];
       const own = this.modes.get(room.room_id);
       if (own !== undefined) return [{ room, mode: own }];
@@ -107,12 +110,12 @@ class SpaceNotifications {
     });
   }
 
-  apply(rooms: readonly RoomListItemView[]): void {
+  apply(roomList: SpaceRooms): void {
     const core = this.sync.core;
     if (core === null) return;
-    const byId = new Map(rooms.map((room) => [room.room_id, room]));
+    const byId = new Map(roomList.rooms.map((room) => [room.room_id, room]));
     const pending: [string, NotificationModeView][] = [];
-    for (const [roomId, mode] of this.inherited(rooms)) {
+    for (const [roomId, mode] of this.inherited(roomList)) {
       if (byId.get(roomId)?.notification.room !== null || this.#tried.has(roomId)) continue;
       this.#tried.add(roomId);
       pending.push([roomId, mode]);
@@ -132,7 +135,7 @@ class SpaceNotifications {
   async set(
     spaceId: string,
     mode: NotificationModeView | null,
-    rooms: readonly RoomListItemView[]
+    roomList: SpaceRooms
   ): Promise<number> {
     const core = this.sync.core;
     if (core === null) return 0;
@@ -143,11 +146,11 @@ class SpaceNotifications {
       ...(mode === null ? [] : [[spaceId, mode] as const]),
     ]);
 
-    const before = inheritedNotificationModes(rooms, previous, this.exempt);
-    const after = inheritedNotificationModes(rooms, next, this.exempt);
+    const before = inheritedNotificationModes(roomList.roomSpaces, previous, this.exempt);
+    const after = inheritedNotificationModes(roomList.roomSpaces, next, this.exempt);
     const moved: [string, NotificationModeView | null][] = [];
     let changed = 0;
-    for (const room of rooms) {
+    for (const room of roomList.rooms) {
       if (room.room_id === spaceId) {
         if (room.notification.room !== mode) moved.push([spaceId, mode]);
         continue;
@@ -194,7 +197,7 @@ export const spaceNotifications = new SpaceNotifications();
 
 export async function setNotificationMode(
   core: CoreClient,
-  roomList: { readonly rooms: readonly RoomListItemView[] },
+  roomList: SpaceRooms,
   room: RoomListItemView,
   mode: NotificationModeView | null
 ): Promise<void> {
@@ -203,7 +206,7 @@ export async function setNotificationMode(
     return;
   }
   const previous = spaceNotifications.modeOf(room.room_id);
-  const count = await spaceNotifications.set(room.room_id, mode, roomList.rooms);
+  const count = await spaceNotifications.set(room.room_id, mode, roomList);
   toasts.undoable(
     i18n.t('room.spaceModeApplied', {
       count,
@@ -213,7 +216,7 @@ export async function setNotificationMode(
     {
       label: i18n.t('common.undo'),
       onUndo: () => {
-        spaceNotifications.set(room.room_id, previous, roomList.rooms).catch((error: unknown) => {
+        spaceNotifications.set(room.room_id, previous, roomList).catch((error: unknown) => {
           console.warn('[sable rooms] undoing the space notification mode failed', error);
           toasts.error(i18n.t('errors.actionFailed'));
         });

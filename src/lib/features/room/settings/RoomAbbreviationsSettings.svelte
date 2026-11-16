@@ -91,7 +91,7 @@
       return;
     }
 
-    const ids = ancestorSpaceIds(roomList.rooms, target);
+    const ids = ancestorSpaceIds(roomList.roomSpaces(target));
     const current = ++inheritedRun;
     void Promise.all(
       ids.map(async (spaceId) => {

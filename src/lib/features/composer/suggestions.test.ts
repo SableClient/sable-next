@@ -1,6 +1,8 @@
 import type { ImagePackView, MemberView, RoomListItemView } from '#src/generated/protocol';
 import { expect, test } from 'vitest';
 
+import { roomSpaces } from '#lib/model/model.js';
+
 import { memberView } from '#lib/test-support/room-views.js';
 
 import type { AutocompleteQuery } from './autocomplete';
@@ -192,11 +194,18 @@ test('rooms with the same name show the space they are in', () => {
     ],
   } as RoomListItemView;
 
+  const rooms = [space, room('!one:example.org', 'General'), room('!two:example.org', 'General')];
+  const spaces = new Map(roomSpaces(rooms).map((entry) => [entry.room_id, entry]));
   const suggestions = suggestionsFor(
     roomQuery('gen'),
     [],
     [],
-    [space, room('!one:example.org', 'General'), room('!two:example.org', 'General')]
+    rooms,
+    undefined,
+    null,
+    null,
+    [],
+    (roomId) => spaces.get(roomId)
   );
 
   expect(suggestions.map((item) => item.detail)).toEqual(['Community', null]);

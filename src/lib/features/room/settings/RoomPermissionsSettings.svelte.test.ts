@@ -15,13 +15,15 @@ import type {
 type Tags = Record<string, PowerLevelTagView>;
 
 const { space, extraRooms } = vi.hoisted(() => ({
-  extraRooms: [] as { room_id: string; state: string; space_children: [] }[],
+  extraRooms: [] as { room_id: string; state: string; space_children: never[] }[],
   space: {
     room_id: '!space:example.org',
     name: 'Guild',
     room_kind: 'space',
     state: 'joined',
-    space_children: [{ room_id: '!room:example.org' }],
+    space_children: [
+      { room_id: '!room:example.org', via: [], order: null, origin_server_ts: 0, suggested: false },
+    ],
   },
 }));
 
@@ -33,9 +35,11 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({
     rooms: [space, ...extraRooms],
     byId: (id: string) => (id === space.room_id ? space : undefined),
+    roomSpaces: (id: string) => roomSpacesLookup([space, ...extraRooms] as never)(id),
   }),
 }));
 
+import { roomSpacesLookup } from '#lib/test-support/room-spaces.js';
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = baseCore;

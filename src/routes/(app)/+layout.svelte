@@ -1002,7 +1002,7 @@
   });
 
   $effect(() => {
-    if (roomList.settled) spaceNotifications.apply(roomList.rooms);
+    if (roomList.settled) spaceNotifications.apply(roomList);
   });
 
   const LEFT_CONVERSATIONS_SETTLE_MS = 2_000;

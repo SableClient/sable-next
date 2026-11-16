@@ -444,7 +444,8 @@
       advertisedAdminCommands.length > 0
         ? adminCommandTree(advertisedAdminCommands)
         : sources.adminCommands,
-      slashBotCommands
+      slashBotCommands,
+      roomList.roomSpaces
     )
   );
 
@@ -1012,11 +1013,8 @@
             await outgoingFile(attachment),
             dueTs,
             attachment.spoiler,
-            outgoingPersona(
-              personas,
-              target,
-              personaSpaces(roomList.rooms, target, undefined).order
-            ).persona,
+            outgoingPersona(personas, target, personaSpaces(roomList, target, undefined).order)
+              .persona,
             attachment.gif
           )
         );

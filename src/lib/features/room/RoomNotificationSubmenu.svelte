@@ -46,7 +46,7 @@
   let row = $derived(roomList.byId(roomId));
   let isSpace = $derived(row?.room_kind === 'space');
   let spaceMode = $derived(
-    isSpace ? undefined : spaceNotifications.spaceModes(roomList.rooms).get(roomId)
+    isSpace ? undefined : spaceNotifications.spaceModes(roomList).get(roomId)
   );
   let exempt = $derived(spaceNotifications.exempt.has(roomId));
   let following = $derived(

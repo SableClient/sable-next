@@ -1,4 +1,9 @@
-import type { RoomBadgeView, RoomListItemView, RoomSectionView } from '#src/generated/protocol';
+import type {
+  RoomBadgeView,
+  RoomSpacesView,
+  RoomListItemView,
+  RoomSectionView,
+} from '#src/generated/protocol';
 
 const KEY_PREFIX = 'sable.room-list.v2.';
 const LEGACY_KEY_PREFIX = 'sable.room-list.';
@@ -9,6 +14,7 @@ export interface RoomListSnapshot {
   badges: RoomBadgeView[];
   quiet_rooms: string[];
   app_badge?: number;
+  room_spaces?: RoomSpacesView[];
 }
 
 function storage(): Storage | null {

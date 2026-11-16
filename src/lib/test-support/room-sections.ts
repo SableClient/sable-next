@@ -36,6 +36,7 @@ export function sectionsUpdate(
     badges: null,
     quiet_rooms: null,
     app_badge: null,
+    room_spaces: null,
     ...extra,
   };
 }

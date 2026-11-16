@@ -5,6 +5,7 @@ import type {
   NotificationModeView,
   RoomBadgeView,
   RoomListItemView,
+  RoomSpacesView,
   RoomListOptionsView,
   RoomSectionView,
   RoomSectionsUpdate,
@@ -46,6 +47,10 @@ function sectionsOf(sections: readonly RoomSectionView[]): ReadonlyMap<string, R
 
 function badgesOf(badges: readonly RoomBadgeView[]): ReadonlyMap<string, RoomUnreadView> {
   return new Map(badges.map((badge) => [badge.room_id, badge.counts]));
+}
+
+function roomSpacesByRoom(spaces: readonly RoomSpacesView[]): ReadonlyMap<string, RoomSpacesView> {
+  return new Map(spaces.map((entry) => [entry.room_id, entry]));
 }
 
 function quietOf(roomIds: readonly string[]): ReadonlySet<string> {
@@ -128,6 +133,7 @@ export class RoomList {
   rooms = $derived(this.#source);
   quietRoomIds = $state.raw(quietOf([]));
   appBadge = $state(0);
+  #roomSpaces = $state.raw(roomSpacesByRoom([]));
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   typingUsers = $state.raw<ReadonlyMap<string, readonly string[]>>(new Map());
 
@@ -156,6 +162,10 @@ export class RoomList {
   get settled(): boolean {
     return this.live;
   }
+
+  /** Where a room sits among the joined spaces, for every room a space lists and every joined space. */
+  readonly roomSpaces = (roomId: string): RoomSpacesView | undefined =>
+    this.#roomSpaces.get(roomId);
 
   byId(roomId: string | null | undefined): RoomListItemView | undefined {
     return roomId === null || roomId === undefined ? undefined : this.roomsById.get(roomId);
@@ -269,6 +279,7 @@ export class RoomList {
     this.#badges = badgesOf([]);
     this.quietRoomIds = quietOf([]);
     this.appBadge = 0;
+    this.#roomSpaces = roomSpacesByRoom([]);
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     this.typingUsers = new Map();
     this.unsubscribeEvents?.();
@@ -347,6 +358,7 @@ export class RoomList {
     this.#badges = badgesOf(snapshot.badges);
     this.quietRoomIds = quietOf(snapshot.quiet_rooms);
     this.appBadge = snapshot.app_badge ?? 0;
+    this.#roomSpaces = roomSpacesByRoom(snapshot.room_spaces ?? []);
   }
 
   /** A painted snapshot is replaced, not patched, by the first live batch. */
@@ -356,17 +368,20 @@ export class RoomList {
     let badges = fresh ? badgesOf([]) : this.#badges;
     let quiet = fresh ? quietOf([]) : this.quietRoomIds;
     let appBadge = fresh ? 0 : this.appBadge;
+    let spaces = fresh ? roomSpacesByRoom([]) : this.#roomSpaces;
     for (const { sections: update } of batches) {
       if (!update) continue;
       sections = applySections(sections, update);
       if (update.badges) badges = badgesOf(update.badges);
       if (update.quiet_rooms) quiet = quietOf(update.quiet_rooms);
       if (update.app_badge !== null) appBadge = update.app_badge;
+      if (update.room_spaces) spaces = roomSpacesByRoom(update.room_spaces);
     }
     this.#sections = sections;
     this.#badges = badges;
     this.quietRoomIds = quiet;
     this.appBadge = appBadge;
+    this.#roomSpaces = spaces;
     const diffs = batches.flatMap((batch) => batch.diffs);
     if (!fresh && diffs.length === 0) {
       this.scheduleSnapshotWrite();
@@ -382,6 +397,7 @@ export class RoomList {
       badges: [...this.#badges].map(([room_id, counts]) => ({ room_id, counts })),
       quiet_rooms: [...this.quietRoomIds],
       app_badge: this.appBadge,
+      room_spaces: [...this.#roomSpaces.values()],
     };
   }
 

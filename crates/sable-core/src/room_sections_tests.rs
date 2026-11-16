@@ -747,3 +747,29 @@ fn a_nickname_renames_and_re_sorts_a_direct_message() {
         .expect("the direct section is resent");
     assert_eq!(direct.rooms, ids(&["carol", "bob"]));
 }
+
+#[test]
+fn room_spaces_name_each_listed_rooms_spaces_and_ships_only_when_it_changes() {
+    let rows = [space("root", &["mid"]), space("mid", &["a"]), row("a")];
+    let mut sections = RoomSections::default();
+    let first = sections.update(build(&rows)).expect("everything is new");
+
+    let room_spaces = first
+        .room_spaces
+        .expect("the room spaces are whole on the first update");
+    let a = room_spaces
+        .iter()
+        .find(|entry| entry.room_id == id("a"))
+        .expect("a listed room");
+    assert_eq!(
+        a.levels,
+        [vec![id("mid").to_string()], vec![id("root").to_string()]]
+    );
+    assert_eq!(a.root_name.as_deref(), Some("root"));
+    assert_eq!(
+        a.parent.as_ref().map(|parent| parent.space_id.as_str()),
+        Some(id("mid").as_str())
+    );
+
+    assert_eq!(sections.update(build(&rows)), None);
+}

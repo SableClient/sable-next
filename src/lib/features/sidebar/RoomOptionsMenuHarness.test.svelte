@@ -6,6 +6,8 @@
 
   import type { RoomListItemView } from '#src/generated/protocol';
 
+  import { roomSpacesLookup } from '#lib/test-support/room-spaces.js';
+
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
 
   interface Props {
@@ -18,6 +20,9 @@
   let { core, room, rooms, registerRefresh }: Props = $props();
   const roomList = untrack(() => new RoomList(core));
   roomList.rooms = untrack(() => rooms);
+  Object.assign(roomList, {
+    roomSpaces: (roomId: string) => roomSpacesLookup(roomList.rooms)(roomId),
+  });
 
   provideCoreClient(untrack(() => core));
   provideRoomList(roomList);

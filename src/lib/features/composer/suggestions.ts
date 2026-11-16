@@ -8,7 +8,7 @@ import type {
 
 import { REACTION_EMOJI, searchReactionEmoji } from '#lib/emoji/emoji.js';
 import { packName } from '#lib/emoji/pack-name.js';
-import { rootSpaceNames } from '#lib/rooms/spaces.js';
+import type { RoomSpacesLookup } from '#lib/rooms/spaces.js';
 import { t } from '#lib/i18n.js';
 
 import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
@@ -141,12 +141,15 @@ function emoteSuggestions(
     .map(({ suggestion }) => suggestion);
 }
 
-function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Suggestion[] {
+function roomSuggestions(
+  needle: string,
+  rooms: readonly RoomListItemView[],
+  roomSpaces: RoomSpacesLookup
+): Suggestion[] {
   const normalized = (text: string) => text.toLowerCase().replace(/\s/g, '');
   const normalizedNeedle = normalized(needle);
   if (!normalizedNeedle) return [];
   const seen = new Set<string>();
-  const spaceNames = rootSpaceNames(rooms);
   return rooms
     .map((room) => {
       const name = room.name ?? room.canonical_alias ?? room.room_id;
@@ -181,7 +184,8 @@ function roomSuggestions(needle: string, rooms: readonly RoomListItemView[]): Su
       insert: name.startsWith('#') ? name : `#${name}`,
       label: label.startsWith('#') ? label : `#${label}`,
       detail:
-        [spaceNames.get(room.room_id), room.canonical_alias].filter(Boolean).join(' · ') || null,
+        [roomSpaces(room.room_id)?.root_name, room.canonical_alias].filter(Boolean).join(' · ') ||
+        null,
       avatarUrl: room.display_avatar_url,
     }))
     .filter(({ id }) => {
@@ -253,7 +257,8 @@ export function suggestionsFor(
   translate: Translate = t,
   admin: AdminScope = null,
   adminCommands: readonly AdminCommand[] | null = null,
-  botCommands: readonly BotCommand[] = []
+  botCommands: readonly BotCommand[] = [],
+  roomSpaces: RoomSpacesLookup = () => undefined
 ): Suggestion[] {
   if (!query) return [];
   if (query.sigil === '!') return adminSuggestions(query.query, admin, adminCommands);
@@ -266,6 +271,6 @@ export function suggestionsFor(
       limit
     );
   }
-  if (query.sigil === '#') return roomSuggestions(needle, rooms);
+  if (query.sigil === '#') return roomSuggestions(needle, rooms, roomSpaces);
   return emoteSuggestions(needle, emotes, translate);
 }

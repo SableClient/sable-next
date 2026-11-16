@@ -9,10 +9,7 @@
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
-  import {
-    joinedSpaceChildrenLeaveOrder,
-    recursiveSpaceLeaveOrder,
-  } from './spaces/space-leave-order.js';
+  import { spaceLeaveOrder } from '#lib/model/model.js';
 
   interface Props {
     open: boolean;
@@ -28,19 +25,19 @@
   let failedNames = $state.raw<string[]>([]);
 
   let children = $derived(
-    room?.room_kind === 'space' ? joinedSpaceChildrenLeaveOrder(roomList.rooms, room.room_id) : null
+    room?.room_kind === 'space' ? spaceLeaveOrder(roomList.rooms, room.room_id) : null
   );
 
   let childrenWarning = $derived.by(() => {
     if (!children || children.order.length === 0) return null;
 
     const rooms =
-      children.roomCount > 0
-        ? i18n.t('room.leaveSpaceChildrenRoomsCount', { count: children.roomCount })
+      children.room_count > 0
+        ? i18n.t('room.leaveSpaceChildrenRoomsCount', { count: children.room_count })
         : null;
     const subspaces =
-      children.subspaceCount > 0
-        ? i18n.t('room.leaveSpaceChildrenSubspacesCount', { count: children.subspaceCount })
+      children.subspace_count > 0
+        ? i18n.t('room.leaveSpaceChildrenSubspacesCount', { count: children.subspace_count })
         : null;
 
     if (rooms && subspaces) {
@@ -85,7 +82,7 @@
 
     leaving = true;
     failedNames = [];
-    const order = recursiveSpaceLeaveOrder(roomList.rooms, target.room_id);
+    const order = [...spaceLeaveOrder(roomList.rooms, target.room_id).order, target.room_id];
     const failures = await leaveIds(order);
     leaving = false;
     if (failures.length > 0) {

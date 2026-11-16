@@ -25,7 +25,7 @@
 
   let custom = $derived(
     spaceNotifications
-      .custom(roomList.rooms)
+      .custom(roomList)
       .map((entry) => ({ ...entry, name: entry.room.display_name }))
       .sort(
         (left, right) =>

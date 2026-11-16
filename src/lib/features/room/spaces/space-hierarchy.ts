@@ -1,9 +1,4 @@
-import type {
-  HierarchyRoomView,
-  HierarchySection,
-  RoomListItemView,
-  SpaceChildEdge,
-} from '#src/generated/protocol';
+import type { HierarchyRoomView, HierarchySection, SpaceChildEdge } from '#src/generated/protocol';
 
 import * as model from '#lib/model/model.js';
 
@@ -18,6 +13,7 @@ export {
   buildHierarchySections,
   joinCandidates,
   lobbyAction,
+  localHierarchyRooms,
   mergeHierarchyRooms,
 } from '#lib/model/model.js';
 
@@ -25,47 +21,6 @@ export type LobbyDragItem = { parentId: string; roomId: string | null };
 
 export function sameLobbyItem(left: LobbyDragItem, right: LobbyDragItem): boolean {
   return left.parentId === right.parentId && left.roomId === right.roomId;
-}
-
-export function localHierarchyRooms(
-  rooms: readonly RoomListItemView[],
-  rootId: string
-): HierarchyRoomView[] {
-  const byId = new Map(rooms.map((room) => [room.room_id, room]));
-  const views: HierarchyRoomView[] = [];
-  const seen = new Set<string>();
-  const queue: string[] = [rootId];
-
-  for (let at = 0; at < queue.length; at += 1) {
-    const roomId = queue[at];
-    if (seen.has(roomId)) continue;
-    seen.add(roomId);
-
-    const summary = byId.get(roomId);
-    if (!summary) continue;
-
-    const children =
-      summary.room_kind === 'space' && summary.state === 'joined'
-        ? [...summary.space_children]
-        : [];
-    views.push({
-      room_id: summary.room_id,
-      canonical_alias: summary.canonical_alias,
-      name: summary.name,
-      topic: summary.topic,
-      avatar_url: summary.avatar_url,
-      is_space: summary.room_kind === 'space',
-      num_joined_members: null,
-      join_rule: summary.join_rule,
-      allowed_room_ids: [],
-      guest_can_join: false,
-      children,
-    });
-
-    for (const edge of children) queue.push(edge.room_id);
-  }
-
-  return views;
 }
 
 const MIN_PLACEHOLDER_ROWS = 3;

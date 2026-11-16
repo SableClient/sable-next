@@ -15,6 +15,7 @@ pub use sable_model::power_levels::{PowerLevelAction, PowerLevelLocation, RoomPo
 pub use sable_model::search_filter::{SearchAttachment, SearchFilter};
 pub use sable_model::sidebar::SidebarItemView;
 pub use sable_model::slash::{GestureView, MessageKind};
+pub use sable_model::space_graph::RoomSpacesView;
 pub use sable_model::spaces::{RoomJoinRuleView, SpaceChildEdge};
 use serde::{Deserialize, Serialize};
 
@@ -1123,7 +1124,7 @@ pub struct RoomBadgeView {
     pub counts: RoomUnreadView,
 }
 
-/// Changed sections only. `badges` and `quiet_rooms` are whole when present.
+/// Changed sections only. `badges`, `quiet_rooms` and `room_spaces` are whole when present.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomSectionsUpdate {
@@ -1133,6 +1134,7 @@ pub struct RoomSectionsUpdate {
     #[cfg_attr(feature = "typegen", specta(type = Option<Vec<String>>))]
     pub quiet_rooms: Option<Vec<OwnedRoomId>>,
     pub app_badge: Option<u32>,
+    pub room_spaces: Option<Vec<RoomSpacesView>>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

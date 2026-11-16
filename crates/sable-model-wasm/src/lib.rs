@@ -21,9 +21,11 @@ use sable_model::power_levels::{self, PowerLevelLocation, RoomPowerLevelsView};
 use sable_model::rtc_invites::{self, InvitePresentation};
 use sable_model::search_filter::{self, SearchDirectory, SearchPerson, SearchRoom};
 use sable_model::sidebar::{self, DropInstruction, LayoutRef, SidebarItemView};
+use sable_model::space_graph::{self, SpaceGraph, SpaceRoomInput};
+use sable_model::space_order::{self, ChildOrder};
 use sable_model::spaces::{
     self, ChildOrderOverride, HierarchyRoomView, HierarchySection, RoomJoinRuleView, SectionInputs,
-    SuggestedOverride,
+    SpaceChildEdge, SuggestedOverride,
 };
 use sable_model::{event_preview, matrix_link, mfm, search_query, shortcodes, slash};
 use serde::Deserialize;
@@ -409,6 +411,46 @@ pub fn merge_hierarchy_rooms(local: &str, fetched: &str) -> Result<String, JsErr
         &decode::<Vec<HierarchyRoomView>>(local)?,
         &decode::<Vec<HierarchyRoomView>>(fetched)?,
     ))
+}
+
+#[wasm_bindgen(js_name = localHierarchyRooms)]
+pub fn local_hierarchy_rooms(rooms: &str, root_id: &str) -> Result<String, JsError> {
+    json(&space_graph::local_hierarchy_rooms(
+        &decode::<Vec<SpaceRoomInput>>(rooms)?,
+        root_id,
+    ))
+}
+
+#[wasm_bindgen(js_name = spaceLeaveOrder)]
+pub fn space_leave_order(rooms: &str, root_id: &str) -> Result<String, JsError> {
+    let rooms = decode::<Vec<SpaceRoomInput>>(rooms)?;
+    json(&SpaceGraph::new(rooms.iter().map(SpaceRoomInput::node).collect()).leave_order(root_id))
+}
+
+#[wasm_bindgen(js_name = roomSpaces)]
+pub fn room_spaces(rooms: &str) -> Result<String, JsError> {
+    let rooms = decode::<Vec<SpaceRoomInput>>(rooms)?;
+    json(&SpaceGraph::new(rooms.iter().map(SpaceRoomInput::node).collect()).room_spaces())
+}
+
+#[wasm_bindgen(js_name = reorderChildren)]
+pub fn reorder_children(
+    children: &str,
+    room_id: &str,
+    target_index: usize,
+) -> Result<String, JsError> {
+    json(&space_order::reorder_children(
+        &decode::<Vec<ChildOrder>>(children)?,
+        room_id,
+        target_index,
+    ))
+}
+
+#[wasm_bindgen(js_name = sortEdges)]
+pub fn sort_edges(edges: &str) -> Result<String, JsError> {
+    json(&space_order::sort_edges(&decode::<Vec<SpaceChildEdge>>(
+        edges,
+    )?))
 }
 
 #[wasm_bindgen(js_name = buildHierarchySections)]

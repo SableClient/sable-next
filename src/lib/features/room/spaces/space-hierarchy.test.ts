@@ -258,46 +258,6 @@ function summary(roomId: string, overrides: Partial<RoomListItemView> = {}): Roo
   });
 }
 
-test('the local tree is walked from this account own state', () => {
-  const local = localHierarchyRooms(
-    [
-      summary('!space', { room_kind: 'space', space_children: [edge('!a'), edge('!sub')] }),
-      summary('!a'),
-      summary('!sub', { room_kind: 'space', space_children: [edge('!nested')] }),
-      summary('!nested'),
-      summary('!elsewhere'),
-    ],
-    '!space'
-  );
-
-  expect(local.map((room) => room.room_id)).toEqual(['!space', '!a', '!sub', '!nested']);
-  expect(local.every((room) => room.num_joined_members === null)).toBe(true);
-});
-
-test('a space this account has left contributes no children', () => {
-  const local = localHierarchyRooms(
-    [
-      summary('!space', { room_kind: 'space', state: 'left', space_children: [edge('!a')] }),
-      summary('!a'),
-    ],
-    '!space'
-  );
-
-  expect(local.map((room) => room.room_id)).toEqual(['!space']);
-});
-
-test('a local cycle terminates', () => {
-  const local = localHierarchyRooms(
-    [
-      summary('!space', { room_kind: 'space', space_children: [edge('!sub')] }),
-      summary('!sub', { room_kind: 'space', space_children: [edge('!space')] }),
-    ],
-    '!space'
-  );
-
-  expect(local.map((room) => room.room_id)).toEqual(['!space', '!sub']);
-});
-
 test('the chunk fills in what local state cannot know', () => {
   const local = localHierarchyRooms([summary('!a', { name: 'Local name' })], '!a');
   const [merged] = mergeHierarchyRooms(local, [

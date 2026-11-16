@@ -13,7 +13,6 @@
   import { bannedMessage } from '#lib/rooms/join-errors.js';
   import { joinVia, roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { childRouting } from '#lib/rooms/spaces.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -102,8 +101,8 @@
   let offerKnock = $derived(mustKnock || (canKnock && !invited && failedAction === 'join'));
   let knocked = $derived((currentMembership === 'knocked' && !withdrew) || (sentKnock && !invited));
 
-  let parent = $derived(childRouting(roomList.rooms, roomId));
-  let selectedVias = $derived(via.length > 0 ? via : parent.via);
+  let parent = $derived(roomList.roomSpaces(roomId)?.parent ?? null);
+  let selectedVias = $derived(via.length > 0 ? via : (parent?.via ?? []));
   let listedKey = $derived(selectedVias.join(','));
 
   let provenanceTooltip = $derived.by(() => {
@@ -123,7 +122,7 @@
   let address = $derived(preview?.canonical_alias ?? roomId);
 
   function routingFor(): Promise<string[]> {
-    return joinVia(core, selectedVias, parent.parentId);
+    return joinVia(core, selectedVias, parent?.space_id ?? null);
   }
 
   async function join(): Promise<void> {

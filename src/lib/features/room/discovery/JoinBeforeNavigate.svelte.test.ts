@@ -9,7 +9,7 @@ import type { RoomPreviewView } from '#src/generated/protocol';
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
-  useRoomList: () => ({ rooms: [] }),
+  useRoomList: () => ({ rooms: [], roomSpaces: () => undefined }),
 }));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';

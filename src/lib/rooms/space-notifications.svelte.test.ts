@@ -10,7 +10,14 @@ import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
+import { roomSpaces } from '#lib/model/model.js';
+
 import { setNotificationMode, spaceNotifications } from './space-notifications.svelte';
+
+function list(rooms: RoomListItemView[]) {
+  const byId = new Map(roomSpaces(rooms).map((entry) => [entry.room_id, entry]));
+  return { rooms, roomSpaces: (roomId: string) => byId.get(roomId) };
+}
 
 function room(
   room_id: string,
@@ -119,8 +126,8 @@ test('rooms without a rule of their own take their space mode, once', async () =
   ];
 
   fake.setRoomsNotificationMode.mockRejectedValueOnce(new Error('rejected'));
-  spaceNotifications.apply(rooms);
-  spaceNotifications.apply(rooms);
+  spaceNotifications.apply(list(rooms));
+  spaceNotifications.apply(list(rooms));
 
   expect(fake.setRoomsNotificationMode).toHaveBeenCalledOnce();
   expect(fake.setRoomsNotificationMode).toHaveBeenCalledWith({
@@ -141,7 +148,7 @@ test('changing a space mode moves the rooms that carried the old one', async () 
     room('!own', 'mentions'),
   ];
 
-  expect(await spaceNotifications.set('!space', 'mute', rooms)).toBe(1);
+  expect(await spaceNotifications.set('!space', 'mute', list(rooms))).toBe(1);
   expect(fake.setSpaceNotification).toHaveBeenCalledWith({ space_id: '!space', mode: 'mute' });
   expect(fake.setRoomsNotificationMode).toHaveBeenCalledWith({
     room_ids: ['!space', '!following'],
@@ -149,14 +156,18 @@ test('changing a space mode moves the rooms that carried the old one', async () 
   });
 
   fake.setRoomsNotificationMode.mockClear();
-  await spaceNotifications.set('!space', null, [
-    {
-      ...space('!space', ['!following', '!own']),
-      notification: { room: 'mute', default: 'mentions' },
-    },
-    room('!following', 'mute'),
-    room('!own', 'mentions'),
-  ]);
+  await spaceNotifications.set(
+    '!space',
+    null,
+    list([
+      {
+        ...space('!space', ['!following', '!own']),
+        notification: { room: 'mute', default: 'mentions' },
+      },
+      room('!following', 'mute'),
+      room('!own', 'mentions'),
+    ])
+  );
   expect(spaceNotifications.modeOf('!space')).toBeNull();
   expect(fake.setRoomsNotificationMode).toHaveBeenCalledWith({
     room_ids: ['!space', '!following'],
@@ -171,14 +182,16 @@ test('custom rooms are the spaces with a mode and the rooms that differ from the
     expect(spaceNotifications.modeOf('!space')).toBe('mute');
   });
 
-  const custom = spaceNotifications.custom([
-    space('!space', ['!following', '!own']),
-    room('!following', 'mute'),
-    room('!own', 'all'),
-    room('!alone', 'mentions'),
-    room('!default', null),
-    room('!left', 'all', { state: 'left' }),
-  ]);
+  const custom = spaceNotifications.custom(
+    list([
+      space('!space', ['!following', '!own']),
+      room('!following', 'mute'),
+      room('!own', 'all'),
+      room('!alone', 'mentions'),
+      room('!default', null),
+      room('!left', 'all', { state: 'left' }),
+    ])
+  );
 
   expect(custom.map(({ room, mode }) => [room.room_id, mode])).toEqual([
     ['!space', 'mute'],
@@ -196,25 +209,23 @@ test('an exempt room keeps the default and can follow its space again', async ()
   const room = (id: string) => ({ ...space('!x', []), room_id: id, room_kind: 'text' as const });
   const rooms = [space('!space', ['!room']), room('!room')];
 
-  spaceNotifications.apply(rooms);
+  spaceNotifications.apply(list(rooms));
   expect(fake.setRoomsNotificationMode).not.toHaveBeenCalledWith(
     expect.objectContaining({ room_ids: expect.arrayContaining(['!room']) as unknown })
   );
-  expect(spaceNotifications.spaceModes(rooms).get('!room')).toBe('mute');
+  expect(spaceNotifications.spaceModes(list(rooms)).get('!room')).toBe('mute');
 
   await spaceNotifications.setExempt(rooms[1], false);
   expect(fake.setSpaceNotificationExempt).toHaveBeenCalledWith({ room_id: '!room', exempt: false });
   expect(fake.setRoomNotificationMode).toHaveBeenCalledWith({ room_id: '!room', mode: null });
-  expect(spaceNotifications.inherited(rooms).get('!room')).toBe('mute');
+  expect(spaceNotifications.inherited(list(rooms)).get('!room')).toBe('mute');
 });
 
 test('changing a space mode says how many rooms it moved and can be undone', async () => {
   const fake = fakeCore([]);
   spaceNotifications.start(fake.core);
   const undoable = vi.spyOn(toasts, 'undoable');
-  const roomList = {
-    rooms: [space('!space', ['!a', '!b']), room('!a', null), room('!b', null)],
-  };
+  const roomList = list([space('!space', ['!a', '!b']), room('!a', null), room('!b', null)]);
 
   await setNotificationMode(fake.core, roomList, roomList.rooms[0], 'mute');
 
