@@ -2,6 +2,7 @@
   "extends": "../tsconfig.json",
   "include": [
     "../src/app.d.ts",
+    "../src/i18next.d.ts",
     "../src/**/*.browser.test.ts",
     "e2e/fixtures/*.browser.test.ts",
     "e2e/fixtures/timeline-probe.ts",
