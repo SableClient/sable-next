@@ -4,7 +4,7 @@
 use super::ComposerPill;
 use super::blocks::Block;
 use super::inline::{Inline, Mark};
-use crate::matrix_link::parse_matrix_link;
+use crate::matrix_link::{mention_uri, parse_matrix_link};
 use crate::mfm::{parse_mfm_color, parse_mfm_unixtime};
 use crate::text::{span, tail};
 
@@ -63,19 +63,7 @@ fn mark_element(mark: &Mark) -> Element {
 fn pill_node(pill: &ComposerPill) -> Node {
     match pill {
         ComposerPill::Mention { user_id, name, via } => {
-            let mut href = format!("{MATRIX_TO}{user_id}");
-            if user_id.starts_with('!') && !via.is_empty() {
-                let query: Vec<String> = via
-                    .iter()
-                    .map(|server| {
-                        format!(
-                            "via={}",
-                            form_urlencoded::byte_serialize(server.as_bytes()).collect::<String>()
-                        )
-                    })
-                    .collect();
-                href = format!("{href}?{}", query.join("&"));
-            }
+            let href = mention_uri(user_id, via).unwrap_or_else(|| format!("{MATRIX_TO}{user_id}"));
             element("a", vec![("href", href)], vec![Node::Text(name.clone())])
         }
         ComposerPill::Emote {

@@ -740,7 +740,7 @@
       }
     ],
     "body": "hi Alice!",
-    "formatted_body": "hi <a href=\"https://link.sable.moe/#/@alice:example.org\">Alice</a>!",
+    "formatted_body": "hi <a href=\"matrix:u/alice:example.org\">Alice</a>!",
     "mentions": {
       "user_ids": ["@alice:example.org"],
       "room": false
@@ -780,7 +780,7 @@
       }
     ],
     "body": "**Alice** in Lounge",
-    "formatted_body": "<a href=\"https://link.sable.moe/#/@alice:example.org\">Alice</a> in <a href=\"https://link.sable.moe/#/!room:example.org?via=example.org&amp;via=other.org\">Lounge</a>",
+    "formatted_body": "<a href=\"matrix:u/alice:example.org\">Alice</a> in <a href=\"matrix:roomid/room:example.org?via=example.org&amp;via=other.org\">Lounge</a>",
     "mentions": {
       "user_ids": ["@alice:example.org"],
       "room": false

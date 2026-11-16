@@ -144,7 +144,7 @@ test('committing a room mention replaces the whole query with spaces', () => {
   if (!doc) throw new Error('no doc');
   const message = serializeComposer(doc);
   expect(message.body).toBe('join #Sable Dev  tomorrow');
-  expect(message.formatted).toContain('https://link.sable.moe/#/#dev:example.org');
+  expect(message.formatted).toContain('matrix:r/dev:example.org');
   expect(doc.nodeAt(6)?.type.name).toBe('mention');
 });
 
@@ -188,7 +188,7 @@ describe('attachVia', () => {
     const doc = editor.doc();
 
     expect(doc && serializeComposer(doc).formatted).toBe(
-      '<a href="https://link.sable.moe/#/!abc:example.org?via=sable.moe">#Sable</a>'
+      '<a href="matrix:roomid/abc:example.org?via=sable.moe">#Sable</a>'
     );
   });
 
@@ -329,12 +329,12 @@ describe('setHtml', () => {
   test('keeps a mention as a mention, not as a link', () => {
     const editor = open();
 
-    editor.setHtml('<p>ask <a href="https://link.sable.moe/#/@one:example.org">Member One</a></p>');
+    editor.setHtml('<p>ask <a href="matrix:u/one:example.org">Member One</a></p>');
     const doc = editor.doc();
 
     expect(doc && serializeComposer(doc)).toEqual({
       body: 'ask Member One',
-      formatted: 'ask <a href="https://link.sable.moe/#/@one:example.org">Member One</a>',
+      formatted: 'ask <a href="matrix:u/one:example.org">Member One</a>',
       mentions: { user_ids: ['@one:example.org'], room: false },
     });
   });

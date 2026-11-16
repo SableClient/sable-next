@@ -28,9 +28,7 @@ test('a mention serialises to a Sable link', () => {
     ]),
   ]);
 
-  expect(html(doc)).toBe(
-    '<p>hey <a href="https://link.sable.moe/#/@one:example.org">Member One</a></p>'
-  );
+  expect(html(doc)).toBe('<p>hey <a href="matrix:u/one:example.org">Member One</a></p>');
 });
 
 test('a room mention serialises to a Sable link', () => {
@@ -38,9 +36,7 @@ test('a room mention serialises to a Sable link', () => {
     paragraph.create(null, [mention.create({ userId: '#general:example.org', name: '#General' })]),
   ]);
 
-  expect(html(doc)).toBe(
-    '<p><a href="https://link.sable.moe/#/#general:example.org">#General</a></p>'
-  );
+  expect(html(doc)).toBe('<p><a href="matrix:r/general:example.org">#General</a></p>');
 });
 
 test.each(['link.sable.moe', 'matrix.to'])(
@@ -58,7 +54,7 @@ test.each(['link.sable.moe', 'matrix.to'])(
 
 test('a room permalink with via servers keeps them out of the room id', () => {
   const doc = parse(
-    '<p><a href="https://link.sable.moe/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe">#Sable</a></p>'
+    '<p><a href="matrix:roomid/6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe">#Sable</a></p>'
   );
 
   expect(doc.firstChild?.firstChild?.attrs).toEqual({
@@ -80,7 +76,7 @@ test('a room id mention serialises with the via servers that make it routable', 
   ]);
 
   expect(html(doc)).toBe(
-    '<p><a href="https://link.sable.moe/#/!abc:example.org?via=sable.moe&amp;via=a.example">#Sable</a></p>'
+    '<p><a href="matrix:roomid/abc:example.org?via=sable.moe&amp;via=a.example">#Sable</a></p>'
   );
 });
 
@@ -91,9 +87,7 @@ test('an alias mention takes no via, since it resolves through its own domain', 
     ]),
   ]);
 
-  expect(html(doc)).toBe(
-    '<p><a href="https://link.sable.moe/#/#general:example.org">#General</a></p>'
-  );
+  expect(html(doc)).toBe('<p><a href="matrix:r/general:example.org">#General</a></p>');
 });
 
 test('an emote serialises to the MSC2545 image the sanitiser allows', () => {
@@ -108,7 +102,7 @@ test('an emote serialises to the MSC2545 image the sanitiser allows', () => {
 
 test('both atoms survive a clipboard round trip', () => {
   const source =
-    '<p>hey <a href="https://link.sable.moe/#/@one:example.org">Member One</a> ' +
+    '<p>hey <a href="matrix:u/one:example.org">Member One</a> ' +
     '<img data-mx-emoticon src="mxc://example.org/wave" alt="wave"></p>';
   const doc = parse(source);
   const kinds = [...Array(doc.firstChild?.childCount ?? 0).keys()].map(

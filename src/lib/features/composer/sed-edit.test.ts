@@ -59,7 +59,7 @@ test('keeps the mentions of the edited message', () => {
     '<p><a href="https://link.sable.moe/#/@ana:example.org">Ana</a> one fish</p>',
     sed('s/fish/cat')
   );
-  expect(edited?.formatted).toContain('https://link.sable.moe/#/@ana:example.org');
+  expect(edited?.formatted).toContain('matrix:u/ana:example.org');
   expect([...(edited?.mentions.user_ids ?? [])]).toEqual(['@ana:example.org']);
 });
 

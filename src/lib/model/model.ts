@@ -135,6 +135,10 @@ export function parseJoinAddress(input: string): JoinAddress | null {
   return JSON.parse(wasm.parseJoinAddress(input)) as JoinAddress | null;
 }
 
+export function mentionUri(id: string, via: readonly string[]): string | undefined {
+  return wasm.mentionUri(id, [...via]);
+}
+
 export function splitVia(href: string): ViaSplit {
   return JSON.parse(wasm.splitVia(href)) as ViaSplit;
 }

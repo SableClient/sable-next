@@ -116,6 +116,12 @@ pub fn parse_join_address(input: &str) -> Result<String, JsError> {
     json(&matrix_link::parse_join_address(input))
 }
 
+#[wasm_bindgen(js_name = mentionUri)]
+#[must_use]
+pub fn mention_uri(id: &str, via: Vec<String>) -> Option<String> {
+    matrix_link::mention_uri(id, &via)
+}
+
 #[wasm_bindgen(js_name = splitVia)]
 pub fn split_via(href: &str) -> Result<String, JsError> {
     json(&matrix_link::split_via(href))

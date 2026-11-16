@@ -1,5 +1,7 @@
 use ruma_common::matrix_uri::MatrixId;
-use ruma_common::{MatrixToUri, MatrixUri};
+use ruma_common::{
+    MatrixToUri, MatrixUri, OwnedServerName, RoomAliasId, RoomId, ServerName, UserId,
+};
 use serde::Serialize;
 
 use crate::text::{head, is_space, tail};
@@ -61,6 +63,27 @@ pub fn parse_matrix_link(href: &str) -> Option<MatrixLink> {
         },
         _ => return None,
     })
+}
+
+/// The spec's recommended cap on routing servers in a link.
+const MAX_VIA: usize = 3;
+
+/// The `matrix:` URI a mention pill links to, routed through `via` for room ids.
+#[must_use]
+pub fn mention_uri(id: &str, via: &[String]) -> Option<String> {
+    let uri = if let Ok(user_id) = UserId::parse(id) {
+        user_id.matrix_uri(false)
+    } else if let Ok(alias) = RoomAliasId::parse(id) {
+        alias.matrix_uri(false)
+    } else {
+        let via: Vec<OwnedServerName> = via
+            .iter()
+            .filter_map(|server| ServerName::parse(server).ok())
+            .take(MAX_VIA)
+            .collect();
+        RoomId::parse(id).ok()?.matrix_uri_via(via, false)
+    };
+    Some(uri.to_string())
 }
 
 /// The servers a link names to route a room through, and the link without them.
@@ -145,7 +168,35 @@ pub fn parse_join_address(input: &str) -> Option<JoinAddress> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MatrixLink, parse_join_address, parse_matrix_link, split_via};
+    use super::{MatrixLink, mention_uri, parse_join_address, parse_matrix_link, split_via};
+
+    #[test]
+    fn a_mention_links_a_matrix_uri_with_at_most_three_routing_servers() {
+        let via = |servers: &[&str]| servers.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            mention_uri("@alice:example.org", &via(&["a.example"])).as_deref(),
+            Some("matrix:u/alice:example.org")
+        );
+        assert_eq!(
+            mention_uri("#lobby:example.org", &[]).as_deref(),
+            Some("matrix:r/lobby:example.org")
+        );
+        assert_eq!(
+            mention_uri(
+                "!room:example.org",
+                &via(&[
+                    "a.example",
+                    "bad server",
+                    "b.example",
+                    "c.example",
+                    "d.example"
+                ])
+            )
+            .as_deref(),
+            Some("matrix:roomid/room:example.org?via=a.example&via=b.example&via=c.example")
+        );
+        assert_eq!(mention_uri("not an id", &[]), None);
+    }
 
     #[test]
     fn a_join_address_is_an_id_an_alias_or_a_link_to_a_room() {

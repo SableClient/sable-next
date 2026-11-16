@@ -676,7 +676,7 @@ test.each([true, false])(
     const message = vi.fn(async () => {});
     const body = 'hey @_one:example.org :wave:';
     const html =
-      'hey <a href="https://link.sable.moe/#/@one:example.org">@_one:example.org</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt="wave" title="wave" height="32">';
+      'hey <a href="matrix:u/one:example.org">@_one:example.org</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt="wave" title="wave" height="32">';
     setup({
       roomId: '!room:example.org',
       onSend: message,
@@ -801,7 +801,7 @@ test.each([true, false])(
     expect(attachment).toHaveBeenCalledWith('!room:example.org', file, {
       caption: 'hey Member One :wave:',
       formattedCaption:
-        'hey <a href="https://link.sable.moe/#/@one:example.org">Member One</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt="wave" title="wave" height="32">',
+        'hey <a href="matrix:u/one:example.org">Member One</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt="wave" title="wave" height="32">',
       mentions: { user_ids: ['@one:example.org'], room: false },
       spoiler: false,
     });

@@ -1,12 +1,14 @@
 import { DOMParser, Schema, type Node as ProseMirrorNode, type ParseRule } from 'prosemirror-model';
 
 import { splitVia } from '#lib/rooms/join-address.js';
+import { mentionUri } from '#lib/model/model.js';
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
 import { canonicalDatetime, isOpaqueMatrixColor, utcFallbackLabel } from '../time-markup';
 
 export const matrixTo = 'https://link.sable.moe/#/';
 const mentionPrefixes = [matrixTo, 'https://matrix.to/#/'];
+const mentionSchemes = ['matrix:u/', 'matrix:r/', 'matrix:roomid/'];
 
 const notExplicit = ':not([data-mx-link]):not([data-org\\.matrix\\.msc4550\\.link])';
 
@@ -16,9 +18,7 @@ const HEADING_LEVELS = [1, 2, 3, 4, 5, 6];
 
 /** A room id is not routable without `via`; an alias resolves on its own. */
 export function mentionHref(userId: string, via: readonly string[]): string {
-  if (!userId.startsWith('!') || via.length === 0) return `${matrixTo}${userId}`;
-  const query = new URLSearchParams(via.map((server) => ['via', server]));
-  return `${matrixTo}${userId}?${query.toString()}`;
+  return mentionUri(userId, via) ?? `${matrixTo}${userId}`;
 }
 
 export function emoticonLabel(
@@ -214,14 +214,23 @@ export const composerSchema = new Schema({
       attrs: { userId: {}, name: {}, via: { default: [] as string[] } },
       parseDOM: [
         {
-          tag: mentionPrefixes
-            .flatMap((prefix) =>
+          tag: [
+            ...mentionPrefixes.flatMap((prefix) =>
               ['@', '#', '!'].map((sigil) => `a[href^="${prefix}${sigil}"]${notExplicit}`)
-            )
-            .join(', '),
+            ),
+            ...mentionSchemes.map((scheme) => `a[href^="${scheme}"]${notExplicit}`),
+          ].join(', '),
           priority: 60,
           getAttrs: (dom) => {
             const { href, via } = splitVia(dom.getAttribute('href') ?? '');
+            if (href.startsWith('matrix:')) {
+              const link = parseMatrixLink(href);
+              if (link?.kind === 'user')
+                return { userId: link.user_id, name: dom.textContent, via };
+              if (link?.kind === 'room')
+                return { userId: link.room_id, name: dom.textContent, via };
+              return false;
+            }
             return {
               userId: decodeURIComponent(href.slice(href.indexOf('#/') + 2)),
               name: dom.textContent,
