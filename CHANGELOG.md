@@ -1,5 +1,22 @@
 # Sable Changelog
 
+## 26.11.2 (2026-11-16)
+
+### Features
+
+* The profile card menu shows the raw profile JSON and the room member event.
+
+### Fixes
+
+* On Android 17, Sable asks for local network access when a signed-in session or a call can't reach a server on your home network.
+* `/converttodm @user` keeps the chat named after that person, in the room list and in notifications, even when more people are in the room.
+* Building the search index no longer asks your other devices for every message key it is missing. Each request made all of them send keys back, which used a lot of battery on every device signed in to the account.
+* The emoji picker no longer opens with every emoji row empty.
+* Images picked for an emote pack now wait in the editor so you can set each shortcode, and upload only when you save. Resetting or discarding them uploads nothing.
+* Search indexing, search sharing and the inbox no longer wake the app every few seconds while it is in the background, which drained the battery on Android.
+* Android and iOS notifications use the room's name as shown in the app instead of the one the server sends.
+* The room list shown at launch is now saved when the app goes to the background and at most once a minute, instead of a second after every change. On large accounts that rewrote about a megabyte many times a minute while the app was open.
+
 ## 26.11.1 (2026-11-16)
 
 ### Features

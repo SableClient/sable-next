@@ -1,0 +1,3 @@
+- The profile card menu shows the raw profile JSON and the room member event.
+- On Android 17, Sable asks for local network access when a signed-in session or a call can't reach a server on your home network.
+- `/converttodm @user` keeps the chat named after that person, in the room list and in notifications, even when more people are in the room.
