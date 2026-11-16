@@ -160,7 +160,7 @@
             role="img"
             aria-label={encryptionLabel}
           >
-            {#if encrypted}<LockSimpleIcon weight="fill" />{:else}<LockSimpleOpenIcon
+            {#if encrypted}<LockSimpleIcon weight="bold" />{:else}<LockSimpleOpenIcon
                 weight="bold"
               />{/if}
           </span>
@@ -318,13 +318,13 @@
   }
 
   .encryption-state {
-    color: var(--crit-main);
+    color: color-mix(in srgb, var(--crit-main) 55%, transparent);
     display: flex;
     padding: var(--space-100);
   }
 
   .encryption-state.encrypted {
-    color: var(--success-main);
+    color: color-mix(in srgb, var(--success-main) 55%, transparent);
   }
 
   .encryption-state :global(svg) {
