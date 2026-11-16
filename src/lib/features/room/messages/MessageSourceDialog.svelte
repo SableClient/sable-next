@@ -9,6 +9,7 @@
   interface Props {
     open?: boolean;
     source: string;
+    title?: string;
     encrypted?: boolean;
     original?: string | null;
     encryption?: string | null;
@@ -17,6 +18,7 @@
   let {
     open = $bindable(false),
     source,
+    title = i18n.t('timeline.sourceTitle'),
     encrypted = false,
     original = null,
     encryption = null,
@@ -24,8 +26,8 @@
   const copied = new Copied();
 </script>
 
-<DialogFrame bind:open variant="verification" label={i18n.t('timeline.sourceTitle')}>
-  <h2>{i18n.t('timeline.sourceTitle')}</h2>
+<DialogFrame bind:open variant="verification" label={title}>
+  <h2>{title}</h2>
   {#if encrypted}
     <p class="encrypted">{i18n.t('timeline.sourceEncrypted')}</p>
   {/if}

@@ -71,6 +71,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import MessageReportDialog from '../messages/MessageReportDialog.svelte';
+  import MessageSourceDialog from '../messages/MessageSourceDialog.svelte';
   import MeowlnirBanDialog from './MeowlnirBanDialog.svelte';
   import ProfileOverrideDialog from './ProfileOverrideDialog.svelte';
   import { sendReport } from '../messages/report';
@@ -83,6 +84,7 @@
 
   import '#lib/ui/primitives/menu.css';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+  import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import { profileFieldJson, profileFieldMap, profileFieldPreview } from './profile-field-map.js';
   import { MemberProfileRelations } from './member-profile-relations.svelte';
   import { MemberProfileActions, deletedMessagesNotice } from './member-profile-actions';
@@ -180,6 +182,9 @@
   let overrideOpen = $state(false);
   let reportOpen = $state(false);
   let securityOpen = $state(false);
+  let sourceOpen = $state(false);
+  let sourceTitle = $state('');
+  let source = $state('');
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let pronouns = $derived(
@@ -328,6 +333,37 @@
       console.warn('[sable profile] presence sharing not changed', error);
       toasts.error(i18n.t('errors.actionFailed'));
     });
+  }
+
+  async function viewProfileSource(): Promise<void> {
+    try {
+      source = await core.rpc.account.userProfileSource({ user_id: userId });
+      sourceTitle = i18n.t('timeline.profileSourceTitle');
+      sourceOpen = true;
+    } catch (error) {
+      console.warn('[sable profile] loading profile source failed', error);
+      toasts.error(i18n.t('errors.actionFailed'));
+    }
+  }
+
+  async function viewMemberEvent(): Promise<void> {
+    try {
+      const content = await core.rpc.room_state.event({
+        room_id: roomId,
+        event_type: 'm.room.member',
+        state_key: userId,
+      });
+      if (content === null || content === undefined) {
+        toasts.info(i18n.t('room.devMissing'));
+        return;
+      }
+      source = JSON.stringify(content, null, 2);
+      sourceTitle = i18n.t('timeline.profileMemberEventTitle');
+      sourceOpen = true;
+    } catch (error) {
+      console.warn('[sable profile] loading member event failed', error);
+      toasts.error(i18n.t('errors.actionFailed'));
+    }
   }
 
   async function toggleIgnored(): Promise<void> {
@@ -532,6 +568,16 @@
         <ActionMenuItem onSelect={shareProfileLink}>
           <ShareNetworkIcon />
           {i18n.t('timeline.profileShareLink')}
+        </ActionMenuItem>
+      {/if}
+      <ActionMenuItem onSelect={viewProfileSource}>
+        <CodeIcon />
+        {i18n.t('common.viewSource')}
+      </ActionMenuItem>
+      {#if roomId !== ''}
+        <ActionMenuItem onSelect={viewMemberEvent}>
+          <CodeIcon />
+          {i18n.t('timeline.profileMemberEvent')}
         </ActionMenuItem>
       {/if}
       {#if !isSelf}
@@ -876,6 +922,8 @@
   {realAvatar}
   onOpenChange={(next) => (overrideOpen = next)}
 />
+
+<MessageSourceDialog bind:open={sourceOpen} title={sourceTitle} {source} />
 
 <UserSecurityDialog
   open={securityOpen}

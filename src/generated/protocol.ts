@@ -2392,6 +2392,9 @@ export type Rpc = {
     userProfile: (params: {
 	user_id: string,
 }) => Promise<ProfileView>;
+    userProfileSource: (params: {
+	user_id: string,
+}) => Promise<string>;
     userRelations: (params: {
 	user_id: string,
 }) => Promise<{
@@ -3864,6 +3867,7 @@ export type RpcResult<M extends RpcMethod> = Awaited<ReturnType<M>>;
 export type RpcMethods = {
   'account.set_read_receipts': Rpc['account']['setReadReceipts'];
   'account.user_profile': Rpc['account']['userProfile'];
+  'account.user_profile_source': Rpc['account']['userProfileSource'];
   'account.user_relations': Rpc['account']['userRelations'];
   'account.well_known': Rpc['account']['wellKnown'];
   'account.data_types': Rpc['account']['dataTypes'];
@@ -4211,6 +4215,7 @@ export function createRpc(call: RpcCall): Rpc {
     account: {
       setReadReceipts: (params) => call('account.set_read_receipts', params) as ReturnType<Rpc['account']['setReadReceipts']>,
       userProfile: (params) => call('account.user_profile', params) as ReturnType<Rpc['account']['userProfile']>,
+      userProfileSource: (params) => call('account.user_profile_source', params) as ReturnType<Rpc['account']['userProfileSource']>,
       userRelations: (params) => call('account.user_relations', params) as ReturnType<Rpc['account']['userRelations']>,
       wellKnown: (params = {}) => call('account.well_known', params) as ReturnType<Rpc['account']['wellKnown']>,
       dataTypes: (params = {}) => call('account.data_types', params) as ReturnType<Rpc['account']['dataTypes']>,

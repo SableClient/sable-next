@@ -17,6 +17,7 @@ use crate::{Core, ResultExt};
 domain! {
     set_read_receipts,
     user_profile,
+    user_profile_source,
     user_relations,
     well_known,
     data_types,
@@ -150,6 +151,32 @@ impl Handler for UserProfileParams {
         let mut profile = profile_view(self.user_id, &response);
         core.nicknames().apply_profile(&mut profile);
         Ok(profile)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct UserProfileSourceParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub user_id: OwnedUserId,
+}
+
+impl Handler for UserProfileSourceParams {
+    type Ok = String;
+
+    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
+        let response = core
+            .client()
+            .await?
+            .account()
+            .fetch_user_profile_of(&self.user_id)
+            .await
+            .map_err(|error| core.profile_error(&error))?;
+        let fields = response
+            .iter()
+            .map(|(field, value)| (field.as_str().to_owned(), value.clone()))
+            .collect::<serde_json::Map<_, _>>();
+        serde_json::to_string_pretty(&fields).or_failed(core, "user_profile_source")
     }
 }
 
