@@ -5,16 +5,5 @@
       "linkMscReferences"
     ],
     "changed": []
-  },
-  "v2.3.9": {
-    "added": [
-      "showBridgeBadges",
-      "messagePreviews",
-      "showAlertZoo",
-      "personaPickerShowAccountWhenDeselected",
-      "jumpToLatestOnSend",
-      "reuploadGifs"
-    ],
-    "changed": []
   }
 }
