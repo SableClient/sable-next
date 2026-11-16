@@ -16,6 +16,7 @@
 
   import { goto } from '$app/navigation';
   import { useCoreClient } from '#lib/core/context.js';
+  import { countNotificationsElsewhere } from '#lib/features/inbox/inbox.js';
   import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
   import { memberName } from '#lib/features/room/members/members.js';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
@@ -42,6 +43,7 @@
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import RoomBackButton from '#lib/features/room/RoomBackButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
@@ -81,6 +83,9 @@
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
+  let backUnread = $derived(
+    countNotificationsElsewhere(roomList.rooms, resolvedRoomId, roomList.badgeUnreadFor)
+  );
   let userId = $derived(core.session?.user_id ?? null);
 
   let view = $state.raw<CalendarView | null>(null);
@@ -407,9 +412,7 @@
 <main class="calendar-page" aria-label={i18n.t('calendar.label')} data-inset-owner="top">
   <PanelHeader title={roomName} titleSize="h1">
     {#snippet prefix()}
-      <PanelHeaderButton label={i18n.t('timeline.back')} onclick={backToRoomList}>
-        <BackIcon class="mirror-rtl" />
-      </PanelHeaderButton>
+      <RoomBackButton onBack={backToRoomList} unread={backUnread} />
       <Avatar
         id={resolvedRoomId}
         src={resolvedRoom?.avatar_url ?? null}
