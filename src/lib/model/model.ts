@@ -361,7 +361,7 @@ export function spaceLeaveOrder(
   ) as SpaceLeaveOrder;
 }
 
-/** What the core ships with the room list sections, for fixtures that have no core. */
+/** What the core ships with the room list sections, for a painted snapshot and fixtures. */
 export function roomSpaces(rooms: readonly RoomListItemView[]): RoomSpacesView[] {
   return JSON.parse(wasm.roomSpaces(JSON.stringify(rooms.map(toSpaceRoom)))) as RoomSpacesView[];
 }

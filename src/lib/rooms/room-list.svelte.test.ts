@@ -474,7 +474,6 @@ test('persists the live room list for the next launch', async () => {
     badges: [],
     quiet_rooms: [],
     app_badge: 0,
-    room_spaces: [],
   });
 
   roomList.stop();
@@ -512,7 +511,6 @@ test('writes the room-list snapshot once when presentation ends, not on every ch
     badges: [],
     quiet_rooms: [],
     app_badge: 0,
-    room_spaces: [],
   });
 
   stored.delete('sable.room-list.v2.acct');

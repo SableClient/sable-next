@@ -15,6 +15,7 @@ import type {
 import { applyDiffs } from '#src/transport';
 
 import { bufferSubscription } from '#lib/core/buffered-subscription.js';
+import { roomSpaces as spacesOfRooms } from '#lib/model/model.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -358,7 +359,7 @@ export class RoomList {
     this.#badges = badgesOf(snapshot.badges);
     this.quietRoomIds = quietOf(snapshot.quiet_rooms);
     this.appBadge = snapshot.app_badge ?? 0;
-    this.#roomSpaces = roomSpacesByRoom(snapshot.room_spaces ?? []);
+    this.#roomSpaces = roomSpacesByRoom(spacesOfRooms(snapshot.rooms));
   }
 
   /** A painted snapshot is replaced, not patched, by the first live batch. */
@@ -397,7 +398,6 @@ export class RoomList {
       badges: [...this.#badges].map(([room_id, counts]) => ({ room_id, counts })),
       quiet_rooms: [...this.quietRoomIds],
       app_badge: this.appBadge,
-      room_spaces: [...this.#roomSpaces.values()],
     };
   }
 
