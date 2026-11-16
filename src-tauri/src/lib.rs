@@ -531,6 +531,7 @@ fn setup(app: &mut tauri::App<tauri::Wry>) -> Result<(), Box<dyn std::error::Err
     #[cfg(target_os = "ios")]
     if let Some(window) = app.get_webview_window("main") {
         ios::hide_form_accessory_bar(&window);
+        ios::relayout_on_keyboard_hide(&window);
     }
 
     map_tiles::cleanup_cache(app.handle());

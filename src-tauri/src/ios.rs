@@ -716,6 +716,21 @@ pub(crate) fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
     });
 }
 
+/// WKWebView can leave part of the page unpainted after the keyboard hides until it is laid out again.
+pub(crate) fn relayout_on_keyboard_hide(window: &tauri::WebviewWindow) {
+    let window = window.clone();
+    // SAFETY: UIKit notification names are immutable constants initialized when the framework loads
+    let name = unsafe { UIKeyboardDidHideNotification };
+    observe_notification(name, move || {
+        let _ = window.with_webview(|webview| {
+            // SAFETY: with_webview runs on the main thread and inner() is the live WKWebView
+            let webview: &AnyObject = unsafe { &*webview.inner().cast::<AnyObject>() };
+            // SAFETY: setNeedsLayout takes no arguments and returns void
+            let _: () = unsafe { msg_send![webview, setNeedsLayout] };
+        });
+    });
+}
+
 #[tauri::command]
 #[expect(
     clippy::needless_pass_by_value,
@@ -744,6 +759,7 @@ unsafe extern "C" {
     static UIApplicationDidEnterBackgroundNotification: &'static NSString;
     static UIApplicationWillEnterForegroundNotification: &'static NSString;
     static UIApplicationDidBecomeActiveNotification: &'static NSString;
+    static UIKeyboardDidHideNotification: &'static NSString;
 }
 
 const UI_APPLICATION_STATE_BACKGROUND: isize = 2;
@@ -766,11 +782,6 @@ pub(crate) enum Lifecycle {
 /// tao's `Focused` follows the key window, which also changes in the background.
 pub(crate) fn observe_lifecycle(handler: impl Fn(Lifecycle) + 'static) {
     let handler = std::rc::Rc::new(handler);
-    // SAFETY: +defaultCenter returns the non-nil shared NSNotificationCenter
-    let center: &AnyObject =
-        unsafe { msg_send![objc2::class!(NSNotificationCenter), defaultCenter] };
-    // SAFETY: +mainQueue returns the non-nil main NSOperationQueue
-    let queue: &AnyObject = unsafe { msg_send![objc2::class!(NSOperationQueue), mainQueue] };
     // SAFETY: UIKit notification names are immutable constants initialized when the framework loads
     let observed = unsafe {
         [
@@ -794,17 +805,26 @@ pub(crate) fn observe_lifecycle(handler: impl Fn(Lifecycle) + 'static) {
     };
     for (name, change) in observed {
         let handler = handler.clone();
-        let block = RcBlock::new(move |_: *mut AnyObject| (*handler)(change));
-        // SAFETY: addObserverForName:object:queue:usingBlock: takes (NSString, nil, NSOperationQueue, block) and returns a retained observer, the block is copied and the handler is only run on the main queue
-        let _: objc2::rc::Retained<AnyObject> = unsafe {
-            msg_send![center,
-                addObserverForName: name,
-                object: std::ptr::null::<AnyObject>(),
-                queue: queue,
-                usingBlock: &*block
-            ]
-        };
+        observe_notification(name, move || (*handler)(change));
     }
+}
+
+fn observe_notification(name: &NSString, handler: impl Fn() + 'static) {
+    // SAFETY: +defaultCenter returns the non-nil shared NSNotificationCenter
+    let center: &AnyObject =
+        unsafe { msg_send![objc2::class!(NSNotificationCenter), defaultCenter] };
+    // SAFETY: +mainQueue returns the non-nil main NSOperationQueue
+    let queue: &AnyObject = unsafe { msg_send![objc2::class!(NSOperationQueue), mainQueue] };
+    let block = RcBlock::new(move |_: *mut AnyObject| handler());
+    // SAFETY: addObserverForName:object:queue:usingBlock: takes (NSString, nil, NSOperationQueue, block) and returns a retained observer, the block is copied and the handler is only run on the main queue
+    let _: Retained<AnyObject> = unsafe {
+        msg_send![center,
+            addObserverForName: name,
+            object: std::ptr::null::<AnyObject>(),
+            queue: queue,
+            usingBlock: &*block
+        ]
+    };
 }
 
 /// iOS kills a process suspended mid-write to the App Group stores.
