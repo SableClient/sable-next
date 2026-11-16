@@ -270,7 +270,7 @@ test('a space applies its levels to the rooms below it that you can edit', async
   core.rpc.members.syncChildPowerLevels.mockResolvedValue({ updated: 1, skipped: 0 });
 
   const user = userEvent.setup();
-  render(RoomPermissionsSettings, { room: space as RoomListItemView, permissions });
+  render(RoomPermissionsSettings, { room: space as never, permissions });
   expect(await screen.findByText(/Apply to 1 room/)).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Apply' }));
