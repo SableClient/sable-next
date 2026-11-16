@@ -1501,6 +1501,7 @@
     "roomTopicRemoved": "{{user}} removed the topic",
     "roomRulesChanged": "{{user}} updated the rules",
     "roomRulesRemoved": "{{user}} removed the rules",
+    "roomRulesView": "View",
     "noMessages": "No messages yet",
     "allFiltered": "Nothing to show here",
     "allFilteredHint": "Every event in this room is hidden by your timeline settings.",

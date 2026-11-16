@@ -105,6 +105,19 @@ test('follows the markdown composer setting', async () => {
   await expect.poll(() => content().formatted).toContain('<em>more</em>');
 });
 
+test('loading a saved value in the markdown composer leaves it as saved', async () => {
+  setPreference('richTextComposer', false);
+  for (const html of [
+    '<span data-plain-body>1. Be nice<br>2. No spam</span>',
+    '<span data-plain-body>see <a href="https://example.org">https://example.org</a></span>',
+  ]) {
+    const { screen, editor, content } = await mount(html);
+    await expect.element(editor).toBeVisible();
+    expect(content()).toEqual(bioContent(html));
+    await screen.unmount();
+  }
+});
+
 test('italic custom emoji slant in the rich text composer', async () => {
   const { editor } = await mount(
     '<p><em><img data-mx-emoticon src="mxc://example.org/wave" alt=":italic:"></em> <img data-mx-emoticon src="mxc://example.org/wave" alt=":plain:"></p>'

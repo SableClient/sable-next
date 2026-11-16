@@ -69,7 +69,7 @@
   import RoomPresencePrompt from './RoomPresencePrompt.svelte';
   import RoomRulesBanner from './RoomRulesBanner.svelte';
   import RoomRulesDialog from './RoomRulesDialog.svelte';
-  import { RoomRules } from './room-rules.svelte.js';
+  import { RoomRules, provideRoomRulesOpener } from './room-rules.svelte.js';
   import RoomTombstoneBanner from './RoomTombstoneBanner.svelte';
   import RoomReadReceipts from './timeline/RoomReadReceipts.svelte';
   import TimelineList from './timeline/TimelineList.svelte';
@@ -300,6 +300,9 @@
   });
 
   const rules = new RoomRules(core.rpc);
+  provideRoomRulesOpener(() => {
+    if (rules.view) rules.open = true;
+  });
   let callParticipants = $derived(resolvedRoom?.call_participants ?? []);
   let callable = $derived(
     !call.active &&

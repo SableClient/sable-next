@@ -100,8 +100,9 @@ pub(super) fn state_change(
         AnyOtherStateEventContentChange::_Custom { event_type }
             if crate::room_rules::RULES_EVENTS.contains(&event_type.as_str()) =>
         {
+            let content = content?;
             Some(StateChangeView::RoomRules {
-                removed: content?.get("rules").is_none(),
+                removed: content.get("rules").is_none() && content.get("delegate_to").is_none(),
             })
         }
         _ => None,

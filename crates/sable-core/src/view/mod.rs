@@ -31,6 +31,7 @@ pub use room::{
 };
 pub(crate) use room::{apply_avatar_override, direct_peer_name, is_one_to_one};
 pub use search::prime_display_names;
+pub(crate) use space::space_children;
 pub use space::{hierarchy_child_edges, listing_spaces, restricted_parents, space_hierarchy_room};
 
 pub(crate) use content::{CUTE_EVENT_MSGTYPE, geo_coordinates};

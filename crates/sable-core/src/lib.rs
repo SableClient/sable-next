@@ -189,6 +189,8 @@ pub struct Core {
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
     warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
     account_data_lock: Mutex<()>,
+    /// Until sync echoes the acceptance, the room would read as unaccepted.
+    accepted_rules: parking_lot::Mutex<HashMap<(matrix_sdk::ruma::OwnedUserId, OwnedRoomId), i64>>,
     inbox: Mutex<inbox::InboxCache>,
     inbox_flush: Mutex<()>,
     account_data_types: Mutex<std::collections::BTreeSet<String>>,
@@ -376,6 +378,7 @@ impl Core {
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
             warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
             account_data_lock: Mutex::new(()),
+            accepted_rules: parking_lot::Mutex::new(HashMap::new()),
             inbox: Mutex::new(inbox::InboxCache::default()),
             inbox_flush: Mutex::new(()),
             account_data_types: Mutex::new(std::collections::BTreeSet::new()),

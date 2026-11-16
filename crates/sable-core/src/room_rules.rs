@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use matrix_sdk::RoomState;
-use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk::ruma::events::message::TextContentBlock;
-use matrix_sdk::ruma::events::{AnyRoomAccountDataEvent, AnySyncStateEvent};
+use matrix_sdk::ruma::events::{AnyInitialStateEvent, AnyRoomAccountDataEvent, AnySyncStateEvent};
 use matrix_sdk::ruma::serde::Raw;
+use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use serde_with::{DefaultOnError, serde_as};
@@ -138,6 +138,35 @@ fn edited(stored: Option<Value>, edit: &RulesEdit) -> Value {
     Value::Object(content)
 }
 
+fn copied(stored: Value, source: &Value, source_version: i64) -> Value {
+    let previous = read(Some(&stored));
+    let mut content = match stored {
+        Value::Object(content) => content,
+        _ => Map::new(),
+    };
+    let text = source.get("rules").cloned();
+    let changed = content.get("rules") != text.as_ref();
+    match text {
+        Some(text) => {
+            content.insert("rules".to_owned(), text);
+        }
+        None => {
+            content.shift_remove("rules");
+        }
+    }
+    let version = if changed {
+        previous.version.saturating_add(1).max(source_version)
+    } else {
+        previous.version
+    };
+    content.insert("version".to_owned(), version.into());
+    content.insert(
+        "require_acceptance".to_owned(),
+        read(Some(source)).require_acceptance.into(),
+    );
+    Value::Object(content)
+}
+
 fn event_type<T>(raw: &Raw<T>) -> Option<String> {
     raw.get_field::<String>("type").ok().flatten()
 }
@@ -154,7 +183,13 @@ impl Core {
     }
 
     async fn accepted_rules_version(&self, room_id: &OwnedRoomId) -> Result<Option<i64>, RpcError> {
-        let mut accepted = None;
+        let own_user = self.client().await?.user_id().map(ToOwned::to_owned);
+        let mut accepted = own_user.and_then(|user| {
+            self.accepted_rules
+                .lock()
+                .get(&(user, room_id.clone()))
+                .copied()
+        });
         for event_type in ACCEPTED_EVENTS {
             let version = self
                 .room_document(room_id, event_type)
@@ -213,7 +248,28 @@ impl Core {
             .set_account_data_raw(ACCEPTED_EVENTS[0].into(), raw)
             .await
             .or_failed(self, LABEL)?;
+        if let Some(user) = self.client().await?.user_id() {
+            self.accepted_rules
+                .lock()
+                .insert((user.to_owned(), room_id), version);
+        }
         Ok(())
+    }
+
+    pub(crate) async fn delegated_rules_state(
+        &self,
+        space_id: Option<&OwnedRoomId>,
+    ) -> Option<Raw<AnyInitialStateEvent>> {
+        let space_id = space_id?;
+        let space_rules = self.rules_content(space_id).await.ok()??;
+        let source = read(Some(&space_rules));
+        source.rules.as_ref()?;
+        let mut content = copied(Value::Object(Map::new()), &space_rules, source.version);
+        content
+            .as_object_mut()?
+            .insert("delegate_to".to_owned(), json!({ "room": space_id }));
+        let event = json!({ "type": RULES_EVENTS[0], "state_key": "", "content": content });
+        Raw::new(&event).ok().map(Raw::cast_unchecked)
     }
 
     pub(crate) async fn room_rules_settings(
@@ -229,10 +285,69 @@ impl Core {
         edit: &RulesEdit,
     ) -> Result<(), RpcError> {
         let stored = self.rules_content(&room_id).await?;
-        self.send_state(room_id.clone(), RULES_EVENTS[0], "", &edited(stored, edit))
+        let content = edited(stored, edit);
+        self.send_state(room_id.clone(), RULES_EVENTS[0], "", &content)
             .await?;
+        // Otherwise the editor's own acceptance prompt covers Room Settings.
+        if read(Some(&content)).rules.is_some() {
+            let version = read(Some(&content)).version;
+            if let Err(error) = self.accept_room_rules(room_id.clone(), version).await {
+                tracing::warn!(?error, "own rules acceptance not saved");
+            }
+        }
+        self.copy_rules_to_delegates(&room_id, &content).await;
         self.emit(CoreEvent::RoomRulesChanged { room_id });
         Ok(())
+    }
+
+    async fn copy_rules_to_delegates(&self, source: &OwnedRoomId, content: &Value) {
+        let Ok(client) = self.client().await else {
+            return;
+        };
+        let Some(own_user) = client.user_id().map(ToOwned::to_owned) else {
+            return;
+        };
+        let Some(space) = client.get_room(source).filter(|room| room.is_space()) else {
+            return;
+        };
+        let children = self
+            .with_open_stores(async || crate::view::space_children(&space).await)
+            .await
+            .unwrap_or_default();
+        let source_rules = read(Some(content));
+        for child in children {
+            let Some(room) = RoomId::parse(&child.room_id)
+                .ok()
+                .and_then(|room_id| client.get_room(&room_id))
+                .filter(|room| room.state() == RoomState::Joined)
+            else {
+                continue;
+            };
+            let room_id = room.room_id().to_owned();
+            if &room_id == source {
+                continue;
+            }
+            let Ok(Some(stored)) = self.rules_content(&room_id).await else {
+                continue;
+            };
+            if delegate(Some(&stored)).as_ref() != Some(source) {
+                continue;
+            }
+            if !room
+                .power_levels_or_default()
+                .await
+                .user_can_send_state(&own_user, RULES_EVENTS[0].into())
+            {
+                continue;
+            }
+            let copy = copied(stored, content, source_rules.version);
+            if let Err(error) = self
+                .send_state(room_id.clone(), RULES_EVENTS[0], "", &copy)
+                .await
+            {
+                tracing::warn!(?error, "delegated rules copy not saved");
+            }
+        }
     }
 
     pub(crate) fn watch_room_rules(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
@@ -283,7 +398,9 @@ mod tests {
     use matrix_sdk_test::JoinedRoomBuilder;
     use serde_json::{Value, json};
 
-    use super::{ACCEPTED_EVENTS, RULES_EVENTS, RulesEdit, delegate, edited, settings, view};
+    use super::{
+        ACCEPTED_EVENTS, RULES_EVENTS, RulesEdit, copied, delegate, edited, settings, view,
+    };
     use crate::protocol::CoreEvent;
     use crate::test_support::signed_in_core;
 
@@ -540,5 +657,66 @@ mod tests {
         assert_eq!(view.html, "");
         assert!(view.require_acceptance);
         assert_eq!(view.delegate_to, None);
+    }
+
+    #[test]
+    fn a_delegating_room_takes_the_text_and_keeps_its_own_version_line() {
+        let mut stored = rules(2);
+        stored["rules"] = json!({ "m.text": [{ "body": "Old" }] });
+        stored["delegate_to"] = json!({ "room": "!space:example.org" });
+        let source = rules(7);
+
+        let copy = copied(stored, &source, 7);
+        assert_eq!(copy["rules"], source["rules"]);
+        assert_eq!(copy["version"], 7);
+        assert_eq!(
+            delegate(Some(&copy)),
+            Some(owned_room_id!("!space:example.org"))
+        );
+
+        assert_eq!(copied(copy.clone(), &source, 7), copy);
+
+        let mut later = copy;
+        later["version"] = json!(9);
+        let mut edited_source = rules(7);
+        edited_source["rules"] = json!({ "m.text": [{ "body": "New" }] });
+        assert_eq!(copied(later, &edited_source, 7)["version"], 10);
+    }
+
+    #[tokio::test]
+    async fn saving_rules_accepts_them_for_the_editor() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!room:example.org");
+        server.sync_joined_room(&client, room_id).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(r"/state/"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(404)
+                    .set_body_json(json!({ "errcode": "M_NOT_FOUND", "error": "not set" })),
+            )
+            .mount(server.server())
+            .await;
+        server
+            .mock_room_send_state()
+            .ok(matrix_sdk::ruma::event_id!("$rules"))
+            .mount()
+            .await;
+        server
+            .mock_set_room_account_data(ACCEPTED_EVENTS[0].into())
+            .ok()
+            .expect(1)
+            .mount()
+            .await;
+        let (core, _events) = signed_in_core(&server, client.clone()).await;
+
+        core.set_room_rules(room_id.to_owned(), &edit("Be kind", false))
+            .await
+            .unwrap();
+
+        let view = core.room_rules(&room_id.to_owned()).await.unwrap().unwrap();
+        assert!(view.require_acceptance);
+        assert!(view.accepted);
     }
 }

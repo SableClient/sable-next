@@ -146,7 +146,7 @@ pub(super) fn kept_children(
     }
 }
 
-pub(super) async fn space_children(room: &Room) -> Result<Vec<SpaceChildEdge>, matrix_sdk::Error> {
+pub(crate) async fn space_children(room: &Room) -> Result<Vec<SpaceChildEdge>, matrix_sdk::Error> {
     let events = room
         .get_state_events_static::<SpaceChildEventContent>()
         .await?;

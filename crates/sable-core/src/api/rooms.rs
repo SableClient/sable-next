@@ -451,6 +451,10 @@ impl Handler for CreateParams {
             request.initial_state.push(rule.to_raw_any());
         }
 
+        if let Some(rules) = core.delegated_rules_state(self.parent_space.as_ref()).await {
+            request.initial_state.push(rules);
+        }
+
         if matches!(self.kind, RoomKind::Voice) {
             // The override is a shallow merge: naming `events` drops the
             // server's default map, so it is re-stated.

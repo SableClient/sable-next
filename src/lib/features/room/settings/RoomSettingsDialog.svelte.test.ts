@@ -278,3 +278,17 @@ test('abbreviations wait for the room entries, and fall back to none when they f
   expect(debug).toHaveBeenCalledWith('[sable room] abbreviations unavailable', failure);
   debug.mockRestore();
 });
+
+test('rules that keep acceptance after their text was removed open without unsaved changes', async () => {
+  Object.assign(core.rpc.room_state, {
+    ownRules: vi.fn().mockResolvedValue({ html: '', require_acceptance: true, delegate_to: null }),
+  });
+  core.rpc.members.permissions.mockResolvedValue(permissions(true));
+  render(RoomSettingsDialog, {
+    props: { open: true, room, initialSection: 'rules', onOpenChange: () => {} },
+  });
+
+  expect(await screen.findByRole('switch', { name: 'room.rulesRequire' })).not.toBeChecked();
+  expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
+  expect(screen.queryByText('common.unsavedChangesNotice')).toBeNull();
+});

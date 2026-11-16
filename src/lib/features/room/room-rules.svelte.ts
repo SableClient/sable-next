@@ -1,3 +1,4 @@
+import { createContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
 import type { Rpc, RoomRulesView } from '#src/generated/protocol';
@@ -122,3 +123,6 @@ export class RoomRules {
     if (!keep) this.shown = view;
   }
 }
+
+export const [useRoomRulesOpener, provideRoomRulesOpener, hasRoomRulesOpener] =
+  createContext<() => void>();

@@ -73,6 +73,7 @@
   let spoilerOpen = $state(false);
   let mounted = $state(false);
   let synced: BioContent | undefined;
+  let loading = false;
   let suggestions = $derived(suggestionsFor(query, [], sources.emotes, []));
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
   let panelOpen = $derived(focused && query !== null && !dismissed && !boardOpen);
@@ -95,7 +96,7 @@
     onChange: (change) => {
       showPlaceholder = change.placeholder;
       activeIndex = 0;
-      if (!change.docChanged) return;
+      if (!change.docChanged || loading) return;
       const doc = editor.doc();
       if (!doc) return;
       const { body, formatted } = preferences.richTextComposer
@@ -146,9 +147,15 @@
     untrack(() => {
       if (next.body === synced?.body && next.formatted === synced.formatted) return;
       synced = next;
-      if (next.formatted === null) editor.setDoc(textDoc(next.body));
-      else if (preferences.richTextComposer) editor.setHtml(next.formatted);
-      else editor.setDoc(plainEditDoc(next.body, next.formatted));
+      // Read back in another form, a loaded value would look edited.
+      loading = true;
+      try {
+        if (next.formatted === null) editor.setDoc(textDoc(next.body));
+        else if (preferences.richTextComposer) editor.setHtml(next.formatted);
+        else editor.setDoc(plainEditDoc(next.body, next.formatted));
+      } finally {
+        loading = false;
+      }
       editor.clearHistory();
     });
   });
