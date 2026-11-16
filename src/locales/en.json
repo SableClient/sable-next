@@ -2689,6 +2689,8 @@
     "callMicTestLevel": "Input level",
     "echoCancellation": "Remove call echo from the microphone",
     "autoGainControl": "Adjust microphone level automatically",
+    "microphoneVolume": "Microphone volume",
+    "microphoneVolumeHint": "How loud you sound to others in calls.",
     "ringForGroupCalls": "Show call screen for groups and voice channels",
     "alwaysShowCallButton": "Show call button in rooms with more than 10 members",
     "callScreenPreview": "Show a shared screen outside the call",

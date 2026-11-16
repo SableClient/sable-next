@@ -184,6 +184,16 @@ export const callsCategory: SettingsCategory = {
       type: 'boolean',
     },
     {
+      key: 'microphoneVolume',
+      section: 'microphone',
+      icon: MicrophoneIcon,
+      name: 'settings.microphoneVolume',
+      description: 'settings.microphoneVolumeHint',
+      type: 'range',
+      step: 0.05,
+      supported: () => !hasNativeCalls(),
+    },
+    {
       key: 'incomingCallSound',
       section: 'ringing',
       icon: PhoneIcon,

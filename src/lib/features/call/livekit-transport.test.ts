@@ -1162,8 +1162,9 @@ test('falls back to browser noise suppression if the microphone processor fails'
     restart: vi.fn(() => Promise.resolve()),
     destroy: vi.fn(() => Promise.resolve()),
   };
-  const createFilter = vi.spyOn(voiceFilter, 'createMicrophoneFilter').mockReturnValue(filter);
+  const createFilter = vi.spyOn(voiceFilter, 'createMicrophoneProcessor').mockReturnValue(filter);
   const track = Object.assign(Object.create(LocalAudioTrack.prototype) as LocalAudioTrack, {
+    getProcessor: vi.fn(() => undefined),
     setProcessor: vi.fn(() => Promise.reject(new Error('filter unavailable'))),
     applyConstraints: vi.fn(() => Promise.resolve()),
   });
@@ -1182,6 +1183,45 @@ test('falls back to browser noise suppression if the microphone processor fails'
   } finally {
     preferences.voiceIsolation = previousIsolation;
     preferences.noiseSuppression = previousSuppression;
+    await transport.disconnect();
+  }
+});
+
+test('attaches the microphone volume processor when the volume is not 100%', async () => {
+  const previous = preferences.microphoneVolume;
+  vi.spyOn(voiceFilter, 'microphoneProcessing').mockReturnValue({
+    filter: false,
+    constraints: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+  const processor = {
+    name: 'microphone-volume',
+    init: vi.fn(() => Promise.resolve()),
+    restart: vi.fn(() => Promise.resolve()),
+    destroy: vi.fn(() => Promise.resolve()),
+  };
+  const create = vi.spyOn(voiceFilter, 'createMicrophoneProcessor').mockReturnValue(processor);
+  const track = () =>
+    Object.assign(Object.create(LocalAudioTrack.prototype) as LocalAudioTrack, {
+      getProcessor: vi.fn(() => undefined),
+      setProcessor: vi.fn(() => Promise.resolve()),
+    });
+  const { room } = roomFixture();
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => room });
+  try {
+    preferences.microphoneVolume = 1;
+    const unchanged = track();
+    room.emit(RoomEvent.LocalTrackPublished, { track: unchanged, source: Track.Source.Microphone });
+    expect(create).not.toHaveBeenCalled();
+
+    preferences.microphoneVolume = 1.5;
+    const louder = track();
+    room.emit(RoomEvent.LocalTrackPublished, { track: louder, source: Track.Source.Microphone });
+    await vi.waitFor(() => {
+      expect(louder.setProcessor).toHaveBeenCalledWith(processor);
+    });
+    expect(create).toHaveBeenCalledWith(false);
+  } finally {
+    preferences.microphoneVolume = previous;
     await transport.disconnect();
   }
 });

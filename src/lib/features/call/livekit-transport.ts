@@ -38,7 +38,8 @@ import type {
 } from './call-transport';
 import { idleTransportState, ignoreError, ScreenAudioError } from './call-transport';
 import { MatrixKeyProvider } from './key-provider';
-import { createMicrophoneFilter, microphoneProcessing } from './voice-filter';
+import { followMicrophoneVolume } from './microphone-volume.svelte';
+import { createMicrophoneProcessor, microphoneProcessing } from './voice-filter';
 import {
   resolveVideoCodec,
   screenCaptureOptions,
@@ -357,6 +358,30 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     }
   };
 
+  let microphoneTrack: LocalAudioTrack | null = null;
+  const attaching = new WeakSet<LocalAudioTrack>();
+  const attachMicrophone = async (track: LocalAudioTrack, filtered: boolean): Promise<void> => {
+    if (track.getProcessor() || attaching.has(track)) return;
+    attaching.add(track);
+    const processor = createMicrophoneProcessor(filtered);
+    try {
+      await step(filtered ? 'call.microphone.filter' : 'call.microphone.volume', () =>
+        track.setProcessor(processor)
+      );
+      return;
+    } catch {
+      void processor.destroy().catch(ignoreError);
+    } finally {
+      attaching.delete(track);
+    }
+    if (!filtered) return;
+    void track.applyConstraints({ noiseSuppression: true }).catch(ignoreError);
+    if (preferences.microphoneVolume !== 1) await attachMicrophone(track, false);
+  };
+  const stopMicrophoneVolume = followMicrophoneVolume((volume) => {
+    if (volume !== 1 && microphoneTrack) void attachMicrophone(microphoneTrack, false);
+  });
+
   const syncLocal = (): void => {
     publish({
       microphoneEnabled: room.localParticipant.isMicrophoneEnabled,
@@ -382,6 +407,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     .on(RoomEvent.LocalTrackUnpublished, syncLocal)
     .on(RoomEvent.LocalTrackUnpublished, (publication) => {
       if (publication.source === Track.Source.ScreenShare) void stopSharingAudio();
+      if (publication.track === microphoneTrack) microphoneTrack = null;
     })
     .on(RoomEvent.TrackMuted, syncLocal)
     .on(RoomEvent.TrackUnmuted, syncLocal)
@@ -439,13 +465,11 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     })
     .on(RoomEvent.LocalTrackPublished, (publication) => {
       const track = publication.track;
-      if (!filterMicrophone || !(track instanceof LocalAudioTrack)) return;
+      if (!(track instanceof LocalAudioTrack)) return;
       if (publication.source !== Track.Source.Microphone) return;
-      const filter = createMicrophoneFilter();
-      void step('call.microphone.filter', () => track.setProcessor(filter)).catch(() => {
-        void filter.destroy().catch(ignoreError);
-        return track.applyConstraints({ noiseSuppression: true }).catch(ignoreError);
-      });
+      microphoneTrack = track;
+      if (filterMicrophone || preferences.microphoneVolume !== 1)
+        void attachMicrophone(track, filterMicrophone);
     })
     .on(RoomEvent.LocalAudioSilenceDetected, () => {
       event('call.media.local_audio_silence');
@@ -605,6 +629,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     connect,
     disconnect: async () => {
       disposed = true;
+      stopMicrophoneVolume();
       healthGeneration += 1;
       if (healthTimer) clearTimeout(healthTimer);
       healthTimer = undefined;

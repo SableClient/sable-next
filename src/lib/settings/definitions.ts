@@ -483,6 +483,7 @@ const SETTINGS = {
   incomingVoiceIsolation: toggle(false, { device: true }),
   echoCancellation: toggle(true, { device: true }),
   autoGainControl: toggle(true, { device: true }),
+  microphoneVolume: range(0, 2.0, 1, { device: true }),
   audioInputDevice: text('', { device: true }),
   audioOutputDevice: text('', { device: true }),
   videoInputDevice: text('', { device: true }),

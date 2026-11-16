@@ -24,8 +24,14 @@ function contextFixture() {
     disconnect: vi.fn(),
     stream: { getAudioTracks: () => [output], getTracks: () => [output] },
   };
+  const gain = {
+    gain: { value: 1 },
+    connect: vi.fn((target: AudioNode) => target),
+    disconnect: vi.fn(),
+  };
   const context = {
     state: 'suspended' as AudioContextState,
+    createGain: vi.fn(() => gain),
     audioWorklet: { addModule: vi.fn(() => Promise.resolve()) },
     createMediaStreamSource: vi.fn(() => source),
     createMediaStreamDestination: vi.fn(() => destination),
@@ -36,7 +42,7 @@ function contextFixture() {
     context.state = 'closed';
     return Promise.resolve();
   });
-  return { context, output, source, destination };
+  return { context, output, source, destination, gain };
 }
 
 let contexts: ReturnType<typeof contextFixture>[];
@@ -115,15 +121,16 @@ function options(track: MediaStreamTrack): AudioProcessorOptions {
 test('publishes filtered audio and releases its graph without stopping the microphone', async () => {
   const stop = vi.fn();
   const input = { stop } as unknown as MediaStreamTrack;
-  const { createMicrophoneFilter } = await import('./voice-filter');
-  const processor = createMicrophoneFilter();
+  const { createMicrophoneProcessor } = await import('./voice-filter');
+  const processor = createMicrophoneProcessor(true);
   await processor.init(options(input));
-  const { context, source, destination, output } = contexts[0];
+  const { context, source, destination, output, gain } = contexts[0];
   const filter = rnnoise.create.mock.results[0].value as ReturnType<typeof rnnoise.create>;
 
   expect(processor.processedTrack).toBe(output);
   expect(source.connect).toHaveBeenCalledWith(filter);
-  expect(filter.connect).toHaveBeenCalledWith(destination);
+  expect(filter.connect).toHaveBeenCalledWith(gain);
+  expect(gain.connect).toHaveBeenCalledWith(destination);
   expect(context.resume).toHaveBeenCalledOnce();
 
   await processor.destroy();
@@ -132,14 +139,15 @@ test('publishes filtered audio and releases its graph without stopping the micro
   expect(source.disconnect).toHaveBeenCalledOnce();
   expect(filter.destroy).toHaveBeenCalledOnce();
   expect(filter.disconnect).toHaveBeenCalledOnce();
+  expect(gain.disconnect).toHaveBeenCalledOnce();
   expect(output.stop).toHaveBeenCalledOnce();
   expect(stop).not.toHaveBeenCalled();
   expect(context.close).toHaveBeenCalledOnce();
 });
 
 test('rebuilds the microphone graph when the input track restarts', async () => {
-  const { createMicrophoneFilter } = await import('./voice-filter');
-  const processor = createMicrophoneFilter();
+  const { createMicrophoneProcessor } = await import('./voice-filter');
+  const processor = createMicrophoneProcessor(true);
   await processor.init(options({} as MediaStreamTrack));
   const previous = contexts[0];
   const previousNode = rnnoise.create.mock.results[0].value as ReturnType<typeof rnnoise.create>;
@@ -156,8 +164,8 @@ test('rebuilds the microphone graph when the input track restarts', async () => 
 test('does not recreate a destroyed microphone graph after assets finish loading', async () => {
   const pending = Promise.withResolvers<ArrayBuffer>();
   rnnoise.load.mockReturnValue(pending.promise);
-  const { createMicrophoneFilter } = await import('./voice-filter');
-  const processor = createMicrophoneFilter();
+  const { createMicrophoneProcessor } = await import('./voice-filter');
+  const processor = createMicrophoneProcessor(true);
   const initializing = processor.init(options({} as MediaStreamTrack));
   await processor.destroy();
   pending.resolve(new ArrayBuffer(8));
@@ -169,8 +177,8 @@ test('does not recreate a destroyed microphone graph after assets finish loading
 });
 
 test('cleans up a failed microphone initialization so the transport can fall back', async () => {
-  const { createMicrophoneFilter } = await import('./voice-filter');
-  const processor = createMicrophoneFilter();
+  const { createMicrophoneProcessor } = await import('./voice-filter');
+  const processor = createMicrophoneProcessor(true);
   const initializing = processor.init(options({} as MediaStreamTrack));
   contexts[0].context.resume.mockRejectedValue(new Error('audio unavailable'));
 
@@ -180,4 +188,25 @@ test('cleans up a failed microphone initialization so the transport can fall bac
   expect(contexts[0].output.stop).toHaveBeenCalledOnce();
   expect(contexts[0].context.close).toHaveBeenCalledOnce();
   expect(processor.processedTrack).toBeUndefined();
+});
+
+test('scales the published microphone by the volume preference without the voice filter', async () => {
+  const { preferences } = await import('#lib/settings/preferences.svelte.js');
+  const previous = preferences.microphoneVolume;
+  preferences.microphoneVolume = 1.5;
+  const { createMicrophoneProcessor } = await import('./voice-filter');
+  const processor = createMicrophoneProcessor(false);
+  try {
+    await processor.init(options({} as MediaStreamTrack));
+    const { source, gain, destination, output } = contexts[0];
+
+    expect(rnnoise.create).not.toHaveBeenCalled();
+    expect(source.connect).toHaveBeenCalledWith(gain);
+    expect(gain.connect).toHaveBeenCalledWith(destination);
+    expect(gain.gain.value).toBe(1.5);
+    expect(processor.processedTrack).toBe(output);
+  } finally {
+    await processor.destroy();
+    preferences.microphoneVolume = previous;
+  }
 });

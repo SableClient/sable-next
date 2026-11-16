@@ -1,5 +1,6 @@
 import type { RnnoiseWorkletNode } from '@sapphi-red/web-noise-suppressor';
 import { ignoreError } from './call-transport';
+import { followMicrophoneVolume } from './microphone-volume.svelte';
 import { createVoiceFilterBank, type MicrophoneProcessing } from './voice-filter';
 
 type Output = AudioContext & { setSinkId?: (deviceId: string) => Promise<void> };
@@ -39,7 +40,11 @@ export async function startInputMeter(
       }
     }
   }
-  input.connect(analyser);
+  const gain = context.createGain();
+  const stopVolume = followMicrophoneVolume((value) => {
+    gain.gain.value = value;
+  });
+  input.connect(gain).connect(analyser);
   if (playback) {
     analyser.connect(context.destination);
     if (playback.outputDevice) context.setSinkId?.(playback.outputDevice).catch(ignoreError);
@@ -60,6 +65,7 @@ export async function startInputMeter(
 
   return () => {
     cancelAnimationFrame(frame);
+    stopVolume();
     for (const track of stream.getTracks()) track.stop();
     filter?.destroy();
     void context.close();

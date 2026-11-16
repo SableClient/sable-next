@@ -5,6 +5,7 @@ import wasmUrl from '@sapphi-red/web-noise-suppressor/rnnoise.wasm?url';
 import simdUrl from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { ignoreError } from './call-transport';
+import { followMicrophoneVolume } from './microphone-volume.svelte';
 
 const SAMPLE_RATE = 48000;
 
@@ -74,16 +75,22 @@ export function createVoiceFilterBank(): VoiceFilterBank {
   };
 }
 
-export function createMicrophoneFilter(): TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> {
+export function createMicrophoneProcessor(
+  filtered: boolean
+): TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> {
   let bank: VoiceFilterBank | undefined;
   let source: MediaStreamAudioSourceNode | undefined;
   let filter: RnnoiseWorkletNode | undefined;
+  let gain: GainNode | undefined;
   let destination: MediaStreamAudioDestinationNode | undefined;
+  let stopVolume: (() => void) | undefined;
 
   const cleanup = (): void => {
+    stopVolume?.();
     source?.disconnect();
     filter?.destroy();
     filter?.disconnect();
+    gain?.disconnect();
     destination?.stream.getTracks().forEach((track) => {
       track.stop();
     });
@@ -91,7 +98,9 @@ export function createMicrophoneFilter(): TrackProcessor<Track.Kind.Audio, Audio
     bank = undefined;
     source = undefined;
     filter = undefined;
+    gain = undefined;
     destination = undefined;
+    stopVolume = undefined;
     processor.processedTrack = undefined;
   };
 
@@ -100,17 +109,23 @@ export function createMicrophoneFilter(): TrackProcessor<Track.Kind.Audio, Audio
     const currentBank = createVoiceFilterBank();
     bank = currentBank;
     try {
-      const node = await currentBank.create();
+      const node = filtered ? await currentBank.create() : undefined;
       if (bank !== currentBank) {
-        node.destroy();
-        node.disconnect();
+        node?.destroy();
+        node?.disconnect();
         return;
       }
       filter = node;
-      destination = currentBank.context.createMediaStreamDestination();
-      source = currentBank.context.createMediaStreamSource(new MediaStream([track]));
-      source.connect(filter).connect(destination);
-      await currentBank.context.resume();
+      const { context } = currentBank;
+      const volume = context.createGain();
+      gain = volume;
+      stopVolume = followMicrophoneVolume((value) => {
+        volume.gain.value = value;
+      });
+      destination = context.createMediaStreamDestination();
+      source = context.createMediaStreamSource(new MediaStream([track]));
+      (filter ? source.connect(filter) : source).connect(volume).connect(destination);
+      await context.resume();
       if (bank === currentBank) processor.processedTrack = destination.stream.getAudioTracks()[0];
     } catch (error) {
       if (bank === currentBank) cleanup();
@@ -119,7 +134,7 @@ export function createMicrophoneFilter(): TrackProcessor<Track.Kind.Audio, Audio
   };
 
   const processor: TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> = {
-    name: 'rnnoise',
+    name: filtered ? 'rnnoise' : 'microphone-volume',
     init,
     restart: init,
     destroy: () => {
