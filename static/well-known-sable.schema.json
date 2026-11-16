@@ -631,9 +631,13 @@
           "default": false
         },
         "linkMscReferences": {
-          "title": "Always link MSC references",
-          "type": "boolean",
-          "default": false
+          "title": "Link MSC references",
+          "enum": [
+            "ask",
+            "always",
+            "never"
+          ],
+          "default": "ask"
         },
         "inlineEditing": {
           "title": "Edit messages in the timeline",
@@ -1463,9 +1467,13 @@
           "default": false
         },
         "linkMscReferences": {
-          "title": "Always link MSC references",
-          "type": "boolean",
-          "default": false
+          "title": "Link MSC references",
+          "enum": [
+            "ask",
+            "always",
+            "never"
+          ],
+          "default": "ask"
         },
         "inlineEditing": {
           "title": "Edit messages in the timeline",

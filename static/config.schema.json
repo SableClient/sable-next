@@ -907,9 +907,13 @@
           "default": false
         },
         "linkMscReferences": {
-          "title": "Always link MSC references",
-          "type": "boolean",
-          "default": false
+          "title": "Link MSC references",
+          "enum": [
+            "ask",
+            "always",
+            "never"
+          ],
+          "default": "ask"
         },
         "inlineEditing": {
           "title": "Edit messages in the timeline",
@@ -1395,6 +1399,13 @@
           "title": "Adjust microphone level automatically",
           "type": "boolean",
           "default": true
+        },
+        "microphoneVolume": {
+          "title": "Microphone volume",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
         },
         "audioInputDevice": {
           "type": "string",
@@ -2391,9 +2402,13 @@
           "default": false
         },
         "linkMscReferences": {
-          "title": "Always link MSC references",
-          "type": "boolean",
-          "default": false
+          "title": "Link MSC references",
+          "enum": [
+            "ask",
+            "always",
+            "never"
+          ],
+          "default": "ask"
         },
         "inlineEditing": {
           "title": "Edit messages in the timeline",
@@ -2879,6 +2894,13 @@
           "title": "Adjust microphone level automatically",
           "type": "boolean",
           "default": true
+        },
+        "microphoneVolume": {
+          "title": "Microphone volume",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
         },
         "audioInputDevice": {
           "type": "string",

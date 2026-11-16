@@ -119,7 +119,7 @@ except those marked deployment only.
 - `alwaysInlineEditor` (Always inline editor): `true` or `false`. Default `false`.
 - `enterForNewline` (Newline on touch screens, send otherwise): One of `adaptive`, `newline`, `send`. Default `adaptive`.
 - `sedEdits` (Edit your last message with s/old/new): `true` or `false`. Default `false`.
-- `linkMscReferences` (Always link MSC references): `true` or `false`. Default `false`.
+- `linkMscReferences` (Link MSC references): One of `ask`, `always`, `never`. Default `ask`.
 - `inlineEditing` (Edit messages in the timeline): `true` or `false`. Default `false`.
 - `mentionInReplies` (Default reply notifications): `true` or `false`. Default `true`.
 - `formattingToolbar` (Keep formatting toolbar open): `true` or `false`. Default `false`.
@@ -207,6 +207,7 @@ except those marked deployment only.
 - `incomingVoiceIsolation` (Voice isolation for others): `true` or `false`. Default `false`. Deployment only.
 - `echoCancellation` (Remove call echo from the microphone): `true` or `false`. Default `true`. Deployment only.
 - `autoGainControl` (Adjust microphone level automatically): `true` or `false`. Default `true`. Deployment only.
+- `microphoneVolume` (Microphone volume): Number from 0 to 2. Default `1`. Deployment only.
 - `callCameraResolution` (Camera resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `auto`. Deployment only.
 - `callCameraBitrate` (Camera maximum bitrate): One of `auto`, `250`, `500`, `1000`, `2000`, `4000`, `8000`, `16000`. Default `auto`. Deployment only.
 - `callCameraCodec` (Camera codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `auto`. Deployment only.
