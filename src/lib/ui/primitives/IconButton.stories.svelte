@@ -1,6 +1,7 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import type { ComponentProps } from 'svelte';
+  import { expect, fn } from 'storybook/test';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -19,7 +20,7 @@
       size: { control: 'select', options: ['small', 'medium', 'large'] },
       disabled: { control: 'boolean' },
     },
-    args: { label: 'Settings', variant: 'ghost', size: 'medium', disabled: false },
+    args: { label: 'Settings', variant: 'ghost', size: 'medium', disabled: false, onclick: fn() },
   });
 
   const sizes = ['small', 'medium', 'large'] as const;
@@ -29,7 +30,14 @@
   <IconButton {...args} label="Settings"><GearIcon /></IconButton>
 {/snippet}
 
-<Story name="Playground" {template} />
+<Story
+  name="Playground"
+  {template}
+  play={async ({ args, canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Settings' }));
+    await expect(args.onclick).toHaveBeenCalledTimes(1);
+  }}
+/>
 
 <Story name="Sizes" asChild>
   <div class="row">

@@ -1,5 +1,6 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
+  import { expect, fn } from 'storybook/test';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
   import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
@@ -9,6 +10,7 @@
 
   const { Story } = defineMeta({
     title: 'Primitives/SettingsNav',
+    component: SettingsNav,
     tags: ['autodocs'],
   });
 
@@ -36,6 +38,19 @@
   let activeId = $state<string | null>('profile');
   let largeId = $state<string | null>(null);
 </script>
+
+<Story
+  name="Playground"
+  args={{ groups, activeId: 'profile', ariaLabel: 'Settings', onSelect: fn() }}
+  play={async ({ args, canvas, userEvent }) => {
+    await expect(canvas.getByRole('button', { name: 'Profile' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Appearance' }));
+    await expect(args.onSelect).toHaveBeenCalledWith(expect.anything(), 'appearance');
+  }}
+/>
 
 <Story name="Groups" asChild>
   <div class="nav">

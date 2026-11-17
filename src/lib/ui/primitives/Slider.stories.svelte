@@ -1,5 +1,6 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
+  import { expect } from 'storybook/test';
 
   import Slider from './Slider.svelte';
 
@@ -12,4 +13,13 @@
   });
 </script>
 
-<Story name="Playground" />
+<Story
+  name="Playground"
+  play={async ({ canvas, userEvent }) => {
+    const thumb = canvas.getByRole('slider', { name: 'Choose quanity' });
+    await expect(thumb).toHaveAttribute('aria-valuenow', '8');
+    thumb.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    await expect(thumb).toHaveAttribute('aria-valuenow', '9');
+  }}
+/>

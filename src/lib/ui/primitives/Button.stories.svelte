@@ -1,6 +1,7 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import type { ComponentProps } from 'svelte';
+  import { expect, fn } from 'storybook/test';
 
   import Button from './Button.svelte';
 
@@ -24,6 +25,7 @@
       loading: false,
       block: false,
       disabled: false,
+      onclick: fn(),
     },
   });
 
@@ -35,7 +37,14 @@
   <Button {...args}>Send message</Button>
 {/snippet}
 
-<Story name="Playground" {template} />
+<Story
+  name="Playground"
+  {template}
+  play={async ({ args, canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Send message' }));
+    await expect(args.onclick).toHaveBeenCalledTimes(1);
+  }}
+/>
 
 <Story name="Variants" asChild>
   <div class="row">

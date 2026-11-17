@@ -1,5 +1,6 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
+  import { expect } from 'storybook/test';
 
   import Switch from './Switch.svelte';
 
@@ -12,7 +13,17 @@
   });
 </script>
 
-<Story name="Playground" />
+<Story
+  name="Playground"
+  play={async ({ canvas, userEvent }) => {
+    const toggle = canvas.getByRole('switch', { name: 'Send read receipts' });
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  }}
+/>
 
 <Story name="States" asChild>
   <div class="row">

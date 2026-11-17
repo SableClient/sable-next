@@ -1,6 +1,7 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { Dialog } from 'bits-ui';
+  import { expect, fn, screen, waitFor, within } from 'storybook/test';
 
   import Button from './Button.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
@@ -13,6 +14,11 @@
     title: 'Primitives/Dialogs',
     tags: ['autodocs'],
   });
+
+  const onConfirm = fn();
+
+  const dialogClosed = () =>
+    waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 </script>
 
 <script lang="ts">
@@ -24,14 +30,36 @@
   let popoverOpen = $state(false);
 </script>
 
-<Story name="Confirm dialog" asChild>
+<Story
+  name="Confirm dialog"
+  asChild
+  play={async ({ canvas, userEvent }) => {
+    onConfirm.mockClear();
+    const open = async () => {
+      await userEvent.click(canvas.getByRole('button', { name: 'Leave room' }));
+      return screen.findByRole('dialog');
+    };
+    let dialog = await open();
+    await waitFor(() => expect(within(dialog).getByText('Leave Design Critique?')).toBeVisible());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await dialogClosed();
+    await expect(onConfirm).not.toHaveBeenCalled();
+    dialog = await open();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Leave' }));
+    await dialogClosed();
+    await expect(onConfirm).toHaveBeenCalledTimes(1);
+  }}
+>
   <Button onclick={() => (confirmOpen = true)}>Leave room</Button>
   <ConfirmDialog
     bind:open={confirmOpen}
     title="Leave Design Critique?"
     description="You will stop receiving messages from this room."
     confirmLabel="Leave"
-    onConfirm={() => (confirmOpen = false)}
+    onConfirm={() => {
+      onConfirm();
+      confirmOpen = false;
+    }}
   />
 </Story>
 
@@ -57,7 +85,19 @@
   />
 </Story>
 
-<Story name="Responsive dialog" asChild>
+<Story
+  name="Responsive dialog"
+  asChild
+  play={async ({ canvas, userEvent }) => {
+    for (const action of ['Cancel', 'Send invite']) {
+      await userEvent.click(canvas.getByRole('button', { name: 'Invite people' }));
+      const dialog = await screen.findByRole('dialog');
+      await waitFor(() => expect(within(dialog).getByText(/by their Matrix ID/)).toBeVisible());
+      await userEvent.click(within(dialog).getByRole('button', { name: action }));
+      await dialogClosed();
+    }
+  }}
+>
   <Button onclick={() => (responsiveOpen = true)}>Invite people</Button>
   <ResponsiveDialog bind:open={responsiveOpen} label="Invite people" closeLabel="Close">
     <div class="demo">
@@ -71,7 +111,23 @@
   </ResponsiveDialog>
 </Story>
 
-<Story name="Responsive info dialog" asChild>
+<Story
+  name="Responsive info dialog"
+  asChild
+  play={async ({ canvas, userEvent }) => {
+    const open = async () => {
+      await userEvent.click(canvas.getByRole('button', { name: 'About encryption' }));
+      return screen.findByRole('dialog');
+    };
+    let dialog = await open();
+    await waitFor(() => expect(within(dialog).getByText(/end-to-end encrypted/)).toBeVisible());
+    await userEvent.keyboard('{Escape}');
+    await dialogClosed();
+    dialog = await open();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await dialogClosed();
+  }}
+>
   <Button onclick={() => (infoOpen = true)}>About encryption</Button>
   <ResponsiveInfoDialog bind:open={infoOpen} label="About encryption" closeLabel="Close">
     {#snippet header()}
@@ -85,7 +141,18 @@
   </ResponsiveInfoDialog>
 </Story>
 
-<Story name="Responsive popover" asChild>
+<Story
+  name="Responsive popover"
+  asChild
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Room topic' }));
+    await expect(await screen.findByText(/weekly critique notes/)).toBeVisible();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByText(/weekly critique notes/)).not.toBeInTheDocument()
+    );
+  }}
+>
   <div class="pad">
     <ResponsivePopover bind:open={popoverOpen} label="Room topic" closeLabel="Close" side="bottom">
       {#snippet trigger({ props })}

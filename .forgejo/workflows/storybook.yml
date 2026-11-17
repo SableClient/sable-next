@@ -8,12 +8,16 @@ on:
       - 'static/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'vitest.config.ts'
       - '.storybook/**'
       - '**/*.stories.svelte'
       - 'packaging/storybook/**'
       - '.forgejo/workflows/storybook.yml'
   pull_request:
     paths:
+      - 'src/lib/ui/**'
+      - 'src/styles.css'
+      - 'vitest.config.ts'
       - '.storybook/**'
       - '**/*.stories.svelte'
       - 'packaging/storybook/**'
@@ -47,6 +51,35 @@ jobs:
         uses: ./.forgejo/actions/setup
         with:
           install-mise-tools: 'false'
+
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: browsers
+        uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        env:
+          PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: '120000'
+        run: |
+          for attempt in 1 2 3; do
+            pnpm exec playwright install chromium && exit 0
+            echo "playwright install attempt $attempt failed"
+            sleep 15
+          done
+          exit 1
+
+      - name: Install Playwright system libraries
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Test stories
+        run: pnpm test:storybook
 
       - name: Build Storybook
         run: pnpm exec storybook build -o storybook-static --quiet

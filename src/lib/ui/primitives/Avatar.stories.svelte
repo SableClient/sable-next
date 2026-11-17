@@ -29,7 +29,7 @@
     <Avatar initials="EL" alt="Erwan Leboucher" />
     <Avatar initials="?" alt="Unknown" />
     <Avatar id="@erwan:example.org" name="Erwan Leboucher" alt="Erwan Leboucher" />
-    <Avatar initials="SB" alt="Sable" color="var(--success-container)" />
+    <Avatar id="@sable:example.org" initials="SB" alt="Sable" />
   </div>
 </Story>
 

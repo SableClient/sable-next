@@ -1,5 +1,7 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
+  import { expect, screen, waitFor, within } from 'storybook/test';
+  import type { ComponentProps } from 'svelte';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
@@ -23,7 +25,35 @@
   const noop = () => {};
 </script>
 
-<Story name="Room options" asChild>
+{#snippet template(args: Omit<ComponentProps<typeof ActionMenu>, 'children' | 'trigger'>)}
+  <div class="pad">
+    <ActionMenu {...args}>
+      {#snippet trigger({ props })}
+        <Button {...props}>Room options</Button>
+      {/snippet}
+      <ActionMenuItem onSelect={noop}>Mark as read</ActionMenuItem>
+      <ActionMenuItem onSelect={noop}>Favourite</ActionMenuItem>
+    </ActionMenu>
+  </div>
+{/snippet}
+
+<Story
+  name="Playground"
+  args={{ label: 'Room options', side: 'bottom', align: 'end' }}
+  {template}
+/>
+
+<Story
+  name="Room options"
+  asChild
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Room options' }));
+    const menu = await screen.findByRole('menu');
+    await expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Favourite' }));
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+  }}
+>
   <div class="pad">
     <ActionMenu label="Room options">
       {#snippet trigger({ props })}
@@ -40,7 +70,16 @@
   </div>
 </Story>
 
-<Story name="Submenu and choices" asChild>
+<Story
+  name="Submenu and choices"
+  asChild
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Room options' }));
+    const menu = await screen.findByRole('menu');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(menu).not.toBeInTheDocument());
+  }}
+>
   <div class="pad">
     <ActionMenu label="Room options">
       {#snippet trigger({ props })}

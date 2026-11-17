@@ -1,6 +1,7 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import type { ComponentProps } from 'svelte';
+  import { expect } from 'storybook/test';
 
   import LinkButton from './LinkButton.svelte';
 
@@ -23,7 +24,16 @@
   <LinkButton {...args}>Read the docs</LinkButton>
 {/snippet}
 
-<Story name="Playground" {template} />
+<Story
+  name="Playground"
+  {template}
+  play={async ({ args, canvas }) => {
+    await expect(canvas.getByRole('link', { name: 'Read the docs' })).toHaveAttribute(
+      'href',
+      args.href
+    );
+  }}
+/>
 
 <Story name="Variants" asChild>
   <div class="row">

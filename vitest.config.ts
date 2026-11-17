@@ -1,3 +1,4 @@
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { mergeConfig } from 'vite';
 import { defineConfig, defineProject } from 'vitest/config';
@@ -12,6 +13,26 @@ const TOUCH_BROWSER_TESTS = [
   'src/lib/features/sidebar/AppShell.browser.test.ts',
   'src/lib/ui/primitives/BottomSheet.browser.test.ts',
 ];
+
+const storybookProject = (theme: 'light' | 'dark') => ({
+  ...mergeConfig(
+    viteConfig,
+    defineProject({
+      plugins: [storybookTest({ configDir: '.storybook', initialGlobals: { theme } })],
+      test: {
+        name: `storybook-${theme}`,
+        setupFiles: ['./.storybook/vitest.setup.ts'],
+        browser: {
+          enabled: true,
+          headless: true,
+          provider: playwright({ contextOptions: { reducedMotion: 'reduce' } }),
+          instances: [{ browser: 'chromium' }],
+        },
+      },
+    })
+  ),
+  extends: false,
+});
 
 const HAPPY_DOM_TESTS = [
   'src/lib/features/composer/VoiceRecorder.svelte.test.ts',
@@ -134,6 +155,8 @@ export default mergeConfig(
           ),
           extends: false,
         },
+        storybookProject('light'),
+        storybookProject('dark'),
       ],
       coverage: {
         provider: 'v8',

@@ -49,14 +49,16 @@
 </Story>
 
 <Story name="States" asChild>
-  <div class="menu-surface demo-menu">
+  <div class="menu-surface demo-menu" role="menu" aria-label="Item states">
     <IconContext values={decorative}>
-      <button class="menu-item" type="button"><StarIcon />Rest</button>
+      <button class="menu-item" type="button" role="menuitem"><StarIcon />Rest</button>
       <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={true}>
         <StarIcon />Checked
       </button>
-      <button class="menu-item" type="button" data-highlighted><LinkIcon />Highlighted</button>
-      <button class="menu-item" type="button" disabled><GearIcon />Disabled</button>
+      <button class="menu-item" type="button" role="menuitem" data-highlighted>
+        <LinkIcon />Highlighted
+      </button>
+      <button class="menu-item" type="button" role="menuitem" disabled><GearIcon />Disabled</button>
     </IconContext>
   </div>
 </Story>

@@ -59,6 +59,7 @@
 
 <Story name="Select: long list" asChild>
   <div class="stack">
+    <Label for="long">Theme</Label>
     <Select id="long" items={manyItems} placeholder="Choose an official theme" />
   </div>
 </Story>
