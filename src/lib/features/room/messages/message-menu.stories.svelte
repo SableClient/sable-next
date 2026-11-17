@@ -2,10 +2,6 @@
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
-  import { provideCoreClient } from '#lib/core/context.js';
-  import type { CoreClient } from '#lib/core/client.svelte.js';
-  import { createRpc } from '#src/generated/protocol';
-  import MessageQuickReactions from '#lib/features/room/messages/MessageQuickReactions.svelte';
   import { messageMenuRows } from '#lib/features/room/messages/message-menu-items.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import '#lib/ui/primitives/menu.css';
@@ -30,24 +26,9 @@
   });
 </script>
 
-<script lang="ts">
-  const frequent = ['👍', '❤️', '😂', '🎉', '👀', '🙏', '🔥', '😮'];
-  const core = {
-    session: null,
-    subscribeEvents: () => () => {},
-    rpc: createRpc((method) =>
-      method === 'messages.frequent_reactions'
-        ? Promise.resolve(frequent)
-        : new Promise<never>(() => {})
-    ),
-  } as unknown as CoreClient;
-  provideCoreClient(core);
-</script>
-
 <Story name="Desktop context menu" asChild>
   <div class="menu-surface demo">
     <IconContext values={decorative}>
-      <MessageQuickReactions count={4} onReact={noop} />
       {#each rows as row (row.key)}
         {@const RowIcon = row.icon}
         {#if row.separated}<div class="line"></div>{/if}
@@ -68,7 +49,6 @@
     <IconContext values={decorative}>
       <p class="preview">Shipped the search crawl fix, coverage looks right now</p>
       <div class="line"></div>
-      <MessageQuickReactions count={8} onReact={noop} roomy />
       <div class="sheet-list">
         {#each rows as row (row.key)}
           {@const RowIcon = row.icon}

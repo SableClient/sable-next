@@ -6,7 +6,6 @@ on:
     paths:
       - 'src/**'
       - 'static/**'
-      - 'crates/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.storybook/**'
@@ -44,10 +43,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up app and build
+      - name: Set up app
         uses: ./.forgejo/actions/setup
         with:
-          build: 'true'
+          install-mise-tools: 'false'
 
       - name: Build Storybook
         run: pnpm exec storybook build -o storybook-static --quiet

@@ -1,5 +1,4 @@
 import type { Decorator, Preview } from '@storybook/sveltekit';
-import { loadModel } from '../src/lib/model/model';
 
 import '../src/styles.css';
 
@@ -11,9 +10,6 @@ const applyTheme: Decorator = (story, context) => {
 };
 
 const preview: Preview = {
-  async beforeAll() {
-    await loadModel();
-  },
   decorators: [applyTheme],
   globalTypes: {
     theme: {
