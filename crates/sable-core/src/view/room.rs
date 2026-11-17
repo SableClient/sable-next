@@ -201,7 +201,7 @@ pub(crate) fn unread_counts(
         count(item.num_unread_mentions()),
     );
 
-    if latest_event_id == Some(&*receipt.event_id) {
+    if latest_event_id == Some(&*receipt.event_id) || local.0 == 0 {
         return local;
     }
 
@@ -231,6 +231,7 @@ pub(crate) fn notifying_count(
 
     let local = count(item.num_unread_notifications());
     if latest_event_id == Some(&*receipt.event_id)
+        || item.num_unread_messages() == 0
         || (every_encrypted && item.encryption_state().is_encrypted())
     {
         local

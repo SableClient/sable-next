@@ -2779,6 +2779,66 @@ async fn a_receipt_on_the_latest_event_clears_a_stale_server_count() {
     );
 }
 
+#[tokio::test]
+async fn a_receipt_on_a_hidden_event_past_the_latest_one_clears_a_stale_server_count() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!hidden-tail-read:example.org");
+    let me = client
+        .user_id()
+        .expect("the mock client is logged in")
+        .to_owned();
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    let rtc_member = matrix_sdk::ruma::serde::Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+        r#"{"type":"m.rtc.member","event_id":"$call","sender":"@alice:example.org","origin_server_ts":3,"content":{},"state_key":"@alice:example.org_DEVICE","unsigned":{}}"#.to_owned(),
+    )
+    .expect("a call membership event");
+
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_bulk([
+                    factory
+                        .text_msg("one")
+                        .event_id(event_id!("$one"))
+                        .into_raw(),
+                    factory
+                        .text_msg("two")
+                        .event_id(event_id!("$two"))
+                        .into_raw(),
+                    rtc_member,
+                ])
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$call"),
+                            &me,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                        )
+                        .into_event(),
+                )
+                .set_unread_notifications_count(json!({
+                    "notification_count": 9,
+                    "highlight_count": 2,
+                })),
+        )
+        .await;
+
+    let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
+
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
+        (0, 0)
+    );
+    assert_eq!(
+        super::view::notifying_count(&item, Some(event_id!("$two")), false),
+        0
+    );
+}
+
 async fn timeline_views(
     client: &matrix_sdk::Client,
     room: &matrix_sdk::Room,
