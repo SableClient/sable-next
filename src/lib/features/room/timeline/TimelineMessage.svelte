@@ -987,6 +987,10 @@
     position: absolute;
   }
 
+  .message-content:has(> :global(.message-crypto-status)) > .receipt-slot {
+    inset-inline-end: calc(var(--space-200) + var(--font-size-body));
+  }
+
   .receipt-space {
     display: inline-block;
     inline-size: var(--receipt-reserve);

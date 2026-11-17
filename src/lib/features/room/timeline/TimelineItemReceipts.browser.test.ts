@@ -386,3 +386,29 @@ for (const layout of ['modern', 'compact', 'bubble'] as const) {
     document.documentElement.dir = 'ltr';
   });
 }
+
+test.each(['modern', 'compact'] as const)(
+  'the %s layout keeps the badge clear of the message shield',
+  async (layout) => {
+    await page.viewport(390, 780);
+    await mountItem(
+      item('shielded', 'Short', {
+        thread_root: '$root:example.test',
+        read_by: TWO_READERS,
+        shield: { code: 'sent_in_clear', critical: true },
+      }),
+      { layout }
+    );
+
+    const row = document.querySelector('[data-item-id="shielded"]');
+    const shield = row?.querySelector('.message-crypto-status')?.getBoundingClientRect();
+    const badge = row?.querySelector('.read-receipt-stack')?.getBoundingClientRect();
+    if (!shield || !badge) throw new Error('no shield or badge');
+    const overlaps =
+      badge.left < shield.right &&
+      shield.left < badge.right &&
+      badge.top < shield.bottom &&
+      shield.top < badge.bottom;
+    expect(overlaps).toBe(false);
+  }
+);
