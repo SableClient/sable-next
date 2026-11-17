@@ -43,12 +43,16 @@ export interface SettingOption {
 
 export interface SettingsContext {
   oauth: boolean;
+  qrGrant: boolean;
 }
 
 export type SettingsGate = (context: SettingsContext) => boolean;
 
-export function settingsContext(core: { oauthMetadata: unknown }): SettingsContext {
-  return { oauth: core.oauthMetadata !== null };
+export function settingsContext(core: {
+  oauthMetadata: unknown;
+  qrGrantSupported: boolean;
+}): SettingsContext {
+  return { oauth: core.oauthMetadata !== null, qrGrant: core.qrGrantSupported };
 }
 
 export interface SettingsTargetDefinition {

@@ -290,7 +290,7 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
     {
       id: 'link-device',
       section: 'account-devices',
-      supported: (context) => context.oauth,
+      supported: (context) => context.oauth && context.qrGrant,
       targets: targets([
         ['account-devices', 'settings.signedInDevices'],
         ['link-device', 'qrLogin.titleGrant', 'qrLogin.linkDeviceHint'],

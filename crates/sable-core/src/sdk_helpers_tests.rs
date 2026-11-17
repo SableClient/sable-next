@@ -4035,6 +4035,34 @@ async fn server_features_lists_only_enabled_unstable_features() {
     );
 }
 
+#[tokio::test]
+async fn qr_grant_needs_a_rendezvous_server() {
+    for (features, supported) in [
+        (json!({"org.matrix.msc4108": true}), true),
+        (json!({"org.matrix.msc4108": false}), false),
+        (json!({}), false),
+    ] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().no_server_versions().build().await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/versions"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"versions": ["v1.19"], "unstable_features": features})),
+            )
+            .mount(server.server())
+            .await;
+        let core = core(&server, client).await;
+        assert_eq!(
+            core.run(crate::api::session::QrGrantSupportedParams {})
+                .await
+                .ok(),
+            Some(supported),
+            "{features}"
+        );
+    }
+}
+
 async fn ban_redacting_events(server_kept_flag: bool) {
     use matrix_sdk::ruma::{room_id, user_id};
     use matrix_sdk_test::event_factory::EventFactory;

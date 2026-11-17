@@ -124,12 +124,12 @@ test('disabling receipts hides indicators and removes controls until the account
   settings.applyAccountPreferences({}, { sendReadReceipts: false });
   expect(settings.preferences.sendReadReceipts).toBe(false);
   expect(settings.preferences.hideReadReceipts).toBe(true);
-  expect(send?.supported?.({ oauth: false })).toBe(false);
-  expect(hide?.supported?.({ oauth: false })).toBe(false);
+  expect(send?.supported?.({ oauth: false, qrGrant: false })).toBe(false);
+  expect(hide?.supported?.({ oauth: false, qrGrant: false })).toBe(false);
   settings.applyAccountPreferences({}, {});
   expect(settings.preferences.sendReadReceipts).toBe(true);
   expect(settings.preferences.hideReadReceipts).toBe(false);
-  expect(send?.supported?.({ oauth: false })).toBe(true);
+  expect(send?.supported?.({ oauth: false, qrGrant: false })).toBe(true);
 });
 
 test('each account keeps its own settings and its online status starts from the shared one', async () => {

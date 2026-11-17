@@ -11,6 +11,7 @@ use matrix_sdk::authentication::oauth::qrcode::{
     QrCodeData, QrCodeIntent, QrCodeIntentData, QrProgress, SecureChannelError,
 };
 use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::api::FeatureFlag;
 use url::Url;
 
 use crate::ResultExt;
@@ -384,6 +385,15 @@ impl Core {
 
     pub(crate) async fn cancel_qr(&self) {
         self.qr_flow.lock().await.take();
+    }
+
+    pub(crate) async fn qr_grant_supported(&self) -> Result<bool, RpcError> {
+        let client = self.client().await?;
+        let features = client
+            .unstable_features()
+            .await
+            .or_failed(self, "qr_grant_supported")?;
+        Ok(features.contains(&FeatureFlag::Msc4108) || msc_4388_supported(&client.oauth()).await)
     }
 
     async fn qr_slots(&self) -> Result<Arc<QrSlots>, RpcError> {

@@ -27,6 +27,7 @@ domain! {
     sync_status,
     server_features,
     delayed_events_supported,
+    qr_grant_supported,
     set_search_options,
     set_network_conditions,
     set_app_in_foreground,
@@ -333,6 +334,18 @@ impl Handler for DelayedEventsSupportedParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
         core.scheduling_supported().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct QrGrantSupportedParams {}
+
+impl Handler for QrGrantSupportedParams {
+    type Ok = bool;
+
+    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
+        core.qr_grant_supported().await
     }
 }
 

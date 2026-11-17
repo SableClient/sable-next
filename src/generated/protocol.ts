@@ -3620,6 +3620,7 @@ export type Rpc = {
     syncStatus: (params?: Record<string, never>) => Promise<SyncStatus>;
     serverFeatures: (params?: Record<string, never>) => Promise<string[]>;
     delayedEventsSupported: (params?: Record<string, never>) => Promise<boolean>;
+    qrGrantSupported: (params?: Record<string, never>) => Promise<boolean>;
     setSearchOptions: (params: {
 	sharing: boolean,
 	disk_budget_mb: number,
@@ -4157,6 +4158,7 @@ export type RpcMethods = {
   'session.sync_status': Rpc['session']['syncStatus'];
   'session.server_features': Rpc['session']['serverFeatures'];
   'session.delayed_events_supported': Rpc['session']['delayedEventsSupported'];
+  'session.qr_grant_supported': Rpc['session']['qrGrantSupported'];
   'session.set_search_options': Rpc['session']['setSearchOptions'];
   'session.set_network_conditions': Rpc['session']['setNetworkConditions'];
   'session.set_app_in_foreground': Rpc['session']['setAppInForeground'];
@@ -4535,6 +4537,7 @@ export function createRpc(call: RpcCall): Rpc {
       syncStatus: (params = {}) => call('session.sync_status', params) as ReturnType<Rpc['session']['syncStatus']>,
       serverFeatures: (params = {}) => call('session.server_features', params) as ReturnType<Rpc['session']['serverFeatures']>,
       delayedEventsSupported: (params = {}) => call('session.delayed_events_supported', params) as ReturnType<Rpc['session']['delayedEventsSupported']>,
+      qrGrantSupported: (params = {}) => call('session.qr_grant_supported', params) as ReturnType<Rpc['session']['qrGrantSupported']>,
       setSearchOptions: (params) => call('session.set_search_options', params) as ReturnType<Rpc['session']['setSearchOptions']>,
       setNetworkConditions: (params) => call('session.set_network_conditions', params) as ReturnType<Rpc['session']['setNetworkConditions']>,
       setAppInForeground: (params) => call('session.set_app_in_foreground', params) as ReturnType<Rpc['session']['setAppInForeground']>,

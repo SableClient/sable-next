@@ -196,6 +196,7 @@ export class CoreClient {
   deviceList = $state.raw<DeviceView[]>([]);
   /** The homeserver's OAuth metadata: `undefined` until known, `null` when it has no OAuth. */
   oauthMetadata = $state.raw<OAuthMetadataView | null | undefined>(undefined);
+  qrGrantSupported = $state(false);
   unresponsive = $state(false);
   localNetworkBlocked = $state<string | null>(null);
   accountRevision = $state(0);
@@ -991,6 +992,7 @@ export class CoreClient {
     this.encryption = null;
     this.deviceList = [];
     this.oauthMetadata = undefined;
+    this.qrGrantSupported = false;
     this.searchCoverage = null;
     this.searchCoverageUnavailable = false;
     this.localNetworkBlocked = null;
@@ -1028,6 +1030,7 @@ export class CoreClient {
       void this.primeEncryptionStatus();
       void this.primeSyncStatus();
       void this.primeOAuthMetadata();
+      void this.primeQrGrantSupport();
       void this.primeOwnProfile(session.user_id);
       if (browserGatesCoreNetwork()) void grantLocalNetworkAccess(session.homeserver);
     }
@@ -1196,6 +1199,16 @@ export class CoreClient {
       this.oauthMetadata = metadata;
     } catch (error) {
       console.debug('[sable core] OAuth metadata unavailable', error);
+    }
+  }
+
+  private async primeQrGrantSupport(): Promise<void> {
+    const revision = this.accountRevision;
+    try {
+      const supported = await this.rpc.session.qrGrantSupported();
+      if (revision === this.accountRevision) this.qrGrantSupported = supported;
+    } catch (error) {
+      console.debug('[sable core] QR grant support unavailable', error);
     }
   }
 

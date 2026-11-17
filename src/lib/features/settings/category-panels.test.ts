@@ -29,8 +29,8 @@ describe('settings panels', () => {
   });
 
   it('hide a panel and its search targets together', () => {
-    const hidden = { oauth: false };
-    const shown = { oauth: true };
+    const hidden = { oauth: true, qrGrant: false };
+    const shown = { oauth: true, qrGrant: true };
     expect(panelsFor('account', hidden).map((panel) => panel.id)).not.toContain('link-device');
     expect(panelsFor('account', shown).map((panel) => panel.id)).toContain('link-device');
 
