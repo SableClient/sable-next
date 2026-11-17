@@ -146,6 +146,9 @@
           class="staged-control staged-remove"
           {disabled}
           label={i18n.t('composer.removeAttachment', { name: item.file.name })}
+          onmousedown={(event: MouseEvent) => {
+            event.preventDefault();
+          }}
           onclick={() => {
             onRemove(item.id);
           }}

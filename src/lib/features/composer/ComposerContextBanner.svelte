@@ -66,7 +66,15 @@
       {/if}
     </IconButton>
   {/if}
-  <IconButton size="small" variant="ghost" label={i18n.t('common.cancel')} onclick={onCancel}>
+  <IconButton
+    size="small"
+    variant="ghost"
+    label={i18n.t('common.cancel')}
+    onmousedown={(event: MouseEvent) => {
+      event.preventDefault();
+    }}
+    onclick={onCancel}
+  >
     <XIcon />
   </IconButton>
 </div>

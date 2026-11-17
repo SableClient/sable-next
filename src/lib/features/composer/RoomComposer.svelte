@@ -790,7 +790,7 @@
 
   function cancelContext(): void {
     onCancelContext?.();
-    if (context?.kind === 'edit' || editingScheduled || !desktop) blurEditor();
+    if (context?.kind === 'edit' || editingScheduled) blurEditor();
   }
 
   let shownLinks = $derived.by(() => {

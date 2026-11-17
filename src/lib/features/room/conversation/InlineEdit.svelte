@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
 
   import { formattedForEditing } from '#lib/composer/composer-context.js';
@@ -18,6 +18,8 @@
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
+  import { focusRegion } from '#lib/ui/shortcuts/focus-regions.js';
 
   import type { Conversation } from './conversation.svelte.js';
 
@@ -92,6 +94,14 @@
     node.scrollIntoView({ block: 'nearest' });
   }
 
+  async function cancel(): Promise<void> {
+    const keyboardUp = isEditableTarget(document.activeElement);
+    conversation.clearContext();
+    if (!keyboardUp) return;
+    await tick();
+    focusRegion('composer');
+  }
+
   async function save(): Promise<void> {
     const edit = pending;
     const doc = editor.doc();
@@ -127,8 +137,12 @@
     <Alert variant="critical" role="alert">{error}</Alert>
   {/if}
   <div class="actions">
-    <Button size="small" onclick={() => conversation.clearContext()}
-      >{i18n.t('common.cancel')}</Button
+    <Button
+      size="small"
+      onmousedown={(event: MouseEvent) => {
+        event.preventDefault();
+      }}
+      onclick={() => void cancel()}>{i18n.t('common.cancel')}</Button
     >
     <Button size="small" variant="primary" loading={saving} onclick={() => void save()}>
       {i18n.t('common.save')}
