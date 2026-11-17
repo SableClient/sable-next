@@ -1,0 +1,10 @@
+[general]
+root = "/public"
+port = 8080
+health = true
+
+[advanced]
+
+[[advanced.headers]]
+source = "{/,/index.html,/iframe.html,/index.json,/project.json}"
+headers = { Cache-Control = "no-cache" }

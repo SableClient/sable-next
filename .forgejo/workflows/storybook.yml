@@ -1,0 +1,113 @@
+name: Storybook
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'static/**'
+      - 'crates/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.storybook/**'
+      - '**/*.stories.svelte'
+      - 'packaging/storybook/**'
+      - '.forgejo/workflows/storybook.yml'
+  pull_request:
+    paths:
+      - '.storybook/**'
+      - '**/*.stories.svelte'
+      - 'packaging/storybook/**'
+      - '.forgejo/workflows/storybook.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storybook-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
+  STORYBOOK_DISABLE_TELEMETRY: '1'
+  IMAGE: git.sable.moe/sableclient/sable-storybook
+
+jobs:
+  build:
+    name: Build Storybook
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up app and build
+        uses: ./.forgejo/actions/setup
+        with:
+          build: 'true'
+
+      - name: Build Storybook
+        run: pnpm exec storybook build -o storybook-static --quiet
+
+      - name: Upload Storybook
+        uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
+        with:
+          name: storybook-static
+          path: storybook-static
+          if-no-files-found: error
+          retention-days: 1
+
+  image:
+    name: Build image
+    needs: build
+    runs-on: multiarch
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download Storybook
+        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
+        with:
+          name: storybook-static
+          path: storybook-static
+
+      - name: Set up Docker Buildx
+        uses: https://github.com/docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to registry
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: https://github.com/docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: git.sable.moe
+          username: ${{ secrets.PACKAGES_USER }}
+          password: ${{ secrets.PACKAGES_TOKEN }}
+
+      - name: Read commit time
+        id: commit
+        run: echo "ts=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set image tags
+        id: meta
+        uses: https://github.com/docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main-{{sha}}-${{ steps.commit.outputs.ts }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha
+
+      - name: Build image
+        uses: https://github.com/docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: packaging/storybook/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
