@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs';
 
 import { writeJson } from './persistence';
 
+const LOCAL_NETWORK = new Set(['local-network', 'local-network-access', 'loopback-network']);
+
 const GRANTED = new Set([
   'clipboard-sanitized-write',
   'display-capture',
   'fullscreen',
-  'local-network',
-  'local-network-access',
-  'loopback-network',
+  ...LOCAL_NETWORK,
   'notifications',
   'persistent-storage',
   'screen-wake-lock',
@@ -44,6 +44,7 @@ function readGrants(path: string): string[] {
 
 function kindsOf(permission: string, mediaTypes: readonly string[] = []): string[] | null {
   if (permission === 'geolocation') return ['location'];
+  if (LOCAL_NETWORK.has(permission)) return ['local network'];
   if (permission !== 'media' || mediaTypes.length === 0) return null;
   if (mediaTypes.some((type) => type !== 'audio' && type !== 'video')) return null;
   return mediaTypes.map((type) => (type === 'audio' ? 'microphone' : 'camera'));

@@ -231,6 +231,31 @@ test('an embedded grant belongs to its origin and device for this session', asyn
   expect(writeGrantsFile).not.toHaveBeenCalled();
 });
 
+test.each(['local-network', 'local-network-access', 'loopback-network'] as const)(
+  'an embedded site asks before reaching the local network through %s',
+  async (permission) => {
+    showMessageBox.mockResolvedValue({ response: 0 });
+    const { request, check } = handlers();
+    const callback = vi.fn();
+    request(contents(), permission, callback, {
+      requestingUrl: 'https://widget.example/call',
+      isMainFrame: false,
+    });
+    await vi.waitFor(() => {
+      expect(callback).toHaveBeenCalledWith(true);
+    });
+    expect(showMessageBox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'https://widget.example wants to access your local network.',
+      })
+    );
+    const details = { embeddingOrigin: 'sable-app://app', isMainFrame: false };
+    expect(check(contents(), permission, 'https://widget.example', details)).toBe(true);
+    expect(check(contents(), permission, 'https://other.example', details)).toBe(false);
+    expect(writeGrantsFile).not.toHaveBeenCalled();
+  }
+);
+
 test.each(['', 'null', 'about:blank', 'data:text/html,hello', 'file:///tmp/widget.html'])(
   'denies an embedded request from %j without prompting',
   (url) => {
