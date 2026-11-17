@@ -1,5 +1,9 @@
 import { copyText as writeClipboard } from '#lib/platform/clipboard.js';
-import type { TimelineItemView, ImageSourcePackView } from '#src/generated/protocol';
+import type {
+  TimelineItemView,
+  ImageSourcePackView,
+  UrlPreviewView,
+} from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
@@ -12,6 +16,7 @@ import { isNativeMobile, isAndroid } from '#lib/platform/os.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { gifFromProxiedMxc, gifFromUploadedMxc } from '#lib/gif/providers.js';
 import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
+import { previewGif } from '../media/link-preview.js';
 import { pinErrorMessage, type PinnedEvents } from '../timeline/pinned-events.svelte.js';
 import type { Bookmarks } from '#lib/rooms/bookmarks.svelte.js';
 import { meowlnirFor } from '#lib/rooms/meowlnir-registry.svelte.js';
@@ -51,6 +56,7 @@ interface MessageActionContext extends MessageCallbacks {
   senderTimezone: string | null;
   anchor: HTMLElement | CursorAnchor | null;
   hasLinkPreviews: boolean;
+  linkPreviews: readonly UrlPreviewView[];
 }
 
 interface MessageActionDeps {
@@ -84,6 +90,7 @@ export class MessageActionExecutor {
       senderTimezone,
       anchor,
       hasLinkPreviews,
+      linkPreviews,
       onToggleReaction,
       onMarkUnread,
       onReply,
@@ -118,6 +125,7 @@ export class MessageActionExecutor {
       bookmarked,
       stealCount: stealable.length,
     });
+    const linkGif = policy.media === null ? previewGif(linkPreviews) : null;
     const gif =
       item.content.kind === 'image'
         ? (gifFromProxiedMxc(
@@ -137,7 +145,7 @@ export class MessageActionExecutor {
             item.content.mime,
             item.content.animated
           ))
-        : undefined;
+        : linkGif?.favorite;
     const downloadMedia = async (media: {
       source: string;
       filename: string;
@@ -403,7 +411,9 @@ export class MessageActionExecutor {
         ? () => {
             if (policy.media) void downloadMedia(policy.media);
           }
-        : undefined,
+        : linkGif
+          ? () => void downloadMedia(linkGif.media)
+          : undefined,
       onSaveToPhotos:
         item.content.kind === 'video' && isNativeMobile() && !isAndroid()
           ? () => void saveVideoToLibrary()

@@ -1,3 +1,5 @@
+import { gifFromUploadedMxc, type GifResult } from '#lib/gif/providers.js';
+import { appMime } from '#lib/mime.js';
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 import type { UrlPreviewView, VideoPlaybackView } from '#src/generated/protocol';
 
@@ -20,6 +22,58 @@ export function isGifHostUrl(href: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function isGifPreview(url: string, preview: UrlPreviewView | null): boolean {
+  return preview?.video?.gif === true || preview?.image_mime === 'image/gif' || isGifHostUrl(url);
+}
+
+type PreviewGif = {
+  media: { source: string; filename: string; mime: string | null };
+  favorite: GifResult | undefined;
+};
+
+function lastPathSegment(url: string): string {
+  try {
+    return new URL(url).pathname.split('/').filter(Boolean).at(-1) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function previewFilename(url: string, mime: string | null): string {
+  const stem = lastPathSegment(url).replace(/\.[^.]+$/, '') || 'gif';
+  return `${stem}.${(mime !== null && appMime.getExtension(mime)) || 'gif'}`;
+}
+
+export function previewGif(previews: readonly UrlPreviewView[]): PreviewGif | null {
+  for (const preview of previews) {
+    if (!isGifPreview(preview.url, preview)) continue;
+    if (preview.video) {
+      const { source, mime } = preview.video;
+      return {
+        media: { source, filename: previewFilename(preview.url, mime), mime },
+        favorite: undefined,
+      };
+    }
+    if (preview.image) {
+      const mime = preview.image_mime ?? imageMimeFromUrl(preview.url) ?? 'image/gif';
+      const filename = previewFilename(preview.url, mime);
+      return {
+        media: { source: preview.image, filename, mime },
+        favorite: gifFromUploadedMxc(
+          preview.image,
+          filename,
+          preview.image_width,
+          preview.image_height,
+          null,
+          mime,
+          true
+        ),
+      };
+    }
+  }
+  return null;
 }
 
 export function hasPreviewData(preview: UrlPreviewView): boolean {

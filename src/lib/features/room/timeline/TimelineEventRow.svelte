@@ -50,6 +50,7 @@
     overrideCosmetics,
     replySender: null,
     hasLinkPreviews: item.link_previews_removed !== true && item.bundled_link_previews.length > 0,
+    linkPreviews: [],
     onToggleReaction,
     onMarkUnread,
     onReply,

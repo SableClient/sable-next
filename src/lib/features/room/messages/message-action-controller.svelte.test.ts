@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { TimelineItemView, UrlPreviewView } from '#src/generated/protocol';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 import { MessageActionExecutor } from './message-action-controller.svelte.js';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
@@ -57,6 +57,7 @@ function fixture() {
     senderTimezone: null,
     anchor: null,
     hasLinkPreviews: false,
+    linkPreviews: [] as UrlPreviewView[],
     onEdit: vi.fn(),
     onDelete: vi.fn(),
     onOpenThread: vi.fn(),

@@ -6,8 +6,13 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
-  import { GIF_PLAYBACK, hasPreviewData, imageMimeFromUrl, isGifHostUrl } from './link-preview.js';
-  import { previewSources, resolveUrlPreview, usesTunnel } from './link-preview-cache';
+  import { GIF_PLAYBACK, hasPreviewData, imageMimeFromUrl, isGifPreview } from './link-preview.js';
+  import {
+    previewSources,
+    resolveUrlPreview,
+    shownLinkPreviews,
+    usesTunnel,
+  } from './link-preview-cache';
   import { findLinkPresentation } from './link-presentations';
   import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
@@ -52,11 +57,19 @@
     };
   });
 
+  $effect(() => {
+    if (preview === null) return;
+    const key = url;
+    const view = preview;
+    shownLinkPreviews.set(key, view);
+    return () => {
+      if (shownLinkPreviews.get(key) === view) shownLinkPreviews.delete(key);
+    };
+  });
+
   let shown = $derived(preview ? [preview] : []);
   let title = $derived(preview?.title ?? preview?.site_name ?? url);
-  let gif = $derived(
-    preview?.video?.gif === true || preview?.image_mime === 'image/gif' || isGifHostUrl(url)
-  );
+  let gif = $derived(isGifPreview(url, preview));
   let compactImage = $derived(
     !gif &&
       (preview?.card === 'summary'

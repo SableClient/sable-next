@@ -1,10 +1,13 @@
 import QuickLRU from 'quick-lru';
+import { SvelteMap } from 'svelte/reactivity';
 
 import { isCoreError } from '#src/transport';
 
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { UrlPreviewView, Rpc } from '#src/generated/protocol';
+
+export const shownLinkPreviews = new SvelteMap<string, UrlPreviewView>();
 
 const previews = new QuickLRU<string, Promise<UrlPreviewView | null>>({ maxSize: 256 });
 let homeserverPreviews = true;

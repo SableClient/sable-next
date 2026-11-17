@@ -6,6 +6,7 @@
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import { senderDisplayColors } from '../members/members.js';
   import { previewableLinks } from '../media/link-preview.js';
+  import { shownLinkPreviews } from '../media/link-preview-cache';
   import LinkEmbed from '../media/embeds/LinkEmbed.svelte';
   import { isMediaCaptionContent } from '../messages/media-caption.js';
   import { i18n } from '#lib/i18n.js';
@@ -108,6 +109,10 @@
     overrideCosmetics,
     replySender,
     hasLinkPreviews: bundledPreviews.length > 0 || previewUrls.length > 0,
+    linkPreviews:
+      bundledPreviews.length > 0
+        ? bundledPreviews
+        : previewUrls.flatMap((url) => shownLinkPreviews.get(url) ?? []),
     onToggleReaction,
     onMarkUnread,
     onReply,

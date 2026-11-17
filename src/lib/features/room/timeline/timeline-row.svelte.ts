@@ -1,6 +1,11 @@
 import { onDestroy, type Snippet } from 'svelte';
 
-import type { MemberView, PerMessageProfileView, TimelineItemView } from '#src/generated/protocol';
+import type {
+  MemberView,
+  PerMessageProfileView,
+  TimelineItemView,
+  UrlPreviewView,
+} from '#src/generated/protocol';
 
 import { copyText } from '#lib/platform/clipboard.js';
 import { shareLink, sharesLinks } from '#lib/platform/files.js';
@@ -92,6 +97,7 @@ export interface TimelineRowOptions extends MessageCallbacks {
   overrideCosmetics: SenderCosmetics | null;
   replySender: string | null;
   hasLinkPreviews: boolean;
+  linkPreviews: readonly UrlPreviewView[];
   onMenuOpenChange?: (open: boolean) => void;
   onSwipeMembers?: () => void;
   onCancelSend?: (transactionId: string) => void;
