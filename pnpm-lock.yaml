@@ -166,7 +166,7 @@ patchedDependencies:
   '@sapphi-red/web-noise-suppressor@0.4.1': 04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828
   '@sveltejs/kit@3.1.1': 6589fb8ecd1177fe34954a01735f3a86ea8c7c2e478a3937cfef8697fffd94b7
   app-builder-lib@26.18.0: facf1d0d35a984729a251fc70348081c9937ff84229f36b8fd203014521e51e9
-  livekit-client@2.23.0: b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e
+  livekit-client@2.23.0: 436b4b961ff4f955bbc57ba84314bed4ae7cd8e1bf062997cc61208b23aa27d3
   recast@0.23.21: e5c14431cd63b5b1de6085bd3e471e62044dfceed736ecf3308a3b1fd6b82c15
   svelte@5.57.3: 49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e
 
@@ -293,7 +293,7 @@ importers:
         version: 1.9.4
       livekit-client:
         specifier: 2.23.0
-        version: 2.23.0(patch_hash=b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e)(@types/dom-mediacapture-record@1.0.22)
+        version: 2.23.0(patch_hash=436b4b961ff4f955bbc57ba84314bed4ae7cd8e1bf062997cc61208b23aa27d3)(@types/dom-mediacapture-record@1.0.22)
       matrix-widget-api:
         specifier: ^1.19.0
         version: 1.20.0
@@ -10401,7 +10401,7 @@ snapshots:
     dependencies:
       uc.micro: 2.1.0
 
-  livekit-client@2.23.0(patch_hash=b07083d5861f45e5bae2c9baafca2e249cebbe7389cf9f3e78fa0e61b0d31c1e)(@types/dom-mediacapture-record@1.0.22):
+  livekit-client@2.23.0(patch_hash=436b4b961ff4f955bbc57ba84314bed4ae7cd8e1bf062997cc61208b23aa27d3)(@types/dom-mediacapture-record@1.0.22):
     dependencies:
       '@livekit/mutex': 1.1.1
       '@livekit/protocol': 1.52.1

@@ -1,5 +1,5 @@
 diff --git a/dist/livekit-client.esm.mjs b/dist/livekit-client.esm.mjs
-index a983f6e39c474912a9052d4a5f7155875f204e4a..e83c954dc8df84676eb4a15b540f864f9c7a08b4 100644
+index a983f6e39c474912a9052d4a5f7155875f204e4a..a066ea3dc3ce563ec3c3d73716543826497c1630 100644
 --- a/dist/livekit-client.esm.mjs
 +++ b/dist/livekit-client.esm.mjs
 @@ -21711,15 +21711,14 @@ function conformBundledCodecFmtp(media, isPlaceholder) {
@@ -44,6 +44,24 @@ index a983f6e39c474912a9052d4a5f7155875f204e4a..e83c954dc8df84676eb4a15b540f864f
        }
      }
    }
+@@ -31715,7 +31721,7 @@ class RpcServerManager extends eventsExports.EventEmitter {
+       if (settings.noiseSuppression) {
+         features.add(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+       }
+-      if (settings.channelCount && settings.channelCount > 1) {
++      if (this.options?.forceStereo ?? (settings.channelCount ?? 0) > 1) {
+         features.add(AudioTrackFeature.TF_STEREO);
+       }
+       if (!((_a = this.options) === null || _a === void 0 ? void 0 : _a.dtx)) {
+@@ -33097,7 +33103,7 @@ class Participant extends eventsExports.EventEmitter {
+       if (settings.noiseSuppression) {
+         audioFeatures.push(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+       }
+-      if (settings.channelCount && settings.channelCount > 1) {
++      if (isStereo) {
+         audioFeatures.push(AudioTrackFeature.TF_STEREO);
+       }
+       if (disableDtx) {
 diff --git a/src/room/PCTransport.ts b/src/room/PCTransport.ts
 index 1b4103130d78b27b9d63f7efa3e1bc8f0d297468..efc69ff4080e2ed662b92a2889153f0d2bcd7781 100644
 --- a/src/room/PCTransport.ts
@@ -90,3 +108,29 @@ index 1b4103130d78b27b9d63f7efa3e1bc8f0d297468..efc69ff4080e2ed662b92a2889153f0d
        }
      }
    }
+diff --git a/src/room/participant/LocalParticipant.ts b/src/room/participant/LocalParticipant.ts
+index 3407d126b1497b4951a8fa01e3c6e98ee2a2db60..18e8f3bced27c1da4ee95f018ae641047d9ec902 100644
+--- a/src/room/participant/LocalParticipant.ts
++++ b/src/room/participant/LocalParticipant.ts
+@@ -1090,7 +1090,7 @@ export default class LocalParticipant extends Participant {
+     if (settings.noiseSuppression) {
+       audioFeatures.push(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+     }
+-    if (settings.channelCount && settings.channelCount > 1) {
++    if (isStereo) {
+       audioFeatures.push(AudioTrackFeature.TF_STEREO);
+     }
+     if (disableDtx) {
+diff --git a/src/room/track/LocalTrackPublication.ts b/src/room/track/LocalTrackPublication.ts
+index 3b9e3a8f5aca3cc7ab72e2d309aa0e42072d4431..29fbb95ce097acf6637545e29737b9293acd3428 100644
+--- a/src/room/track/LocalTrackPublication.ts
++++ b/src/room/track/LocalTrackPublication.ts
+@@ -102,7 +102,7 @@ export default class LocalTrackPublication extends TrackPublication {
+       if (settings.noiseSuppression) {
+         features.add(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+       }
+-      if (settings.channelCount && settings.channelCount > 1) {
++      if (this.options?.forceStereo ?? (settings.channelCount ?? 0) > 1) {
+         features.add(AudioTrackFeature.TF_STEREO);
+       }
+       if (!this.options?.dtx) {
