@@ -162,97 +162,100 @@
   label={i18n.t('nav.findOrJoin')}
   closeLabel={i18n.t('common.close')}
 >
-  <div class="find-or-join">
-    <h2>{i18n.t('nav.findOrJoin')}</h2>
+  {#snippet children(desktop)}
+    <div class={['find-or-join', { sheet: !desktop }]}>
+      <h2>{i18n.t('nav.findOrJoin')}</h2>
 
-    <TextInput
-      id={inputId}
-      bind:value
-      onkeydown={onKeydown}
-      aria-label={i18n.t('nav.findOrJoin')}
-      placeholder={i18n.t('findOrJoin.placeholder')}
-      autocomplete="off"
-      autocapitalize="none"
-      spellcheck={false}
-    />
+      <TextInput
+        id={inputId}
+        bind:value
+        onkeydown={onKeydown}
+        aria-label={i18n.t('nav.findOrJoin')}
+        placeholder={i18n.t('findOrJoin.placeholder')}
+        autocomplete="off"
+        autocapitalize="none"
+        spellcheck={false}
+      />
 
-    {#if room}
-      <div class="room">
-        {#if previewing}
-          <div class="pending" role="status"><Spinner /></div>
-        {:else if preview}
-          {@const name = preview.name ?? preview.canonical_alias ?? room.address}
-          <Avatar id={preview.room_id} src={preview.avatar_url} {name} />
-          <div class="identity">
-            <span class="name">{name}</span>
-            {#if preview.canonical_alias}<span class="detail">{preview.canonical_alias}</span>{/if}
-            {#if preview.num_joined_members != null}
-              <span class="detail">
-                {i18n.t('join.members', { count: preview.num_joined_members })}
-              </span>
-            {/if}
-            {#if preview.topic}<span class="topic">{preview.topic}</span>{/if}
-          </div>
-        {:else}
-          <p class="note">{i18n.t('findOrJoin.previewUnavailable', { address: room.address })}</p>
-        {/if}
-      </div>
-    {:else if people.length > 0}
-      <ul class="people" aria-label={i18n.t('findOrJoin.people')} {@attach scrollHint}>
-        {#each people as entry (entry.user_id)}
-          {@const name = entry.display_name ?? entry.user_id}
-          <li>
-            <button
-              type="button"
-              class="menu-item"
-              disabled={busy}
-              onclick={() => {
-                void message(entry.user_id);
-              }}
-            >
-              <Avatar size="small" id={entry.user_id} src={entry.avatar_url} {name} />
-              <span class="identity">
-                <span class="name">{name}</span>
-                <span class="detail">{entry.user_id}</span>
-              </span>
-            </button>
-          </li>
-        {/each}
-      </ul>
-    {:else if term !== '' && !directory.searching}
-      <p class="note">{i18n.t('findOrJoin.noPeople')}</p>
-    {:else if term === ''}
-      <p class="note">{i18n.t('findOrJoin.hint')}</p>
-    {/if}
-
-    {#if failed}
-      <Alert variant="critical" role="alert">{failed}</Alert>
-    {/if}
-
-    <footer>
-      <Button
-        variant="ghost"
-        size="small"
-        onclick={() => {
-          void leaveTo(resolve('explore'));
-        }}
-      >
-        {i18n.t('findOrJoin.explore')}
-      </Button>
       {#if room}
+        <div class="room">
+          {#if previewing}
+            <div class="pending" role="status"><Spinner /></div>
+          {:else if preview}
+            {@const name = preview.name ?? preview.canonical_alias ?? room.address}
+            <Avatar id={preview.room_id} src={preview.avatar_url} {name} />
+            <div class="identity">
+              <span class="name">{name}</span>
+              {#if preview.canonical_alias}<span class="detail">{preview.canonical_alias}</span
+                >{/if}
+              {#if preview.num_joined_members != null}
+                <span class="detail">
+                  {i18n.t('join.members', { count: preview.num_joined_members })}
+                </span>
+              {/if}
+              {#if preview.topic}<span class="topic">{preview.topic}</span>{/if}
+            </div>
+          {:else}
+            <p class="note">{i18n.t('findOrJoin.previewUnavailable', { address: room.address })}</p>
+          {/if}
+        </div>
+      {:else if people.length > 0}
+        <ul class="people" aria-label={i18n.t('findOrJoin.people')} {@attach scrollHint}>
+          {#each people as entry (entry.user_id)}
+            {@const name = entry.display_name ?? entry.user_id}
+            <li>
+              <button
+                type="button"
+                class="menu-item"
+                disabled={busy}
+                onclick={() => {
+                  void message(entry.user_id);
+                }}
+              >
+                <Avatar size="small" id={entry.user_id} src={entry.avatar_url} {name} />
+                <span class="identity">
+                  <span class="name">{name}</span>
+                  <span class="detail">{entry.user_id}</span>
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {:else if term !== '' && !directory.searching}
+        <p class="note">{i18n.t('findOrJoin.noPeople')}</p>
+      {:else if term === ''}
+        <p class="note">{i18n.t('findOrJoin.hint')}</p>
+      {/if}
+
+      {#if failed}
+        <Alert variant="critical" role="alert">{failed}</Alert>
+      {/if}
+
+      <footer>
         <Button
-          variant="primary"
-          loading={busy}
-          disabled={previewing}
+          variant="ghost"
+          size="small"
           onclick={() => {
-            void enterRoom();
+            void leaveTo(resolve('explore'));
           }}
         >
-          {actionLabel}
+          {i18n.t('findOrJoin.explore')}
         </Button>
-      {/if}
-    </footer>
-  </div>
+        {#if room}
+          <Button
+            variant="primary"
+            loading={busy}
+            disabled={previewing}
+            onclick={() => {
+              void enterRoom();
+            }}
+          >
+            {actionLabel}
+          </Button>
+        {/if}
+      </footer>
+    </div>
+  {/snippet}
 </ResponsiveDialog>
 
 <style>
@@ -260,6 +263,11 @@
     display: grid;
     gap: var(--space-400);
     width: min(26rem, calc(100vw - 2rem));
+  }
+
+  .find-or-join.sheet {
+    padding: 0 var(--space-400);
+    width: auto;
   }
 
   h2 {
