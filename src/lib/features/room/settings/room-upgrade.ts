@@ -1,3 +1,5 @@
+import type { CreateJoinRuleView, RoomJoinRuleView } from '#src/generated/protocol';
+
 const NO_ADDITIONAL_CREATORS = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']);
 
 export function additionalCreatorsSupported(version: string): boolean {
@@ -54,4 +56,16 @@ export function readTombstone(content: unknown): {
 export function readReplacementId(input: string): string | null {
   const id = input.trim();
   return /^![^\s:]+(:\S+)?$/.test(id) ? id : null;
+}
+
+export function replacementJoinRule(rule: RoomJoinRuleView | undefined): CreateJoinRuleView | null {
+  switch (rule) {
+    case 'invite':
+    case 'knock':
+    case 'restricted':
+    case 'knock_restricted':
+      return rule;
+    default:
+      return null;
+  }
 }

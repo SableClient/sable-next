@@ -6,6 +6,7 @@ import {
   readFounders,
   readReplacementId,
   readTombstone,
+  replacementJoinRule,
 } from './room-upgrade';
 
 test('additional creators arrived in room version 12', () => {
@@ -75,4 +76,13 @@ test('an archived room has no replacement to join', () => {
     replacement: null,
     body: 'This room has been archived.',
   });
+});
+
+test('a replacement room keeps the join rule it can be created with', () => {
+  expect(replacementJoinRule('restricted')).toBe('restricted');
+  expect(replacementJoinRule('knock_restricted')).toBe('knock_restricted');
+  expect(replacementJoinRule('invite')).toBe('invite');
+  expect(replacementJoinRule('public')).toBeNull();
+  expect(replacementJoinRule('private')).toBeNull();
+  expect(replacementJoinRule('unknown')).toBeNull();
 });
