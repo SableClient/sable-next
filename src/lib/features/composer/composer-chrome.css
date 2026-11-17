@@ -143,11 +143,8 @@
 }
 
 @media (pointer: fine) {
-  .composer-formatting .formatting {
-    flex-wrap: wrap;
-    height: auto;
-    justify-content: end;
-    overflow: visible;
+  .composer-formatting .formatting > :first-child {
+    margin-inline-start: auto;
   }
 }
 

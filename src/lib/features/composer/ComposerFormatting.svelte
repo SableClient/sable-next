@@ -90,6 +90,27 @@
     return binding ? `${label} (${formatBinding(binding, isMacPlatform())})` : label;
   }
 
+  let fadeStart = $state(false);
+  let fadeEnd = $state(false);
+
+  function measureOverflow(bar: HTMLElement): void {
+    const scrolled = Math.abs(bar.scrollLeft);
+    fadeStart = scrolled > 1;
+    fadeEnd = bar.scrollWidth - bar.clientWidth - scrolled > 1;
+  }
+
+  function trackOverflow(bar: HTMLDivElement): () => void {
+    // re-measure when the buttons change, which does not resize the bar
+    void visible;
+    const observer = new ResizeObserver(() => {
+      measureOverflow(bar);
+    });
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+    };
+  }
+
   function scrollSideways(event: WheelEvent & { currentTarget: HTMLDivElement }): void {
     const bar = event.currentTarget;
     if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
@@ -100,10 +121,14 @@
 </script>
 
 <div
-  class="formatting scrollbar-hidden"
+  {@attach trackOverflow}
+  class={['formatting scrollbar-hidden', { 'fade-start': fadeStart, 'fade-end': fadeEnd }]}
   role="group"
   aria-label={i18n.t('composer.formatting')}
   onwheel={scrollSideways}
+  onscroll={(event) => {
+    measureOverflow(event.currentTarget);
+  }}
 >
   {#each visible as button (button.action)}
     <Tooltip label={withShortcut(i18n.t(button.label), `composer.${button.action}`)}>
@@ -170,6 +195,28 @@
     min-width: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
+  }
+
+  .fade-start {
+    --fade-start-edge: transparent;
+  }
+
+  .fade-end {
+    --fade-end-edge: transparent;
+  }
+
+  .fade-start,
+  .fade-end {
+    --fade-edges:
+      var(--fade-start-edge, black), black var(--space-600), black calc(100% - var(--space-600)),
+      var(--fade-end-edge, black);
+
+    mask-image: linear-gradient(to right, var(--fade-edges));
+  }
+
+  .fade-start:dir(rtl),
+  .fade-end:dir(rtl) {
+    mask-image: linear-gradient(to left, var(--fade-edges));
   }
 
   :global(.format-button) {

@@ -352,17 +352,15 @@ for (const width of [320, 412, 520, 768]) {
       expect(strip.x + strip.width).toBeLessThanOrEqual(actions.x);
     }
     const composer = boxOf('.composer');
-    for (const button of rail.querySelectorAll('button')) {
-      await expect.element(button).toBeVisible();
-      const box = button.getBoundingClientRect();
-      expect(box.left).toBeGreaterThanOrEqual(Math.max(composer.left, 0));
-      expect(box.right).toBeLessThanOrEqual(Math.min(composer.right, window.innerWidth));
-      expect(box.top).toBeGreaterThanOrEqual(Math.max(composer.top, 0));
-      expect(box.bottom).toBeLessThanOrEqual(Math.min(composer.bottom, window.innerHeight));
+    expect(strip.left).toBeGreaterThanOrEqual(composer.left);
+    expect(strip.right).toBeLessThanOrEqual(composer.right);
+    if (rail.scrollWidth > rail.clientWidth) {
+      await expect.element(rail).toHaveClass('fade-end');
     }
     const highlight = screen.getByRole('button', { name: 'Highlight colour', exact: true });
     highlight.element().focus();
     await expect.element(highlight).toBeInViewport();
+    await expect.element(rail).not.toHaveClass('fade-end');
   });
 }
 
