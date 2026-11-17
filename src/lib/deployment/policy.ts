@@ -20,7 +20,12 @@ export function logoutRedirectUrl(config: RuntimeConfig = deployment()): string 
   return config.auth.logoutRedirectUrl;
 }
 
-export function deviceDisplayName(config: RuntimeConfig = deployment()): string {
+/** The homeserver's auth service adds the device itself, as "<client> on <device>". */
+export function oauthClientName(config: RuntimeConfig = deployment()): string {
   const name = config.auth.deviceDisplayName ?? appName(config);
-  return `${name}${isNightlyBuild() ? ' (Nightly)' : ''} on ${devicePlatformLabel()}`;
+  return `${name}${isNightlyBuild() ? ' (Nightly)' : ''}`;
+}
+
+export function deviceDisplayName(config: RuntimeConfig = deployment()): string {
+  return `${oauthClientName(config)} on ${devicePlatformLabel()}`;
 }

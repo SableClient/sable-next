@@ -27,7 +27,7 @@ import type { Transport } from '../../transport';
 import { CoreError, isCoreError } from '../../transport';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
-import { deviceDisplayName } from '#lib/deployment/policy.js';
+import { deviceDisplayName, oauthClientName } from '#lib/deployment/policy.js';
 import {
   activateAccountConfiguration,
   removeAccountConfiguration,
@@ -451,7 +451,7 @@ export class CoreClient {
       homeserver: resolvedHomeserver,
       redirect_uri: redirectUri,
       intent,
-      device_display_name: deviceDisplayName(await prepareLoginConfiguration(homeserver)),
+      device_display_name: oauthClientName(await prepareLoginConfiguration(homeserver)),
     });
   }
 

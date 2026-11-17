@@ -13,7 +13,7 @@ import {
   sourceUrl,
   supportRoom,
 } from './links.js';
-import { deviceDisplayName, registrationEnabled } from './policy.js';
+import { deviceDisplayName, oauthClientName, registrationEnabled } from './policy.js';
 
 const build = vi.hoisted(() => ({ nightly: false }));
 vi.mock('#lib/platform/build-channel.js', () => ({ isNightlyBuild: () => build.nightly }));
@@ -47,6 +47,7 @@ test('a branded deployment names itself everywhere', () => {
   expect(pageTitle('Settings', acme)).toBe('Settings - Acme');
   expect(pageTitle('Acme', acme)).toBe('Acme');
   expect(deviceDisplayName(acme)).toBe('Acme on Android');
+  expect(oauthClientName(acme)).toBe('Acme');
   expect(privacyUrl(acme)).toBe('https://acme.example/privacy');
   expect(registrationEnabled(acme)).toBe(false);
 });
@@ -63,6 +64,7 @@ test('hiding community links keeps the deployment support room', () => {
 test('a nightly build says so in the device name', () => {
   build.nightly = true;
   expect(deviceDisplayName(sable)).toBe('Sable (Nightly) on Android');
+  expect(oauthClientName(sable)).toBe('Sable (Nightly)');
   build.nightly = false;
 });
 

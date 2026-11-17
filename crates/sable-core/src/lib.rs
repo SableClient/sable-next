@@ -97,8 +97,39 @@ pub mod webpush;
 
 pub use matrix_sdk::{Client as MatrixClient, reqwest, ruma};
 
-/// User-Agent for native HTTP requests.
-pub const USER_AGENT: &str = concat!("Sable/", env!("SABLE_APP_VERSION"));
+// MAS names OAuth devices from the `(model; os)` segment and falls back to "Unknown device".
+macro_rules! user_agent {
+    ($platform:literal) => {
+        concat!(
+            "Sable/",
+            env!("SABLE_APP_VERSION"),
+            " (",
+            $platform,
+            "; ",
+            $platform,
+            ")"
+        )
+    };
+}
+
+#[cfg(target_os = "android")]
+pub const USER_AGENT: &str = user_agent!("Android");
+#[cfg(target_os = "ios")]
+pub const USER_AGENT: &str = user_agent!("iOS");
+#[cfg(target_os = "macos")]
+pub const USER_AGENT: &str = user_agent!("macOS");
+#[cfg(target_os = "windows")]
+pub const USER_AGENT: &str = user_agent!("Windows");
+#[cfg(target_family = "wasm")]
+pub const USER_AGENT: &str = user_agent!("Web");
+#[cfg(not(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "macos",
+    target_os = "windows",
+    target_family = "wasm"
+)))]
+pub const USER_AGENT: &str = user_agent!("Linux");
 
 mod widgets;
 
@@ -204,6 +235,7 @@ pub struct Core {
     notify_once: AtomicBool,
     private_receipts: AtomicBool,
     widget_feed: AtomicBool,
+    scalar_tokens: parking_lot::Mutex<HashMap<(ruma::OwnedUserId, String), String>>,
     notifications_enabled: AtomicBool,
     in_app_banners: AtomicBool,
     search_crawler_enabled: AtomicBool,
@@ -324,6 +356,7 @@ impl Core {
             notify_once: AtomicBool::new(true),
             private_receipts: AtomicBool::new(true),
             widget_feed: AtomicBool::new(false),
+            scalar_tokens: parking_lot::Mutex::new(HashMap::new()),
             notifications_enabled: AtomicBool::new(true),
             in_app_banners: AtomicBool::new(false),
             search_crawler_enabled: AtomicBool::new(true),
