@@ -3,6 +3,18 @@ name: Server Docker image
 on:
   push:
     branches: [main]
+    paths:
+      - 'crates/**'
+      - 'vendor/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'patches/**'
+      - 'packaging/server/**'
+      - '.forgejo/workflows/docker-server.yml'
 
 concurrency:
   group: docker-server-${{ github.workflow }}-${{ github.ref }}

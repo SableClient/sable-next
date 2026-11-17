@@ -2,8 +2,22 @@ name: Quality checks
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.changeset/**'
+      - 'fastlane/**'
+      - 'src-tauri/**'
+      - 'electron/**'
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.changeset/**'
+      - 'fastlane/**'
+      - 'src-tauri/**'
+      - 'electron/**'
 
 concurrency:
   group: quality-checks-${{ github.workflow }}-${{ github.ref }}

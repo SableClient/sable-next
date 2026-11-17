@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.changeset/**'
+      - 'fastlane/**'
+      - 'src-tauri/**'
+      - 'electron/**'
   pull_request:
     paths:
       - 'infra/**'
