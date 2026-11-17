@@ -6,7 +6,6 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
-  import { formatDate } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
@@ -298,9 +297,6 @@
               {i18n.t('inbox.invitedBy', { name: fromName })}
               <span>({from})</span>
             </button>
-          {/if}
-          {#if room.latest_event?.timestamp}
-            <span>{formatDate(room.latest_event.timestamp)}</span>
           {/if}
           {#if room.canonical_alias}
             <span class="alias">{room.canonical_alias}</span>
