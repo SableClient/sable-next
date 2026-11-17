@@ -107,7 +107,7 @@
     <BitsCombobox.Trigger aria-label={i18n.t('combobox.showOptions')}>
       {#snippet child({ props })}
         <button {...props} tabindex="-1" class="combobox-trigger selection-open">
-          <CaretDownIcon class="combobox-icon" />
+          <CaretDownIcon class="combobox-icon" aria-hidden="true" />
         </button>
       {/snippet}
     </BitsCombobox.Trigger>

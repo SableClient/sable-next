@@ -3,6 +3,7 @@
   import { Tooltip as BitsTooltip } from 'bits-ui';
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
 
   import { collisionPadding } from '#lib/ui/titlebar-inset.svelte.js';
 
@@ -54,7 +55,13 @@
     type="button"
     aria-label={variant === 'icon' ? label || undefined : undefined}
   >
-    {@render children?.()}
+    {#if variant === 'icon'}
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        {@render children?.()}
+      </IconContext>
+    {:else}
+      {@render children?.()}
+    {/if}
   </button>
 {/snippet}
 

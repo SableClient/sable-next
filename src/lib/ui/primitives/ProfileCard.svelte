@@ -259,7 +259,7 @@
           <div
             class="profile-card-bio explicit-scrollbar"
             role="region"
-            aria-labelledby={nameField ? undefined : nameId}
+            aria-label={i18n.t('settings.biography')}
             tabindex="0"
             {@attach scrollHint}
           >

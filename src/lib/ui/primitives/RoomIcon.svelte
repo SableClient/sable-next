@@ -23,13 +23,13 @@
 <span class="room-icon-root">
   {#if Badge && overlay}
     <span class="room-icon-composite">
-      <Glyph weight={glyphWeight} />
+      <Glyph weight={glyphWeight} aria-hidden="true" />
       <span class={['room-icon-badge', overlay]} aria-hidden="true">
         <span class="room-icon-badge-glyph"><Badge size="100%" weight="regular" /></span>
       </span>
     </span>
   {:else}
-    <Glyph weight={glyphWeight} />
+    <Glyph weight={glyphWeight} aria-hidden="true" />
   {/if}
 </span>
 
