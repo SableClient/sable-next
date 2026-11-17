@@ -49,7 +49,13 @@ function compileEmojiData() {
     const groupIndex = emojiGroupOrder.indexOf(groupId);
     if (groupIndex === -1) throw new Error(`Unknown emoji group: ${groupId}`);
 
-    const keywords = [...new Set([...codes.slice(1), ...entry.label.toLowerCase().split(/\s+/)])];
+    const keywords = [
+      ...new Set([
+        ...codes.slice(1),
+        ...entry.label.toLowerCase().split(/\s+/),
+        ...(entry.tags ?? []),
+      ]),
+    ];
     records.push([entry.unicode, codes, keywords, groupIndex]);
   }
 
