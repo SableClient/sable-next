@@ -490,10 +490,10 @@ const SETTINGS = {
   callCameraResolution: choice(CALL_VIDEO_RESOLUTIONS, 'auto'),
   callCameraBitrate: choice(CALL_VIDEO_BITRATES, 'auto'),
   callCameraCodec: choice(CALL_VIDEO_CODECS, 'auto'),
-  callScreenResolution: choice(CALL_VIDEO_RESOLUTIONS, '720'),
+  callScreenResolution: choice(CALL_VIDEO_RESOLUTIONS, '1080'),
   callScreenBitrate: choice(CALL_VIDEO_BITRATES, 'auto'),
   callScreenFramerate: choice(CALL_SCREEN_FRAMERATES, '30'),
-  callScreenCodec: choice(CALL_VIDEO_CODECS, 'h264'),
+  callScreenCodec: choice(CALL_VIDEO_CODECS, 'vp8'),
   callSimulcast: toggle(true),
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */

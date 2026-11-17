@@ -415,11 +415,12 @@ test('an encrypted call publishes H.264 in place of AV1 and says so once', async
   }
 });
 
-test('a fresh profile shares the screen at 720p and 30 fps', async () => {
+test('a fresh profile shares the screen in VP8 at 1080p and 30 fps', async () => {
   vi.resetModules();
   const { preferences: fresh } = await import('#lib/settings/preferences.svelte.js');
-  expect(fresh.callScreenResolution).toBe('720');
+  expect(fresh.callScreenResolution).toBe('1080');
   expect(fresh.callScreenFramerate).toBe('30');
+  expect(fresh.callScreenCodec).toBe('vp8');
 });
 
 test('screen frame rate caps capture and encoding', async () => {
