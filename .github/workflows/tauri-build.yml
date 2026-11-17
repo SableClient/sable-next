@@ -249,6 +249,7 @@ jobs:
       - name: Render the manifest from the published tarball
         run: |
           tarball="sable-$VERSION-x64.tar.gz"
+          mkdir tarball
           node scripts/ci/forgejo-release.mjs download --pattern "$tarball" --dir tarball
           node scripts/ci/render-flatpak-nightly.mjs "$VERSION" "$TAG" \
             "$(sha256sum "tarball/$tarball" | cut -d' ' -f1):$(stat -c %s "tarball/$tarball")" -
