@@ -148,7 +148,26 @@ test('allows the explicit display-capture permission used by newer Electron vers
   expect(callback).toHaveBeenCalledWith(true);
 });
 
-test.each(['media', 'notifications', 'display-capture', 'geolocation'] as const)(
+test.each(['local-network', 'local-network-access', 'loopback-network'] as const)(
+  'lets the app reach a call server on the local network through %s',
+  (permission) => {
+    const { request, check } = handlers();
+    const callback = vi.fn();
+    request(contents(), permission, callback, {
+      isMainFrame: true,
+      requestingUrl: 'sable-app://app/',
+    });
+    expect(callback).toHaveBeenCalledWith(true);
+    expect(
+      check(contents(), permission, 'sable-app://app', {
+        requestingUrl: 'sable-app://app/',
+        isMainFrame: true,
+      })
+    ).toBe(true);
+  }
+);
+
+test.each(['media', 'notifications', 'display-capture', 'geolocation', 'local-network'] as const)(
   'an embedded site cannot inherit the app %s permission',
   (permission) => {
     const { check } = handlers();
