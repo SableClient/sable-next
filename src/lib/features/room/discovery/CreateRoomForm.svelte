@@ -8,6 +8,8 @@
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
+  import { onDestroy } from 'svelte';
+
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
@@ -27,6 +29,8 @@
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
+  import { UserDirectoryLookup } from '../members/user-directory-lookup.svelte.js';
+  import UserSuggestionList from '../members/UserSuggestionList.svelte';
   import { validateRoomAliasLocalpart, type RoomAliasLocalpartError } from './room-alias-localpart';
 
   type PrivateJoinRule = Exclude<CreateJoinRuleView, 'public'>;
@@ -59,6 +63,7 @@
   let roomVersionChoice = $state('');
   let federate = $state(true);
   let roomVersions = $state.raw<RoomVersionsView | null>(null);
+  const directory = new UserDirectoryLookup(core);
   let inviteDraft = $state('');
   let invites = $state.raw<string[]>([]);
   let inviteInvalid = $state(false);
@@ -101,6 +106,11 @@
       label: entry.stable ? entry.id : i18n.t('room.createVersionUnstable', { version: entry.id }),
     })),
   ]);
+  let suggestions = $derived(
+    directory.results.filter(
+      (entry) => entry.user_id !== inviteDraft.trim() && !invites.includes(entry.user_id)
+    )
+  );
   let canSubmit = $derived(name.trim() !== '' && aliasError === null && !submitting);
 
   $effect(() => {
@@ -116,6 +126,10 @@
     return () => {
       cancelled = true;
     };
+  });
+
+  onDestroy(() => {
+    directory.cancel();
   });
 
   function aliasErrorMessageKey(error: RoomAliasLocalpartError): string {
@@ -139,8 +153,12 @@
       : i18n.t('room.createJoinRuleRequiresSpace');
   }
 
-  function addInvite(): void {
-    const candidate = inviteDraft.trim();
+  function setInviteDraft(next: string): void {
+    inviteDraft = next;
+    directory.search(next.trim());
+  }
+
+  function addInvite(candidate = inviteDraft.trim()): void {
     if (candidate === '') return;
     if (!isUserId(candidate)) {
       inviteInvalid = true;
@@ -148,7 +166,7 @@
     }
     inviteInvalid = false;
     if (!invites.includes(candidate)) invites = [...invites, candidate];
-    inviteDraft = '';
+    setInviteDraft('');
   }
 
   function removeInvite(userId: string): void {
@@ -428,14 +446,23 @@
     <div class="invite-row">
       <TextInput
         id="create-room-invite"
-        bind:value={inviteDraft}
+        bind:value={() => inviteDraft, setInviteDraft}
         autocomplete="off"
         placeholder={i18n.t('room.createInvitePlaceholder')}
         aria-invalid={inviteInvalid}
         onkeydown={onInviteKeydown}
       />
-      <Button onclick={addInvite}>{i18n.t('common.add')}</Button>
+      <Button
+        onclick={() => {
+          addInvite();
+        }}
+      >
+        {i18n.t('common.add')}
+      </Button>
     </div>
+    {#if suggestions.length > 0}
+      <UserSuggestionList entries={suggestions} onSelect={addInvite} />
+    {/if}
     {#if inviteInvalid}
       <p class="error">{i18n.t('common.userIdFormatHint')}</p>
     {/if}

@@ -6,15 +6,13 @@
   import { i18n } from '#lib/i18n.js';
   import { isUserId } from '#lib/guards.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
-  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import '#lib/ui/primitives/menu.css';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
   import { UserDirectoryLookup } from './members/user-directory-lookup.svelte.js';
+  import UserSuggestionList from './members/UserSuggestionList.svelte';
 
   interface Props {
     open: boolean;
@@ -147,27 +145,13 @@
       </FormField>
 
       {#if suggestions.length > 0}
-        <ul class="suggestions" {@attach scrollHint}>
-          {#each suggestions as entry (entry.user_id)}
-            {@const name = entry.display_name ?? entry.user_id}
-            <li>
-              <button
-                type="button"
-                class="menu-item"
-                onclick={() => {
-                  setDraft(entry.user_id);
-                  document.getElementById('room-invite-user')?.focus();
-                }}
-              >
-                <Avatar size="small" id={entry.user_id} src={entry.avatar_url} {name} />
-                <span class="identity">
-                  <span class="name">{name}</span>
-                  <span class="user-id">{entry.user_id}</span>
-                </span>
-              </button>
-            </li>
-          {/each}
-        </ul>
+        <UserSuggestionList
+          entries={suggestions}
+          onSelect={(userId) => {
+            setDraft(userId);
+            document.getElementById('room-invite-user')?.focus();
+          }}
+        />
       {/if}
 
       {#if invalid}
@@ -218,36 +202,5 @@
   .explain {
     color: var(--surface-var-on-container);
     margin: 0;
-  }
-
-  .suggestions {
-    display: grid;
-    list-style: none;
-    margin: 0;
-    max-height: 16rem;
-    overflow: auto;
-    padding: 0;
-  }
-
-  .suggestions :global(.menu-item) {
-    --menu-item-height: var(--control-height-500);
-    --menu-item-gap: var(--space-200);
-  }
-
-  .identity {
-    display: grid;
-    min-width: 0;
-  }
-
-  .name,
-  .user-id {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .user-id {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
   }
 </style>
