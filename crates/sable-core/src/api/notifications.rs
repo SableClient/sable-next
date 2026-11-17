@@ -329,12 +329,6 @@ impl Handler for SetDefaultModeParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let rules = core.push_rules().await?;
-        if self.direct {
-            return rules
-                .set_direct_default(self.mode)
-                .await
-                .or_report(core, "set_default_notification_mode");
-        }
         let before = rules.snapshot().await;
         let writes = push_rules::plan_default_mode(&before, self.direct, self.mode)
             .or_report(core, "set_default_notification_mode")?;

@@ -17,7 +17,7 @@ use serde_json::json;
 use tokio::sync::mpsc::UnboundedReceiver;
 use wiremock::{
     Mock, ResponseTemplate,
-    matchers::{method, path_regex},
+    matchers::{body_json, method, path_regex},
 };
 
 use crate::{
@@ -26,8 +26,6 @@ use crate::{
     session::Session,
     store::MemorySessionStore,
 };
-
-mod direct;
 
 #[expect(clippy::unwrap_used, reason = "test code")]
 async fn watching(
@@ -731,6 +729,16 @@ async fn notification_cleanup_reads_the_server_and_retries_a_partial_failure() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let (core, _) = watching(&server, &client).await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"/account_data/moe\.sable\.dm_notification_default$",
+        ))
+        .respond_with(
+            ResponseTemplate::new(404)
+                .set_body_json(json!({"errcode":"M_NOT_FOUND", "error":"not set"})),
+        )
+        .mount(server.server())
+        .await;
     let mut remote = Ruleset::server_default(client.user_id().unwrap());
     for id in ["moe.sable.sticker", "moe.sable.sticker_one_to_one"] {
         let mut conditions =
@@ -804,6 +812,48 @@ async fn notification_cleanup_reads_the_server_and_retries_a_partial_failure() {
             .iter()
             .all(|request| request.method.as_str() != "PUT")
     );
+    core.session_tasks.lock().clear();
+}
+
+#[tokio::test]
+async fn notification_cleanup_empties_the_old_dm_default() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (core, _) = watching(&server, &client).await;
+    let remote = Ruleset::server_default(client.user_id().unwrap());
+    Mock::given(method("GET"))
+        .and(path_regex(r"/pushrules/$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"global":remote})))
+        .mount(server.server())
+        .await;
+    let stored = Mock::given(method("GET"))
+        .and(path_regex(
+            r"/account_data/moe\.sable\.dm_notification_default$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "mode":"all", "managed":{"!dm:example.org":{"mode":"all"}}
+        })))
+        .mount_as_scoped(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(
+            r"/account_data/moe\.sable\.dm_notification_default$",
+        ))
+        .and(body_json(json!({})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    assert!(core.cleanup_notification_rules().await);
+    drop(stored);
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"/account_data/moe\.sable\.dm_notification_default$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
+    assert!(core.cleanup_notification_rules().await);
     core.session_tasks.lock().clear();
 }
 
@@ -982,10 +1032,6 @@ async fn a_pending_invite_does_not_make_a_room_one_to_one() {
 }
 
 #[tokio::test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "one sequential flow kept in a single function"
-)]
 async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
     use std::collections::BTreeSet;
 
@@ -1061,29 +1107,6 @@ async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
     })
     .await
     .unwrap();
-    Mock::given(method("GET"))
-        .and(path_regex(r"/pushrules/$"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "global": core.push_rules().await.unwrap().snapshot().await
-        })))
-        .mount(server.server())
-        .await;
-    Mock::given(method("GET"))
-        .and(path_regex(
-            r"/account_data/(moe.sable.dm_notification_default|m.direct)$",
-        ))
-        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
-            "errcode":"M_NOT_FOUND", "error":"not set"
-        })))
-        .mount(server.server())
-        .await;
-    Mock::given(method("PUT"))
-        .and(path_regex(
-            r"/account_data/moe.sable.dm_notification_default$",
-        ))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .mount(server.server())
-        .await;
     for direct in [true, false] {
         core.run(SetDefaultModeParams {
             direct,

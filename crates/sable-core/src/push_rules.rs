@@ -14,7 +14,6 @@ use crate::protocol::{
 mod alignment;
 mod authored;
 mod categories;
-mod direct;
 mod keywords;
 mod related;
 mod store;
@@ -136,14 +135,9 @@ pub fn dm_notifies(rules: &Ruleset, room_id: &RoomId) -> bool {
     match room_mode(rules, room_id) {
         Some(NotificationModeView::Mute | NotificationModeView::Mentions) => false,
         Some(NotificationModeView::All) => true,
-        None => direct::inherited_mode(rules, room_id).map_or_else(
-            || {
-                rules
-                    .get(RuleKind::Underride, message_rule(true).as_str())
-                    .is_none_or(rule_notifies)
-            },
-            |mode| mode == NotificationModeView::All,
-        ),
+        None => rules
+            .get(RuleKind::Underride, message_rule(true).as_str())
+            .is_none_or(rule_notifies),
     }
 }
 
@@ -212,8 +206,7 @@ pub fn default_modes(rules: &Ruleset) -> DefaultNotificationModesView {
 pub fn room_settings(rules: &Ruleset, room_id: &RoomId, direct: bool) -> NotificationSettingsView {
     NotificationSettingsView {
         room: room_mode(rules, room_id),
-        default: direct::inherited_mode(rules, room_id)
-            .unwrap_or_else(|| default_mode(rules, direct)),
+        default: default_mode(rules, direct),
     }
 }
 

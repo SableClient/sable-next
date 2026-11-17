@@ -5,7 +5,16 @@ use serde_json::{Value, json};
 use super::RuleWrite;
 
 /// Per-room DM copies written by older versions.
-const SHAPE_PREFIX: &str = "moe.sable.shape.";
+const PER_ROOM_PREFIXES: [&str; 2] = ["moe.sable.shape.", "moe.sable.dm_default."];
+const PER_ROOM_EVENTS: [(&str, &str); 7] = [
+    ("message", "m.room.message"),
+    ("encrypted", "m.room.encrypted"),
+    ("sticker", "m.sticker"),
+    ("poll_start", "m.poll.start"),
+    ("poll_end", "m.poll.end"),
+    ("poll_start_unstable", "org.matrix.msc3381.poll.start"),
+    ("poll_end_unstable", "org.matrix.msc3381.poll.end"),
+];
 pub(super) const STICKER: &str = "moe.sable.sticker";
 pub(super) const STICKER_DIRECT: &str = "moe.sable.sticker_one_to_one";
 pub(super) const RING_ONE_TO_ONE: &str = "moe.sable.ring_one_to_one";
@@ -106,15 +115,15 @@ fn is_generated(rule: &ConditionalPushRule, kind: &RuleKind, user_id: &UserId) -
             }
             return definition(rule, json!(conditions), &json!(super::spec_actions(direct)));
         }
-        if let Some(suffix) = rule.rule_id.strip_prefix(SHAPE_PREFIX)
+        if let Some(suffix) = PER_ROOM_PREFIXES
+            .iter()
+            .find_map(|prefix| rule.rule_id.strip_prefix(prefix))
             && let Some((family, room_id)) = suffix.split_once('.')
             && RoomId::parse(room_id).is_ok()
         {
-            let event_type = match family {
-                "message" => "m.room.message",
-                "encrypted" => "m.room.encrypted",
-                "sticker" => "m.sticker",
-                _ => return false,
+            let Some((_, event_type)) = PER_ROOM_EVENTS.iter().find(|(name, _)| *name == family)
+            else {
+                return false;
             };
             let conditions = json!([
                 {"kind":"event_match", "key":"room_id", "pattern":room_id},

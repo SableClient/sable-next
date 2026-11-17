@@ -965,6 +965,29 @@ fn legacy_rules() -> Ruleset {
             json!(["notify"]),
         );
     }
+    for (family, event_type, actions) in [
+        ("message", "m.room.message", json!([])),
+        (
+            "encrypted",
+            "m.room.encrypted",
+            json!(["notify", {"set_tweak":"sound", "value":"default"}]),
+        ),
+        (
+            "poll_start_unstable",
+            "org.matrix.msc3381.poll.start",
+            json!([]),
+        ),
+    ] {
+        insert(
+            RuleKind::Underride,
+            &format!("moe.sable.dm_default.{family}.!dm:example.org"),
+            json!([
+                {"kind":"event_match", "key":"room_id", "pattern":"!dm:example.org"},
+                {"kind":"event_match", "key":"type", "pattern":event_type}
+            ]),
+            actions,
+        );
+    }
     rules
 }
 
@@ -973,7 +996,7 @@ fn cleanup_removes_generated_rules_without_installing_or_reenabling_any() {
     let defaults = rtc_rules();
     let old = legacy_rules();
     let writes = plan_cleanup(&old, me());
-    assert_eq!(writes.len(), 32);
+    assert_eq!(writes.len(), 35);
     assert!(
         writes
             .iter()
@@ -1017,6 +1040,13 @@ fn cleanup_keeps_modified_rules_keywords_and_explicit_reaction_notifications() {
         .shift_remove("moe.sable.shape.message.!room:example.org");
     shape.conditions.clear();
     rules.underride.insert(shape);
+    rules
+        .set_actions(
+            RuleKind::Underride,
+            "moe.sable.dm_default.message.!dm:example.org",
+            level_actions(MentionNotificationModeView::Loud, true),
+        )
+        .unwrap();
     let rules = applied(rules.clone(), plan_add_keyword(&rules, "sticker").unwrap());
     let rules = applied(
         rules.clone(),
@@ -1030,6 +1060,10 @@ fn cleanup_keeps_modified_rules_keywords_and_explicit_reaction_notifications() {
         (
             RuleKind::Underride,
             "moe.sable.shape.message.!room:example.org",
+        ),
+        (
+            RuleKind::Underride,
+            "moe.sable.dm_default.message.!dm:example.org",
         ),
         (RuleKind::Override, "moe.sable.reaction_to_me"),
     ] {

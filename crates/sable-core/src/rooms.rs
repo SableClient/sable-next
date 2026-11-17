@@ -166,6 +166,33 @@ pub(crate) async fn fill_own_member(room: &matrix_sdk::Room) -> Result<(), matri
     Ok(())
 }
 
+const DM_DEFAULT_EVENT: &str = "moe.sable.dm_notification_default";
+
+async fn clear_dm_default(client: &Client) -> matrix_sdk::Result<()> {
+    let event_type = DM_DEFAULT_EVENT;
+    let Some(raw) = client
+        .account()
+        .fetch_account_data(event_type.into())
+        .await?
+    else {
+        return Ok(());
+    };
+    if raw
+        .deserialize_as_unchecked::<serde_json::Map<String, serde_json::Value>>()
+        .is_ok_and(|content| content.is_empty())
+    {
+        return Ok(());
+    }
+    client
+        .account()
+        .set_account_data_raw(
+            event_type.into(),
+            matrix_sdk::ruma::serde::Raw::from_json_string("{}".to_owned())?,
+        )
+        .await?;
+    Ok(())
+}
+
 impl Core {
     /// The active account, with the rooms it left or was banned from: their conversations are gone.
     ///
@@ -343,6 +370,10 @@ impl Core {
         let writes = crate::push_rules::plan_cleanup(&snapshot, user_id);
         if let Err(error) = rules.apply(writes).await {
             tracing::warn!("could not clean up notification rules: {error}");
+            return false;
+        }
+        if let Err(error) = clear_dm_default(&client).await {
+            tracing::warn!("could not clear the old DM notification default: {error}");
             return false;
         }
         true
