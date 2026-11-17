@@ -15,6 +15,7 @@
 
   import { findMember, senderDisplayColors } from './members.js';
   import SenderName from './SenderName.svelte';
+  import { hasSenderRoles, useSenderRoles } from './sender-roles.js';
   import type { PowerLevelTag } from '../settings/power-level-tags.js';
 
   interface Props {
@@ -42,6 +43,7 @@
   const profileDescriptionId = $props.id();
   const presenceStore = usePresenceStore();
   const roomCosmetics = useRoomCosmetics();
+  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
   const profile = new UserProfile(core, () => userId);
   let member = $derived(findMember(members, userId));
   let shown = $derived(member ?? profile.current);
@@ -49,7 +51,14 @@
   let avatarUrl = $derived(shown?.avatar_url ?? null);
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let colors = $derived(
-    senderDisplayColors(userId, profile.current, null, false, cosmetics, powerTag?.color ?? null)
+    senderDisplayColors(
+      userId,
+      profile.current,
+      null,
+      false,
+      cosmetics,
+      powerTag?.color ?? senderRoles?.(userId)?.color ?? null
+    )
   );
   let profileLabel = $derived(i18n.t('timeline.senderProfile', { name: displayName }));
   let presence = $derived(presenceStore.peek(userId));

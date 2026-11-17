@@ -8,6 +8,7 @@
 
   import { senderDisplayColors } from '../members/members.js';
   import '../members/sender-identity.css';
+  import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
   import ReadReceiptTime from './ReadReceiptTime.svelte';
 
   interface Props {
@@ -23,9 +24,17 @@
 
   const core = useCoreClient();
   const roomCosmetics = useRoomCosmetics();
+  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
   const profile = new UserProfile(core, () => userId);
   let colors = $derived(
-    senderDisplayColors(userId, profile.current, null, false, roomCosmetics?.for(userId) ?? null)
+    senderDisplayColors(
+      userId,
+      profile.current,
+      null,
+      false,
+      roomCosmetics?.for(userId) ?? null,
+      senderRoles?.(userId)?.color ?? null
+    )
   );
 </script>
 
