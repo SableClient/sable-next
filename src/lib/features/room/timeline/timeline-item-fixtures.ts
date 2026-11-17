@@ -155,6 +155,7 @@ export function replyItem(
       sender_name: 'Bob',
       body,
       fallback: null,
+      emotes: [],
     },
   };
 }

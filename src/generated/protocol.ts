@@ -398,6 +398,7 @@ export type EventPreview = {
 	sender: string | null,
 	body: string | null,
 	fallback: ReplyFallbackView | null,
+	emotes: PreviewEmote[],
 };
 
 /**
@@ -1081,6 +1082,11 @@ export type PresenceUserSharingView = "allow" | "deny";
 
 export type PresenceView = "online" | "offline" | "unavailable" | "busy";
 
+export type PreviewEmote = {
+	alt: string,
+	source: string,
+};
+
 export type PrimitiveType = "string" | "integer" | "boolean" | "user_id" | "server_name" | "room_alias" | "room_id" | "event_id";
 
 export type ProfileFieldView = {
@@ -1305,6 +1311,7 @@ export type ReplyView = {
 	body: string | null,
 	/**  Set instead of `body` when the replied-to event has none to show. */
 	fallback: ReplyFallbackView | null,
+	emotes: PreviewEmote[],
 };
 
 export type ResolvedQuery = {

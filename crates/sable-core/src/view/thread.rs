@@ -10,7 +10,7 @@ use matrix_sdk_ui::timeline::{
 use serde::Deserialize as _;
 use serde_with::{DefaultOnError, serde_as};
 
-use crate::matrix_html::preview_body;
+use crate::matrix_html::{PreviewEmote, preview_body, preview_emotes};
 use sable_model::event_preview::VERIFICATION_REQUEST_MSGTYPE;
 
 use crate::protocol::{ReplyFallbackView, ReplyView, ThreadSummaryView};
@@ -53,7 +53,9 @@ pub(super) fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
                 .is_some_and(|sender| mentions.user_ids.contains(sender))
         });
 
-    let (body, fallback) = embedded.map_or((None, None), |event| embedded_reply_preview(event));
+    let (body, fallback, emotes) = embedded.map_or((None, None, Vec::new()), |event| {
+        embedded_reply_preview(event)
+    });
 
     Some(ReplyView {
         event_id: reply.event_id.clone(),
@@ -69,13 +71,14 @@ pub(super) fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
         }),
         body,
         fallback,
+        emotes,
     })
 }
 
 pub(super) fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
     let summary = msg_like(content)?.thread_summary.as_ref()?;
 
-    let (latest_event_id, (latest_body, latest_fallback)) = match &summary.latest_event {
+    let (latest_event_id, (latest_body, latest_fallback, _)) = match &summary.latest_event {
         TimelineDetails::Ready(event) => (
             match &event.identifier {
                 TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
@@ -83,7 +86,7 @@ pub(super) fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSumm
             },
             embedded_reply_preview(event),
         ),
-        _ => (None, (None, None)),
+        _ => (None, (None, None, Vec::new())),
     };
 
     Some(ThreadSummaryView {
@@ -181,9 +184,9 @@ pub(super) fn bundled_thread_summary(unsigned: &serde_json::Value) -> Option<Thr
                 content.msgtype.as_deref() == Some(VERIFICATION_REQUEST_MSGTYPE)
             })
         },
-        |(_, fallback)| matches!(fallback, Some(ReplyFallbackView::VerificationRequest)),
+        |(_, fallback, _)| matches!(fallback, Some(ReplyFallbackView::VerificationRequest)),
     );
-    let latest_body = if let Some((body, _)) = forwarded_preview {
+    let latest_body = if let Some((body, _, _)) = forwarded_preview {
         body
     } else {
         latest_content
@@ -207,28 +210,39 @@ pub(super) fn bundled_thread_summary(unsigned: &serde_json::Value) -> Option<Thr
 
 /// The quoted body as plain text, since a preview must not run untrusted HTML,
 /// or what the event was when it has none.
-fn reply_preview(content: &TimelineItemContent) -> (Option<String>, Option<ReplyFallbackView>) {
+type Preview = (Option<String>, Option<ReplyFallbackView>, Vec<PreviewEmote>);
+
+fn reply_preview(content: &TimelineItemContent) -> Preview {
     let TimelineItemContent::MsgLike(msg) = content else {
-        return (None, None);
+        return (None, None, Vec::new());
     };
+    let mut emotes = Vec::new();
     let body = match &msg.kind {
         MsgLikeKind::Message(message) => match message.msgtype() {
             MessageType::VerificationRequest(_) => {
-                return (None, Some(ReplyFallbackView::VerificationRequest));
+                return (
+                    None,
+                    Some(ReplyFallbackView::VerificationRequest),
+                    Vec::new(),
+                );
             }
             MessageType::Gallery(gallery) if gallery.body.is_empty() => {
                 gallery_filenames(gallery).join(", ")
             }
-            _ => preview_body(message.body(), formatted_body(message.msgtype()).as_deref()),
+            _ => {
+                let formatted = formatted_body(message.msgtype());
+                emotes = preview_emotes(formatted.as_deref());
+                preview_body(message.body(), formatted.as_deref())
+            }
         },
         MsgLikeKind::Sticker(sticker) => sticker.content().body.clone(),
         MsgLikeKind::Poll(state) => state.results().question,
-        _ => return (None, None),
+        _ => return (None, None, Vec::new()),
     };
-    (Some(body), None)
+    (Some(body), None, emotes)
 }
 
-fn embedded_reply_preview(event: &EmbeddedEvent) -> (Option<String>, Option<ReplyFallbackView>) {
+fn embedded_reply_preview(event: &EmbeddedEvent) -> Preview {
     if event.content.is_redacted() {
         return reply_preview(&event.content);
     }
@@ -249,7 +263,7 @@ fn embedded_reply_preview(event: &EmbeddedEvent) -> (Option<String>, Option<Repl
             _ => false,
         });
         let selected = nested.unwrap_or(content);
-        let (mut body, fallback) = forwarded_content_preview(selected)?;
+        let (mut body, fallback, emotes) = forwarded_content_preview(selected)?;
         if nested.is_some()
             && selected.get("msgtype").and_then(serde_json::Value::as_str) == Some("m.emote")
         {
@@ -264,24 +278,30 @@ fn embedded_reply_preview(event: &EmbeddedEvent) -> (Option<String>, Option<Repl
                 );
             }
         }
-        Some((body, fallback))
+        Some((body, fallback, emotes))
     })();
     preview.unwrap_or_else(|| reply_preview(&event.content))
 }
 
-fn forwarded_content_preview(
-    forwarded: &serde_json::Value,
-) -> Option<(Option<String>, Option<ReplyFallbackView>)> {
+fn forwarded_content_preview(forwarded: &serde_json::Value) -> Option<Preview> {
     if let Ok(message) = serde_json::from_value::<RoomMessageEventContent>(forwarded.clone()) {
         if matches!(message.msgtype, MessageType::VerificationRequest(_)) {
-            return Some((None, Some(ReplyFallbackView::VerificationRequest)));
+            return Some((
+                None,
+                Some(ReplyFallbackView::VerificationRequest),
+                Vec::new(),
+            ));
         }
         let body = message.msgtype.body();
         let formatted = formatted_body(&message.msgtype);
-        return Some((Some(preview_body(body, formatted.as_deref())), None));
+        return Some((
+            Some(preview_body(body, formatted.as_deref())),
+            None,
+            preview_emotes(formatted.as_deref()),
+        ));
     }
     if let Ok(sticker) = serde_json::from_value::<StickerEventContent>(forwarded.clone()) {
-        return Some((Some(sticker.body), None));
+        return Some((Some(sticker.body), None, Vec::new()));
     }
     None
 }
@@ -326,7 +346,7 @@ mod tests {
         }));
         assert_eq!(
             embedded_reply_preview(&event),
-            (Some("original".to_owned()), None)
+            (Some("original".to_owned()), None, Vec::new())
         );
     }
 
@@ -338,7 +358,7 @@ mod tests {
         }));
         assert_eq!(
             embedded_reply_preview(&event),
-            (Some("original fallback".to_owned()), None)
+            (Some("original fallback".to_owned()), None, Vec::new())
         );
     }
 
@@ -374,7 +394,7 @@ mod tests {
             in_reply_to: None,
             thread_summary: None,
         });
-        assert_eq!(embedded_reply_preview(&event), (None, None));
+        assert_eq!(embedded_reply_preview(&event), (None, None, Vec::new()));
     }
 
     #[test]

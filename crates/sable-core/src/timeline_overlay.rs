@@ -11,8 +11,8 @@ use serde_json::Value;
 
 use crate::nicknames::{Nicknames, RealNames};
 use crate::protocol::{
-    MentionView, MessageShieldCode, ReplyFallbackView, TimelineItemContentView, TimelineItemView,
-    VectorDiff,
+    MentionView, MessageShieldCode, PreviewEmote, ReplyFallbackView, TimelineItemContentView,
+    TimelineItemView, VectorDiff,
 };
 use crate::view::apply_diff;
 
@@ -29,6 +29,7 @@ pub(crate) struct ReplyFallback {
     sender: Option<OwnedUserId>,
     body: Option<String>,
     fallback: Option<ReplyFallbackView>,
+    emotes: Vec<PreviewEmote>,
     session_id: Option<String>,
 }
 
@@ -46,6 +47,7 @@ impl ReplyFallback {
                 .and_then(|sender| OwnedUserId::try_from(sender).ok()),
             body: preview.body,
             fallback: preview.fallback,
+            emotes: preview.emotes,
             session_id,
         })
     }
@@ -196,6 +198,7 @@ impl TimelineOverlay {
             reply.sender = reply.sender.take().or_else(|| stand_in.sender.clone());
             reply.body.clone_from(&stand_in.body);
             reply.fallback.clone_from(&stand_in.fallback);
+            reply.emotes.clone_from(&stand_in.emotes);
         }
         if let Some(profile) = item
             .sender
@@ -427,6 +430,7 @@ impl TimelineOverlay {
             {
                 reply.body = None;
                 reply.fallback = None;
+                reply.emotes.clear();
             }
         }
         self.refresh(|item| {
@@ -531,6 +535,7 @@ mod tests {
             sender_name: Some("Old".to_owned()),
             body: body.map(ToOwned::to_owned),
             fallback: None,
+            emotes: Vec::new(),
         }
     }
 

@@ -3328,6 +3328,7 @@ test('after following a reply the jump control first returns to the message it w
             sender_name: 'Bob',
             body: 'original',
             fallback: null,
+            emotes: [],
           },
         }
       : entry
@@ -3361,6 +3362,7 @@ test('following a reply out of the loaded timeline keeps the way back', async ()
             sender_name: 'Bob',
             body: 'original',
             fallback: null,
+            emotes: [],
           },
         }
       : entry

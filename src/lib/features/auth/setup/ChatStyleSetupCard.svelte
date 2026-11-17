@@ -61,6 +61,7 @@
       sender_name: 'Alex',
       body: 'See you at six?',
       fallback: null,
+      emotes: [],
     },
   });
 </script>

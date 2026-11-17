@@ -1703,6 +1703,7 @@ test('a reply target can be jumped to again after scrolling away', async ({
           sender_name: 'Bob',
           body: 'Mobile history 4',
           fallback: null,
+          emotes: [],
         },
       },
     },
@@ -1757,6 +1758,7 @@ test('a reply jump from a permalink context stays on its loaded target', async (
           sender_name: 'Bob',
           body: 'General message 3',
           fallback: null,
+          emotes: [],
         },
       },
     },
@@ -1797,6 +1799,7 @@ test('returning to the latest message drops the jump target from the address', a
       sender_name: 'Bob',
       body: 'Quoted',
       fallback: null,
+      emotes: [],
     },
   });
   const subscription = await core.subscription();

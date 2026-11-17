@@ -1,5 +1,6 @@
 <script lang="ts">
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpRightIcon';
+  import { SvelteSet } from 'svelte/reactivity';
 
   import type {
     MemberView,
@@ -12,10 +13,16 @@
   import { i18n } from '#lib/i18n.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
+  import {
+    hasRoomMediaPreviews,
+    useRoomMediaPreviews,
+  } from '../media/room-media-previews.svelte.js';
   import { findMember, senderDisplayColors, stripReplyFallback } from '../members/members.js';
   import SenderName from '../members/SenderName.svelte';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
   import { replyText } from '../messages/reply-fallback.js';
+  import { previewSegments } from '../messages/reply-preview.js';
   import { stateEventText } from './state-event-text';
 
   interface Props {
@@ -34,6 +41,8 @@
 
   const roomCosmetics = useRoomCosmetics();
   const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
+  const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
+  const failedEmotes = new SvelteSet<string>();
 
   let roomName = $derived.by(() => {
     const member = findMember(members, sender);
@@ -45,7 +54,7 @@
   let name = $derived(
     reply.sender_mentioned && !nameBase.startsWith('@') ? `@${nameBase}` : nameBase
   );
-  let body = $derived.by(() => {
+  let segments = $derived.by(() => {
     const kind = target?.content.kind;
     if (
       target &&
@@ -54,9 +63,10 @@
         kind === 'state_event' ||
         kind === 'hidden_event')
     ) {
-      return stateEventText(target, i18n.t);
+      return [stateEventText(target, i18n.t)];
     }
-    return stripReplyFallback(replyText(reply, i18n.t), persona);
+    const text = stripReplyFallback(replyText(reply, i18n.t), persona);
+    return roomMedia?.hidden ? [text] : previewSegments(text, reply.emotes);
   });
   let cosmetics = $derived(persona ? null : (roomCosmetics?.for(reply.sender) ?? null));
   let colors = $derived(
@@ -74,7 +84,22 @@
 {#snippet copy()}
   <span class="reply-copy"
     ><SenderName displayName={name} {colors} nameClass="reply-name" compact />
-    <span class="reply-body" dir="auto">{body}</span></span
+    <span class="reply-body" dir="auto"
+      >{#each segments as segment, index (index)}{#if typeof segment === 'string' || failedEmotes.has(segment.source)}{typeof segment ===
+          'string'
+            ? segment
+            : segment.alt}{:else}<MediaImage
+            class="reply-emote"
+            source={segment.source}
+            alt={segment.alt}
+            title={segment.alt}
+            width={64}
+            height={64}
+            original
+            emoticon
+            onfailed={(source) => failedEmotes.add(source)}
+          />{/if}{/each}</span
+    ></span
   >
 {/snippet}
 
@@ -132,6 +157,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .reply-body :global(.reply-emote) {
+    display: inline-block;
+    height: 1.25em;
+    max-width: 6em;
+    object-fit: contain;
+    vertical-align: middle;
+    width: calc(1.25em * var(--media-ratio, 1));
   }
 
   /* WebKit uses a clipped inline-block's bottom as its baseline. */

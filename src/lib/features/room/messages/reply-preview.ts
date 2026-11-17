@@ -1,4 +1,4 @@
-import type { TimelineItemContentView } from '#src/generated/protocol';
+import type { PreviewEmote, TimelineItemContentView } from '#src/generated/protocol';
 
 const SPOILER = 'data-mx-spoiler';
 
@@ -33,6 +33,24 @@ function previewText(body: string, html: string | null): string {
   };
   parsed.childNodes.forEach(visit);
   return text.replace(/\n+$/, '') || body;
+}
+
+/** Splits a preview at each emote's `alt` text, which the core wrote in the same order. */
+export function previewSegments(
+  text: string,
+  emotes: readonly PreviewEmote[]
+): (string | PreviewEmote)[] {
+  const segments: (string | PreviewEmote)[] = [];
+  let cursor = 0;
+  for (const emote of emotes) {
+    const at = text.indexOf(emote.alt, cursor);
+    if (at === -1) continue;
+    if (at > cursor) segments.push(text.slice(cursor, at));
+    segments.push(emote);
+    cursor = at + emote.alt.length;
+  }
+  if (cursor < text.length) segments.push(text.slice(cursor));
+  return segments;
 }
 
 export function replyPreviewBody(content: TimelineItemContentView): string {

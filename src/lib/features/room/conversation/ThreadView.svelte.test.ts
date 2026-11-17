@@ -82,6 +82,7 @@ test.each([false, true])('thread quotes jump to messages (loaded=%s)', async (lo
     sender_mentioned: false,
     body: 'Quoted message',
     fallback: null,
+    emotes: [],
   };
   const startThread = vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
     this: RoomTimeline

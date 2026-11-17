@@ -54,6 +54,7 @@ for (const [surface, mode, path] of [
           sender_mentioned: false,
           body: 'Quoted message',
           fallback: null,
+          emotes: [],
         },
       };
       await core.emitTimelineDiff(subscription, [

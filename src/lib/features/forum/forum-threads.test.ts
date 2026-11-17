@@ -139,6 +139,7 @@ test('ignores a thread reply, a plain reply and a state change', () => {
       sender_name: null,
       body: null,
       fallback: null,
+      emotes: [],
     },
   });
   const joined = item({

@@ -111,6 +111,7 @@ function replyToAlice(id: string, sender: string, senderName: string): TimelineI
       sender_name: 'Alice',
       body: 'General message 1',
       fallback: null,
+      emotes: [],
     },
   };
 }

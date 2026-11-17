@@ -15,6 +15,7 @@ function reply(body: string | null, fallback: ReplyView['fallback']): ReplyView 
     sender_name: null,
     body,
     fallback,
+    emotes: [],
   };
 }
 

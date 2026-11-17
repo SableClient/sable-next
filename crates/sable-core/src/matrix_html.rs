@@ -17,7 +17,7 @@ pub use sable_model::html::link_scheme_allowed;
 use sable_model::html::nests_too_deeply;
 use sable_model::jumbo;
 
-pub use sable_model::html::preview_body;
+pub use sable_model::html::{PreviewEmote, preview_body, preview_emotes};
 
 const ALLOWED_TAGS: [&str; 41] = [
     "a",
@@ -585,7 +585,7 @@ fn render_html(body: &str, formatted: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        display_html, escape_html, preview_body, render_plain_text, rewrite_markup,
+        display_html, escape_html, preview_body, preview_emotes, render_plain_text, rewrite_markup,
         strip_profile_fallback_body, strip_profile_fallback_html,
     };
 
@@ -735,6 +735,23 @@ mod tests {
         }
         assert_eq!(preview_body("plain **literal**", None), "plain **literal**");
         assert_eq!(preview_body("fallback", Some("")), "fallback");
+    }
+
+    #[test]
+    fn preview_emotes_are_the_visible_emoticons_in_order() {
+        let formatted = "<mx-reply><img data-mx-emoticon src=\"mxc://x/quoted\" alt=\":q:\"></mx-reply>\
+             <img data-mx-emoticon src=\"mxc://x/a\" alt=\":a:\"> and \
+             <span data-mx-spoiler><img data-mx-emoticon src=\"mxc://x/s\" alt=\":s:\"></span>\
+             <img src=\"mxc://x/photo\" alt=\"photo\"><img data-mx-emoticon src=\"mxc://x/b\" alt=\":b:\">";
+        let emotes = preview_emotes(Some(formatted));
+        assert_eq!(
+            emotes
+                .iter()
+                .map(|emote| (emote.alt.as_str(), emote.source.as_str()))
+                .collect::<Vec<_>>(),
+            [(":a:", "mxc://x/a"), (":b:", "mxc://x/b")]
+        );
+        assert_eq!(preview_emotes(None), []);
     }
 
     #[test]

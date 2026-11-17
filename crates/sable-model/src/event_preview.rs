@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, NoneAsEmptyString, serde_as};
 
+use crate::html::{PreviewEmote, preview_emotes};
+
 pub const VERIFICATION_REQUEST_MSGTYPE: &str = "m.key.verification.request";
 
 /// What a quoted event was, when it has no body to show.
@@ -25,6 +27,7 @@ pub struct EventPreview {
     pub sender: Option<String>,
     pub body: Option<String>,
     pub fallback: Option<ReplyFallbackView>,
+    pub emotes: Vec<PreviewEmote>,
 }
 
 #[serde_as]
@@ -44,6 +47,12 @@ struct Content {
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[serde(default)]
     msgtype: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default)]
+    format: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default)]
+    formatted_body: Option<String>,
     #[serde_as(deserialize_as = "DefaultOnError<NoneAsEmptyString>")]
     #[serde(default)]
     shortcode: Option<String>,
@@ -110,6 +119,7 @@ pub fn event_preview(source: &Value) -> Option<EventPreview> {
             sender: sender.clone(),
             body: None,
             fallback: Some(fallback),
+            emotes: Vec::new(),
         })
     };
     if unsigned.is_some_and(|unsigned| unsigned.redacted_because.is_some()) {
@@ -127,10 +137,15 @@ pub fn event_preview(source: &Value) -> Option<EventPreview> {
         return stand_in(ReplyFallbackView::VerificationRequest);
     }
     if let Some(body) = content.body {
+        let formatted = content
+            .formatted_body
+            .as_deref()
+            .filter(|_| content.format.as_deref() == Some("org.matrix.custom.html"));
         return Some(EventPreview {
             sender,
             body: Some(body),
             fallback: None,
+            emotes: preview_emotes(formatted),
         });
     }
     stand_in(ReplyFallbackView::Event { event_type })
@@ -153,7 +168,8 @@ mod tests {
             EventPreview {
                 sender: Some("@b:x".to_owned()),
                 body: Some("hi".to_owned()),
-                fallback: None
+                fallback: None,
+                emotes: Vec::new(),
             }
         );
         assert_eq!(
@@ -193,7 +209,8 @@ mod tests {
             EventPreview {
                 sender: None,
                 body: None,
-                fallback: Some(ReplyFallbackView::VerificationRequest)
+                fallback: Some(ReplyFallbackView::VerificationRequest),
+                emotes: Vec::new(),
             }
         );
         assert!(event_preview(&json!([])).is_none());
@@ -214,6 +231,7 @@ mod tests {
                 fallback: Some(ReplyFallbackView::Event {
                     event_type: "m.room.message".to_owned()
                 }),
+                emotes: Vec::new(),
             }
         );
         assert!(event_preview(&json!({"type": 3})).is_none());

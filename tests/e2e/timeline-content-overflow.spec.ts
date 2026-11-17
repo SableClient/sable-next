@@ -75,6 +75,7 @@ const cases: Record<string, TimelineItemView> = {
       sender_mentioned: false,
       body: long,
       fallback: null,
+      emotes: [],
     },
   },
   image: timelineImage('general-19'),

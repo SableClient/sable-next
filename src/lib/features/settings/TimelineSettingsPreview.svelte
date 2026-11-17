@@ -63,6 +63,7 @@
       sender_name: 'Alex',
       body: 'See you at six?',
       fallback: null,
+      emotes: [],
     },
     is_own: true,
     read_by: [previewAlexId],

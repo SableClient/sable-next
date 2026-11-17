@@ -441,6 +441,7 @@ test('only a connected reply preview starts a new message group', () => {
       sender_name: 'Bob',
       body: 'Earlier message',
       fallback: null,
+      emotes: [],
     },
   } as TimelineItemView;
   const run = [first, reply];

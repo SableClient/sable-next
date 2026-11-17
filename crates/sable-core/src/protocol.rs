@@ -8,6 +8,7 @@ pub use sable_model::emote_picker::{
     ImageSourcePackView, ImageUsageView, PackImageInfoView, PackImageView,
 };
 pub use sable_model::event_preview::ReplyFallbackView;
+pub use sable_model::html::PreviewEmote;
 pub use sable_model::markdown::{ComposerContent, ComposerMentions, ComposerPill};
 pub use sable_model::member_look::{FieldEdit, PronounView};
 pub use sable_model::notifications::NotificationModeView;
@@ -2049,6 +2050,7 @@ pub struct ReplyView {
     pub body: Option<String>,
     /// Set instead of `body` when the replied-to event has none to show.
     pub fallback: Option<ReplyFallbackView>,
+    pub emotes: Vec<PreviewEmote>,
 }
 
 /// What the homeserver still holds of a redacted event (MSC2815).

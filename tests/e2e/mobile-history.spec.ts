@@ -58,6 +58,7 @@ for (const source of ['reply', 'link']) {
                 sender_name: 'Alice',
                 body: `Target ${id}`,
                 fallback: null,
+                emotes: [],
               },
             })),
           ],

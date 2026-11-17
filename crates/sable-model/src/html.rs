@@ -1,6 +1,7 @@
 use std::sync::LazyLock;
 
 use ruma_html::{Html, ListBehavior, NodeData, NodeRef, SanitizerConfig};
+use serde::Serialize;
 
 static PREVIEW_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
     SanitizerConfig::compat()
@@ -105,6 +106,60 @@ pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
         body.to_owned()
     } else {
         text.to_owned()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PreviewEmote {
+    pub alt: String,
+    pub source: String,
+}
+
+/// The emotes `preview_body` turned into their `alt` text, in order.
+#[must_use]
+pub fn preview_emotes(formatted: Option<&str>) -> Vec<PreviewEmote> {
+    let Some(formatted) = formatted.filter(|formatted| !nests_too_deeply(formatted)) else {
+        return Vec::new();
+    };
+    let html = Html::parse(formatted);
+    html.sanitize_with(&PREVIEW_POLICY);
+    let mut emotes = Vec::new();
+    for node in html.children() {
+        push_preview_emotes(&node, &mut emotes);
+    }
+    emotes
+}
+
+fn push_preview_emotes(node: &NodeRef, out: &mut Vec<PreviewEmote>) {
+    let NodeData::Element(element) = node.data() else {
+        return;
+    };
+    let attrs = element.attrs.borrow();
+    let attr = |name: &str| {
+        attrs
+            .iter()
+            .find(|attribute| &*attribute.name.local == name)
+            .map(|attribute| &*attribute.value)
+    };
+    if attr(SPOILER_ATTRIBUTE).is_some() {
+        return;
+    }
+    if &*element.name.local == "img" {
+        if attr("data-mx-emoticon").is_some()
+            && let (Some(alt), Some(source)) = (attr("alt"), attr("src"))
+            && !alt.is_empty()
+            && source.starts_with("mxc://")
+        {
+            out.push(PreviewEmote {
+                alt: alt.to_owned(),
+                source: source.to_owned(),
+            });
+        }
+        return;
+    }
+    for child in node.children() {
+        push_preview_emotes(&child, out);
     }
 }
 
