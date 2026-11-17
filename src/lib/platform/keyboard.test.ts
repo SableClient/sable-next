@@ -47,6 +47,14 @@ test.each([-30, 30])('vertical touch scrolling dismisses the keyboard (%i)', asy
   expect(event.defaultPrevented).toBe(false);
 });
 
+test('scrolling on Android keeps the keyboard up', async () => {
+  document.documentElement.dataset.tauriOs = 'android';
+  const { field, touch } = await scrollKeyboardHarness();
+  touch('touchstart');
+  touch('touchmove', 2, 30);
+  expect(document.activeElement).toBe(field);
+});
+
 test('taps, small movements, and horizontal swipes preserve composer focus', async () => {
   const { field, touch } = await scrollKeyboardHarness();
   touch('touchstart');

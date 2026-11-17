@@ -6,6 +6,8 @@ import { startSwipeGesture, updateSwipeGesture, type SwipeGesture } from '#lib/u
 import { hasIosKeyboardContextQuirk } from './input.js';
 
 export function dismissKeyboardOnScroll(node: HTMLElement): () => void {
+  // Android chat apps keep the keyboard up while the message list scrolls.
+  if (document.documentElement.dataset.tauriOs === 'android') return () => {};
   let gesture: SwipeGesture | undefined;
   let field: HTMLElement | null = null;
 
