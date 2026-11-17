@@ -20,7 +20,7 @@ includes = ["scripts"]
 excludes = ["scripts/ci"]
 
 [tools]
-node = "24.22.3"
+node = "26.13.1"
 "github:wasm-bindgen/wasm-bindgen" = { version = "0.2.130" }
 "github:WebAssembly/binaryen" = { version = "133", version_prefix = "version_" }
 "aqua:watchexec/watchexec" = "2.8.0"
