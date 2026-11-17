@@ -84,7 +84,7 @@ export function rovingFocus({
         const at = Math.min(order.indexOf(current), all.length - 1);
         const replacement = walk(all, at, 1) ?? walk(all, at, -1);
         current = replacement;
-        if (focusLost && restoreFocus) replacement?.focus();
+        if (focusLost && restoreFocus) replacement?.focus({ preventScroll: true });
       }
       current ??=
         near(

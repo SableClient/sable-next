@@ -85,6 +85,25 @@ test('focus moves to a neighbour when the focused control is removed', async () 
   expect(tabStops(root).map((stop) => stop.id)).toEqual(['c']);
 });
 
+test('a scrolled list stays put when its focused item is windowed out', async () => {
+  const rows = Array.from(
+    { length: 40 },
+    (_, index) =>
+      `<button id="r${String(index)}" style="display:block;height:40px">${String(index)}</button>`
+  );
+  const root = mount(rows.join(''));
+  root.style.cssText = 'height:200px;overflow:auto';
+  root.querySelector<HTMLElement>('#r0')?.focus();
+  root.scrollTop = 1000;
+  const spacer = document.createElement('div');
+  spacer.style.height = '40px';
+  root.querySelector('#r0')?.replaceWith(spacer);
+  await vi.waitFor(() => {
+    expect(document.activeElement?.id).toBe('r1');
+  });
+  expect(root.scrollTop).toBe(1000);
+});
+
 test('Tab first lands on the current item', async () => {
   const root = mount(
     '<a href="#a" id="a">a</a><a href="#b" id="b" aria-current="page">b</a><a href="#c" id="c">c</a>'
