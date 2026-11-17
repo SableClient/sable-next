@@ -88,6 +88,21 @@ export function applyOffers(
   return tr;
 }
 
+export function standingOffers(
+  state: EditorState,
+  rules: readonly OfferRule[],
+  enabled: (rule: OfferRule) => boolean
+): ComposerOffer[] {
+  const { doc } = state;
+  const inMarkdownLink = (offer: ComposerOffer) =>
+    doc.textBetween(offer.from - 1, offer.from) === '[' &&
+    doc.textBetween(offer.to, Math.min(offer.to + 2, doc.content.size)) === '](';
+  return rules
+    .filter(enabled)
+    .flatMap((rule) => matches(state, rule, 0, doc.content.size))
+    .filter((offer) => !inMarkdownLink(offer));
+}
+
 interface OfferOptions {
   rules: readonly OfferRule[];
   enabled: (rule: OfferRule) => boolean;

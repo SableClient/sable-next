@@ -69,7 +69,14 @@ import { filesFromSources, pastedImageSources } from './pasted-images';
 import { mathInputRule } from './math';
 import { mfmTimeInputRule } from './mfm';
 import { traceComposerInput } from './input-trace';
-import { applyOffers, offerKey, offersPlugin, type ComposerOffer, type OfferRule } from './offers';
+import {
+  applyOffers,
+  offerKey,
+  offersPlugin,
+  standingOffers,
+  type ComposerOffer,
+  type OfferRule,
+} from './offers';
 import { queryKey, queryPlugin } from './query-plugin';
 import { codeLanguage, composerSchema, parseMatrixHtml } from './schema';
 import {
@@ -429,6 +436,8 @@ function codeLanguageLabels(): Plugin {
     },
   });
 }
+
+const offerAlways = (rule: OfferRule) => preferences[rule.mode] === 'always';
 
 function isTrailingParagraph(doc: ProseMirrorNode): boolean {
   const last = doc.lastChild;
@@ -805,7 +814,7 @@ export class ComposerEditor {
         ? [
             offersPlugin({
               rules: this.options.offers,
-              enabled: (rule) => preferences[rule.mode] === 'always',
+              enabled: offerAlways,
               markdown: () => this.markdownMode(),
             }),
           ]
@@ -1314,6 +1323,14 @@ export class ComposerEditor {
     if (!view) return;
     view.dispatch(applyOffers(view.state, [offer], this.markdownMode()));
     view.focus();
+  }
+
+  linkStandingOffers(): ProseMirrorNode | undefined {
+    const view = this.view;
+    if (!view) return this.doc();
+    const offers = standingOffers(view.state, this.options.offers ?? [], offerAlways);
+    if (offers.length > 0) view.dispatch(applyOffers(view.state, offers, this.markdownMode()));
+    return view.state.doc;
   }
 
   replaceQuery(query: AutocompleteQuery, node: ProseMirrorNode): void {

@@ -5,7 +5,7 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { expect, test } from 'vitest';
 
 import { MSC_LINK } from './offer-rules';
-import { applyOffers, offerKey, offersPlugin } from './offers';
+import { applyOffers, offerKey, offersPlugin, standingOffers } from './offers';
 import { composerSchema } from './schema';
 import { serializeComposer } from './serialize';
 
@@ -44,4 +44,17 @@ test('an accepted offer links in rich text and writes markdown in plain mode', (
 
   const plain = state.apply(applyOffers(state, [offer], true));
   expect(plain.doc.textContent).toBe('see [MSC4444](https://msc.sable.moe/4444) ');
+});
+
+test('always-on offers link references the caret never left, once each', () => {
+  const state = stateOf('see MSC1 and MSC4444');
+  const offers = standingOffers(state, [MSC_LINK], () => true);
+  expect(offers.map((offer) => offer.text)).toEqual(['MSC1', 'MSC4444']);
+  expect(standingOffers(state, [MSC_LINK], () => false)).toEqual([]);
+
+  const plain = state.apply(applyOffers(state, offers, true));
+  expect(plain.doc.textContent).toBe(
+    'see [MSC1](https://msc.sable.moe/1) and [MSC4444](https://msc.sable.moe/4444)'
+  );
+  expect(standingOffers(plain, [MSC_LINK], () => true)).toEqual([]);
 });

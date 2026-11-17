@@ -874,14 +874,15 @@
     const typedLine = commandLine();
     if (typedLine !== null && (await typedBotCommand(typedLine))) return;
 
-    const doc = editor.doc();
+    const typed = editor.doc();
     const untouched =
       context?.kind === 'edit' &&
       prefilledDoc !== undefined &&
-      doc?.eq(prefilledDoc) === true &&
+      typed?.eq(prefilledDoc) === true &&
       staged.length === 0
         ? { body: context.body, formatted: context.html ?? null }
         : null;
+    const doc = untouched ? typed : editor.linkStandingOffers();
     const rich = richSend;
     const attachmentsCancelEdit = context?.kind === 'edit' && staged.length > 0;
     const captionEdit = editingCaption && !attachmentsCancelEdit;
