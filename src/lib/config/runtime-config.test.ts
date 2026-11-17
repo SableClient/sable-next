@@ -293,6 +293,8 @@ test('a config with no branding keeps every brand field unset', () => {
     logoUrl: null,
     faviconUrl: null,
     themeUrl: null,
+    lightThemeUrl: null,
+    darkThemeUrl: null,
   });
 });
 
@@ -303,6 +305,7 @@ test('brand assets accept site paths and http urls, nothing else', () => {
       logoUrl: '/branding/logo.svg',
       faviconUrl: 'https://cdn.example/favicon.png',
       themeUrl: 'javascript:alert(1)',
+      darkThemeUrl: '/branding/dark.sable.css',
     },
   });
 
@@ -311,6 +314,8 @@ test('brand assets accept site paths and http urls, nothing else', () => {
     logoUrl: '/branding/logo.svg',
     faviconUrl: 'https://cdn.example/favicon.png',
     themeUrl: null,
+    lightThemeUrl: null,
+    darkThemeUrl: '/branding/dark.sable.css',
   });
 });
 

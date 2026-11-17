@@ -22,6 +22,7 @@
   import AccountLocked from '#lib/features/sidebar/AccountLocked.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { appName, faviconUrl } from '#lib/deployment/brand.js';
+  import { setDeploymentThemeKind } from '#lib/deployment/theme.js';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { blockEdgeNavigation } from '#lib/platform/edge-navigation.js';
   import { lockNativeZoom } from '#lib/platform/viewport-zoom.js';
@@ -223,11 +224,14 @@
     const preview = themePreview.current;
     if (preview) {
       applyTheme(preview.kind, systemDark.current);
+      setDeploymentThemeKind(preview.kind);
       applyCustomTheme(preview.css);
       return;
     }
+    const kind = resolveTheme(preferences.theme, systemDark.current);
     applyTheme(preferences.theme, systemDark.current);
-    applyCustomTheme(activeCustomThemeCss(resolveTheme(preferences.theme, systemDark.current)));
+    setDeploymentThemeKind(kind);
+    applyCustomTheme(activeCustomThemeCss(kind));
   });
 
   $effect(() => {

@@ -12,6 +12,9 @@ export type AccountConfig = {
   settingsLocked?: Record<string, unknown>;
 };
 
+const THEME_KEYS = ['themeUrl', 'lightThemeUrl', 'darkThemeUrl'] as const;
+const NO_THEME = { themeUrl: null, lightThemeUrl: null, darkThemeUrl: null };
+
 export function parseAccountConfig(raw: unknown, source: string): AccountConfig | null {
   if (!isRecord(raw)) return null;
   const input: Record<string, unknown> = {
@@ -19,7 +22,7 @@ export function parseAccountConfig(raw: unknown, source: string): AccountConfig 
     ...(isRecord(raw.branding) ? { branding: { ...raw.branding } } : {}),
   };
   if (isRecord(input.branding)) {
-    for (const key of ['logoUrl', 'faviconUrl', 'themeUrl']) {
+    for (const key of ['logoUrl', 'faviconUrl', ...THEME_KEYS]) {
       const value = input.branding[key];
       if (typeof value !== 'string') continue;
       try {
@@ -82,7 +85,11 @@ export function mergeAccountConfig(
   return {
     ...base,
     ...account,
-    branding: { ...base.branding, ...account.branding },
+    branding: {
+      ...base.branding,
+      ...(THEME_KEYS.some((key) => account.branding && key in account.branding) ? NO_THEME : {}),
+      ...account.branding,
+    },
     links: { ...base.links, ...account.links },
     auth: {
       ...base.auth,

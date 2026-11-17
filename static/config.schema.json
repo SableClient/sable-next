@@ -191,6 +191,14 @@
         "themeUrl": {
           "type": "string",
           "pattern": "^(https?://|/)"
+        },
+        "lightThemeUrl": {
+          "type": "string",
+          "pattern": "^(https?://|/)"
+        },
+        "darkThemeUrl": {
+          "type": "string",
+          "pattern": "^(https?://|/)"
         }
       }
     },

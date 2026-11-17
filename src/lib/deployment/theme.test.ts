@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { applyCustomTheme, applyCustomTweaks, applyQuickCss } from '#lib/settings/theme.js';
 
-import { loadDeploymentTheme } from './theme.js';
+import { loadDeploymentTheme, setDeploymentThemeKind } from './theme.js';
 
 const THEME = '/* @sable-theme\nname: Corp\nkind: dark\n*/\n:root { --primary-main: #123456; }';
 
@@ -15,6 +15,8 @@ function respond(body: string, ok = true): void {
   );
 }
 
+const theme = (themeUrl: string | null) => ({ themeUrl, lightThemeUrl: null, darkThemeUrl: null });
+
 const ids = (): string[] => [...document.head.querySelectorAll('style')].map((style) => style.id);
 
 beforeEach(() => {
@@ -22,6 +24,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setDeploymentThemeKind('light');
   document.head.replaceChildren();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -29,7 +32,7 @@ afterEach(() => {
 
 it('injects the parsed theme', async () => {
   respond(THEME);
-  await loadDeploymentTheme('/brand.sable.css');
+  await loadDeploymentTheme(theme('/brand.sable.css'));
   expect(document.getElementById('sable-deployment-theme')?.textContent).toContain('#123456');
 });
 
@@ -38,7 +41,7 @@ it('sits below user themes, tweaks and quick CSS whatever the load order', async
   applyCustomTweaks(['b{}']);
   applyCustomTheme(THEME);
   respond(THEME);
-  await loadDeploymentTheme('/brand.sable.css');
+  await loadDeploymentTheme(theme('/brand.sable.css'));
   expect(ids()).toEqual([
     'sable-deployment-theme',
     'sable-custom-theme',
@@ -49,16 +52,16 @@ it('sits below user themes, tweaks and quick CSS whatever the load order', async
 
 it('stays below user styles applied afterwards', async () => {
   respond(THEME);
-  await loadDeploymentTheme('/brand.sable.css');
+  await loadDeploymentTheme(theme('/brand.sable.css'));
   applyCustomTheme(THEME);
   expect(ids()).toEqual(['sable-deployment-theme', 'sable-custom-theme']);
 });
 
 it('clears the previous theme without a theme url', async () => {
   respond(THEME);
-  await loadDeploymentTheme('/previous.sable.css');
+  await loadDeploymentTheme(theme('/previous.sable.css'));
   vi.mocked(fetch).mockClear();
-  await loadDeploymentTheme(null);
+  await loadDeploymentTheme(theme(null));
   expect(fetch).not.toHaveBeenCalled();
   expect(document.getElementById('sable-deployment-theme')).toBeNull();
 });
@@ -84,7 +87,7 @@ it.each([
   ],
 ])('logs and keeps the default theme on %s', async (_, setup) => {
   setup();
-  await loadDeploymentTheme('/brand.sable.css');
+  await loadDeploymentTheme(theme('/brand.sable.css'));
   expect(document.getElementById('sable-deployment-theme')).toBeNull();
   expect(console.debug).toHaveBeenCalledWith(
     '[sable deployment] theme not applied',
@@ -95,7 +98,7 @@ it.each([
 
 it('clears the previous theme immediately and discards a stale response', async () => {
   respond(THEME);
-  await loadDeploymentTheme('/previous.sable.css');
+  await loadDeploymentTheme(theme('/previous.sable.css'));
   let finishOld: (response: { ok: boolean; text: () => Promise<string> }) => void = () => {};
   vi.stubGlobal(
     'fetch',
@@ -112,9 +115,9 @@ it('clears the previous theme immediately and discards a stale response', async 
         text: () => Promise.resolve(THEME.replace('#123456', '#abcdef')),
       })
   );
-  const pending = loadDeploymentTheme('/old.sable.css');
+  const pending = loadDeploymentTheme(theme('/old.sable.css'));
   expect(document.getElementById('sable-deployment-theme')).toBeNull();
-  await loadDeploymentTheme('/new.sable.css');
+  await loadDeploymentTheme(theme('/new.sable.css'));
   finishOld({ ok: true, text: () => Promise.resolve(THEME) });
   await pending;
   expect(document.getElementById('sable-deployment-theme')?.textContent).toContain('#abcdef');
@@ -127,12 +130,31 @@ it('discards a slow theme body after signing out', async () => {
   });
   const text = vi.fn(() => body);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text }));
-  const pending = loadDeploymentTheme('/old.sable.css');
+  const pending = loadDeploymentTheme(theme('/old.sable.css'));
   await vi.waitFor(() => {
     expect(text).toHaveBeenCalled();
   });
-  await loadDeploymentTheme(null);
+  await loadDeploymentTheme(theme(null));
   finishBody(THEME);
   await pending;
   expect(document.getElementById('sable-deployment-theme')).toBeNull();
+});
+
+it('follows the light or dark mode, falling back to themeUrl', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(THEME.replace('#123456', url)) })
+    )
+  );
+  const css = () => document.getElementById('sable-deployment-theme')?.textContent;
+  await loadDeploymentTheme({
+    themeUrl: '/base.sable.css',
+    lightThemeUrl: null,
+    darkThemeUrl: '/dark.sable.css',
+  });
+  expect(css()).toContain('/base.sable.css');
+  setDeploymentThemeKind('dark');
+  expect(css()).toContain('/dark.sable.css');
+  expect(fetch).toHaveBeenCalledTimes(2);
 });

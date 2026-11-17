@@ -97,6 +97,8 @@ const BrandingSchema = v.object({
   logoUrl: AssetUrl,
   faviconUrl: AssetUrl,
   themeUrl: AssetUrl,
+  lightThemeUrl: AssetUrl,
+  darkThemeUrl: AssetUrl,
 });
 const LinksSchema = v.object({
   help: OptionalHttpService,

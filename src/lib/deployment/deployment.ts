@@ -35,7 +35,7 @@ function applyAccount(config: AccountConfig | null): void {
   configuration.account = mergeAccountConfig(configuration.base, config);
   applyAccountPreferences(config?.settingsDefaults ?? {}, config?.settingsLocked ?? {});
   setAppName(appName(configuration.account));
-  void loadDeploymentTheme(configuration.account.branding.themeUrl);
+  void loadDeploymentTheme(configuration.account.branding);
 }
 
 export function activateAccountConfiguration(

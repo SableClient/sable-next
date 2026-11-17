@@ -138,6 +138,8 @@ function policySections(settings: Schema, accountOnly: boolean): Record<string, 
       logoUrl: assets,
       faviconUrl: assets,
       themeUrl: assets,
+      lightThemeUrl: assets,
+      darkThemeUrl: assets,
     }),
     links: strict({
       help: httpUrl,

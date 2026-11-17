@@ -15,7 +15,7 @@ test('filters account fields and resolves asset URLs', () => {
   expect(
     parseAccountConfig(
       {
-        branding: { logoUrl: '/logo.svg', themeUrl: 'theme.json' },
+        branding: { logoUrl: '/logo.svg', themeUrl: 'theme.json', darkThemeUrl: '/dark.json' },
         settingsLocked: {
           hour24Clock: true,
           pushGatewayUrl: 'https://push.example.org',
@@ -30,6 +30,7 @@ test('filters account fields and resolves asset URLs', () => {
     branding: {
       logoUrl: 'https://example.org/logo.svg',
       themeUrl: 'https://example.org/.well-known/theme.json',
+      darkThemeUrl: 'https://example.org/dark.json',
     },
     settingsLocked: { hour24Clock: true },
   });
@@ -57,4 +58,25 @@ test('preserves omitted fields and accepts false overrides', () => {
   expect(merged.auth.disableRegistration).toBe(true);
   expect(merged.settingsLocked.urlPreviews).toBe(false);
   expect(parseAccountConfig([], 'https://example.org')).toBeNull();
+});
+
+test('an account theme replaces the deployment light and dark themes', () => {
+  const base = parseRuntimeConfig({
+    branding: { lightThemeUrl: '/light.sable.css', darkThemeUrl: '/dark.sable.css' },
+  });
+  const source = 'https://example.org/.well-known/sable';
+  const themed = mergeAccountConfig(
+    base,
+    parseAccountConfig({ branding: { themeUrl: '/a.css' } }, source)
+  );
+  expect(themed.branding).toMatchObject({
+    themeUrl: 'https://example.org/a.css',
+    lightThemeUrl: null,
+    darkThemeUrl: null,
+  });
+  const unthemed = mergeAccountConfig(
+    base,
+    parseAccountConfig({ branding: { appName: 'A' } }, source)
+  );
+  expect(unthemed.branding.darkThemeUrl).toBe('/dark.sable.css');
 });

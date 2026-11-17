@@ -141,7 +141,8 @@ Omit any of them to keep Sable's behaviour.
     "appName": "Acme Chat",
     "logoUrl": "/branding/logo.svg",
     "faviconUrl": "/branding/favicon.png",
-    "themeUrl": "/branding/theme.css"
+    "themeUrl": "/branding/theme.css",
+    "darkThemeUrl": "/branding/theme-dark.css"
   },
   "links": {
     "help": "https://help.example.org",
@@ -166,12 +167,15 @@ Omit any of them to keep Sable's behaviour.
 - `branding.appName` replaces "Sable" in the interface, page titles and
   notifications. Text about the Sable project itself, such as donations and
   the default theme name, keeps the Sable name.
-- `branding.logoUrl`, `faviconUrl` and `themeUrl` accept a path on the same
+- `branding.logoUrl`, `faviconUrl`, `themeUrl`, `lightThemeUrl` and `darkThemeUrl` accept a path on the same
   site or an HTTP(S) URL. Serve the files next to `config.json`, for example by
   mounting a directory at `/app/branding`.
 - `branding.themeUrl` points at a theme file in the same format users import as
   a custom theme. It is the base theme, so users' own themes and quick CSS still
   apply on top. It loads after startup, so the default theme can show briefly.
+- `branding.lightThemeUrl` and `branding.darkThemeUrl` set the base theme for
+  light and dark mode. Each falls back to `themeUrl`. Account branding that sets
+  any of the three theme URLs replaces all three deployment theme URLs.
 - `links.help`, `links.privacy` and `links.terms` appear in the sign-in footer.
   `links.privacy` also replaces the telemetry policy link and the `/privacy`
   page. `links.supportRoom` replaces the support room on the home page.
