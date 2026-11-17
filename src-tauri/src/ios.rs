@@ -716,7 +716,7 @@ pub(crate) fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
     });
 }
 
-/// WKWebView can leave part of the page unpainted after the keyboard hides until it is laid out again.
+/// `WKWebView` can leave part of the page unpainted after the keyboard hides until it is laid out again.
 pub(crate) fn relayout_on_keyboard_hide(window: &tauri::WebviewWindow) {
     let window = window.clone();
     // SAFETY: UIKit notification names are immutable constants initialized when the framework loads
