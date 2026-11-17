@@ -6,16 +6,14 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
-  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
-  import { findMember, senderDisplayColors } from './members.js';
+  import { findMember, useSenderColors } from './members.js';
   import SenderName from './SenderName.svelte';
-  import { hasSenderRoles, useSenderRoles } from './sender-roles.js';
   import type { PowerLevelTag } from '../settings/power-level-tags.js';
 
   interface Props {
@@ -42,24 +40,13 @@
   const core = useCoreClient();
   const profileDescriptionId = $props.id();
   const presenceStore = usePresenceStore();
-  const roomCosmetics = useRoomCosmetics();
-  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
+  const senderColors = useSenderColors();
   const profile = new UserProfile(core, () => userId);
   let member = $derived(findMember(members, userId));
   let shown = $derived(member ?? profile.current);
   let displayName = $derived(shown?.display_name ?? userId);
   let avatarUrl = $derived(shown?.avatar_url ?? null);
-  let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
-  let colors = $derived(
-    senderDisplayColors(
-      userId,
-      profile.current,
-      null,
-      false,
-      cosmetics,
-      powerTag?.color ?? senderRoles?.(userId)?.color ?? null
-    )
-  );
+  let colors = $derived(senderColors(userId, profile.current, { roleColor: powerTag?.color }));
   let profileLabel = $derived(i18n.t('timeline.senderProfile', { name: displayName }));
   let presence = $derived(presenceStore.peek(userId));
   let userStatus = $derived(showStatus ? resolveUserStatus(profile.current, presence) : null);

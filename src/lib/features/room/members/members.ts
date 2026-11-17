@@ -2,7 +2,7 @@ import type { MemberView, PerMessageProfileView, ProfileView } from '#src/genera
 
 import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import type { SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
+import { useRoomCosmetics, type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 import {
   nameColorOnDark,
   nameColorOnLight,
@@ -11,6 +11,7 @@ import {
 } from '#lib/ui/primitives/readable-color.js';
 
 import { senderColor } from '../timeline/timeline-format';
+import { hasSenderRoles, useSenderRoles } from './sender-roles.js';
 
 export interface SenderDisplayColors {
   nameColor: string;
@@ -59,6 +60,33 @@ export function senderDisplayColors(
     nameColorDark: nameColorOnDark(nameColorDark),
     tinted,
   };
+}
+
+export interface SenderColorOptions {
+  persona?: PerMessageProfileView | null;
+  isOwn?: boolean;
+  cosmetics?: SenderCosmetics | null;
+  roleColor?: string | null;
+}
+
+export type SenderColors = (
+  userId: string | null | undefined,
+  profile: ProfileView | null,
+  options?: SenderColorOptions
+) => SenderDisplayColors;
+
+export function useSenderColors(): SenderColors {
+  const roomCosmetics = useRoomCosmetics();
+  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
+  return (userId, profile, { persona = null, isOwn = false, cosmetics, roleColor } = {}) =>
+    senderDisplayColors(
+      userId ?? '',
+      profile,
+      persona,
+      isOwn,
+      persona ? null : (cosmetics ?? roomCosmetics?.for(userId) ?? null),
+      roleColor ?? (userId ? (senderRoles?.(userId)?.color ?? null) : null)
+    );
 }
 
 const memberIndexes = new WeakMap<readonly MemberView[], Map<string, MemberView>>();

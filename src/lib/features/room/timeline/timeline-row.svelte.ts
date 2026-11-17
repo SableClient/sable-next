@@ -18,7 +18,7 @@ import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
 import { useRoomCosmetics, type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 import type { MatrixLink } from '#lib/rooms/matrix-link.js';
 
-import { senderDisplayColors } from '../members/members.js';
+import { useSenderColors } from '../members/members.js';
 import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
 import { MessageSwipe } from '../messages/message-swipe.svelte.js';
 import { useMessageMenu } from '../messages/message-menu-open.svelte.js';
@@ -113,6 +113,7 @@ export class TimelineRow {
   readonly #doubleTap: DoubleTap;
   readonly #roomCosmetics = useRoomCosmetics();
   readonly #senderRoles = hasSenderRoles() ? useSenderRoles() : null;
+  readonly #senderColors = useSenderColors();
   readonly #options: () => TimelineRowOptions;
 
   constructor(options: () => TimelineRowOptions) {
@@ -195,14 +196,12 @@ export class TimelineRow {
   });
   readonly senderColors = $derived.by(() => {
     const { item } = this.#options();
-    return senderDisplayColors(
-      item.sender ?? '',
-      this.profile,
-      item.per_message_profile,
-      item.is_own,
-      this.senderCosmetics,
-      this.senderRole?.color ?? null
-    );
+    return this.#senderColors(item.sender, this.profile, {
+      persona: item.per_message_profile,
+      isOwn: item.is_own,
+      cosmetics: this.senderCosmetics,
+      roleColor: this.senderRole?.color,
+    });
   });
   readonly stalled = $derived.by(() => {
     const { send_state } = this.#options().item;

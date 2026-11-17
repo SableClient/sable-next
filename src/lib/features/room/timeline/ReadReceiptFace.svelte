@@ -2,13 +2,11 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
-  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
-  import { senderDisplayColors } from '../members/members.js';
+  import { useSenderColors } from '../members/members.js';
   import '../members/sender-identity.css';
-  import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
   import ReadReceiptTime from './ReadReceiptTime.svelte';
 
   interface Props {
@@ -23,19 +21,9 @@
   let { userId, name, avatar, timestamp, onProfile, onHover }: Props = $props();
 
   const core = useCoreClient();
-  const roomCosmetics = useRoomCosmetics();
-  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
+  const senderColors = useSenderColors();
   const profile = new UserProfile(core, () => userId);
-  let colors = $derived(
-    senderDisplayColors(
-      userId,
-      profile.current,
-      null,
-      false,
-      roomCosmetics?.for(userId) ?? null,
-      senderRoles?.(userId)?.color ?? null
-    )
-  );
+  let colors = $derived(senderColors(userId, profile.current));
 </script>
 
 {#snippet faceTrigger({ props }: { props: Record<string, unknown> })}

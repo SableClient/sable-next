@@ -2,10 +2,8 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { UserProfile } from '#lib/profile/user-profile.svelte.js';
-  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 
-  import { senderDisplayColors } from './members.js';
-  import { hasSenderRoles, useSenderRoles } from './sender-roles';
+  import { useSenderColors } from './members.js';
   import SenderName from './SenderName.svelte';
 
   interface Props {
@@ -16,19 +14,9 @@
 
   let { userId, name, onProfile }: Props = $props();
   const core = useCoreClient();
-  const roomCosmetics = useRoomCosmetics();
-  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
+  const senderColors = useSenderColors();
   const profile = new UserProfile(core, () => userId);
-  let colors = $derived(
-    senderDisplayColors(
-      userId,
-      profile.current,
-      null,
-      false,
-      roomCosmetics?.for(userId) ?? null,
-      senderRoles?.(userId)?.color ?? null
-    )
-  );
+  let colors = $derived(senderColors(userId, profile.current));
 
   function openProfile(anchor: HTMLElement): void {
     onProfile?.(userId, anchor);

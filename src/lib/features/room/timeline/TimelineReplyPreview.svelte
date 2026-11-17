@@ -11,16 +11,14 @@
   } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
-  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import {
     hasRoomMediaPreviews,
     useRoomMediaPreviews,
   } from '../media/room-media-previews.svelte.js';
-  import { findMember, senderDisplayColors, stripReplyFallback } from '../members/members.js';
+  import { findMember, stripReplyFallback, useSenderColors } from '../members/members.js';
   import SenderName from '../members/SenderName.svelte';
-  import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
   import { replyText } from '../messages/reply-fallback.js';
   import { previewSegments } from '../messages/reply-preview.js';
   import { stateEventText } from './state-event-text';
@@ -39,8 +37,7 @@
   let { reply, target, sender, persona, profile, currentUserId, members, onJumpToEvent }: Props =
     $props();
 
-  const roomCosmetics = useRoomCosmetics();
-  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
+  const senderColors = useSenderColors();
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   const failedEmotes = new SvelteSet<string>();
 
@@ -68,16 +65,11 @@
     const text = stripReplyFallback(replyText(reply, i18n.t), persona);
     return roomMedia?.hidden ? [text] : previewSegments(text, reply.emotes);
   });
-  let cosmetics = $derived(persona ? null : (roomCosmetics?.for(reply.sender) ?? null));
   let colors = $derived(
-    senderDisplayColors(
-      sender ?? '',
-      profile,
+    senderColors(sender, profile, {
       persona,
-      currentUserId !== null && sender === currentUserId,
-      cosmetics,
-      sender ? (senderRoles?.(sender)?.color ?? null) : null
-    )
+      isOwn: currentUserId !== null && sender === currentUserId,
+    })
   );
 </script>
 
