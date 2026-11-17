@@ -65,6 +65,13 @@ export function setSystemBarsHidden(hidden: boolean): void {
   });
 }
 
+export function setKeepScreenOn(on: boolean): void {
+  if (!isTauri() || (osType() !== 'android' && osType() !== 'ios')) return;
+  void invoke('set_keep_screen_on', { on }).catch((error: unknown) => {
+    console.debug('[sable window] keep screen on not toggled', error);
+  });
+}
+
 const SAMPLE_INTERVAL_MS = 200;
 
 type BarCommand = 'set_status_bar_light' | 'set_navigation_bar_light';

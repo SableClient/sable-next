@@ -524,6 +524,20 @@ class MainActivity : TauriActivity() {
     @Keep
     @JvmStatic
     @Suppress("unused")
+    fun setKeepScreenOnNative(on: Boolean) {
+      val activity = instance ?: return
+      activity.runOnUiThread {
+        if (on) {
+          activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+          activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+      }
+    }
+
+    @Keep
+    @JvmStatic
+    @Suppress("unused")
     fun setSentryEnabledNative(enabled: Boolean) {
       val activity = instance ?: return
       

@@ -752,6 +752,20 @@ pub(crate) fn set_system_bars_hidden(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "tauri extracts command arguments by value"
+)]
+pub(crate) fn set_keep_screen_on(window: tauri::WebviewWindow, on: bool) -> Result<(), String> {
+    window
+        .with_webview(move |_| {
+            // SAFETY: with_webview runs on the main thread and UIApplication declares setIdleTimerDisabled: taking a BOOL
+            let _: () = unsafe { msg_send![shared_application(), setIdleTimerDisabled: on] };
+        })
+        .map_err(|error| error.to_string())
+}
+
 #[link(name = "UIKit", kind = "framework")]
 unsafe extern "C" {
     static UIBackgroundTaskInvalid: usize;

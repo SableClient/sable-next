@@ -83,7 +83,7 @@
   import idleFavicon from '#lib/assets/favicon.png';
   import unreadFavicon from '#lib/assets/res/svg/unread.svg';
   import highlightFavicon from '#lib/assets/res/svg/highlight.svg';
-  import { startSystemBarSync } from '#lib/platform/system-bars.js';
+  import { setKeepScreenOn, startSystemBarSync } from '#lib/platform/system-bars.js';
   import { installAndroidBack } from '#lib/platform/android-back.js';
   import {
     preferences,
@@ -205,6 +205,11 @@
   });
   provideCallSession(callSession);
   onMount(() => registerDesktopCallShortcuts(callSession));
+  $effect(() => {
+    if (!callSession.active) return;
+    setKeepScreenOn(true);
+    return () => setKeepScreenOn(false);
+  });
   $effect(() => {
     const inputMode = preferences.callInputMode;
     untrack(() => callSession.setInputMode(inputMode));

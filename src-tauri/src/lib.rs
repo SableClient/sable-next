@@ -906,6 +906,8 @@ pub fn run() {
             #[cfg(target_os = "ios")]
             ios::set_system_bars_hidden,
             #[cfg(target_os = "ios")]
+            ios::set_keep_screen_on,
+            #[cfg(target_os = "ios")]
             ios::set_badge_count,
             #[cfg(target_os = "android")]
             mobile::copy_image_to_clipboard,
@@ -919,6 +921,8 @@ pub fn run() {
             mobile::set_navigation_bar_light,
             #[cfg(target_os = "android")]
             mobile::set_system_bars_hidden,
+            #[cfg(target_os = "android")]
+            mobile::set_keep_screen_on,
             #[cfg(target_os = "android")]
             mobile::set_window_background
         ])

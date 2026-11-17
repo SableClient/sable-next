@@ -230,6 +230,11 @@ pub(crate) fn set_system_bars_hidden(hidden: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub(crate) fn set_keep_screen_on(on: bool) -> Result<(), String> {
+    call_activity_bool("setKeepScreenOnNative", on)
+}
+
+#[tauri::command]
 pub(crate) fn haptic_feedback(strong: bool) -> Result<(), String> {
     call_activity_bool("hapticFeedbackNative", strong)
 }
