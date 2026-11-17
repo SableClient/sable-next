@@ -721,6 +721,14 @@
     );
   }
 
+  .resting .media {
+    padding-block-end: var(--space-300);
+  }
+
+  .resting .media:not(.with-notice) {
+    padding-block-start: var(--space-300);
+  }
+
   .failed {
     display: flex;
     flex: 1;

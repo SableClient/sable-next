@@ -11,11 +11,10 @@ import CallViewHarness from './CallViewHarness.test.svelte';
 
 afterEach(() => vi.restoreAllMocks());
 
-test('a remote camera stays clear of the controls when they wrap on a phone', async () => {
-  await page.viewport(402, 874);
+function activeCall(): CallSession {
   const overlay = { place: vi.fn(() => Promise.resolve()), clear: vi.fn(() => Promise.resolve()) };
   const track = { id: 'camera', muted: false, subscribed: true };
-  const session = {
+  return {
     lifecycle: 'active',
     mediaReady: true,
     failure: null,
@@ -44,12 +43,21 @@ test('a remote camera stays clear of the controls when they wrap on a phone', as
     },
     roomFor: () => undefined,
   } as unknown as CallSession;
+}
+
+async function renderCall() {
   const { container } = await render(CallViewHarness, {
-    session,
+    session: activeCall(),
     members: [],
     onOpenSettings: vi.fn(),
   });
   container.style.cssText = 'display:flex;width:402px;height:700px';
+  return container;
+}
+
+test('a remote camera stays clear of the controls when they wrap on a phone', async () => {
+  await page.viewport(402, 874);
+  const container = await renderCall();
   const controls = container.querySelector<HTMLElement>('.dock .controls');
   const video = container.querySelector<HTMLElement>('.tile .video');
   if (!controls || !video) throw new Error('call not rendered');
@@ -58,4 +66,19 @@ test('a remote camera stays clear of the controls when they wrap on a phone', as
   await expect
     .poll(() => controls.getBoundingClientRect().top - video.getBoundingClientRect().bottom)
     .toBeGreaterThanOrEqual(0);
+});
+
+test('resting controls give their space back to the video', async () => {
+  await page.viewport(402, 874);
+  const container = await renderCall();
+  const stage = container.querySelector<HTMLElement>('.stage');
+  const video = container.querySelector<HTMLElement>('.tile .video');
+  if (!stage || !video) throw new Error('call not rendered');
+  await expect.poll(() => video.getBoundingClientRect().height).toBeGreaterThan(0);
+  const awake = video.getBoundingClientRect().height;
+
+  stage.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
+
+  await expect.poll(() => stage.classList.contains('resting')).toBe(true);
+  await expect.poll(() => video.getBoundingClientRect().height).toBeGreaterThan(awake);
 });
