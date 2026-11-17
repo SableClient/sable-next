@@ -93,7 +93,7 @@
 
   let mobileSelectedIndex = $derived.by(() => {
     if (page.url.pathname === '/profile') {
-      return mobileTools.length;
+      return mobileSlotCount - 1;
     }
 
     return mobileTools.findIndex((item) => isToolActive(item.href));

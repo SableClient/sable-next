@@ -104,6 +104,19 @@ test('the mobile bar marks the profile tab as selected on the profile page', () 
   expect(bar.style.getPropertyValue('--mobile-selected-index')).toBe('3');
 });
 
+test('the mobile bar keeps the profile tab selected past a pending alert slot', () => {
+  visit('/profile');
+  setup({
+    mobile: true,
+    alertProviders: [
+      { priority: { level: 'update', icon: CircleIcon }, progress: undefined, dismiss: () => {} },
+    ],
+  });
+
+  const bar = screen.getByRole('navigation', { name: 'nav.quickTools' });
+  expect(bar.style.getPropertyValue('--mobile-selected-index')).toBe('4');
+});
+
 test('the collapsed sidebar leaves message search to the rail', () => {
   setup({ compact: true, mobile: false });
 
