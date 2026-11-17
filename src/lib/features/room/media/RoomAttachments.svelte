@@ -17,7 +17,6 @@
   import FileTextIcon from 'phosphor-svelte/lib/FileTextIcon';
   import FileVideoIcon from 'phosphor-svelte/lib/FileVideoIcon';
   import FileZipIcon from 'phosphor-svelte/lib/FileZipIcon';
-  import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
   import ChatCenteredTextIcon from 'phosphor-svelte/lib/ChatCenteredTextIcon';
 
@@ -38,7 +37,6 @@
   import type { MediaItem } from '#lib/ui/media/media-viewer-types.js';
   import { galleryItemId } from '#lib/ui/media/media-items.js';
   import { memberName } from '../members/members';
-  import RoomSidePanel from '../RoomSidePanel.svelte';
   import { formatDate } from '#lib/ui/date-time.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.ts';
@@ -49,7 +47,7 @@
     modal?: boolean;
     onJump: (eventId: string) => void;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
-    onClose: () => void;
+    onClose?: () => void;
   }
 
   let { roomId, members, modal = false, onJump, onMatrixLink, onClose }: Props = $props();
@@ -226,7 +224,7 @@
       action();
       return;
     }
-    onClose();
+    onClose?.();
     void afterOverlayPops().then(action);
   }
 
@@ -470,97 +468,83 @@
   {/if}
 {/snippet}
 
-<RoomSidePanel
-  title={i18n.t('timeline.attachmentsTitle')}
-  closeLabel={i18n.t('timeline.attachmentsClose')}
-  resizeLabel={i18n.t('timeline.attachmentsResize')}
-  widthKey="sable-attachments-width"
-  width={22}
-  body="none"
-  {modal}
-  {onClose}
+<div class="tabs" role="tablist" aria-label={i18n.t('timeline.attachmentsTitle')}>
+  {#each tabs as tab (tab.id)}
+    <Button
+      size="small"
+      variant="ghost"
+      class="attachments-tab choice"
+      role="tab"
+      id={`attachments-tab-${tab.id}`}
+      aria-controls="attachments-panel"
+      aria-selected={kind === tab.id}
+      tabindex={kind === tab.id ? 0 : -1}
+      onkeydown={tabKeydown}
+      onclick={() => {
+        selectTab(tab.id, false);
+      }}
+    >
+      {i18n.t(tab.label)}
+    </Button>
+  {/each}
+</div>
+{#if !showEmpty}
+  <p class="attachments-scope">{i18n.t('timeline.attachmentsIndexed')}</p>
+{/if}
+<p class="screen-reader-only" aria-live="polite">
+  {items.length > 0 ? i18n.t('timeline.attachmentsLoaded', { count: items.length }) : ''}
+</p>
+
+<div
+  class="attachments-body"
+  role="tabpanel"
+  id="attachments-panel"
+  aria-labelledby={`attachments-tab-${kind}`}
+  aria-busy={loading}
+  {@attach scrollHint}
 >
-  {#snippet icon()}
-    <ImagesIcon aria-hidden="true" />
-  {/snippet}
-  <div class="tabs" role="tablist" aria-label={i18n.t('timeline.attachmentsTitle')}>
-    {#each tabs as tab (tab.id)}
-      <Button
-        size="small"
-        variant="ghost"
-        class="attachments-tab choice"
-        role="tab"
-        id={`attachments-tab-${tab.id}`}
-        aria-controls="attachments-panel"
-        aria-selected={kind === tab.id}
-        tabindex={kind === tab.id ? 0 : -1}
-        onkeydown={tabKeydown}
-        onclick={() => {
-          selectTab(tab.id, false);
-        }}
-      >
-        {i18n.t(tab.label)}
-      </Button>
+  {#if items.length > 0}
+    {#each groups as group (group.key)}
+      <section aria-labelledby={`attachments-month-${group.key}`}>
+        <h3 class="group-heading" id={`attachments-month-${group.key}`}>{group.label}</h3>
+        {#if kind === 'media'}
+          <ul class="media-grid">
+            {#each group.items as item (attachmentKey(item))}
+              <li>{@render mediaTile(item)}</li>
+            {/each}
+          </ul>
+        {:else}
+          <ul class="attachment-list">
+            {#each group.items as item (attachmentKey(item))}
+              <li>{@render row(item)}</li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
     {/each}
-  </div>
-  {#if !showEmpty}
-    <p class="attachments-scope">{i18n.t('timeline.attachmentsIndexed')}</p>
+  {:else if loading}
+    {@render skeleton()}
+  {:else if showEmpty}
+    <p class="attachments-status">{i18n.t(emptyLabel)}</p>
   {/if}
-  <p class="screen-reader-only" aria-live="polite">
-    {items.length > 0 ? i18n.t('timeline.attachmentsLoaded', { count: items.length }) : ''}
-  </p>
 
-  <div
-    class="attachments-body"
-    role="tabpanel"
-    id="attachments-panel"
-    aria-labelledby={`attachments-tab-${kind}`}
-    aria-busy={loading}
-    {@attach scrollHint}
-  >
-    {#if items.length > 0}
-      {#each groups as group (group.key)}
-        <section aria-labelledby={`attachments-month-${group.key}`}>
-          <h3 class="group-heading" id={`attachments-month-${group.key}`}>{group.label}</h3>
-          {#if kind === 'media'}
-            <ul class="media-grid">
-              {#each group.items as item (attachmentKey(item))}
-                <li>{@render mediaTile(item)}</li>
-              {/each}
-            </ul>
-          {:else}
-            <ul class="attachment-list">
-              {#each group.items as item (attachmentKey(item))}
-                <li>{@render row(item)}</li>
-              {/each}
-            </ul>
-          {/if}
-        </section>
-      {/each}
-    {:else if loading}
-      {@render skeleton()}
-    {:else if showEmpty}
-      <p class="attachments-status">{i18n.t(emptyLabel)}</p>
-    {/if}
-
-    {#if failed}
-      <div class="attachments-failure" role="alert">
-        <p>{i18n.t('timeline.attachmentsFailed')}</p>
-        <Button size="small" variant="secondary" onclick={() => pager.retry()}>
-          {i18n.t('common.tryAgain')}
-        </Button>
-      </div>
-    {:else if loading && items.length > 0}
-      <div class="attachments-more"><Spinner small /></div>
-    {:else if !exhausted && !loading}
-      <div class="attachments-more" {@attach nearEnd}>
-        <Button size="small" variant="secondary" onclick={loadMore}>
-          {i18n.t('common.loadMore')}
-        </Button>
-      </div>
-    {/if}
-  </div>
-</RoomSidePanel>
+  {#if failed}
+    <div class="attachments-failure" role="alert">
+      <p>{i18n.t('timeline.attachmentsFailed')}</p>
+      <Button size="small" variant="secondary" onclick={() => pager.retry()}>
+        {i18n.t('common.tryAgain')}
+      </Button>
+    </div>
+  {:else if loading && items.length > 0}
+    <div class="attachments-more"><Spinner small /></div>
+  {:else if !exhausted && !loading}
+    <div class="attachments-more" {@attach nearEnd}>
+      <Button size="small" variant="secondary" onclick={loadMore}>
+        {i18n.t('common.loadMore')}
+      </Button>
+    </div>
+  {/if}
+</div>
 
 <style>
   .tabs {

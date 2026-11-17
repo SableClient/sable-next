@@ -2,11 +2,11 @@
   import type { RoomListItemView } from '#src/generated/protocol';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import type { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
-  import ThreadList from './conversation/ThreadList.svelte';
-  import RoomAttachments from './media/RoomAttachments.svelte';
+  import RoomAttachmentsPanel from './RoomAttachmentsPanel.svelte';
   import RoomMembersPanel from './RoomMembersPanel.svelte';
   import RoomNotificationsPanel from './RoomNotificationsPanel.svelte';
   import RoomSearchPanel from './RoomSearchPanel.svelte';
+  import RoomThreadsPanel from './RoomThreadsPanel.svelte';
   import RoomWidgetsPanel from './RoomWidgetsPanel.svelte';
   import type { RoomPanels } from './room-panels.svelte.js';
   import type { RoomSession } from './room-session.svelte.js';
@@ -42,7 +42,7 @@
 </script>
 
 {#if panels.threadsOpen}
-  <ThreadList
+  <RoomThreadsPanel
     {roomId}
     members={memberLoader.members}
     modal={!desktop}
@@ -74,7 +74,7 @@
 {/if}
 
 {#if panels.attachmentsOpen}
-  <RoomAttachments
+  <RoomAttachmentsPanel
     {roomId}
     members={memberLoader.members}
     modal={!desktop}

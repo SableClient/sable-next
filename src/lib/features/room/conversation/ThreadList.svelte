@@ -4,7 +4,6 @@
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import type { MemberView } from '#src/generated/protocol';
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
-  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -15,18 +14,15 @@
   import { fallbackText } from '../messages/reply-fallback.js';
   import { stripReplyFallback } from '../members/members.js';
   import MessagePreview from '../messages/MessagePreview.svelte';
-  import RoomSidePanel from '../RoomSidePanel.svelte';
   import { opensFrom } from '../messages/message-preview';
 
   interface Props {
     roomId: string;
     members: readonly MemberView[];
-    modal?: boolean;
     onOpenThread: (rootEventId: string) => void;
-    onClose: () => void;
   }
 
-  let { roomId, members, modal = false, onOpenThread, onClose }: Props = $props();
+  let { roomId, members, onOpenThread }: Props = $props();
 
   const core = useCoreClient();
   const threads = new ThreadRoots(core);
@@ -43,95 +39,81 @@
   });
 </script>
 
-<RoomSidePanel
-  title={i18n.t('timeline.threadsTitle')}
-  closeLabel={i18n.t('timeline.threadsClose')}
-  resizeLabel={i18n.t('timeline.threadsResize')}
-  widthKey="sable-thread-list-width"
-  width={22}
-  body="flush"
-  {modal}
-  {onClose}
->
-  {#snippet icon()}
-    <ChatsIcon aria-hidden="true" />
-  {/snippet}
-  {#if threads.items.length > 0}
-    <ul>
-      {#each threads.items as root (root.id)}
-        {@const rootId = root.event_id ?? root.id}
-        {@const threadOpenLabel = i18n.t('timeline.threadOpen')}
-        <li>
-          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <div
-            class="thread-root"
-            onclick={(event) => {
-              if (opensFrom(event)) onOpenThread(rootId);
-            }}
-          >
-            <MessagePreview {roomId} eventId={rootId} item={root} {members} loadPreviewProfile>
-              {#snippet fallback()}{/snippet}
-            </MessagePreview>
-          </div>
-          <Tooltip label={threadOpenLabel} disabled={!!root.thread_summary}>
-            {#snippet trigger({ props })}
-              <button
-                {...props}
-                type="button"
-                class={['thread-summary', { 'no-summary': !root.thread_summary }]}
-                aria-label={root.thread_summary ? undefined : threadOpenLabel}
-                onclick={() => {
-                  onOpenThread(rootId);
-                }}
-              >
-                <ThreadIcon size={14} aria-hidden="true" />
-                {#if root.thread_summary}
-                  <span class="thread-count">
-                    {i18n.t('timeline.threadReplies', {
-                      count: root.thread_summary.num_replies,
-                    })}
-                  </span>
+{#if threads.items.length > 0}
+  <ul>
+    {#each threads.items as root (root.id)}
+      {@const rootId = root.event_id ?? root.id}
+      {@const threadOpenLabel = i18n.t('timeline.threadOpen')}
+      <li>
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+        <div
+          class="thread-root"
+          onclick={(event) => {
+            if (opensFrom(event)) onOpenThread(rootId);
+          }}
+        >
+          <MessagePreview {roomId} eventId={rootId} item={root} {members} loadPreviewProfile>
+            {#snippet fallback()}{/snippet}
+          </MessagePreview>
+        </div>
+        <Tooltip label={threadOpenLabel} disabled={!!root.thread_summary}>
+          {#snippet trigger({ props })}
+            <button
+              {...props}
+              type="button"
+              class={['thread-summary', { 'no-summary': !root.thread_summary }]}
+              aria-label={root.thread_summary ? undefined : threadOpenLabel}
+              onclick={() => {
+                onOpenThread(rootId);
+              }}
+            >
+              <ThreadIcon size={14} aria-hidden="true" />
+              {#if root.thread_summary}
+                <span class="thread-count">
+                  {i18n.t('timeline.threadReplies', {
+                    count: root.thread_summary.num_replies,
+                  })}
+                </span>
+              {/if}
+              {#if root.thread_summary}
+                {@const latest = stripReplyFallback(
+                  fallbackText(
+                    root.thread_summary.latest_body,
+                    root.thread_summary.latest_fallback,
+                    i18n.t
+                  ),
+                  null
+                )}
+                {#if latest}
+                  <span class="thread-latest">{latest}</span>
                 {/if}
-                {#if root.thread_summary}
-                  {@const latest = stripReplyFallback(
-                    fallbackText(
-                      root.thread_summary.latest_body,
-                      root.thread_summary.latest_fallback,
-                      i18n.t
-                    ),
-                    null
-                  )}
-                  {#if latest}
-                    <span class="thread-latest">{latest}</span>
-                  {/if}
-                {/if}
-              </button>
-            {/snippet}
-          </Tooltip>
-        </li>
-      {/each}
-    </ul>
-  {:else if !threads.loading && !threads.error}
-    <p class="thread-list-status">{i18n.t('timeline.threadsEmpty')}</p>
-  {/if}
+              {/if}
+            </button>
+          {/snippet}
+        </Tooltip>
+      </li>
+    {/each}
+  </ul>
+{:else if !threads.loading && !threads.error}
+  <p class="thread-list-status">{i18n.t('timeline.threadsEmpty')}</p>
+{/if}
 
-  {#if threads.error}
-    <p class="thread-list-status" role="alert">{i18n.t('timeline.threadsFailed')}</p>
-  {/if}
-  {#if threads.loading}
-    <div class="thread-list-loading"><Spinner small /></div>
-  {:else if threads.nextBatch !== null || threads.error}
-    <div class="thread-list-more">
-      <Button
-        size="small"
-        variant="secondary"
-        onclick={() => void (threads.error ? threads.retry() : threads.loadMore())}
-      >
-        {threads.error ? i18n.t('common.tryAgain') : i18n.t('timeline.threadsLoadMore')}
-      </Button>
-    </div>
-  {/if}
-</RoomSidePanel>
+{#if threads.error}
+  <p class="thread-list-status" role="alert">{i18n.t('timeline.threadsFailed')}</p>
+{/if}
+{#if threads.loading}
+  <div class="thread-list-loading"><Spinner small /></div>
+{:else if threads.nextBatch !== null || threads.error}
+  <div class="thread-list-more">
+    <Button
+      size="small"
+      variant="secondary"
+      onclick={() => void (threads.error ? threads.retry() : threads.loadMore())}
+    >
+      {threads.error ? i18n.t('common.tryAgain') : i18n.t('timeline.threadsLoadMore')}
+    </Button>
+  </div>
+{/if}
 
 <style>
   ul {
