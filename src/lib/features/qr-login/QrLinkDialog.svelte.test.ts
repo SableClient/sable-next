@@ -112,6 +112,19 @@ test('points QR sign-in instructions to Account settings', async () => {
   );
 });
 
+test('offers only scanning when the provider cannot show a sign-in code', async () => {
+  render(QrLinkDialog, {
+    props: {
+      open: true,
+      mode: 'login',
+      target: { homeserver: () => null, redirectUri: () => '', canShowCode: () => false },
+    },
+  });
+
+  expect(await screen.findByRole('button', { name: 'Scan a QR code' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Show a QR code' })).not.toBeInTheDocument();
+});
+
 test('links a new device through the code, the check number and a clear failure', async () => {
   const user = userEvent.setup();
   render(QrLinkDialog, { open: true, mode: 'grant' });

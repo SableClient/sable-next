@@ -210,14 +210,16 @@
       </div>
     {:else if progress === null}
       <div class="qr-actions">
-        <Button
-          variant="primary"
-          class="qr-action"
-          disabled={flow.pending}
-          onclick={() => void flow.showCode()}
-        >
-          <QrCodeIcon size={18} aria-hidden="true" />{i18n.t('qrLogin.showCode')}
-        </Button>
+        {#if target?.canShowCode() !== false}
+          <Button
+            variant="primary"
+            class="qr-action"
+            disabled={flow.pending}
+            onclick={() => void flow.showCode()}
+          >
+            <QrCodeIcon size={18} aria-hidden="true" />{i18n.t('qrLogin.showCode')}
+          </Button>
+        {/if}
         <Button class="qr-action" disabled={flow.pending} onclick={() => flow.startScanning()}>
           <CameraIcon size={18} aria-hidden="true" />{i18n.t('qrLogin.scanCode')}
         </Button>

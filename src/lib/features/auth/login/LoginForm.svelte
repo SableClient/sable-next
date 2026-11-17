@@ -229,15 +229,6 @@
               disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
               onclick={() => void onLaunchRedirectLogin('oidc')}
             />
-            {#if onQrLogin && loginFlows.qr_login}
-              <Button
-                variant="ghost"
-                disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
-                onclick={onQrLogin}
-              >
-                <QrCodeIcon size={18} aria-hidden="true" />{i18n.t('qrLogin.titleLogin')}
-              </Button>
-            {/if}
           </div>
         </LoginMethod>
       {/if}
@@ -291,6 +282,14 @@
         </LoginMethod>
       {/if}
     </div>
+
+    {#if onQrLogin}
+      <div class="actions">
+        <Button variant="ghost" disabled={isAuthenticating || isLaunchingLogin} onclick={onQrLogin}>
+          <QrCodeIcon size={18} aria-hidden="true" />{i18n.t('qrLogin.titleLogin')}
+        </Button>
+      </div>
+    {/if}
 
     {#if availableLoginMethodCount > 1}
       <AuthMethodToggle

@@ -34,7 +34,11 @@ test('a new device scanning a code signs in against the homeserver the code name
   const flow = new QrFlow(
     core,
     () => 'login',
-    () => ({ homeserver: () => 'example.org', redirectUri: () => 'https://app.example/callback' })
+    () => ({
+      homeserver: () => 'example.org',
+      redirectUri: () => 'https://app.example/callback',
+      canShowCode: () => true,
+    })
   );
 
   await flow.scanned(new Uint8Array([1, 2, 3]));

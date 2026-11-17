@@ -141,6 +141,15 @@ test('an empty provider has no Continue button', () => {
   expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
 });
 
+test('QR sign-in is offered while the provider is still being checked', () => {
+  setup(() => Promise.resolve(null), {
+    loginFlows: null,
+    isCheckingHomeserver: true,
+    onQrLogin: vi.fn(),
+  });
+  expect(screen.getByRole('button', { name: 'Sign in with a QR code' })).toBeEnabled();
+});
+
 test('the create-account link only shows when the caller offers it', async () => {
   const { rerender } = setup(() => Promise.resolve(flows));
   expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull();

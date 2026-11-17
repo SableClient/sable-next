@@ -29,6 +29,7 @@ export type QrFlowCore = Pick<
 export interface QrLoginTarget {
   homeserver: () => string | null;
   redirectUri: () => string;
+  canShowCode: () => boolean;
 }
 
 export class QrFlow {

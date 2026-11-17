@@ -561,6 +561,7 @@
   target={{
     homeserver: () => flow.homeserver.trim() || null,
     redirectUri: () => redirect.qrRedirectUri(),
+    canShowCode: () => flow.loginFlows?.qr_login === true,
   }}
   onSignedIn={async () => {
     loginPending = true;
