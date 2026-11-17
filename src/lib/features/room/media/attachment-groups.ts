@@ -1,14 +1,16 @@
 import type { RoomAttachmentView } from '#src/generated/protocol';
 import { currentLocale } from '#lib/i18n.js';
 
-export interface AttachmentGroup {
+export interface AttachmentGroup<T extends RoomAttachmentView> {
   key: string;
   label: string;
-  items: RoomAttachmentView[];
+  items: T[];
 }
 
-export function groupByMonth(items: readonly RoomAttachmentView[]): AttachmentGroup[] {
-  const groups: AttachmentGroup[] = [];
+export function groupByMonth<T extends RoomAttachmentView>(
+  items: readonly T[]
+): AttachmentGroup<T>[] {
+  const groups: AttachmentGroup<T>[] = [];
   const locale = currentLocale();
   const now = new Date();
   for (const item of items) {

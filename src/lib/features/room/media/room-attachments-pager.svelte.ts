@@ -1,20 +1,13 @@
-import type { RoomAttachmentKind, RoomAttachmentView } from '#src/generated/protocol';
+import type { RoomAttachmentKind } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
-import { galleryItemId } from '#lib/ui/media/media-items.js';
+import { attachmentKey, isAttachmentOf, type RoomAttachmentOf } from './room-attachments';
 
 const PAGE_SIZE = 30;
 
-function attachmentKey(item: RoomAttachmentView): string {
-  return item.gallery_index === null
-    ? item.event_id
-    : galleryItemId(item.event_id, item.gallery_index);
-}
-
-export class RoomAttachmentsPager {
-  kind = $state<RoomAttachmentKind>('media');
-  items = $state.raw<RoomAttachmentView[]>([]);
+export class RoomAttachmentsPager<K extends RoomAttachmentKind> {
+  items = $state.raw<RoomAttachmentOf<K>[]>([]);
   loading = $state(true);
   failed = $state(false);
   exhausted = $state(false);
@@ -23,17 +16,14 @@ export class RoomAttachmentsPager {
   #cursor: string | null = null;
   #generation = 0;
 
-  constructor(private readonly core: CoreClient) {}
+  constructor(
+    private readonly core: CoreClient,
+    readonly kind: K
+  ) {}
 
   sync(roomId: string): void {
     if (this.#roomId === roomId) return;
     this.#roomId = roomId;
-    this.#reset();
-  }
-
-  select(kind: RoomAttachmentKind): void {
-    if (this.kind === kind) return;
-    this.kind = kind;
     this.#reset();
   }
 
@@ -76,7 +66,8 @@ export class RoomAttachmentsPager {
         from: cursor,
       });
       if (generation !== this.#generation) return;
-      this.items = cursor === null ? page.items : [...this.items, ...this.#unseen(page.items)];
+      const items = page.items.filter((item) => isAttachmentOf(kind, item));
+      this.items = cursor === null ? items : [...this.items, ...this.#unseen(items)];
       this.#cursor = page.next_batch;
       this.exhausted = page.next_batch === null;
     } catch (error) {
@@ -87,7 +78,7 @@ export class RoomAttachmentsPager {
     }
   }
 
-  #unseen(page: readonly RoomAttachmentView[]): RoomAttachmentView[] {
+  #unseen(page: readonly RoomAttachmentOf<K>[]): RoomAttachmentOf<K>[] {
     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local lookup, never observed
     const loaded = new Set(this.items.map(attachmentKey));
     return page.filter((item) => !loaded.has(attachmentKey(item)));
