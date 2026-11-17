@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.service.notification.StatusBarNotification
 import android.util.Log
 
 internal object AlertLog {
@@ -37,6 +38,16 @@ internal object AlertLog {
 
     fun skipped(context: Context, path: String, trace: PushTrace, reason: String) {
         write(context, PushOutcome.REPLAY_DROPPED, trace, "path=$path skipped=$reason")
+    }
+
+    fun dismissal(context: Context, outcome: PushOutcome, shown: StatusBarNotification) {
+        val extras = shown.notification.extras
+        val trace = PushTrace(
+            extras.getString(ConversationHistory.ACCOUNT_KEY).orEmpty(),
+            extras.getString(ConversationHistory.ROOM_KEY).orEmpty(),
+            "",
+        )
+        write(context, outcome, trace, "id=${shown.id}")
     }
 
     private fun write(context: Context, outcome: PushOutcome, trace: PushTrace, detail: String) {

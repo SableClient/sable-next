@@ -38,6 +38,9 @@ internal enum class PushOutcome {
     ACTIVE_ELSEWHERE,
     IN_APP,
     POSTED,
+    APP_DISMISSED,
+    APP_DISMISS_IGNORED,
+    ALL_DISMISSED,
 }
 
 internal data class PushTrace(

@@ -249,7 +249,7 @@ object PushNotifier {
         else -> null
     }
 
-    private fun appInForeground(): Boolean {
+    internal fun appInForeground(): Boolean {
         val state = ActivityManager.RunningAppProcessInfo()
         ActivityManager.getMyMemoryState(state)
         return state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND

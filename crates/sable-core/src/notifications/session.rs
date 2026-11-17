@@ -56,19 +56,92 @@ pub struct PushSession {
 
 const READ_ROOMS_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_ROOMS_CONNECTION: &str = "read-rooms";
+const READ_ROOMS_TIMELINE: u32 = 1;
 
+/// MSC4186 has no notification counts (Synapse always sent zero), so a room is
+/// read when its latest event carries the user's own receipt or is the user's
+/// own. A room missing from the response proves nothing, so it stays unread.
 fn read_rooms_from_sync(
-    joined: &std::collections::BTreeMap<matrix_sdk::ruma::OwnedRoomId, Option<u64>>,
+    response: &sync_events::msc4186::Response,
+    own_user: &matrix_sdk::ruma::UserId,
     room_ids: &[matrix_sdk::ruma::OwnedRoomId],
 ) -> Vec<String> {
     room_ids
         .iter()
         .filter(|room_id| {
-            joined
-                .get(*room_id)
-                .is_none_or(|count| count.is_none_or(|count| count == 0))
+            let Some(room) = response.rooms.get(*room_id) else {
+                return false;
+            };
+            let receipts = own_receipts(response.extensions.receipts.rooms.get(*room_id), own_user);
+            read_through_latest(&room.timeline, &receipts, own_user)
         })
         .map(ToString::to_string)
+        .collect()
+}
+
+fn read_through_latest(
+    timeline: &[matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>],
+    receipts: &std::collections::HashSet<String>,
+    own_user: &matrix_sdk::ruma::UserId,
+) -> bool {
+    let Some(latest) = timeline.last() else {
+        return false;
+    };
+    latest
+        .get_field::<String>("event_id")
+        .ok()
+        .flatten()
+        .is_some_and(|event_id| receipts.contains(&event_id))
+        || latest
+            .get_field::<String>("sender")
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some(own_user.as_str())
+}
+
+/// Main-timeline receipts only: a threaded receipt says nothing about the room's latest event.
+fn own_receipts(
+    receipts: Option<
+        &matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::receipt::SyncReceiptEvent>,
+    >,
+    own_user: &matrix_sdk::ruma::UserId,
+) -> std::collections::HashSet<String> {
+    let Some(value) =
+        receipts.and_then(|raw| serde_json::from_str::<serde_json::Value>(raw.json().get()).ok())
+    else {
+        return std::collections::HashSet::new();
+    };
+    // MSC4551 sends the receipts bare; servers predating it wrap them in an `m.receipt` event.
+    let content = value
+        .get("content")
+        .filter(|_| value.get("type").is_some())
+        .unwrap_or(&value);
+    let Some(events) = content.as_object() else {
+        return std::collections::HashSet::new();
+    };
+    events
+        .iter()
+        .filter(|(_, types)| {
+            [
+                "m.read",
+                "m.read.private",
+                "org.matrix.msc2285.read.private",
+            ]
+            .iter()
+            .any(|kind| {
+                types
+                    .get(kind)
+                    .and_then(|users| users.get(own_user.as_str()))
+                    .is_some_and(|receipt| {
+                        receipt
+                            .get("thread_id")
+                            .and_then(serde_json::Value::as_str)
+                            .is_none_or(|thread| thread == "main")
+                    })
+            })
+        })
+        .map(|(event_id, _)| event_id.clone())
         .collect()
 }
 
@@ -228,13 +301,13 @@ impl PushSession {
 
         // Room subscriptions name exactly what to send. A `/sync` filter is advisory: a server
         // ignoring it answers with every room and all of the account's data.
+        let own_user = self.host.client().user_id()?.to_owned();
         let subscriptions: std::collections::BTreeMap<_, _> = room_ids
             .iter()
             .map(|room_id| {
-                (
-                    room_id.clone(),
-                    sync_events::msc4186::request::RoomSubscription::default(),
-                )
+                let mut subscription = sync_events::msc4186::request::RoomSubscription::default();
+                subscription.timeline_limit = READ_ROOMS_TIMELINE.into();
+                (room_id.clone(), subscription)
             })
             .collect();
 
@@ -246,6 +319,10 @@ impl PushSession {
                 request.timeout = Some(Duration::ZERO);
                 request.set_presence = PresenceState::Offline;
                 request.room_subscriptions.clone_from(&subscriptions);
+                request.extensions.receipts.enabled = Some(true);
+                request.extensions.receipts.rooms = Some(vec![
+                    sync_events::msc4186::request::ExtensionRoomConfig::AllSubscribed,
+                ]);
                 self.host
                     .client()
                     .send(request)
@@ -259,17 +336,7 @@ impl PushSession {
         .await
         .ok()?
         .ok()?;
-        let joined = response
-            .rooms
-            .iter()
-            .map(|(room_id, room)| {
-                (
-                    room_id.clone(),
-                    room.unread_notifications.notification_count.map(u64::from),
-                )
-            })
-            .collect();
-        Some(read_rooms_from_sync(&joined, &room_ids))
+        Some(read_rooms_from_sync(&response, &own_user, &room_ids))
     }
 
     #[must_use]
@@ -506,31 +573,103 @@ pub async fn cold_push_media(
 
 #[cfg(test)]
 mod tests {
-    use matrix_sdk::ruma::room_id;
+    use matrix_sdk::ruma::api::client::sync::sync_events::msc4186::{Response, response};
+    use matrix_sdk::ruma::events::AnySyncTimelineEvent;
+    use matrix_sdk::ruma::serde::Raw;
+    use matrix_sdk::ruma::{RoomId, user_id};
+    use serde_json::json;
 
     use super::read_rooms_from_sync;
 
+    fn event(id: &str, sender: &str) -> Raw<AnySyncTimelineEvent> {
+        Raw::from_json_string(
+            json!({"type": "m.room.message", "event_id": id, "sender": sender,
+                "origin_server_ts": 1, "content": {"msgtype": "m.text", "body": "hi"}})
+            .to_string(),
+        )
+        .unwrap()
+    }
+
+    fn room(
+        response: &mut Response,
+        id: &str,
+        timeline: Vec<Raw<AnySyncTimelineEvent>>,
+        receipts: Option<serde_json::Value>,
+    ) {
+        let room_id = RoomId::parse(id).unwrap();
+        let mut room = response::Room::default();
+        room.timeline = timeline;
+        response.rooms.insert(room_id.clone(), room);
+        if let Some(receipts) = receipts {
+            response.extensions.receipts.rooms.insert(
+                room_id,
+                Raw::from_json_string(receipts.to_string()).unwrap(),
+            );
+        }
+    }
+
     #[test]
-    fn a_sync_response_identifies_read_rooms() {
-        let rooms = vec![
-            room_id!("!zero:example.org").to_owned(),
-            room_id!("!unread:example.org").to_owned(),
-            room_id!("!missing-count:example.org").to_owned(),
-            room_id!("!absent:example.org").to_owned(),
-        ];
-        let joined = [
-            (room_id!("!zero:example.org").to_owned(), Some(0)),
-            (room_id!("!unread:example.org").to_owned(), Some(2)),
-            (room_id!("!missing-count:example.org").to_owned(), None),
+    fn a_room_is_read_once_the_users_receipt_or_message_follows_everyone_elses() {
+        let me = user_id!("@me:example.org");
+        let bob = "@bob:example.org";
+        let mut response = Response::new("1".to_owned());
+        room(
+            &mut response,
+            "!read:example.org",
+            vec![event("$a", bob), event("$b", bob)],
+            Some(
+                json!({"type": "m.receipt", "content": {"$b": {"m.read": {"@me:example.org": {"ts": 1}}}}}),
+            ),
+        );
+        room(
+            &mut response,
+            "!private:example.org",
+            vec![event("$c", bob)],
+            Some(json!({"$c": {"m.read.private": {"@me:example.org": {"thread_id": "main"}}}})),
+        );
+        room(
+            &mut response,
+            "!replied:example.org",
+            vec![event("$d", bob), event("$e", me.as_str())],
+            None,
+        );
+        room(
+            &mut response,
+            "!unread:example.org",
+            vec![event("$f", bob), event("$g", bob)],
+            Some(json!({"$f": {"m.read": {"@me:example.org": {}}}})),
+        );
+        room(
+            &mut response,
+            "!threaded:example.org",
+            vec![event("$h", bob)],
+            Some(json!({"$h": {"m.read": {"@me:example.org": {"thread_id": "$root"}}}})),
+        );
+        room(
+            &mut response,
+            "!theirs:example.org",
+            vec![event("$i", bob)],
+            Some(json!({"$i": {"m.read": {"@bob:example.org": {}}}})),
+        );
+        room(&mut response, "!no-timeline:example.org", Vec::new(), None);
+        let rooms = [
+            "!read:example.org",
+            "!private:example.org",
+            "!replied:example.org",
+            "!unread:example.org",
+            "!threaded:example.org",
+            "!theirs:example.org",
+            "!no-timeline:example.org",
+            "!left:example.org",
         ]
-        .into_iter()
-        .collect();
+        .map(|id| RoomId::parse(id).unwrap());
+
         assert_eq!(
-            read_rooms_from_sync(&joined, &rooms),
+            read_rooms_from_sync(&response, me, &rooms),
             vec![
-                "!zero:example.org".to_owned(),
-                "!missing-count:example.org".to_owned(),
-                "!absent:example.org".to_owned(),
+                "!read:example.org".to_owned(),
+                "!private:example.org".to_owned(),
+                "!replied:example.org".to_owned(),
             ]
         );
     }

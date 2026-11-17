@@ -1054,17 +1054,27 @@ async fn read_rooms_asks_only_for_the_rooms_still_shown() {
         .and(body_json(json!({
             "conn_id": "read-rooms",
             "room_subscriptions": {
-                "!read:example.org": {"timeline_limit": 0},
-                "!unread:example.org": {"timeline_limit": 0},
-                "!left:example.org": {"timeline_limit": 0},
+                "!read:example.org": {"timeline_limit": 1},
+                "!unread:example.org": {"timeline_limit": 1},
+                "!left:example.org": {"timeline_limit": 1},
             },
+            "extensions": {"receipts": {"enabled": true, "rooms": ["*"]}},
         })))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "pos": "1",
             "rooms": {
-                "!read:example.org": {"notification_count": 0},
-                "!unread:example.org": {"notification_count": 3},
+                "!read:example.org": {"notification_count": 0, "timeline": [
+                    {"type": "m.room.message", "event_id": "$read", "sender": "@bob:example.org",
+                        "origin_server_ts": 1, "content": {"msgtype": "m.text", "body": "hi"}},
+                ]},
+                "!unread:example.org": {"notification_count": 0, "timeline": [
+                    {"type": "m.room.message", "event_id": "$new", "sender": "@bob:example.org",
+                        "origin_server_ts": 2, "content": {"msgtype": "m.text", "body": "hi"}},
+                ]},
             },
+            "extensions": {"receipts": {"rooms": {
+                "!read:example.org": {"$read": {"m.read": {"@alice:example.org": {"ts": 1}}}},
+            }}},
         })))
         .expect(1)
         .mount(fixture.server.server())
@@ -1086,13 +1096,7 @@ async fn read_rooms_asks_only_for_the_rooms_still_shown() {
         ])
         .await;
 
-    assert_eq!(
-        read,
-        Some(vec![
-            "!read:example.org".to_owned(),
-            "!left:example.org".to_owned()
-        ])
-    );
+    assert_eq!(read, Some(vec!["!read:example.org".to_owned()]));
     drop(session);
     remove_data_dir(&fixture.data_dir).await;
 }
