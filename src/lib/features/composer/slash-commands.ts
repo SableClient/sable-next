@@ -12,7 +12,7 @@ import { knockRoom, openDirectMessage } from '#lib/core/api/rooms.js';
 import type { E2eePolicy } from '#lib/deployment/e2ee-policy.js';
 import { setMemberLook } from '#lib/core/api/members.js';
 import { joinOrOfferKnock } from '#lib/rooms/join-or-knock.js';
-import { parseSlash } from '#lib/model/model.js';
+import { parseMatrixLink, parseSlash } from '#lib/model/model.js';
 import { currentFix } from '#lib/platform/geolocation.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -555,17 +555,15 @@ function plainTextFrom(html: string): string {
   return textFrom(new DOMParser().parseFromString(html, 'text/html').body).trim();
 }
 
-const MENTION_USER_ID = /#\/(@[^?]+)/;
-
 /** A mention pill reads as its display name in the body; commands take the id. */
 function spellMentions(body: string, formatted: string | null | undefined): string {
   if (!formatted) return body;
   const links = new DOMParser().parseFromString(formatted, 'text/html').querySelectorAll('a[href]');
   let spelled = body;
   for (const link of links) {
-    const userId = MENTION_USER_ID.exec(link.getAttribute('href') ?? '')?.[1];
+    const target = parseMatrixLink(link.getAttribute('href') ?? '');
     const label = link.textContent;
-    if (userId && label) spelled = spelled.replace(label, () => decodeURIComponent(userId));
+    if (target?.kind === 'user' && label) spelled = spelled.replace(label, () => target.user_id);
   }
   return spelled;
 }

@@ -247,7 +247,7 @@ test('a mention pill stands in for the user id a command asks for', async () => 
 
   await runSlash('/headpat @Kris', {
     ...context(commands),
-    formatted: '/headpat <a href="https://link.sable.moe/#/@kris:example.org">@Kris</a>',
+    formatted: '/headpat <a href="matrix:u/kris:example.org">@Kris</a>',
   });
 
   expect(commands.sendGesture).toHaveBeenCalledWith({
