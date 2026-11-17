@@ -195,11 +195,11 @@ fn trusted_submit_url(pending: &PendingRegistration, submit_url: &str) -> Option
     allowed.then_some(url)
 }
 
-fn can_complete_email_out_of_band(versions: &matrix_sdk::ruma::api::SupportedVersions) -> bool {
+fn can_complete_email_out_of_band(versions: &ruma::api::SupportedVersions) -> bool {
     versions
         .versions
         .iter()
-        .any(|version| *version >= matrix_sdk::ruma::api::MatrixVersion::V1_0)
+        .any(|version| *version >= ruma::api::MatrixVersion::V1_0)
 }
 
 impl Core {
@@ -484,7 +484,7 @@ impl Core {
                 ));
         let auth = match stage {
             "m.login.dummy" => {
-                let mut dummy = matrix_sdk::ruma::api::client::uiaa::Dummy::new();
+                let mut dummy = ruma::api::client::uiaa::Dummy::new();
                 dummy.session = Some(pending.session.clone());
                 Some(AuthData::Dummy(dummy))
             }
@@ -496,7 +496,7 @@ impl Core {
             }
             "m.login.registration_token" => pending.registration_token.as_ref().map(|token| {
                 let mut registration_token =
-                    matrix_sdk::ruma::api::client::uiaa::RegistrationToken::new(token.clone());
+                    ruma::api::client::uiaa::RegistrationToken::new(token.clone());
                 registration_token.session = Some(pending.session.clone());
                 AuthData::RegistrationToken(registration_token)
             }),
@@ -807,10 +807,10 @@ impl Core {
             self.restore_pending_registration(pending).await;
             return Err(RpcCode::EmailVerificationFailed.into());
         };
-        let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
+        let builder = crate::tls::apply(reqwest::Client::builder());
         #[cfg(not(target_family = "wasm"))]
         let builder = builder
-            .redirect(matrix_sdk::reqwest::redirect::Policy::none())
+            .redirect(reqwest::redirect::Policy::none())
             .timeout(std::time::Duration::from_secs(15));
         let Ok(client) = builder.build() else {
             self.restore_pending_registration(pending).await;
@@ -1002,8 +1002,7 @@ mod tests {
 
     #[test]
     fn registration_request_serializes_token_and_fallback_auth() -> Result<(), serde_json::Error> {
-        let mut token =
-            matrix_sdk::ruma::api::client::uiaa::RegistrationToken::new("invite-123".to_owned());
+        let mut token = ruma::api::client::uiaa::RegistrationToken::new("invite-123".to_owned());
         token.session = Some("session-1".to_owned());
         let request = registration_request(
             "alice",
@@ -1026,8 +1025,7 @@ mod tests {
     #[test]
     fn a_token_stage_without_a_session_serializes_a_null_session() -> Result<(), serde_json::Error>
     {
-        let token =
-            matrix_sdk::ruma::api::client::uiaa::RegistrationToken::new("invite-123".to_owned());
+        let token = ruma::api::client::uiaa::RegistrationToken::new("invite-123".to_owned());
         let value = serde_json::to_value(AuthData::RegistrationToken(token))?;
         assert_eq!(value.get("session"), Some(&serde_json::Value::Null));
         Ok(())
@@ -1051,18 +1049,12 @@ mod tests {
 
     #[test]
     fn out_of_band_email_completion_requires_r0_5_or_newer() {
-        let unknown = matrix_sdk::ruma::api::SupportedVersions::from_parts(
-            &["r0.4.0".to_owned()],
-            &BTreeMap::new(),
-        );
-        let legacy = matrix_sdk::ruma::api::SupportedVersions::from_parts(
-            &["r0.5.0".to_owned()],
-            &BTreeMap::new(),
-        );
-        let stable = matrix_sdk::ruma::api::SupportedVersions::from_parts(
-            &["v1.1".to_owned()],
-            &BTreeMap::new(),
-        );
+        let unknown =
+            ruma::api::SupportedVersions::from_parts(&["r0.4.0".to_owned()], &BTreeMap::new());
+        let legacy =
+            ruma::api::SupportedVersions::from_parts(&["r0.5.0".to_owned()], &BTreeMap::new());
+        let stable =
+            ruma::api::SupportedVersions::from_parts(&["v1.1".to_owned()], &BTreeMap::new());
 
         assert!(!can_complete_email_out_of_band(&unknown));
         assert!(can_complete_email_out_of_band(&legacy));

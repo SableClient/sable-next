@@ -384,7 +384,7 @@ mod tests {
 
         let plain = split_via("#room:example.org");
         assert_eq!(plain.href, "#room:example.org");
-        assert_eq!(plain.via, [] as [String; 0]);
+        assert_eq!(plain.via, Vec::<String>::new());
     }
 
     #[test]
@@ -468,7 +468,7 @@ mod tests {
         assert_eq!(parse_matrix_link(&split.href), Some(room("!opaque")));
         assert_eq!(
             split_via("matrix:roomid/opaque#reserved?via=wrong.example").via,
-            [] as [std::string::String; 0]
+            Vec::<String>::new()
         );
     }
 }

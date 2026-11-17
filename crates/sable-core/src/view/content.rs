@@ -572,7 +572,7 @@ mod tests {
 
     #[test]
     fn call_invites_have_a_dedicated_view() {
-        let view = super::content(
+        let view = content(
             &TimelineItemContent::CallInvite,
             None,
             &RawFields::default(),

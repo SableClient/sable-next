@@ -1,0 +1,33 @@
+[files]
+extend-exclude = [
+  "*.lock",
+  "pnpm-lock.yaml",
+  "*.asc",
+  "patches/",
+  "vendor/",
+  "src/generated/",
+  "src/locales/",
+  "CHANGELOG.md",
+]
+
+[default]
+extend-ignore-re = ["[A-Za-z0-9_+/=-]{30,}", "\\$s[0-9A-Za-z_]{20,}"]
+
+[default.extend-words]
+commet = "commet"
+trak = "trak"
+tpe = "tpe"
+sie = "sie"
+statuts = "statuts"
+rememberable = "rememberable"
+unparseable = "unparseable"
+iy = "iy"
+notfication = "notfication"
+deligate = "deligate"
+recieve = "recieve"
+messag = "messag"
+helo = "helo"
+abd = "abd"
+ba = "ba"
+nd = "nd"
+pn = "pn"

@@ -72,7 +72,7 @@ async fn test_chinese_search_survives_restore() {
         }
         assert_eq!(
             found(&index, "天气", &crate::search::IndexFilter::default()),
-            [] as [String; 0]
+            Vec::<String>::new()
         );
     }
 }
@@ -101,7 +101,7 @@ async fn test_pending_chinese_reindex() {
     assert!(index.chinese_pending());
     assert_eq!(
         found(&index, "搜索", &crate::search::IndexFilter::default()),
-        [] as [String; 0]
+        Vec::<String>::new()
     );
 
     index.refresh_chinese().await;
@@ -116,7 +116,7 @@ async fn test_pending_chinese_reindex() {
 
 #[async_test]
 async fn test_a_restored_index_lists_media_without_the_event_cache() {
-    let room = matrix_sdk::ruma::RoomId::parse("!pictures:localhost").expect("room id");
+    let room = ruma::RoomId::parse("!pictures:localhost").expect("room id");
     let mut index = MessageIndex::new();
     index.rooms.insert(
         room.clone(),
@@ -411,23 +411,23 @@ async fn test_only_the_crawl_rederives_classified_documents() {
         .sync_room(
             &client,
             JoinedRoomBuilder::new(&room_id).add_timeline_event(
-                serde_json::from_value::<
-                    matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>,
-                >(serde_json::json!({
-                    "type": "m.room.message",
-                    "event_id": "$gallery",
-                    "sender": "@kris:localhost",
-                    "origin_server_ts": 5_000,
-                    "content": {
-                        "msgtype": "dm.filament.gallery",
-                        "body": "",
-                        "itemtypes": [{
-                            "itemtype": "m.file",
-                            "body": "notes.pdf",
-                            "url": "mxc://localhost/notes"
-                        }]
-                    }
-                }))
+                serde_json::from_value::<ruma::serde::Raw<ruma::events::AnySyncTimelineEvent>>(
+                    serde_json::json!({
+                        "type": "m.room.message",
+                        "event_id": "$gallery",
+                        "sender": "@kris:localhost",
+                        "origin_server_ts": 5_000,
+                        "content": {
+                            "msgtype": "dm.filament.gallery",
+                            "body": "",
+                            "itemtypes": [{
+                                "itemtype": "m.file",
+                                "body": "notes.pdf",
+                                "url": "mxc://localhost/notes"
+                            }]
+                        }
+                    }),
+                )
                 .expect("gallery event"),
             ),
         )
@@ -616,7 +616,7 @@ async fn test_a_room_left_between_sessions_is_wiped_at_restore() {
 
     assert_eq!(
         crate::search::persist::listed_rooms(&client).await,
-        [] as [matrix_sdk::ruma::OwnedRoomId; 0]
+        Vec::<ruma::OwnedRoomId>::new()
     );
     assert!(matches!(
         crate::search::persist::open(&client, &left).await,
@@ -689,7 +689,7 @@ async fn test_a_flushed_index_is_searchable_in_the_next_session() {
 
 #[test]
 fn test_a_lightly_edited_room_waits_before_its_snapshot_is_rewritten() {
-    let room = matrix_sdk::ruma::RoomId::parse("!throttle:localhost").expect("room id");
+    let room = ruma::RoomId::parse("!throttle:localhost").expect("room id");
     let mut index = MessageIndex::new();
     index
         .rooms
@@ -719,15 +719,12 @@ fn test_a_lightly_edited_room_waits_before_its_snapshot_is_rewritten() {
     );
 
     index.take_flush(&room);
-    assert_eq!(
-        index.rooms_due_to_flush(),
-        [] as [matrix_sdk::ruma::OwnedRoomId; 0]
-    );
+    assert_eq!(index.rooms_due_to_flush(), Vec::<ruma::OwnedRoomId>::new());
 }
 
 #[test]
 fn test_a_busy_room_is_persisted_without_waiting_out_the_ticks() {
-    let room = matrix_sdk::ruma::RoomId::parse("!busy:localhost").expect("room id");
+    let room = ruma::RoomId::parse("!busy:localhost").expect("room id");
     let mut index = MessageIndex::new();
     let room_index = index
         .rooms
@@ -754,7 +751,7 @@ fn test_a_busy_room_is_persisted_without_waiting_out_the_ticks() {
 
 #[test]
 fn test_an_unreadable_room_is_never_flushed_over_its_blob() {
-    let room = matrix_sdk::ruma::RoomId::parse("!unreadable:localhost").expect("room id");
+    let room = ruma::RoomId::parse("!unreadable:localhost").expect("room id");
     let mut index = MessageIndex::new();
     index.mark_unreadable(&room);
     let room_index = index
@@ -772,10 +769,7 @@ fn test_an_unreadable_room_is_never_flushed_over_its_blob() {
         ));
     }
 
-    assert_eq!(
-        index.dirty_rooms(),
-        [] as [matrix_sdk::ruma::OwnedRoomId; 0]
-    );
+    assert_eq!(index.dirty_rooms(), Vec::<ruma::OwnedRoomId>::new());
     for _ in 0..crate::search::TICKS_BEFORE_FLUSH {
         assert!(
             index.rooms_due_to_flush().is_empty(),
@@ -786,7 +780,7 @@ fn test_an_unreadable_room_is_never_flushed_over_its_blob() {
 
 #[async_test]
 async fn test_a_restored_room_waits_out_the_ticks_before_it_is_rewritten() {
-    let room = matrix_sdk::ruma::RoomId::parse("!restored:localhost").expect("room id");
+    let room = ruma::RoomId::parse("!restored:localhost").expect("room id");
     let documents = (0..crate::search::CHANGES_BEFORE_FLUSH)
         .map(|seed| {
             document(

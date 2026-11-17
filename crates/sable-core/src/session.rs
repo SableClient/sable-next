@@ -375,11 +375,7 @@ pub(crate) async fn restore_notification_client(
         .backend()?;
     // Fetching a push must not report the user online.
     client
-        .set_presence(
-            matrix_sdk::ruma::presence::PresenceState::Offline,
-            None,
-            false,
-        )
+        .set_presence(ruma::presence::PresenceState::Offline, None, false)
         .await
         .backend()?;
     before_restore(&client);
@@ -653,7 +649,7 @@ async fn build_account_client(
         let lock = store_lock(&holder);
 
         let config = native_store_config(store_id, role, lock.clone()).await?;
-        let base = std::sync::Arc::new(matrix_sdk_base::BaseClient::new(
+        let base = Arc::new(matrix_sdk_base::BaseClient::new(
             config,
             THREADING_SUPPORT,
             matrix_sdk_base::DmRoomDefinition::MatrixSpec,
@@ -707,12 +703,10 @@ async fn build_account_client(
         BASE_CLIENTS.with_borrow_mut(|bases| {
             bases.insert(store_id.to_owned(), std::rc::Rc::downgrade(&base));
         });
-        client.add_event_handler(
-            move |_: matrix_sdk::ruma::events::dummy::ToDeviceDummyEvent| {
-                let _owner = &base;
-                async {}
-            },
-        );
+        client.add_event_handler(move |_: ruma::events::dummy::ToDeviceDummyEvent| {
+            let _owner = &base;
+            async {}
+        });
         Ok(client)
     }
 }
@@ -736,7 +730,7 @@ thread_local! {
 pub(crate) type SharedBaseClient = std::rc::Rc<matrix_sdk_base::BaseClient>;
 
 #[cfg(not(target_family = "wasm"))]
-pub(crate) type SharedBaseClient = std::sync::Arc<matrix_sdk_base::BaseClient>;
+pub(crate) type SharedBaseClient = Arc<matrix_sdk_base::BaseClient>;
 
 #[cfg(not(target_family = "wasm"))]
 static BASE_CLIENTS: std::sync::LazyLock<
@@ -749,21 +743,20 @@ static BASE_CLIENTS: std::sync::LazyLock<
 fn register_base_client(store_id: &str, base: SharedBaseClient, client: &Client) {
     BASE_CLIENTS
         .lock()
-        .insert(store_id.to_owned(), std::sync::Arc::downgrade(&base));
-    client.add_event_handler(
-        move |_: matrix_sdk::ruma::events::dummy::ToDeviceDummyEvent| {
-            let _owner = &base;
-            async {}
-        },
-    );
+        .insert(store_id.to_owned(), Arc::downgrade(&base));
+    client.add_event_handler(move |_: ruma::events::dummy::ToDeviceDummyEvent| {
+        let _owner = &base;
+        async {}
+    });
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 pub(crate) async fn mock_account_client(
     server: &matrix_sdk::test_utils::mocks::MatrixMockServer,
     store_id: &str,
 ) -> Client {
-    let base = std::sync::Arc::new(matrix_sdk_base::BaseClient::new(
+    let base = Arc::new(matrix_sdk_base::BaseClient::new(
         matrix_sdk_base::store::StoreConfig::new(
             matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess,
         ),
@@ -1190,10 +1183,8 @@ mod tests {
         assert!(persisted.resolved_homeserver.is_none());
         persisted.homeserver = "does-not-exist.invalid".to_owned();
         persisted.resolved_homeserver = Some(url::Url::parse("https://endpoint.invalid").unwrap());
-        let directory = std::env::temp_dir().join(format!(
-            "sable-offline-{}",
-            matrix_sdk::ruma::TransactionId::new()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("sable-offline-{}", ruma::TransactionId::new()));
         let client = super::restore_client(directory.to_str().unwrap(), persisted, true)
             .await
             .unwrap();

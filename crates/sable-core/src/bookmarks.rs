@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(index.bookmark_ids, ["a", "b"]);
         assert_eq!(index.revision, None);
         let index: IndexIn = serde_json::from_value(json!({ "bookmark_ids": "a" })).unwrap();
-        assert_eq!(index.bookmark_ids, [] as [String; 0]);
+        assert_eq!(index.bookmark_ids, Vec::<String>::new());
 
         let item: ItemIn = serde_json::from_value(
             json!({ "room_id": "!r:x", "event_id": 4, "event_ts": 2, "sender": null }),

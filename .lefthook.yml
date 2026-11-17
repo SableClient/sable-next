@@ -50,6 +50,9 @@ pre-commit:
       run: cargo fmt --all
       stage_fixed: true
 
+    - name: typos
+      run: mise exec -- typos --force-exclude {staged_files}
+
 pre-push:
   parallel: true
   skip:

@@ -349,7 +349,7 @@ impl Core {
         let content = room_media_previews_content(stored, previews);
         let room = self.room(room_id).await?;
         for event in [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT] {
-            let raw = matrix_sdk::ruma::serde::Raw::new(&content)
+            let raw = ruma::serde::Raw::new(&content)
                 .or_failed(self, "set_room_media_previews")?
                 .cast_unchecked();
             room.set_account_data_raw(event.into(), raw)
@@ -369,7 +369,7 @@ impl Core {
 
     pub(crate) async fn synced_dm_spaces_of(
         client: &matrix_sdk::Client,
-        room_id: &matrix_sdk::ruma::RoomId,
+        room_id: &ruma::RoomId,
     ) -> Vec<OwnedRoomId> {
         synced_dm_spaces(client)
             .await
@@ -576,7 +576,7 @@ mod tests {
         );
         assert_eq!(
             dismissed_invites(Some(&json!({ "roomIds": "nope" }))),
-            [] as [matrix_sdk::ruma::OwnedRoomId; 0]
+            Vec::<ruma::OwnedRoomId>::new()
         );
     }
 

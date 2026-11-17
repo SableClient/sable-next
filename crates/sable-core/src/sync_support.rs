@@ -93,7 +93,7 @@ impl Core {
         let versions = client
             .fetch_server_versions(Some(
                 RequestConfig::new()
-                    .timeout(std::time::Duration::from_secs(15))
+                    .timeout(Duration::from_secs(15))
                     .disable_retry(),
             ))
             .await

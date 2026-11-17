@@ -403,7 +403,7 @@ impl Core {
     }
 }
 
-pub(crate) fn fill_sender_profiles(room: &matrix_sdk::Room, timeline: &Arc<Timeline>) {
+pub(crate) fn fill_sender_profiles(room: &Room, timeline: &Arc<Timeline>) {
     if room.are_members_synced() {
         return;
     }
@@ -502,7 +502,7 @@ fn is_signaling_event(event: &AnySyncTimelineEvent) -> bool {
 }
 
 pub(crate) async fn build_room_timeline(
-    room: &matrix_sdk::Room,
+    room: &Room,
     focus: &TimelineFocusView,
     hidden_events: bool,
 ) -> Result<Timeline, matrix_sdk_ui::timeline::Error> {
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn signaling_events_are_filtered_unless_hidden_events_are_on() {
-        let rules = matrix_sdk::ruma::room_version_rules::RoomVersionRules::V11;
+        let rules = ruma::room_version_rules::RoomVersionRules::V11;
         let event_json = [
             ("m.rtc.member", "{}", true),
             ("org.matrix.msc4143.rtc.member", "{}", true),
@@ -596,7 +596,7 @@ mod tests {
             } else {
                 ""
             };
-            let event = Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+            let event = Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(
                 format!(
                     r#"{{"type":"{event_type}","event_id":"$signal","sender":"@alice:example.org","origin_server_ts":1,"content":{content},"unsigned":{{}}{state_key}}}"#
                 ),
@@ -609,7 +609,7 @@ mod tests {
             assert_eq!(super::hidden_event_filter(&event, &rules), hidden);
         }
 
-        let ordinary = Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+        let ordinary = Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(
             r#"{"type":"com.example.signal","event_id":"$ordinary","sender":"@alice:example.org","origin_server_ts":1,"content":{},"unsigned":{}}"#.to_owned(),
         )
         .unwrap()
@@ -621,9 +621,9 @@ mod tests {
 
     #[test]
     fn fluffychat_cute_events_reach_the_timeline() {
-        let rules = matrix_sdk::ruma::room_version_rules::RoomVersionRules::V11;
+        let rules = ruma::room_version_rules::RoomVersionRules::V11;
         let event = |content: &str| {
-            Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(format!(
+            Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(format!(
                 r#"{{"type":"m.room.message","event_id":"$cute","sender":"@alice:example.org","origin_server_ts":1,"content":{content},"unsigned":{{}}}}"#
             ))
             .unwrap()
@@ -642,14 +642,12 @@ mod tests {
     fn aggregations_become_hidden_rows() {
         use matrix_sdk_base::deserialized_responses::TimelineEvent;
 
-        let rules = matrix_sdk::ruma::room_version_rules::RoomVersionRules::V11;
+        let rules = ruma::room_version_rules::RoomVersionRules::V11;
         let event = |json: &str| {
             TimelineEvent::from_plaintext(
-                Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
-                    json.to_owned(),
-                )
-                .unwrap()
-                .cast_unchecked(),
+                Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(json.to_owned())
+                    .unwrap()
+                    .cast_unchecked(),
             )
         };
         let reaction = event(
@@ -672,11 +670,9 @@ mod tests {
 
     fn cached(json: &str) -> matrix_sdk_base::event_cache::Event {
         matrix_sdk_base::deserialized_responses::TimelineEvent::from_plaintext(
-            Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
-                json.to_owned(),
-            )
-            .unwrap()
-            .cast_unchecked(),
+            Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(json.to_owned())
+                .unwrap()
+                .cast_unchecked(),
         )
     }
 
@@ -692,7 +688,7 @@ mod tests {
 
     async fn kept_ids(scope: &super::AggregationScope) -> Vec<String> {
         let known = [REPLY, ROOT, MAIN].map(cached);
-        let lookup = |id: matrix_sdk::ruma::OwnedEventId| {
+        let lookup = |id: ruma::OwnedEventId| {
             let found = known
                 .iter()
                 .find(|event| event.event_id() == Some(&*id))
@@ -733,7 +729,7 @@ mod tests {
     #[tokio::test]
     async fn an_unrelated_thread_keeps_none() {
         let scope = super::AggregationScope::Thread(event_id!("$other").to_owned());
-        assert_eq!(kept_ids(&scope).await, [] as [String; 0]);
+        assert_eq!(kept_ids(&scope).await, Vec::<String>::new());
     }
 
     #[tokio::test]

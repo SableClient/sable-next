@@ -186,7 +186,7 @@ impl RoomDownloadState {
 enum RoomDownloadStep {
     /// The receiving device is waiting for the room's parts list.
     WaitingForParts { pending_room: OwnedRoomId },
-    /// The receving device is downloading the room's parts.
+    /// The receiving device is downloading the room's parts.
     DownloadingParts(PartsDownloadState),
     /// Every room was downloaded.
     Done,

@@ -492,7 +492,7 @@ mod tests {
         };
         assert_eq!(
             build_hierarchy_sections(&rooms, "!root", &loaded),
-            [] as [crate::spaces::HierarchySection; 0]
+            Vec::<HierarchySection>::new()
         );
         let kept = SectionInputs {
             keep_empty: ["!space1".to_owned()].into(),

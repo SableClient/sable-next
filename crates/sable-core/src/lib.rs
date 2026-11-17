@@ -148,12 +148,10 @@ pub struct Core {
     next_login_attempt: AtomicU64,
     account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
     session_handlers: parking_lot::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
-    probed_pinned_rooms: parking_lot::Mutex<
-        HashMap<matrix_sdk::ruma::OwnedRoomId, Vec<matrix_sdk::ruma::OwnedEventId>>,
-    >,
+    probed_pinned_rooms: parking_lot::Mutex<HashMap<OwnedRoomId, Vec<OwnedEventId>>>,
     pinned_caches: parking_lot::Mutex<
         HashMap<
-            matrix_sdk::ruma::OwnedRoomId,
+            OwnedRoomId,
             (
                 matrix_sdk::event_cache::PinnedEventsCache,
                 Arc<matrix_sdk::event_cache::EventCacheDropHandles>,
@@ -165,7 +163,7 @@ pub struct Core {
     nicknames_stale: tokio::sync::Notify,
     room_list_options: watch::Sender<protocol::RoomListOptionsView>,
     dm_spaces_changed: watch::Sender<()>,
-    cosmetics_fetches: parking_lot::Mutex<HashMap<matrix_sdk::ruma::OwnedRoomId, Arc<Mutex<()>>>>,
+    cosmetics_fetches: parking_lot::Mutex<HashMap<OwnedRoomId, Arc<Mutex<()>>>>,
     probed_state: parking_lot::Mutex<probed_state::ProbedState>,
     recent_state: parking_lot::Mutex<probed_state::RecentState>,
     media_health: parking_lot::Mutex<media_health::MediaHealth>,
@@ -190,7 +188,7 @@ pub struct Core {
     warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
     account_data_lock: Mutex<()>,
     /// Until sync echoes the acceptance, the room would read as unaccepted.
-    accepted_rules: parking_lot::Mutex<HashMap<(matrix_sdk::ruma::OwnedUserId, OwnedRoomId), i64>>,
+    accepted_rules: parking_lot::Mutex<HashMap<(ruma::OwnedUserId, OwnedRoomId), i64>>,
     inbox: Mutex<inbox::InboxCache>,
     inbox_flush: Mutex<()>,
     inbox_changed: tokio::sync::Notify,
@@ -233,7 +231,7 @@ struct CallSession {
     delay_id: Arc<Mutex<calls::DelayState>>,
     postpone: Option<Task>,
     updates: Option<Task>,
-    state: Arc<tokio::sync::Mutex<calls::CallRuntimeState>>,
+    state: Arc<Mutex<calls::CallRuntimeState>>,
     sticky_member: Option<String>,
     _handlers: Vec<matrix_sdk::event_handler::EventHandlerDropGuard>,
 }
@@ -289,9 +287,7 @@ enum SubscriptionKind {
 }
 
 pub(crate) fn now_ms() -> u64 {
-    matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now()
-        .get()
-        .into()
+    ruma::MilliSecondsSinceUnixEpoch::now().get().into()
 }
 
 impl Core {
@@ -877,7 +873,7 @@ mod tests {
     async fn to_device_work_runs_in_order_without_blocking_the_caller() {
         let (core, _events) = Core::new(
             "to-device-inbox",
-            Box::new(crate::store::MemorySessionStore::default()),
+            Box::new(store::MemorySessionStore::default()),
         );
         let (release, released) = tokio::sync::oneshot::channel::<()>();
         let (done, mut finished) = mpsc::unbounded_channel();
@@ -908,18 +904,16 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionStore for FailingClearSessionStore {
-        async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
+        async fn load(&self) -> Result<Option<Vec<u8>>, store::StoreError> {
             Ok(None)
         }
 
-        async fn save(&self, _bytes: Vec<u8>) -> Result<(), crate::store::StoreError> {
+        async fn save(&self, _bytes: Vec<u8>) -> Result<(), store::StoreError> {
             Ok(())
         }
 
-        async fn clear(&self) -> Result<(), crate::store::StoreError> {
-            Err(crate::store::StoreError::Message(
-                "storage unavailable".to_owned(),
-            ))
+        async fn clear(&self) -> Result<(), store::StoreError> {
+            Err(store::StoreError::Message("storage unavailable".to_owned()))
         }
     }
 
@@ -929,16 +923,16 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionStore for TestSessionStore {
-        async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
+        async fn load(&self) -> Result<Option<Vec<u8>>, store::StoreError> {
             Ok(self.bytes.lock().await.clone())
         }
 
-        async fn save(&self, bytes: Vec<u8>) -> Result<(), crate::store::StoreError> {
+        async fn save(&self, bytes: Vec<u8>) -> Result<(), store::StoreError> {
             *self.bytes.lock().await = Some(bytes);
             Ok(())
         }
 
-        async fn clear(&self) -> Result<(), crate::store::StoreError> {
+        async fn clear(&self) -> Result<(), store::StoreError> {
             *self.bytes.lock().await = None;
             Ok(())
         }
@@ -989,7 +983,7 @@ mod tests {
     async fn commands_before_login_are_rejected() {
         let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
         assert!(matches!(
-            core.run(crate::api::timeline::SubscribeRoomListParams::default())
+            core.run(api::timeline::SubscribeRoomListParams::default())
                 .await,
             Err(RpcError {
                 code: RpcCode::NotLoggedIn,
@@ -1029,7 +1023,7 @@ mod tests {
 
         assert!(core.handle_session_change(
             &matrix_sdk::SessionChange::UnknownToken(
-                matrix_sdk::ruma::api::error::UnknownTokenErrorData::new(),
+                ruma::api::error::UnknownTokenErrorData::new(),
             ),
             1,
         ));
@@ -1050,7 +1044,7 @@ mod tests {
             .unwrap();
         changes
             .send(matrix_sdk::SessionChange::UnknownToken(
-                matrix_sdk::ruma::api::error::UnknownTokenErrorData::new(),
+                ruma::api::error::UnknownTokenErrorData::new(),
             ))
             .unwrap();
         core.watch_session_changes(receiver, 1);
@@ -1069,7 +1063,7 @@ mod tests {
         let (core, mut events) = Core::new("test", Box::new(store::MemorySessionStore::default()));
         let (changes, receiver) = tokio::sync::broadcast::channel(1);
 
-        let mut data = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
+        let mut data = ruma::api::error::UnknownTokenErrorData::new();
         data.soft_logout = true;
         changes
             .send(matrix_sdk::SessionChange::UnknownToken(data))
@@ -1210,7 +1204,7 @@ mod tests {
 
         assert!(matches!(core.restore().await, Ok(None)));
         assert!(matches!(
-            core.switch_account(crate::api::session::SwitchAccountParams {
+            core.switch_account(api::session::SwitchAccountParams {
                 account_id: "a1".to_owned()
             })
             .await,
@@ -1300,7 +1294,7 @@ mod tests {
         let tokens = accounts.accounts[0].session.credentials.tokens();
         assert_eq!(tokens.access_token, "embedded");
 
-        let logins = crate::credentials::LoginTokens::new(base.path());
+        let logins = credentials::LoginTokens::new(base.path());
         assert_eq!(
             logins.read("a1", "DEVICEID").unwrap().unwrap().access_token,
             "embedded"
@@ -1312,7 +1306,7 @@ mod tests {
     #[tokio::test]
     async fn a_login_file_wins_over_tokens_a_registry_still_holds() {
         let base = tempfile::tempdir().unwrap();
-        crate::credentials::LoginTokens::new(base.path())
+        credentials::LoginTokens::new(base.path())
             .save(
                 "a1",
                 "DEVICEID",
@@ -1341,20 +1335,26 @@ mod tests {
     }
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod sdk_timeline_tests;
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod sdk_spoiler_tests;
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod sdk_notification_tests;
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod sdk_helpers_tests;
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod live_member_tests;
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod sdk_verification_tests;

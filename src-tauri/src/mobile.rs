@@ -14,7 +14,10 @@ static MAIN_ACTIVITY: OnceLock<Global<JClass<'static>>> = OnceLock::new();
 static ACTIVITY: Mutex<(bool, Option<Weak<sable_core::Core>>)> = Mutex::new((true, None));
 
 /// Takes the pending Java exception, which would otherwise abort the next JNI call.
-pub(crate) fn caught<T>(env: &jni::Env, result: jni::errors::Result<T>) -> jni::errors::Result<T> {
+pub(crate) fn caught<T>(
+    env: &jni::Env<'_>,
+    result: jni::errors::Result<T>,
+) -> jni::errors::Result<T> {
     result.map_err(|error| env.exception_catch().err().unwrap_or(error))
 }
 
@@ -40,8 +43,8 @@ pub(crate) fn attach_activity(core: &Arc<sable_core::Core>) {
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
 pub(crate) extern "system" fn Java_moe_sable_client_AppLifecycle_nativeActivityChanged(
-    _env: EnvUnowned,
-    _this: JObject,
+    _env: EnvUnowned<'_>,
+    _this: JObject<'_>,
     active: jni::sys::jboolean,
 ) {
     let core = {
@@ -146,8 +149,8 @@ pub(crate) async fn copy_image_to_clipboard(image: String) -> Result<(), String>
     reason = "the export symbol is fixed by the JNI naming convention"
 )]
 pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeNetworkChanged(
-    _env: EnvUnowned,
-    _this: JObject,
+    _env: EnvUnowned<'_>,
+    _this: JObject<'_>,
     available: jni::sys::jboolean,
     unmetered: jni::sys::jboolean,
 ) {
@@ -160,8 +163,8 @@ pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeNetworkCh
     reason = "the export symbol is fixed by the JNI naming convention"
 )]
 pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeSentryConsent(
-    _env: EnvUnowned,
-    _this: JObject,
+    _env: EnvUnowned<'_>,
+    _this: JObject<'_>,
     enabled: jni::sys::jboolean,
 ) {
     crate::sentry::restore_consent(enabled);
@@ -173,8 +176,8 @@ pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeSentryCon
     reason = "the export symbol is fixed by the JNI naming convention"
 )]
 pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeInitSystemBars(
-    mut env: EnvUnowned,
-    this: JObject,
+    mut env: EnvUnowned<'_>,
+    this: JObject<'_>,
 ) {
     env.with_env(|env| {
         let vm = env.get_java_vm()?;
@@ -205,7 +208,7 @@ pub(crate) async fn recent_media(limit: i32) -> Result<serde_json::Value, String
                     &[JValue::Int(limit)],
                 );
                 let listed = caught(env, result)?.l()?;
-                env.cast_local::<JString>(listed)?.try_to_string(env)
+                env.cast_local::<JString<'_>>(listed)?.try_to_string(env)
             })
             .map_err(|error| describe(&error))?;
         serde_json::from_str(&listed).map_err(|error| error.to_string())
@@ -260,7 +263,7 @@ fn call_activity_bool(method: &str, value: bool) -> Result<(), String> {
 fn call_activity(
     method: &str,
     signature: MethodSignature<'static, 'static>,
-    value: JValue,
+    value: JValue<'_>,
 ) -> Result<(), String> {
     let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
     let class = MAIN_ACTIVITY

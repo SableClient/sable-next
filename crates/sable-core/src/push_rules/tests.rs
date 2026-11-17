@@ -59,7 +59,7 @@ fn applied(mut rules: Ruleset, writes: Vec<RuleWrite>) -> Ruleset {
     rules
 }
 
-fn me() -> &'static matrix_sdk::ruma::UserId {
+fn me() -> &'static ruma::UserId {
     user_id!("@me:example.org")
 }
 
@@ -542,7 +542,7 @@ fn a_keyword_level_and_removal_reach_every_rule_carrying_it() {
     let removed = applied(loud.clone(), plan_remove_keyword(&loud, "sable"));
     assert_eq!(
         keywords(&removed),
-        [] as [crate::protocol::KeywordNotificationView; 0]
+        Vec::<crate::protocol::KeywordNotificationView>::new()
     );
     assert!(plan_remove_keyword(&removed, "other").is_empty());
 }

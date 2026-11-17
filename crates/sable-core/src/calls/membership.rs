@@ -261,9 +261,9 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
         alias_foci(&mut value, room.room_id().as_str());
-        let Ok(event) = serde_json::from_value::<
-            matrix_sdk::ruma::events::SyncStateEvent<CallMemberEventContent>,
-        >(value) else {
+        let Ok(event) =
+            serde_json::from_value::<ruma::events::SyncStateEvent<CallMemberEventContent>>(value)
+        else {
             continue;
         };
         let Some(event) = event.as_original() else {
@@ -910,16 +910,10 @@ mod tests {
         let event = sticky_event("$member", 100);
         assert!(store.apply(&event, 100));
         store.redact("$member", 200);
-        assert_eq!(
-            store.members(200),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(200), Vec::<CallMember>::new());
         assert!(!store.apply(&event, 200));
         assert!(!store.apply(&sticky_event("$older", 50), 200));
-        assert_eq!(
-            store.members(200),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(200), Vec::<CallMember>::new());
         assert!(store.apply(&sticky_event("$renewed", 300), 300));
         assert_eq!(store.members(300).len(), 1);
     }
@@ -929,10 +923,7 @@ mod tests {
         let mut store = StickyMemberships::default();
         store.redact("$member", 200);
         assert!(!store.apply(&sticky_event("$member", 100), 300));
-        assert_eq!(
-            store.members(300),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(300), Vec::<CallMember>::new());
     }
 
     #[test]
@@ -970,10 +961,7 @@ mod tests {
         assert!(!store.apply_authenticated(&replacement, device_id!("LAPTOP"), 200));
         assert_eq!(store.members(200).len(), 1);
         assert!(store.apply_authenticated(&replacement, device_id!("PHONE"), 200));
-        assert_eq!(
-            store.members(200),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(200), Vec::<CallMember>::new());
     }
 
     #[test]
@@ -1043,23 +1031,17 @@ mod tests {
 
     #[test]
     fn sticky_expiry_uses_the_envelope_and_receipt_ttl_without_extending_replays() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         let event = sticky_event("$a", 100);
         assert!(store.apply(&event, 200));
         assert_eq!(store.members(200)[0].expires_at_ms, Some(900_100));
-        assert_eq!(
-            store.members(900_100),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(900_100), Vec::<CallMember>::new());
         let mut event = sticky_event("$b", 500);
         event["unsigned"] = serde_json::json!({"msc4354_sticky_duration_ttl_ms": 300});
         assert!(store.apply(&event, 1000));
         assert_eq!(store.members(1000)[0].expires_at_ms, Some(1300));
         assert!(!store.apply(&event, 1100));
-        assert_eq!(
-            store.members(1300),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(1300), Vec::<CallMember>::new());
     }
 
     #[test]
@@ -1073,19 +1055,16 @@ mod tests {
 
     #[test]
     fn sticky_expiry_without_a_ttl_does_not_extend_a_future_timestamp() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         let event = sticky_event("$future", 2_000);
         assert!(store.apply(&event, 1_000));
         assert_eq!(store.members(1_000)[0].expires_at_ms, Some(901_000));
-        assert_eq!(
-            store.members(901_000),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(901_000), Vec::<CallMember>::new());
     }
 
     #[test]
     fn sticky_tombstones_override_older_memberships_and_are_sender_scoped() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         let event = sticky_event("$a", 100);
         assert!(store.apply(&event, 100));
         let mut leave = sticky_event("$b", 200);
@@ -1095,20 +1074,14 @@ mod tests {
         assert_eq!(store.members(200).len(), 1);
         leave["sender"] = serde_json::json!("@kris:localhost");
         assert!(store.apply(&leave, 200));
-        assert_eq!(
-            store.members(200),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(200), Vec::<CallMember>::new());
         assert!(!store.apply(&event, 300));
-        assert_eq!(
-            store.members(300),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(300), Vec::<CallMember>::new());
     }
 
     #[test]
     fn a_sticky_renewal_keeps_the_time_the_member_joined() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         assert!(store.apply(&sticky_event("$a", 100), 100));
         assert!(store.apply(&sticky_event("$b", 600_000), 600_000));
         let member = &store.members(600_000)[0];
@@ -1140,22 +1113,19 @@ mod tests {
 
     #[test]
     fn a_sticky_leave_that_names_its_slot_is_a_tombstone() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         assert!(store.apply(&sticky_event("$a", 100), 100));
         let mut leave = sticky_event("$b", 200);
         leave["type"] = serde_json::json!("org.matrix.msc4143.rtc.member");
         leave["content"] =
             serde_json::json!({"slot_id":"m.call#ROOM", "msc4354_sticky_key":"member"});
         assert!(store.apply(&leave, 200));
-        assert_eq!(
-            store.members(200),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(200), Vec::<CallMember>::new());
     }
 
     #[test]
     fn an_explicit_sticky_leave_is_a_tombstone() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         assert!(store.apply(&sticky_event("$a", 100), 100));
         let mut leave = sticky_event("$b", 200);
         leave["content"] = serde_json::json!({
@@ -1165,30 +1135,24 @@ mod tests {
             "msc4354_sticky_key": "member",
         });
         assert!(store.apply(&leave, 200));
-        assert_eq!(
-            store.members(200),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(200), Vec::<CallMember>::new());
     }
 
     #[test]
     fn a_non_joined_membership_replaces_an_older_join() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         let joined = sticky_event("$a", 100);
         assert!(store.apply(&joined, 100));
         let mut updated = sticky_event("$b", 200);
         updated["content"]["member"]["membership"] = serde_json::json!("other");
         assert!(store.apply(&updated, 200));
-        assert_eq!(
-            store.members(200),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(200), Vec::<CallMember>::new());
         assert!(!store.apply(&joined, 300));
     }
 
     #[test]
     fn sticky_order_uses_server_expiry_and_event_id_not_receipt_time() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         let newer = sticky_event("$z", 200);
         assert!(store.apply(&newer, 200));
         let mut stale = sticky_event("$a", 100);
@@ -1201,7 +1165,7 @@ mod tests {
 
     #[test]
     fn sticky_order_uses_the_unclamped_duration() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         let mut first = sticky_event("$a", 100);
         first["msc4354_sticky"]["duration_ms"] = serde_json::json!(3_600_200);
         assert!(store.apply(&first, 100));
@@ -1213,7 +1177,7 @@ mod tests {
 
     #[test]
     fn malformed_sticky_memberships_cannot_act_as_leave_events() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         assert!(store.apply(&sticky_event("$a", 100), 100));
         for (field, value) in [
             ("slot_id", serde_json::json!("m.call#OTHER")),
@@ -1232,14 +1196,11 @@ mod tests {
 
     #[test]
     fn a_sticky_member_id_must_match_its_sticky_key() {
-        let mut store = super::StickyMemberships::default();
+        let mut store = StickyMemberships::default();
         let mut event = sticky_event("$mismatch", 100);
         event["content"]["member"]["id"] = serde_json::json!("other");
         assert!(!store.apply(&event, 100));
-        assert_eq!(
-            store.members(100),
-            [] as [crate::calls::membership::CallMember; 0]
-        );
+        assert_eq!(store.members(100), Vec::<CallMember>::new());
     }
     #[tokio::test]
     async fn state_memberships_survive_the_sdk_store_for_both_focus_modes() {

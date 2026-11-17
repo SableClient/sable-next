@@ -342,7 +342,7 @@ impl Core {
                     .account()
                     .set_account_data_raw(
                         EVENT_TYPE.into(),
-                        matrix_sdk::ruma::serde::Raw::new(&content)
+                        ruma::serde::Raw::new(&content)
                             .or_failed(self, "reaction_history")?
                             .cast_unchecked(),
                     )

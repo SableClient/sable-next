@@ -637,10 +637,7 @@ mod tests {
             (COLOR_EVENT, ALICE, json!({ "color": "red" })),
         ]);
 
-        assert_eq!(
-            resolve(&room, None),
-            [] as [crate::protocol::SenderCosmeticsView; 0]
-        );
+        assert_eq!(resolve(&room, None), Vec::<SenderCosmeticsView>::new());
     }
 
     #[test]
@@ -658,10 +655,7 @@ mod tests {
         assert!(room.apply(MEMBER_EVENT, ALICE, &renamed));
         assert!(!room.apply(MEMBER_EVENT, ALICE, &renamed));
         assert!(room.apply(MEMBER_EVENT, ALICE, &json!({ "membership": "leave" })));
-        assert_eq!(
-            resolve(&room, None),
-            [] as [crate::protocol::SenderCosmeticsView; 0]
-        );
+        assert_eq!(resolve(&room, None), Vec::<SenderCosmeticsView>::new());
     }
 
     #[test]
@@ -672,10 +666,7 @@ mod tests {
             ALICE,
             &json!({ "font": "Georgia" })
         ));
-        assert_eq!(
-            resolve(&room, None),
-            [] as [crate::protocol::SenderCosmeticsView; 0]
-        );
+        assert_eq!(resolve(&room, None), Vec::<SenderCosmeticsView>::new());
     }
 
     async fn joined(server: &MatrixMockServer, rooms: &[&RoomId]) -> matrix_sdk::Client {
@@ -949,7 +940,7 @@ mod tests {
         let room = client.get_room(room_id).unwrap();
         assert_eq!(
             core.cosmetics_for(&client, &room, None).await.users,
-            [] as [crate::protocol::SenderCosmeticsView; 0]
+            Vec::<SenderCosmeticsView>::new()
         );
 
         server
@@ -1004,7 +995,7 @@ mod tests {
             core.cosmetics_for(&client, &room, Some(space_id.to_owned()))
                 .await
                 .users,
-            [] as [crate::protocol::SenderCosmeticsView; 0]
+            Vec::<SenderCosmeticsView>::new()
         );
 
         rename(&server, &client, room_id, &old, &new).await;

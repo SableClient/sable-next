@@ -230,7 +230,10 @@ mod tests {
     fn plain_words_become_the_free_text() {
         let parsed = parse_search_query("deploy pipeline broken");
         assert_eq!(parsed.text, "deploy pipeline broken");
-        assert_eq!(parsed.tokens, [] as [crate::search_query::SearchToken; 0]);
+        assert_eq!(
+            parsed.tokens,
+            Vec::<crate::search_query::SearchToken>::new()
+        );
     }
 
     #[test]
@@ -270,7 +273,10 @@ mod tests {
     fn a_negated_date_bound_is_unsupported() {
         let parsed = parse_search_query("deploy -before:2024-01-01 -on:2026-01-01");
         assert_eq!(parsed.unsupported, vec!["-before", "-on"]);
-        assert_eq!(parsed.tokens, [] as [crate::search_query::SearchToken; 0]);
+        assert_eq!(
+            parsed.tokens,
+            Vec::<crate::search_query::SearchToken>::new()
+        );
     }
 
     #[test]
@@ -280,7 +286,7 @@ mod tests {
             "deploy colour:red"
         );
         let empty = parse_search_query("from: deploy");
-        assert_eq!(empty.tokens, [] as [crate::search_query::SearchToken; 0]);
+        assert_eq!(empty.tokens, Vec::<crate::search_query::SearchToken>::new());
         assert_eq!(empty.text, "deploy");
     }
 
@@ -313,6 +319,6 @@ mod tests {
         let parsed = parse_search_query("from:a deploy -in:b now");
         let again = parse_search_query(&parsed.text);
         assert_eq!(again.text, parsed.text);
-        assert_eq!(again.tokens, [] as [crate::search_query::SearchToken; 0]);
+        assert_eq!(again.tokens, Vec::<crate::search_query::SearchToken>::new());
     }
 }

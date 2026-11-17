@@ -115,7 +115,8 @@ fn discard_databases(store_id: &str) -> Result<(), StoreError> {
     Ok(())
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod tests {
     #[tokio::test]
     async fn legacy_disposal_preserves_the_shared_registry() {

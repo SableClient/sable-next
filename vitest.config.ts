@@ -18,7 +18,20 @@ const storybookProject = (theme: 'light' | 'dark') => ({
   ...mergeConfig(
     viteConfig,
     defineProject({
-      plugins: [storybookTest({ configDir: '.storybook', initialGlobals: { theme } })],
+      plugins: [
+        storybookTest({ configDir: '.storybook', initialGlobals: { theme } }),
+        {
+          // SvelteKit scans every route, which imports WASM bindings Storybook never builds.
+          name: 'storybook-scan-entries',
+          enforce: 'post',
+          config(config) {
+            config.optimizeDeps = {
+              ...config.optimizeDeps,
+              entries: ['src/**/*.stories.svelte', '.storybook/preview.ts'],
+            };
+          },
+        },
+      ],
       test: {
         name: `storybook-${theme}`,
         setupFiles: ['./.storybook/vitest.setup.ts'],

@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn a_silent_reply_carries_no_mention() {
-        let event_id = <&matrix_sdk::ruma::EventId>::try_from("$one:example.org")
+        let event_id = <&ruma::EventId>::try_from("$one:example.org")
             .expect("an event id")
             .to_owned();
 
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn a_state_event_reply_keeps_the_relation_without_a_fallback() {
-        let event_id = <&matrix_sdk::ruma::EventId>::try_from("$state:example.org")
+        let event_id = <&ruma::EventId>::try_from("$state:example.org")
             .expect("an event id")
             .to_owned();
         let content = message_content(
@@ -322,7 +322,7 @@ mod tests {
     fn gifs_and_locations_without_mentions_send_an_empty_m_mentions() {
         let gif = gif_content(
             "dancing".to_owned(),
-            matrix_sdk::ruma::OwnedMxcUri::from("mxc://example.org/gif"),
+            ruma::OwnedMxcUri::from("mxc://example.org/gif"),
             super::ImageInfo::new(),
         );
         let location = location_content("here".to_owned(), "geo:48.8584,2.2945".to_owned());

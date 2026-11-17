@@ -86,7 +86,7 @@ tokio::task_local! {
     static PENDING_REFRESHES: PendingRefreshes;
 }
 
-pub async fn settle_refreshes<T>(operation: impl std::future::Future<Output = T>) -> T {
+pub async fn settle_refreshes<T>(operation: impl Future<Output = T>) -> T {
     let pending = PendingRefreshes::default();
     let result = PENDING_REFRESHES.scope(pending.clone(), operation).await;
     let tasks = std::mem::take(&mut *pending.0.lock());
@@ -138,7 +138,7 @@ impl PushClient {
             self.client.whoami().await,
             Err(error) if matches!(
                 error.client_api_error_kind(),
-                Some(matrix_sdk::ruma::api::error::ErrorKind::UnknownToken(_))
+                Some(ruma::api::error::ErrorKind::UnknownToken(_))
             )
         )
     }
@@ -147,7 +147,7 @@ impl PushClient {
     ///
     /// # Errors
     /// Returns the request error when refresh is unavailable or the retry fails.
-    pub async fn retry<T, E, F: std::future::Future<Output = Result<T, E>>>(
+    pub async fn retry<T, E, F: Future<Output = Result<T, E>>>(
         &self,
         request: impl Fn() -> F,
     ) -> Result<T, E> {
@@ -264,7 +264,7 @@ impl PushHost {
         }
     }
 
-    pub(super) async fn retry<T, E, F: std::future::Future<Output = Result<T, E>>>(
+    pub(super) async fn retry<T, E, F: Future<Output = Result<T, E>>>(
         &self,
         request: impl Fn() -> F,
     ) -> Result<T, E> {
@@ -303,11 +303,7 @@ pub(super) async fn push_host(
     }
     let client = core.saved_account_client(account, &lease).await.ok()?;
     client
-        .set_presence(
-            matrix_sdk::ruma::presence::PresenceState::Offline,
-            None,
-            false,
-        )
+        .set_presence(ruma::presence::PresenceState::Offline, None, false)
         .await
         .ok()?;
     Some(PushHost::Shared { client, lease })
@@ -394,7 +390,7 @@ pub(super) async fn decrypt_push_event(
     else {
         return ColdPush::Undecryptable;
     };
-    if let Ok(Some(sender)) = event.get_field::<matrix_sdk::ruma::OwnedUserId>("sender")
+    if let Ok(Some(sender)) = event.get_field::<ruma::OwnedUserId>("sender")
         && client.is_user_ignored(&sender).await
     {
         return ColdPush::Discard;
@@ -476,8 +472,8 @@ pub(super) async fn decrypt_push_event(
 
 async fn decrypted_push(
     room: &matrix_sdk::Room,
-    clear: &Raw<matrix_sdk::ruma::events::AnyTimelineEvent>,
-    actions: Option<&[matrix_sdk::ruma::push::Action]>,
+    clear: &Raw<ruma::events::AnyTimelineEvent>,
+    actions: Option<&[ruma::push::Action]>,
     every_encrypted: bool,
 ) -> ColdPush {
     let actions = match actions {

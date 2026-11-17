@@ -92,7 +92,7 @@ pub fn push_preview(content: &serde_json::Value) -> Option<String> {
 #[cfg(not(target_family = "wasm"))]
 pub(super) fn message_image(
     content: &serde_json::Value,
-) -> Option<matrix_sdk::ruma::events::room::MediaSource> {
+) -> Option<ruma::events::room::MediaSource> {
     use matrix_sdk::ruma::events::room::MediaSource;
     use serde_json::Value;
 
@@ -132,7 +132,7 @@ pub(super) fn message_image(
 pub(super) async fn cached_push_media(
     client: &Client,
     directory: &std::path::Path,
-    source: Option<matrix_sdk::ruma::events::room::MediaSource>,
+    source: Option<ruma::events::room::MediaSource>,
     bounds: Option<(u32, u32)>,
 ) -> Option<(String, &'static str)> {
     use base64::Engine as _;

@@ -1468,7 +1468,7 @@
             "1440",
             "2160"
           ],
-          "default": "720"
+          "default": "1080"
         },
         "callScreenBitrate": {
           "title": "Screen sharing maximum bitrate",
@@ -1503,7 +1503,7 @@
             "vp9",
             "av1"
           ],
-          "default": "h264"
+          "default": "vp8"
         },
         "callSimulcast": {
           "title": "Use simulcast",
@@ -2963,7 +2963,7 @@
             "1440",
             "2160"
           ],
-          "default": "720"
+          "default": "1080"
         },
         "callScreenBitrate": {
           "title": "Screen sharing maximum bitrate",
@@ -2998,7 +2998,7 @@
             "vp9",
             "av1"
           ],
-          "default": "h264"
+          "default": "vp8"
         },
         "callSimulcast": {
           "title": "Use simulcast",

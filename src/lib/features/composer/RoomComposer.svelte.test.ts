@@ -2031,13 +2031,13 @@ test('an edited scheduled message loads its text and saves through its own time'
     context: {
       kind: 'schedule',
       eventId: 'delay',
-      body: 'see you tomorow',
+      body: 'see you tomorrow',
       scheduled: { source: 'server', dueTs },
     },
   });
   await flushed();
 
-  expect(editorText()).toBe('see you tomorow');
+  expect(editorText()).toBe('see you tomorrow');
 
   submit();
   await flushed();
@@ -2051,7 +2051,7 @@ test('an edited scheduled message loads its text and saves through its own time'
   if (!scheduleForm) throw new Error('schedule form not found');
   await fireEvent.submit(scheduleForm);
 
-  expect(schedule).toHaveBeenCalledWith('!room:example.org', 'see you tomorow', null, dueTs);
+  expect(schedule).toHaveBeenCalledWith('!room:example.org', 'see you tomorrow', null, dueTs);
 });
 
 test('a press beside the text focuses the editor, and one on a button does not', async () => {

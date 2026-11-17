@@ -292,7 +292,8 @@ impl SessionStore for MemorySessionStore {
     }
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod tests {
     #[cfg(unix)]
     use super::write_atomic_private;

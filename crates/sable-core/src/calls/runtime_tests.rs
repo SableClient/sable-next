@@ -30,7 +30,7 @@ pub(in crate::calls) fn member(mode: CallMode, created_ts: u64, foci: &[&str]) -
         foci: foci.iter().map(ToString::to_string).collect(),
         screen_sharing: false,
         wire: super::membership::RtcWire::Deployed,
-        focus_servers: std::collections::HashMap::default(),
+        focus_servers: HashMap::default(),
     }
 }
 
@@ -626,14 +626,14 @@ async fn sdk_redaction_removes_sticky_membership_and_wakes_the_call() {
         Raw::new(&json!({
             "type":"m.room.redaction", "event_id":"$redaction", "sender":"@moderator:example.org",
             "origin_server_ts":200, "redacts":"$member", "content":{"redacts":"$member"}
-        })).unwrap().cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>()
+        })).unwrap().cast_unchecked::<ruma::events::AnySyncTimelineEvent>()
     )).await;
     tokio::time::timeout(std::time::Duration::from_secs(1), wake.notified())
         .await
         .unwrap();
     assert_eq!(
         state.lock().await.sticky.members(200),
-        [] as [crate::calls::membership::CallMember; 0]
+        Vec::<CallMember>::new()
     );
 }
 

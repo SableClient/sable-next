@@ -369,15 +369,15 @@ impl Core {
     pub(crate) async fn presence_hint_initial_state(
         &self,
         hint: PresenceHintView,
-    ) -> Option<matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnyInitialStateEvent>> {
+    ) -> Option<ruma::serde::Raw<ruma::events::AnyInitialStateEvent>> {
         let keys = self.presence_keys().await?;
-        matrix_sdk::ruma::serde::Raw::new(&json!({
+        ruma::serde::Raw::new(&json!({
             "type": keys.hint,
             "state_key": "",
             "content": hint_content(hint),
         }))
         .ok()
-        .map(matrix_sdk::ruma::serde::Raw::cast_unchecked)
+        .map(ruma::serde::Raw::cast_unchecked)
     }
 
     pub(crate) async fn presence_prompt(
@@ -990,7 +990,7 @@ mod tests {
         let own = client.user_id().unwrap().to_owned();
         let partner = owned_user_id!("@bob:example.org");
         let factory = EventFactory::new().room(&room_id);
-        let hint = matrix_sdk::ruma::serde::Raw::new(&json!({
+        let hint = ruma::serde::Raw::new(&json!({
             "type": UNSTABLE.hint,
             "state_key": "",
             "sender": own,

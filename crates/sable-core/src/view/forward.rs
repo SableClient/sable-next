@@ -163,17 +163,11 @@ mod tests {
         .unwrap();
         assert_eq!(famedly.timestamp, Some(9));
         assert_eq!(
-            famedly
-                .room_id
-                .as_deref()
-                .map(matrix_sdk::ruma::RoomId::as_str),
+            famedly.room_id.as_deref().map(RoomId::as_str),
             Some("!room:example.org")
         );
         assert_eq!(
-            famedly
-                .event_id
-                .as_deref()
-                .map(matrix_sdk::ruma::EventId::as_str),
+            famedly.event_id.as_deref().map(ruma::EventId::as_str),
             Some("$event")
         );
 
@@ -197,9 +191,7 @@ mod tests {
         .unwrap();
         assert_eq!(meta.timestamp, Some(3));
         assert_eq!(
-            meta.event_id
-                .as_deref()
-                .map(matrix_sdk::ruma::EventId::as_str),
+            meta.event_id.as_deref().map(ruma::EventId::as_str),
             Some("$event")
         );
         assert_eq!(meta.content_valid, Some(true));

@@ -782,10 +782,7 @@ fn room_spaces_are_reused_until_the_space_tree_changes() {
 
     let busier = [space("root", &["a"]), unread(row("a"), 3, 1)];
     let reused = RoomSections::rebuild(&busier, &options, &first);
-    assert!(std::sync::Arc::ptr_eq(
-        &first.room_spaces,
-        &reused.room_spaces
-    ));
+    assert!(Arc::ptr_eq(&first.room_spaces, &reused.room_spaces));
 
     let mut renamed = space("root", &["a"]);
     renamed.display_name = "Guild".to_owned();

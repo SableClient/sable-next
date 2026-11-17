@@ -124,9 +124,7 @@ mod tests {
         let stranger = user_id!("@stranger:example.org");
         let spammer = user_id!("@spammer:example.org");
 
-        let invite = |room_id: &matrix_sdk::ruma::RoomId,
-                      sender: &matrix_sdk::ruma::UserId,
-                      reason: Option<&str>| {
+        let invite = |room_id: &ruma::RoomId, sender: &ruma::UserId, reason: Option<&str>| {
             let mut content = serde_json::json!({ "membership": "invite" });
             if let Some(reason) = reason {
                 content["reason"] = reason.into();
@@ -183,10 +181,7 @@ mod tests {
             .map(|invite| {
                 (
                     invite.room_id.as_str(),
-                    invite
-                        .inviter
-                        .as_deref()
-                        .map(matrix_sdk::ruma::UserId::as_str),
+                    invite.inviter.as_deref().map(ruma::UserId::as_str),
                     invite.reason.as_deref(),
                     invite.shares_room,
                     invite.inviter_banned,
@@ -239,7 +234,7 @@ mod tests {
         );
         assert_eq!(
             triage(&core, &client).await,
-            [] as [crate::protocol::InviteTriageView; 0]
+            Vec::<crate::protocol::InviteTriageView>::new()
         );
         drop(server);
     }

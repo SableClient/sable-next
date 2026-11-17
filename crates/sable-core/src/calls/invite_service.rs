@@ -236,7 +236,7 @@ async fn run(
 /// Reads stored call state only for rooms that changed since the last step.
 #[derive(Default)]
 struct Watcher {
-    rooms: HashMap<matrix_sdk::ruma::OwnedRoomId, WatchedRoom>,
+    rooms: HashMap<ruma::OwnedRoomId, WatchedRoom>,
 }
 
 impl Watcher {
@@ -262,7 +262,7 @@ impl Watcher {
         core: &Core,
         client: &Client,
         generation: u64,
-        changed: &HashSet<matrix_sdk::ruma::OwnedRoomId>,
+        changed: &HashSet<ruma::OwnedRoomId>,
     ) {
         for room in client.joined_rooms() {
             let values: Vec<_> = sticky::live_events(&room)
@@ -412,7 +412,7 @@ async fn present_invite(core: &Core, room: &Room, invite: &Invite, generation: u
         Ok(Some(_)) => return true,
         Ok(None) | Err(_) => return false,
     }
-    let Ok(sender) = matrix_sdk::ruma::UserId::parse(&invite.sender) else {
+    let Ok(sender) = ruma::UserId::parse(&invite.sender) else {
         return true;
     };
     let sender_name = room
@@ -495,15 +495,13 @@ pub(super) async fn invite_event(room: &Room, event: &Value) -> Option<Value> {
     {
         return Some(current);
     }
-    let id = matrix_sdk::ruma::EventId::parse(event["event_id"].as_str()?).ok()?;
+    let id = ruma::EventId::parse(event["event_id"].as_str()?).ok()?;
     let response = room
         .client()
-        .send(
-            matrix_sdk::ruma::api::client::room::get_room_event::v3::Request::new(
-                room.room_id().to_owned(),
-                id,
-            ),
-        )
+        .send(ruma::api::client::room::get_room_event::v3::Request::new(
+            room.room_id().to_owned(),
+            id,
+        ))
         .await
         .ok()?;
     let source: Value = serde_json::from_str(response.event.json().get()).ok()?;
@@ -521,10 +519,7 @@ pub(super) async fn invite_event(room: &Room, event: &Value) -> Option<Value> {
     Some(event)
 }
 
-pub(super) async fn active_invite(
-    room: &Room,
-    event: &Value,
-) -> Option<(super::invites::Invite, Vec<Value>)> {
+pub(super) async fn active_invite(room: &Room, event: &Value) -> Option<(Invite, Vec<Value>)> {
     let now = crate::now_ms();
     let event = &invite_event(room, event).await?;
     let modern = Invite::parse(event, now)?.modern;
@@ -546,7 +541,7 @@ pub(super) async fn active_invite(
     let candidate = values
         .iter()
         .find(|value| value["event_id"] == event["event_id"])?;
-    let parsed = super::invites::Invite::parse(candidate, now)?;
+    let parsed = Invite::parse(candidate, now)?;
     if parsed.modern
         && !values.iter().any(|value| {
             super::SLOT_TYPES.contains(&value["type"].as_str().unwrap_or_default())
@@ -624,7 +619,7 @@ mod tests {
         let client = server.client_builder().build().await;
         let room_id = room_id!("!slot:example.org");
         server.sync_room(&client, JoinedRoomBuilder::new(room_id).add_state_event(
-            matrix_sdk::ruma::serde::Raw::new(&json!({
+            ruma::serde::Raw::new(&json!({
                 "type":"m.rtc.slot", "event_id":"$cached", "sender":client.user_id().unwrap(),
                 "state_key":"m.call#room", "origin_server_ts":1,
                 "content":{"status":"open", "application":{"type":"m.call"}}
@@ -752,7 +747,7 @@ mod tests {
             .sync_room(
                 client,
                 JoinedRoomBuilder::new(room_id).add_state_event(
-                    matrix_sdk::ruma::serde::Raw::new(&json!({
+                    ruma::serde::Raw::new(&json!({
                         "type":"org.matrix.msc3401.call.member", "event_id":"$member",
                         "sender":"@caller:example.org", "state_key":"@caller:example.org",
                         "origin_server_ts":1, "content":{}

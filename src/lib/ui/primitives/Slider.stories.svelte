@@ -9,14 +9,14 @@
     component: Slider,
     tags: ['autodocs'],
     argTypes: { max: { control: 'number' }, disabled: { control: 'boolean' } },
-    args: { label: 'Choose quanity', max: 12, value: 8, disabled: false },
+    args: { label: 'Choose quantity', max: 12, value: 8, disabled: false },
   });
 </script>
 
 <Story
   name="Playground"
   play={async ({ canvas, userEvent }) => {
-    const thumb = canvas.getByRole('slider', { name: 'Choose quanity' });
+    const thumb = canvas.getByRole('slider', { name: 'Choose quantity' });
     await expect(thumb).toHaveAttribute('aria-valuenow', '8');
     thumb.focus();
     await userEvent.keyboard('{ArrowRight}');

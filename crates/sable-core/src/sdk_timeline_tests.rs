@@ -107,7 +107,7 @@ async fn timeline_view_preserves_available_read_receipt_timestamps() {
     let bob = user_id!("@bob:example.org");
     let carol = user_id!("@carol:example.org");
     let factory = EventFactory::new().room(room_id).sender(User::Alice);
-    let timestamp = matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::from_system_time(
+    let timestamp = ruma::MilliSecondsSinceUnixEpoch::from_system_time(
         std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
     )
     .unwrap();
@@ -241,11 +241,7 @@ async fn a_redacted_message_in_an_encrypted_room_has_no_shield() {
                 &client,
                 JoinedRoomBuilder::new(room_id)
                     .add_state_event(factory.room_encryption())
-                    .add_timeline_event(
-                        matrix_sdk::ruma::serde::Raw::new(&event)
-                            .unwrap()
-                            .cast_unchecked(),
-                    ),
+                    .add_timeline_event(ruma::serde::Raw::new(&event).unwrap().cast_unchecked()),
             )
             .await;
         let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
@@ -298,11 +294,8 @@ async fn a_message_the_server_redacted_on_ban_reads_as_deleted_by_the_moderator(
     let room = server
         .sync_room(
             &client,
-            JoinedRoomBuilder::new(room_id).add_timeline_event(
-                matrix_sdk::ruma::serde::Raw::new(&event)
-                    .unwrap()
-                    .cast_unchecked(),
-            ),
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(ruma::serde::Raw::new(&event).unwrap().cast_unchecked()),
         )
         .await;
     let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
@@ -349,7 +342,7 @@ async fn only_a_state_change_that_came_encrypted_is_hidden_as_forged() {
                 .add_timeline_event(
                     factory
                         .member(user_id!("@alice:example.org"))
-                        .membership(matrix_sdk::ruma::events::room::member::MembershipState::Join)
+                        .membership(ruma::events::room::member::MembershipState::Join)
                         .display_name("Alice")
                         .event_id(member_id),
                 ),
@@ -485,7 +478,7 @@ async fn hidden_events_admit_only_events_the_sdk_can_render_and_place() {
                         .event_id(event_id!("$done")),
                 )
                 .add_timeline_event(
-                    matrix_sdk::ruma::serde::Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+                    ruma::serde::Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(
                         json!({
                             "type": "com.example.custom",
                             "event_id": "$custom",
@@ -871,11 +864,9 @@ async fn custom_room_state_reads_from_the_server_when_not_in_the_store() {
 async fn core_for(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
     crate::test_support::signed_in_core(server, client).await.0
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn read_state(
     core: &Arc<Core>,
-    room_id: &matrix_sdk::ruma::RoomId,
+    room_id: &ruma::RoomId,
     event_type: &str,
 ) -> Option<serde_json::Value> {
     core.run(EventParams {
@@ -1110,11 +1101,7 @@ async fn a_refused_pin_puts_back_the_marker_it_advanced() {
                         .sender(User::Alice)
                         .room_pinned_events(seen.clone()),
                 )
-                .add_account_data(
-                    matrix_sdk::ruma::serde::Raw::new(&marker)
-                        .unwrap()
-                        .cast_unchecked(),
-                ),
+                .add_account_data(ruma::serde::Raw::new(&marker).unwrap().cast_unchecked()),
         )
         .await;
     let advanced = json!({
@@ -1150,8 +1137,6 @@ async fn a_refused_pin_puts_back_the_marker_it_advanced() {
         .await;
     assert!(refused.err().is_some());
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 fn clear_override(user_id: &str) -> crate::api::account::SetProfileOverrideParams {
     crate::api::account::SetProfileOverrideParams {
         user_id: user_id.try_into().unwrap(),
@@ -1193,7 +1178,7 @@ async fn a_stable_profile_override_is_written_back_plain() {
     let view = core.run(clear_override("@s:example.org")).await.unwrap();
     assert_eq!(
         view.overrides,
-        [] as [crate::protocol::ProfileOverrideView; 0]
+        Vec::<crate::protocol::ProfileOverrideView>::new()
     );
 }
 
@@ -1228,8 +1213,8 @@ async fn a_locked_profile_override_document_refuses_a_write() {
     let core = core_for(&server, client).await;
     assert!(matches!(
         core.run(clear_override("@s:example.org")).await,
-        Err(crate::protocol::RpcError {
-            code: crate::protocol::RpcCode::DocumentLocked,
+        Err(RpcError {
+            code: RpcCode::DocumentLocked,
             ..
         })
     ));
@@ -1422,7 +1407,7 @@ async fn enabling_encryption_sets_the_recommended_key_rotation() {
     server.sync_joined_room(&client, room_id).await;
     server
         .mock_room_send_state()
-        .for_type(matrix_sdk::ruma::events::StateEventType::RoomEncryption)
+        .for_type(ruma::events::StateEventType::RoomEncryption)
         .body_matches_partial_json(json!({
             "algorithm": "m.megolm.v1.aes-sha2",
             "rotation_period_ms": 604_800_000,
@@ -1496,9 +1481,7 @@ async fn warmed_rooms_join_the_subscription_set_up_to_a_cap() {
     server.sync_joined_room(&client, open_room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
     let warm_ids = (0..=super::subscriptions::MAX_WARM_ROOMS)
-        .map(|index| {
-            matrix_sdk::ruma::OwnedRoomId::try_from(format!("!warm{index}:example.org")).unwrap()
-        })
+        .map(|index| ruma::OwnedRoomId::try_from(format!("!warm{index}:example.org")).unwrap())
         .collect::<Vec<_>>();
     for room_id in &warm_ids {
         server.sync_joined_room(&client, room_id).await;
@@ -1890,8 +1873,6 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
     assert_eq!(sent["url"], "mxc://example.org/blob");
     assert_eq!(sent["body"], "blobwave");
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 fn attachment_bytes(bytes: &[u8]) -> Vec<u8> {
     let mut body = Vec::new();
     body.extend_from_slice(&u64::try_from(bytes.len()).unwrap().to_le_bytes());
@@ -1902,9 +1883,9 @@ fn attachment_bytes(bytes: &[u8]) -> Vec<u8> {
 
 async fn send_media_reply(
     core: &Arc<Core>,
-    room_id: &matrix_sdk::ruma::RoomId,
+    room_id: &ruma::RoomId,
     kind: &str,
-    outgoing: crate::protocol::Outgoing,
+    outgoing: Outgoing,
 ) -> Result<(), RpcError> {
     use crate::protocol::{SendAttachmentRequest, SendGalleryRequest};
 
@@ -2249,7 +2230,7 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
             ],
             caption: None,
             formatted_caption: None,
-            outgoing: crate::protocol::Outgoing {
+            outgoing: Outgoing {
                 mentions: Vec::new(),
                 mentions_room: false,
                 in_reply_to: None,
@@ -2499,7 +2480,7 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
     let summary = super::view::room_list_item(
         &item,
         &std::collections::HashMap::new(),
-        &matrix_sdk::ruma::push::Ruleset::new(),
+        &ruma::push::Ruleset::new(),
         &crate::nicknames::Nicknames::default(),
     );
 
@@ -2643,13 +2624,11 @@ async fn unread_reply_counts_persist_until_read() {
         factory
             .text_msg("hey")
             .reply_to(event_id!("$original"))
-            .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
-                me.clone()
-            ]))
+            .mentions(ruma::events::Mentions::with_user_ids([me.clone()]))
             .event_id(event_id)
             .into_raw()
     };
-    let rules = matrix_sdk::ruma::push::Ruleset::server_default(&me);
+    let rules = ruma::push::Ruleset::server_default(&me);
     let joined = JoinedRoomBuilder::new(room_id)
         .add_state_event(factory.member(&me))
         .add_state_event(factory.power_levels())
@@ -2789,7 +2768,7 @@ async fn a_receipt_on_a_hidden_event_past_the_latest_one_clears_a_stale_server_c
         .expect("the mock client is logged in")
         .to_owned();
     let factory = EventFactory::new().room(room_id).sender(User::Alice);
-    let rtc_member = matrix_sdk::ruma::serde::Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+    let rtc_member = ruma::serde::Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(
         r#"{"type":"m.rtc.member","event_id":"$call","sender":"@alice:example.org","origin_server_ts":3,"content":{},"state_key":"@alice:example.org_DEVICE","unsigned":{}}"#.to_owned(),
     )
     .expect("a call membership event");
@@ -2878,7 +2857,7 @@ fn poll_content(
     question: &str,
     answers: &[&str],
     undisclosed: bool,
-) -> Option<matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent> {
+) -> Option<ruma::events::poll::unstable_start::UnstablePollStartEventContent> {
     let answers: Vec<String> = answers.iter().map(|text| (*text).to_owned()).collect();
     let mut content = crate::polls::start(question, &answers, undisclosed, 1)?;
     content.text = None;
@@ -3056,11 +3035,10 @@ async fn a_poll_kind_we_do_not_recognise_withholds_its_tally() {
 
     let mut content = poll_content("lunch?", &["ramen"], false)
         .expect("a question and one answer are a valid poll");
-    if let matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent::New(new) =
+    if let ruma::events::poll::unstable_start::UnstablePollStartEventContent::New(new) =
         &mut content
     {
-        new.poll_start.kind =
-            matrix_sdk::ruma::events::poll::start::PollKind::from("org.example.secret");
+        new.poll_start.kind = ruma::events::poll::start::PollKind::from("org.example.secret");
     }
 
     server.mock_room_state_encryption().plain().mount().await;
@@ -3310,7 +3288,7 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
             &client,
             JoinedRoomBuilder::new(room_id).add_timeline_event(
                 serde_json::from_value::<
-                    matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>,
+                    ruma::serde::Raw<ruma::events::AnySyncTimelineEvent>,
                 >(json!({
                     "type": "m.room.message",
                     "event_id": "$gallery",
@@ -3668,7 +3646,7 @@ async fn joining_a_call_is_worded_as_a_join() {
 
 /// The UI branches on these variants, so the mapping is a contract.
 /// `None` when the mocked server accepted the write.
-async fn room_command_error(response: ResponseTemplate) -> Option<crate::protocol::RpcError> {
+async fn room_command_error(response: ResponseTemplate) -> Option<RpcError> {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!errors:example.org");
@@ -3840,13 +3818,11 @@ async fn fetching_members_names_a_bridge_ghost_the_sync_never_shipped() {
 
     assert_eq!(named, "Marie");
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn dispatch_mark_read(
     server: &MatrixMockServer,
     client: matrix_sdk::Client,
-    room_id: matrix_sdk::ruma::OwnedRoomId,
-    event_id: Option<matrix_sdk::ruma::OwnedEventId>,
+    room_id: ruma::OwnedRoomId,
+    event_id: Option<ruma::OwnedEventId>,
     private_receipt: bool,
     fully_read: bool,
 ) {
@@ -3873,13 +3849,9 @@ async fn dispatch_mark_read(
     .unwrap();
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "test code; one sequential flow kept in a single function"
-)]
 async fn mark_read_body(
     private_receipt: bool,
-    event_id: Option<matrix_sdk::ruma::OwnedEventId>,
+    event_id: Option<ruma::OwnedEventId>,
     include_threaded_reply: bool,
 ) -> (
     serde_json::Value,
@@ -3891,7 +3863,7 @@ async fn mark_read_body(
     let server = MatrixMockServer::new().await;
     let client = server
         .client_builder()
-        .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
+        .on_builder(|builder| builder.with_threading_support(session::THREADING_SUPPORT))
         .build()
         .await;
     let room_id = room_id!("!receipts:example.org");
@@ -4147,7 +4119,7 @@ async fn reading_the_last_shown_message_covers_the_hidden_events_after_it() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!hidden-tail:example.org");
     let factory = EventFactory::new().room(room_id).sender(User::Alice);
-    let rtc_member = matrix_sdk::ruma::serde::Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+    let rtc_member = ruma::serde::Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(
         r#"{"type":"m.rtc.member","event_id":"$call","sender":"@alice:example.org","origin_server_ts":2,"content":{},"state_key":"@alice:example.org_DEVICE","unsigned":{}}"#.to_owned(),
     )
     .expect("a call membership event");
@@ -4216,7 +4188,7 @@ async fn a_receipt_short_of_the_latest_message_leaves_the_marker() {
     let server = MatrixMockServer::new().await;
     let client = server
         .client_builder()
-        .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
+        .on_builder(|builder| builder.with_threading_support(session::THREADING_SUPPORT))
         .build()
         .await;
     let room_id = room_id!("!receipts:example.org");
@@ -4256,8 +4228,6 @@ async fn a_receipt_short_of_the_latest_message_leaves_the_marker() {
     )
     .await;
 }
-
-#[expect(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 async fn read_marker_for(fully_read: bool) -> Option<String> {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -4349,7 +4319,7 @@ async fn invited_direct_room_summary_is_direct() {
         let client = server.client_builder().build().await;
         let room_id = room_id!("!dm-invite:example.org");
         let own = client.user_id().expect("a logged-in client").to_owned();
-        let member = matrix_sdk::ruma::serde::Raw::new(&json!({
+        let member = ruma::serde::Raw::new(&json!({
             "type": "m.room.member",
             "sender": User::Alice,
             "state_key": own,
@@ -4380,10 +4350,7 @@ async fn invited_direct_room_summary_is_direct() {
         .await;
         let summary = room_row(&item, &cache);
 
-        assert_eq!(
-            summary.direct_targets,
-            [] as [matrix_sdk::ruma::OwnedUserId; 0]
-        );
+        assert_eq!(summary.direct_targets, Vec::<ruma::OwnedUserId>::new());
         assert_eq!(summary.is_direct, expected);
     }
 }
@@ -4518,7 +4485,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
         .sync_room(
             &client,
             JoinedRoomBuilder::new(room_id).add_state_event(
-                matrix_sdk::ruma::serde::Raw::new(&json!({
+                ruma::serde::Raw::new(&json!({
                     "content": {"url": null},
                     "event_id": "$room-avatar-cleared",
                     "origin_server_ts": 0,
@@ -4527,7 +4494,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
                     "type": "m.room.avatar",
                 }))
                 .unwrap()
-                .cast_unchecked::<matrix_sdk::ruma::events::AnySyncStateEvent>(),
+                .cast_unchecked::<ruma::events::AnySyncStateEvent>(),
             ),
         )
         .await;
@@ -4611,7 +4578,7 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
             .get_state_event_static::<RoomAvatarEventContent>()
             .await
             .unwrap();
-        let expected_cached_avatar: Option<Option<matrix_sdk::ruma::OwnedMxcUri>> = avatar_content
+        let expected_cached_avatar: Option<Option<ruma::OwnedMxcUri>> = avatar_content
             .as_ref()
             .map(|content| content["url"].as_str().map(Into::into));
         assert_eq!(
@@ -4723,9 +4690,7 @@ async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
                 .add_timeline_event(
                     factory
                         .text_msg("hey")
-                        .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
-                            own_user_id.clone(),
-                        ]))
+                        .mentions(ruma::events::Mentions::with_user_ids([own_user_id.clone()]))
                         .event_id(event_id!("$mention")),
                 ),
         )
@@ -4785,9 +4750,7 @@ async fn a_deleted_mention_is_not_highlighted() {
                 .add_timeline_event(
                     factory
                         .text_msg("hey")
-                        .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
-                            own_user_id.clone(),
-                        ]))
+                        .mentions(ruma::events::Mentions::with_user_ids([own_user_id.clone()]))
                         .event_id(event_id!("$mention")),
                 ),
         )
@@ -4886,7 +4849,7 @@ async fn a_live_redaction_drops_the_reactions() {
         .sync_room(
             &client,
             JoinedRoomBuilder::new(room_id).add_timeline_event(
-                matrix_sdk::ruma::serde::Raw::new(&redaction)
+                ruma::serde::Raw::new(&redaction)
                     .expect("a redaction")
                     .cast_unchecked(),
             ),
@@ -5117,7 +5080,7 @@ async fn an_edit_renders_the_formatted_body_of_its_new_content() {
                         .text_html("* fallback", "* <em>fallback</em>")
                         .edit(
                             original,
-                            matrix_sdk::ruma::events::room::message::RoomMessageEventContentWithoutRelation::text_html(
+                            ruma::events::room::message::RoomMessageEventContentWithoutRelation::text_html(
                                 "$[unixtime 0]",
                                 TIME_HTML,
                             ),
@@ -5422,9 +5385,9 @@ fn calendar_event(event_id: &str, uid: &str) -> serde_json::Value {
 #[tokio::test]
 async fn a_calendar_reload_reads_back_only_to_what_it_already_has() {
     let raw_timeline_event = |event: serde_json::Value| {
-        matrix_sdk::ruma::serde::Raw::new(&event)
+        ruma::serde::Raw::new(&event)
             .unwrap()
-            .cast_unchecked::<matrix_sdk::ruma::events::AnyTimelineEvent>()
+            .cast_unchecked::<ruma::events::AnyTimelineEvent>()
     };
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -5486,11 +5449,7 @@ async fn a_synced_calendar_entry_tells_the_page_to_reload() {
     core.watch_calendars(&client, 1);
 
     let room_id = room_id!("!calendar:example.org");
-    let state = |event: serde_json::Value| {
-        matrix_sdk::ruma::serde::Raw::new(&event)
-            .unwrap()
-            .cast_unchecked()
-    };
+    let state = |event: serde_json::Value| ruma::serde::Raw::new(&event).unwrap().cast_unchecked();
     server
         .sync_room(
             &client,
@@ -5501,9 +5460,9 @@ async fn a_synced_calendar_entry_tells_the_page_to_reload() {
                     "content": { "room_version": "11", "type": "chat.commet.calendar" }
                 }))])
                 .add_timeline_event(
-                    matrix_sdk::ruma::serde::Raw::new(&calendar_event("$a", "raid"))
+                    ruma::serde::Raw::new(&calendar_event("$a", "raid"))
                         .unwrap()
-                        .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                        .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
                 ),
         )
         .await;
@@ -5526,9 +5485,7 @@ async fn an_emptied_state_event_is_a_state_event_not_a_deleted_message() {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!cleared:example.org");
     let cleared = |id: &str| {
-        serde_json::from_value::<
-            matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>,
-        >(json!({
+        serde_json::from_value::<ruma::serde::Raw<ruma::events::AnySyncTimelineEvent>>(json!({
             "type": "m.room.pinned_events",
             "state_key": "",
             "event_id": id,
@@ -5572,18 +5529,17 @@ async fn a_pin_list_with_junk_entries_still_reads_as_a_pin_change() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let room_id = room_id!("!junk-pins:example.org");
-    let event = serde_json::from_value::<
-        matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>,
-    >(json!({
-        "type": "m.room.pinned_events",
-        "state_key": "",
-        "event_id": "$pins",
-        "sender": User::Alice.to_string(),
-        "origin_server_ts": 1,
-        "content": { "pinned": ["$a", "nex", "$b", "$new", "@nex:example.org", 4, [], {}] },
-        "unsigned": { "prev_content": { "pinned": ["$a", "nex", "$b"] } },
-    }))
-    .unwrap();
+    let event =
+        serde_json::from_value::<ruma::serde::Raw<ruma::events::AnySyncTimelineEvent>>(json!({
+            "type": "m.room.pinned_events",
+            "state_key": "",
+            "event_id": "$pins",
+            "sender": User::Alice.to_string(),
+            "origin_server_ts": 1,
+            "content": { "pinned": ["$a", "nex", "$b", "$new", "@nex:example.org", 4, [], {}] },
+            "unsigned": { "prev_content": { "pinned": ["$a", "nex", "$b"] } },
+        }))
+        .unwrap();
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = server
@@ -5611,7 +5567,7 @@ async fn a_pin_list_with_junk_entries_still_reads_as_a_pin_change() {
         panic!("expected a pin change, got {:?}", item.content);
     };
     assert_eq!(added, &[event_id!("$new").to_owned()]);
-    assert_eq!(removed, &[] as &[matrix_sdk::ruma::OwnedEventId]);
+    assert!(removed.is_empty(), "{removed:?}");
     assert_eq!(*total, 3);
 }
 
@@ -5640,7 +5596,7 @@ async fn an_ignore_change_resyncs_rooms_with_their_history_gap() {
             }
         })
     };
-    let sync_event = |body: &str, id: &matrix_sdk::ruma::EventId| {
+    let sync_event = |body: &str, id: &ruma::EventId| {
         serde_json::from_str::<serde_json::Value>(
             factory
                 .text_msg(body)
@@ -5986,7 +5942,7 @@ async fn thread_actions_accept_linked_context_only_for_its_inferred_root() {
     let server = MatrixMockServer::new().await;
     let client = server
         .client_builder()
-        .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
+        .on_builder(|builder| builder.with_threading_support(session::THREADING_SUPPORT))
         .build()
         .await;
     let room_id = room_id!("!linked-thread:example.org");
@@ -6080,11 +6036,8 @@ async fn redacting_a_topic_the_server_already_stripped_leaves_the_room_without_t
     server
         .sync_room(
             &client,
-            JoinedRoomBuilder::new(room_id).add_state_event(
-                matrix_sdk::ruma::serde::Raw::new(&topic)
-                    .unwrap()
-                    .cast_unchecked(),
-            ),
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(ruma::serde::Raw::new(&topic).unwrap().cast_unchecked()),
         )
         .await;
     assert_eq!(client.get_room(room_id).unwrap().topic(), None);
@@ -6100,22 +6053,15 @@ async fn redacting_a_topic_the_server_already_stripped_leaves_the_room_without_t
     let room = server
         .sync_room(
             &client,
-            JoinedRoomBuilder::new(room_id).add_timeline_event(
-                matrix_sdk::ruma::serde::Raw::new(&redaction)
-                    .unwrap()
-                    .cast_unchecked(),
-            ),
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(ruma::serde::Raw::new(&redaction).unwrap().cast_unchecked()),
         )
         .await;
 
     assert_eq!(room.topic(), None);
     let stored = client
         .state_store()
-        .get_state_event(
-            room_id,
-            matrix_sdk::ruma::events::StateEventType::RoomTopic,
-            "",
-        )
+        .get_state_event(room_id, ruma::events::StateEventType::RoomTopic, "")
         .await
         .unwrap()
         .expect("the redacted topic is kept");
@@ -6128,12 +6074,12 @@ async fn redacting_a_topic_the_server_already_stripped_leaves_the_room_without_t
 
 fn room_row(
     item: &matrix_sdk_ui::room_list_service::RoomListItem,
-    cache: &std::collections::HashMap<matrix_sdk::ruma::OwnedRoomId, super::view::RoomInfo>,
+    cache: &std::collections::HashMap<ruma::OwnedRoomId, super::view::RoomInfo>,
 ) -> crate::protocol::RoomListItemView {
     super::view::room_list_item(
         item,
         cache,
-        &matrix_sdk::ruma::push::Ruleset::new(),
+        &ruma::push::Ruleset::new(),
         &crate::nicknames::Nicknames::default(),
     )
 }

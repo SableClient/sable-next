@@ -720,13 +720,12 @@ impl Core {
             let Ok(body) = Raw::new(content).map(Raw::cast_unchecked) else {
                 continue;
             };
-            let request =
-                matrix_sdk::ruma::api::client::state::send_state_event::v3::Request::new_raw(
-                    to.to_owned(),
-                    StateEventType::from(event_type),
-                    state_key.to_owned(),
-                    body,
-                );
+            let request = ruma::api::client::state::send_state_event::v3::Request::new_raw(
+                to.to_owned(),
+                StateEventType::from(event_type),
+                state_key.to_owned(),
+                body,
+            );
             if let Err(error) = client.send(request).await {
                 tracing::warn!(room = %to, event_type, %error, "image pack not copied to the upgraded room");
             }

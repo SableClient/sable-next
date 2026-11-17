@@ -239,7 +239,8 @@ pub(crate) async fn update(
     Ok(())
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod tests {
     use std::time::Duration;
 
@@ -265,8 +266,6 @@ mod tests {
         let client = server.client_builder().no_server_versions().build().await;
         (server, client)
     }
-
-    #[expect(clippy::unwrap_used, reason = "test code")]
     fn event(state_key: Option<&str>) -> DelayedEvent {
         DelayedEvent {
             room_id: owned_room_id!("!room:example.org"),

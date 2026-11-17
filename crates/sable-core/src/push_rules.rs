@@ -248,7 +248,7 @@ pub fn plan_room_mode(
             NewConditionalPushRule::new(
                 room_id.to_string(),
                 vec![PushCondition::EventMatch(
-                    matrix_sdk::ruma::push::EventMatchConditionData::new(
+                    ruma::push::EventMatchConditionData::new(
                         "room_id".to_owned(),
                         room_id.to_string(),
                     ),

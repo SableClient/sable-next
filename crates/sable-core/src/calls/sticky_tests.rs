@@ -36,7 +36,7 @@ fn plaintext_membership_is_rejected_in_encrypted_rooms() {
     assert!(event.apply(&mut memberships, true, 100));
     assert_eq!(
         memberships.members(100),
-        [] as [crate::calls::membership::CallMember; 0]
+        Vec::<crate::calls::membership::CallMember>::new()
     );
     let mut memberships = crate::calls::membership::StickyMemberships::default();
     assert!(event.apply(&mut memberships, false, 100));
@@ -318,7 +318,7 @@ async fn test_sticky_sync_applies_redactions_in_encrypted_rooms() {
     }
     assert_eq!(
         memberships.members(200),
-        [] as [crate::calls::membership::CallMember; 0]
+        Vec::<crate::calls::membership::CallMember>::new()
     );
     assert!(!memberships.apply_authenticated(&member, ruma::device_id!("DEVICE"), 200));
 }

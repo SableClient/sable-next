@@ -51,7 +51,7 @@ pub async fn fetch_cold_push_event(
 pub struct PushSession {
     host: push_cache::ColdHost,
     store_dir: std::path::PathBuf,
-    pub(super) room_id: matrix_sdk::ruma::OwnedRoomId,
+    pub(super) room_id: ruma::OwnedRoomId,
 }
 
 const READ_ROOMS_TIMEOUT: Duration = Duration::from_secs(5);
@@ -63,8 +63,8 @@ const READ_ROOMS_TIMELINE: u32 = 1;
 /// own. A room missing from the response proves nothing, so it stays unread.
 fn read_rooms_from_sync(
     response: &sync_events::msc4186::Response,
-    own_user: &matrix_sdk::ruma::UserId,
-    room_ids: &[matrix_sdk::ruma::OwnedRoomId],
+    own_user: &ruma::UserId,
+    room_ids: &[ruma::OwnedRoomId],
 ) -> Vec<String> {
     room_ids
         .iter()
@@ -80,9 +80,9 @@ fn read_rooms_from_sync(
 }
 
 fn read_through_latest(
-    timeline: &[matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>],
+    timeline: &[ruma::serde::Raw<ruma::events::AnySyncTimelineEvent>],
     receipts: &std::collections::HashSet<String>,
-    own_user: &matrix_sdk::ruma::UserId,
+    own_user: &ruma::UserId,
 ) -> bool {
     let Some(latest) = timeline.last() else {
         return false;
@@ -102,10 +102,8 @@ fn read_through_latest(
 
 /// Main-timeline receipts only: a threaded receipt says nothing about the room's latest event.
 fn own_receipts(
-    receipts: Option<
-        &matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::receipt::SyncReceiptEvent>,
-    >,
-    own_user: &matrix_sdk::ruma::UserId,
+    receipts: Option<&ruma::serde::Raw<ruma::events::receipt::SyncReceiptEvent>>,
+    own_user: &ruma::UserId,
 ) -> std::collections::HashSet<String> {
     let Some(value) =
         receipts.and_then(|raw| serde_json::from_str::<serde_json::Value>(raw.json().get()).ok())
@@ -225,7 +223,7 @@ impl PushSession {
     async fn name_ambiguous(&self, sender: &str) -> bool {
         let (Some(room), Ok(sender)) = (
             self.host.client().get_room(&self.room_id),
-            matrix_sdk::ruma::UserId::parse(sender),
+            ruma::UserId::parse(sender),
         ) else {
             return false;
         };
@@ -270,7 +268,7 @@ impl PushSession {
         };
         let Ok(response) = client
             .send(
-                matrix_sdk::ruma::api::client::config::get_global_account_data::v3::Request::new(
+                ruma::api::client::config::get_global_account_data::v3::Request::new(
                     user_id.to_owned(),
                     DEVICE_ACTIVITY_EVENT.into(),
                 ),
@@ -370,8 +368,8 @@ impl PushSession {
         let sender_url = match (profile_avatar, sender) {
             (Some(url), _) => Some(url)
                 .filter(|url| !url.is_empty())
-                .map(matrix_sdk::ruma::OwnedMxcUri::from),
-            (None, Some(sender)) => match matrix_sdk::ruma::UserId::parse(sender) {
+                .map(ruma::OwnedMxcUri::from),
+            (None, Some(sender)) => match ruma::UserId::parse(sender) {
                 Ok(sender) => room
                     .get_member_no_sync(&sender)
                     .await
@@ -385,7 +383,7 @@ impl PushSession {
         let room_url = match sender {
             Some(_) => crate::view::room_avatar_url(&room)
                 .await
-                .map(matrix_sdk::ruma::OwnedMxcUri::from),
+                .map(ruma::OwnedMxcUri::from),
             None => None,
         };
         let own = match sender {
@@ -417,8 +415,8 @@ impl PushSession {
         };
         let directory = self.store_dir.join(PUSH_MEDIA_DIRECTORY);
         prune_push_media(&directory).await;
-        let avatar = |url: Option<matrix_sdk::ruma::OwnedMxcUri>| {
-            let source = url.map(matrix_sdk::ruma::events::room::MediaSource::Plain);
+        let avatar = |url: Option<ruma::OwnedMxcUri>| {
+            let source = url.map(ruma::events::room::MediaSource::Plain);
             cached_push_media(
                 client,
                 &directory,
@@ -482,7 +480,7 @@ impl PushSession {
         if let Some(profile) = profile.as_ref() {
             crate::personas::stamp_profile(&mut content, profile);
         }
-        let transaction = matrix_sdk::ruma::OwnedTransactionId::from(transaction_id);
+        let transaction = ruma::OwnedTransactionId::from(transaction_id);
         let sent = self
             .host
             .retry(|| {

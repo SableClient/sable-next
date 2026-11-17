@@ -174,8 +174,7 @@ async fn bounded<T>(
 
 /// The cached push client's background tasks need a runtime that outlives each call.
 fn cold_runtime() -> Option<&'static tokio::runtime::Runtime> {
-    static RUNTIME: std::sync::OnceLock<Option<tokio::runtime::Runtime>> =
-        std::sync::OnceLock::new();
+    static RUNTIME: OnceLock<Option<tokio::runtime::Runtime>> = OnceLock::new();
     RUNTIME
         .get_or_init(|| {
             tokio::runtime::Builder::new_multi_thread()

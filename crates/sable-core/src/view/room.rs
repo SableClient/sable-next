@@ -687,7 +687,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bridge_without_a_protocol_image_borrows_the_network_one() {
+    fn a_bridge_without_a_protocol_image_shows_none() {
         let event = serde_json::json!({"type": "m.bridge", "content": {
             "protocol": {"id": "discord", "avatar_url": "https://example.org/logo.png"},
             "network": {"id": "1234", "avatar_url": "mxc://example.org/guild"}
@@ -696,7 +696,7 @@ mod tests {
             bridge_view(&event.to_string()),
             Some(BridgeView {
                 network: "discord".to_owned(),
-                avatar_url: Some("mxc://example.org/guild".to_owned()),
+                avatar_url: None,
             })
         );
     }

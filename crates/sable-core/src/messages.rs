@@ -106,8 +106,7 @@ pub(crate) fn edit_content(
     if media_caption {
         EditedContent::MediaCaption {
             caption: (!body.is_empty()).then_some(body),
-            formatted_caption: formatted
-                .map(matrix_sdk::ruma::events::room::message::FormattedBody::html),
+            formatted_caption: formatted.map(ruma::events::room::message::FormattedBody::html),
             mentions: Some(outgoing_mentions(mentions, room)),
         }
     } else {
@@ -334,7 +333,7 @@ impl Core {
     async fn edit_queued_message(
         &self,
         room: &matrix_sdk::Room,
-        transaction_id: matrix_sdk::ruma::OwnedTransactionId,
+        transaction_id: ruma::OwnedTransactionId,
         mut edited: EditedContent,
         persona: Option<&PerMessageProfileView>,
         thread_root: Option<&OwnedEventId>,
@@ -1368,15 +1367,13 @@ fn prior_forward(
 
 fn strip_reply_fallback(content: &mut serde_json::Map<String, serde_json::Value>) {
     if let Some(serde_json::Value::String(body)) = content.get_mut("body") {
-        *body =
-            matrix_sdk::ruma::events::room::message::sanitize::remove_plain_reply_fallback(body)
-                .to_owned();
+        *body = ruma::events::room::message::sanitize::remove_plain_reply_fallback(body).to_owned();
     }
     let html = content
         .get("format")
         .is_some_and(|format| format == "org.matrix.custom.html");
     if html && let Some(serde_json::Value::String(formatted)) = content.get_mut("formatted_body") {
-        *formatted = matrix_sdk::ruma::html::remove_html_reply_fallback(formatted);
+        *formatted = ruma::html::remove_html_reply_fallback(formatted);
     }
 }
 
@@ -2341,7 +2338,7 @@ mod tests {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!stale:example.org");
-        let stale: matrix_sdk::ruma::serde::Raw<_> = matrix_sdk::ruma::serde::Raw::new(&json!({
+        let stale: ruma::serde::Raw<_> = ruma::serde::Raw::new(&json!({
             "type": "m.room.pinned_events", "state_key": "", "event_id": "$state",
             "sender": "@alice:example.org", "origin_server_ts": 1,
             "content": {"pinned": ["$a"]}
@@ -2582,7 +2579,7 @@ mod tests {
                 "/_matrix/client/v3/rooms/{target}/send/m.room.message/.*"
             )))
             .and(|request: &wiremock::Request| {
-                let body: serde_json::Value = request.body_json().unwrap();
+                let body: Value = request.body_json().unwrap();
                 body["org.matrix.msc4553.forwarded"]
                     == json!({
                         "content": {"msgtype": "m.text", "body": "original"}
@@ -3273,7 +3270,7 @@ mod tests {
         .unwrap();
     }
 
-    async fn receipt_body(read: &str, viewed: Option<&str>) -> serde_json::Value {
+    async fn receipt_body(read: &str, viewed: Option<&str>) -> Value {
         use crate::api::timeline::MarkReadParams;
         use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
         let server = MatrixMockServer::new().await;

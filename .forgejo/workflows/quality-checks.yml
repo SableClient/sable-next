@@ -90,6 +90,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm stylelint
 
+      - name: Check spelling
+        if: ${{ !cancelled() }}
+        run: mise exec -- typos
+
   checks:
     name: Lint, typecheck and tests
     # ESLint runs with projectService, so it needs the generated WASM bindings.

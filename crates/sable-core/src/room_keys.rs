@@ -144,8 +144,8 @@ impl Core {
     }
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
-#[expect(clippy::unwrap_used, reason = "test code")]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod tests {
     use std::{sync::Arc, time::Duration};
 
@@ -264,7 +264,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         let store_id = format!(
             "{}-{}",
             store.path().to_str().unwrap(),
-            matrix_sdk::ruma::TransactionId::new()
+            ruma::TransactionId::new()
         );
         let client = crate::session::mock_account_client(server, &store_id).await;
         let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
@@ -618,7 +618,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             crate::protocol::KeyBackupDownloadState::Complete
         );
         assert_eq!(session_ids(&client).await.len(), 1);
-        assert_eq!(session_ids(&other).await, [] as [String; 0]);
+        assert_eq!(session_ids(&other).await, Vec::<String>::new());
         let status = core.key_backup_status().await.unwrap();
         assert!(status.download.is_none());
     }
@@ -827,7 +827,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
                 ..
             })
         ));
-        assert_eq!(session_ids(&client).await, [] as [String; 0]);
+        assert_eq!(session_ids(&client).await, Vec::<String>::new());
         assert_eq!(listing(), before);
     }
 

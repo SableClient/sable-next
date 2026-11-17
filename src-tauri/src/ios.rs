@@ -650,7 +650,7 @@ pub(crate) fn donate_sent_message(
             log::warn!("conversation donation bridge is unavailable");
             return;
         };
-        let avatar = (!avatar.is_empty()).then(|| objc2_foundation::NSData::with_bytes(&avatar));
+        let avatar = (!avatar.is_empty()).then(|| NSData::with_bytes(&avatar));
         let (user, room, name) = (
             NSString::from_str(&user),
             NSString::from_str(&room),
@@ -703,6 +703,10 @@ pub(crate) fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
                 };
                 // SAFETY: the function takes (self, _cmd) and returns an object pointer, matching the inputAccessoryView signature
                 unsafe {
+                    #[expect(
+                        trivial_casts,
+                        reason = "add_method needs a fn pointer, not the fn item"
+                    )]
                     builder.add_method(
                         sel!(inputAccessoryView),
                         input_accessory_view_nil as extern "C-unwind" fn(_, _) -> _,
@@ -898,7 +902,7 @@ pub(crate) fn haptic_feedback(app: tauri::AppHandle, strong: bool) -> Result<(),
         let allocated: objc2::rc::Allocated<AnyObject> =
             unsafe { msg_send![objc2::class!(UIImpactFeedbackGenerator), alloc] };
         // SAFETY: initWithStyle: takes a UIImpactFeedbackStyle (NSInteger) and runs on the main thread as UIKit requires
-        let generator: objc2::rc::Retained<AnyObject> =
+        let generator: Retained<AnyObject> =
             unsafe { msg_send![allocated, initWithStyle: isize::from(strong)] };
         // SAFETY: impactOccurred takes no arguments and returns void
         let _: () = unsafe { msg_send![&*generator, impactOccurred] };

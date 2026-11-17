@@ -190,13 +190,9 @@ test('a room can be protected by pasting its ID into the picker', async () => {
   );
 
   await vi.waitFor(() => {
-    expect(sendEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event_type: 'fi.mau.meowlnir.protected_rooms',
-        content: expect.objectContaining({
-          rooms: ['!lobby:example.org', '!new:example.org'],
-        }),
-      })
-    );
+    expect(sendEvent.mock.lastCall?.[0]).toMatchObject({
+      event_type: 'fi.mau.meowlnir.protected_rooms',
+      content: { rooms: ['!lobby:example.org', '!new:example.org'] },
+    });
   });
 });

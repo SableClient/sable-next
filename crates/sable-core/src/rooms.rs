@@ -111,7 +111,7 @@ pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_
     Ok(())
 }
 
-pub(crate) async fn poll_memberships(core: std::sync::Arc<crate::Core>, client: Client) {
+pub(crate) async fn poll_memberships(core: std::sync::Arc<Core>, client: Client) {
     loop {
         matrix_sdk::sleep::sleep(MEMBERSHIP_POLL_INTERVAL).await;
         core.wait_until_active().await;
@@ -154,7 +154,7 @@ pub(crate) async fn fill_own_members(client: &Client) -> Result<(), matrix_sdk::
     Ok(())
 }
 
-pub(crate) async fn fill_own_member(room: &matrix_sdk::Room) -> Result<(), matrix_sdk::Error> {
+pub(crate) async fn fill_own_member(room: &Room) -> Result<(), matrix_sdk::Error> {
     if room.joined_members_count() > OWN_MEMBER_FILL_MAX_MEMBERS
         || room.get_member_no_sync(room.own_user_id()).await?.is_some()
     {
@@ -187,7 +187,7 @@ async fn clear_dm_default(client: &Client) -> matrix_sdk::Result<()> {
         .account()
         .set_account_data_raw(
             event_type.into(),
-            matrix_sdk::ruma::serde::Raw::from_json_string("{}".to_owned())?,
+            ruma::serde::Raw::from_json_string("{}".to_owned())?,
         )
         .await?;
     Ok(())
@@ -215,7 +215,7 @@ impl Core {
         &self,
         room_id: &OwnedRoomId,
         direct: bool,
-        user_id: Option<matrix_sdk::ruma::OwnedUserId>,
+        user_id: Option<ruma::OwnedUserId>,
     ) -> Result<(), RpcError> {
         let client = self.client().await?;
         let room = self.room(room_id).await?;
@@ -245,15 +245,15 @@ impl Core {
 
         // Written before `m.direct`, whose update is what refreshes the room's name.
         let partner = user_id.filter(|_| direct);
-        if partner.is_some() || crate::view::chosen_partner(&room).await.is_some() {
+        if partner.is_some() || view::chosen_partner(&room).await.is_some() {
             let content = partner.map_or_else(
                 || serde_json::json!({}),
                 |user_id| serde_json::json!({ "user_id": user_id }),
             );
-            let raw = matrix_sdk::ruma::serde::Raw::new(&content)
+            let raw = ruma::serde::Raw::new(&content)
                 .or_failed(self, "set_direct_partner")?
                 .cast_unchecked();
-            room.set_account_data_raw(crate::view::DIRECT_PARTNER_EVENT.into(), raw)
+            room.set_account_data_raw(view::DIRECT_PARTNER_EVENT.into(), raw)
                 .await
                 .or_failed(self, "set_direct_partner")?;
         }
@@ -394,9 +394,9 @@ impl Core {
             .await
             .or_failed(self, "room_encryption_state")?
         {
-            matrix_sdk::EncryptionState::Encrypted => Ok(true),
-            matrix_sdk::EncryptionState::NotEncrypted => Ok(false),
-            matrix_sdk::EncryptionState::Unknown => Err(RpcCode::Unavailable.into()),
+            EncryptionState::Encrypted => Ok(true),
+            EncryptionState::NotEncrypted => Ok(false),
+            EncryptionState::Unknown => Err(RpcCode::Unavailable.into()),
         }
     }
 
@@ -945,7 +945,7 @@ mod tests {
         assert!(room.successor_room().is_none());
         let row = crate::view::listless_room_list_item(
             room,
-            &matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap()),
+            &ruma::push::Ruleset::server_default(client.user_id().unwrap()),
             &crate::nicknames::Nicknames::default(),
         )
         .await;

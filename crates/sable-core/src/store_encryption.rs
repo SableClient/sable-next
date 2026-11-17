@@ -871,7 +871,7 @@ mod tests {
             .save_send_queue_request(
                 room_id!("!room:example.org"),
                 "txn".into(),
-                matrix_sdk::ruma::MilliSecondsSinceUnixEpoch::now(),
+                ruma::MilliSecondsSinceUnixEpoch::now(),
                 QueuedRequestKind::Event {
                     content: SerializableEventContent::new(&content).unwrap(),
                     sticky_duration: None,

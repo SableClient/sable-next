@@ -29,7 +29,7 @@ impl SecretBackend for KeystoreSecrets {
                 if secret.is_null() {
                     return Ok(None);
                 }
-                let secret = env.cast_local::<JByteArray>(secret)?;
+                let secret = env.cast_local::<JByteArray<'_>>(secret)?;
                 env.convert_byte_array(&secret).map(Some)
             })
             .map_err(|error| failure(&error))

@@ -437,10 +437,19 @@ mod tests {
                 factory.text_msg("original").event_id(original).into_raw(),
                 custom(annotation, "m.annotation"),
                 custom(replacement, "m.replace"),
-                factory.text_msg("edited")
-                    .edit(original, matrix_sdk::ruma::events::room::message::RoomMessageEventContent::text_plain("edited").into())
-                    .event_id(edit).into_raw(),
-                factory.reaction(original, "👍").event_id(reaction).into_raw(),
+                factory
+                    .text_msg("edited")
+                    .edit(
+                        original,
+                        ruma::events::room::message::RoomMessageEventContent::text_plain("edited")
+                            .into(),
+                    )
+                    .event_id(edit)
+                    .into_raw(),
+                factory
+                    .reaction(original, "👍")
+                    .event_id(reaction)
+                    .into_raw(),
             ];
             let annotations = [
                 image_reaction(annotation, event_id!("$nested")),

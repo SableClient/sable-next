@@ -156,7 +156,7 @@ mod tests {
         .unwrap();
         let levels = RoomPowerLevels::new(
             content.into(),
-            &matrix_sdk::ruma::room_version_rules::AuthorizationRules::V1,
+            &ruma::room_version_rules::AuthorizationRules::V1,
             [],
         );
         let user = matrix_sdk::ruma::user_id!("@user:example.org");
@@ -185,7 +185,7 @@ mod tests {
         let levels: RoomPowerLevelsEventContent = serde_json::from_value(content.clone()).unwrap();
         let view = room_power_levels(&RoomPowerLevels::new(
             levels.into(),
-            &matrix_sdk::ruma::room_version_rules::AuthorizationRules::V1,
+            &ruma::room_version_rules::AuthorizationRules::V1,
             [],
         ));
         let mut actual = serde_json::to_value(view).unwrap();

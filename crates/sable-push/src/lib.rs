@@ -21,10 +21,7 @@ const RENDER_TIMEOUT: Duration = Duration::from_secs(20);
 const OPTIONAL_TIMEOUT: Duration = Duration::from_secs(3);
 const FINISH_RESERVE: Duration = Duration::from_secs(1);
 
-async fn optional_work<T: Default>(
-    deadline: Instant,
-    operation: impl std::future::Future<Output = T>,
-) -> T {
+async fn optional_work<T: Default>(deadline: Instant, operation: impl Future<Output = T>) -> T {
     let now = Instant::now();
     if deadline <= now {
         return T::default();
@@ -970,8 +967,7 @@ fn render_response(
     if let Some(issue) = issue {
         let response = response.get_or_insert_with(|| serde_json::json!({}));
         let object = response.as_object_mut()?;
-        let mut diagnostic =
-            serde_json::Map::from_iter([("issue".to_owned(), issue.as_str().into())]);
+        let mut diagnostic = Map::from_iter([("issue".to_owned(), issue.as_str().into())]);
         diagnostic.insert("reporting".to_owned(), reporting.into());
         if let Issue::Timeout(stage) = issue {
             diagnostic.insert("stage".to_owned(), stage.into());
@@ -1478,7 +1474,7 @@ mod tests {
     }
 
     fn shape_push(notification: Value) -> Value {
-        Value::Object(serde_json::Map::from_iter([
+        Value::Object(Map::from_iter([
             ("user_id".to_owned(), "@alice:example.org".into()),
             ("notification".to_owned(), notification),
         ]))

@@ -650,7 +650,7 @@ mod tests {
         assert_eq!(document.body, "moai");
         assert_eq!(
             document.attachments,
-            [] as [sable_model::search_filter::SearchAttachment; 0]
+            Vec::<sable_model::search_filter::SearchAttachment>::new()
         );
     }
 

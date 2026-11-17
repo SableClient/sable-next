@@ -783,7 +783,7 @@ mod tests {
 
     #[test]
     fn a_json_quoted_token_is_scrubbed() {
-        let text = super::scrub_text(r#"{"access_token": "syt_secret", "error": "x"}"#);
+        let text = scrub_text(r#"{"access_token": "syt_secret", "error": "x"}"#);
         assert!(!text.contains("syt_secret"), "{text}");
     }
 }

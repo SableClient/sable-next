@@ -26,8 +26,6 @@ use crate::{
     session::Session,
     store::MemorySessionStore,
 };
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn watching(
     server: &MatrixMockServer,
     client: &Client,
@@ -44,8 +42,6 @@ async fn watching(
         .await;
     (core, events)
 }
-
-#[expect(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 async fn next_notification(events: &mut UnboundedReceiver<CoreEvent>) -> NotificationView {
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -102,7 +98,7 @@ async fn a_replayed_invite_alerts_once() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let own = client.user_id().unwrap().to_owned();
-    let invite = |room_id: &matrix_sdk::ruma::RoomId| {
+    let invite = |room_id: &ruma::RoomId| {
         InvitedRoomBuilder::new(room_id).add_state_event(stripped_state_event!({
             "type": "m.room.member", "sender": User::Alice, "state_key": own,
             "content": { "membership": "invite" }
@@ -154,15 +150,13 @@ async fn a_replayed_message_alerts_once() {
         )
         .await;
     let (core, mut events) = watching(&server, &client).await;
-    let mut rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
+    let mut rules = Ruleset::server_default(client.user_id().unwrap());
     rules
         .insert(
-            matrix_sdk::ruma::push::NewPushRule::Room(
-                matrix_sdk::ruma::push::NewSimplePushRule::new(
-                    room_id.to_owned(),
-                    vec![matrix_sdk::ruma::push::Action::Notify],
-                ),
-            ),
+            ruma::push::NewPushRule::Room(ruma::push::NewSimplePushRule::new(
+                room_id.to_owned(),
+                vec![Action::Notify],
+            )),
             None,
             None,
         )
@@ -201,9 +195,9 @@ async fn a_replayed_message_alerts_once() {
                             json!({"notification_count": 1, "highlight_count": 0}),
                         )
                         .add_timeline_event(
-                            matrix_sdk::ruma::serde::Raw::new(&message)
+                            ruma::serde::Raw::new(&message)
                                 .unwrap()
-                                .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                                .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
                         ),
                 );
             })
@@ -244,7 +238,7 @@ async fn a_message_delivered_late_by_a_resumed_sync_does_not_alert() {
         )
         .await;
     let (core, mut events) = watching(&server, &client).await;
-    let rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
+    let rules = Ruleset::server_default(client.user_id().unwrap());
     let long_ago = MilliSecondsSinceUnixEpoch::from_system_time(
         std::time::SystemTime::now() - Duration::from_secs(600),
     )
@@ -282,9 +276,9 @@ async fn a_message_delivered_late_by_a_resumed_sync_does_not_alert() {
                             json!({"notification_count": 1, "highlight_count": 0}),
                         )
                         .add_timeline_event(
-                            matrix_sdk::ruma::serde::Raw::new(&event)
+                            ruma::serde::Raw::new(&event)
                                 .unwrap()
-                                .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                                .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
                         ),
                 );
             })
@@ -400,9 +394,9 @@ async fn an_existing_bridge_status_rule_is_respected() {
                 builder.add_global_account_data(factory.push_rules(rules.clone()));
                 builder.add_joined_room(
                     JoinedRoomBuilder::new(room_id).add_timeline_event(
-                        matrix_sdk::ruma::serde::Raw::new(&event)
+                        ruma::serde::Raw::new(&event)
                             .unwrap()
-                            .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                            .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
                     ),
                 );
             })
@@ -440,15 +434,13 @@ async fn a_message_alerts_when_the_server_reports_no_counts() {
         )
         .await;
     let (core, mut events) = watching(&server, &client).await;
-    let mut rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
+    let mut rules = Ruleset::server_default(client.user_id().unwrap());
     rules
         .insert(
-            matrix_sdk::ruma::push::NewPushRule::Room(
-                matrix_sdk::ruma::push::NewSimplePushRule::new(
-                    room_id.to_owned(),
-                    vec![matrix_sdk::ruma::push::Action::Notify],
-                ),
-            ),
+            ruma::push::NewPushRule::Room(ruma::push::NewSimplePushRule::new(
+                room_id.to_owned(),
+                vec![Action::Notify],
+            )),
             None,
             None,
         )
@@ -476,9 +468,9 @@ async fn a_message_alerts_when_the_server_reports_no_counts() {
                         json!({"notification_count": 0, "highlight_count": 0}),
                     )
                     .add_timeline_event(
-                        matrix_sdk::ruma::serde::Raw::new(&message)
+                        ruma::serde::Raw::new(&message)
                             .unwrap()
-                            .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                            .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
                     ),
             );
         })
@@ -515,15 +507,13 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
             )
             .await;
         let (core, mut events) = watching(&server, &client).await;
-        let mut rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
+        let mut rules = Ruleset::server_default(client.user_id().unwrap());
         rules
             .insert(
-                matrix_sdk::ruma::push::NewPushRule::Room(
-                    matrix_sdk::ruma::push::NewSimplePushRule::new(
-                        room_id.to_owned(),
-                        vec![matrix_sdk::ruma::push::Action::Notify],
-                    ),
-                ),
+                ruma::push::NewPushRule::Room(ruma::push::NewSimplePushRule::new(
+                    room_id.to_owned(),
+                    vec![Action::Notify],
+                )),
                 None,
                 None,
             )
@@ -560,9 +550,9 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
                             json!({"notification_count": 1, "highlight_count": 0}),
                         )
                         .add_timeline_event(
-                            matrix_sdk::ruma::serde::Raw::new(&event)
+                            ruma::serde::Raw::new(&event)
                                 .unwrap()
-                                .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                                .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
                         ),
                 );
             }),
@@ -580,8 +570,8 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
                 .add_receipt(factory.read_receipts().add_with_timestamp(
                     matrix_sdk::ruma::event_id!("$sticker"),
                     client.user_id().unwrap(),
-                    matrix_sdk::ruma::events::receipt::ReceiptType::Read,
-                    matrix_sdk::ruma::events::receipt::ReceiptThread::Unthreaded,
+                    ruma::events::receipt::ReceiptType::Read,
+                    ruma::events::receipt::ReceiptThread::Unthreaded,
                     Some(MilliSecondsSinceUnixEpoch::now()),
                 ).into_event()));
             builder.add_invited_room(InvitedRoomBuilder::new(invite_room).add_state_event(stripped_state_event!({
@@ -977,11 +967,7 @@ async fn a_grown_direct_room_keeps_the_partner_converttodm_chose() {
             builder.add_joined_room(
                 JoinedRoomBuilder::new(room_id)
                     .add_state_bulk(members.iter().map(|member| factory.member(*member).into()))
-                    .add_account_data(
-                        matrix_sdk::ruma::serde::Raw::new(&chosen)
-                            .unwrap()
-                            .cast_unchecked(),
-                    )
+                    .add_account_data(ruma::serde::Raw::new(&chosen).unwrap().cast_unchecked())
                     .set_joined_members_count(3),
             );
             builder.add_global_account_data(factory.direct().add_user(partner.to_owned(), room_id));
@@ -1265,9 +1251,9 @@ async fn a_knock_alerts_like_a_join() {
                 builder.add_global_account_data(factory.push_rules(rules.clone()));
                 builder.add_joined_room(
                     JoinedRoomBuilder::new(room_id).add_timeline_event(
-                        matrix_sdk::ruma::serde::Raw::new(&event)
+                        ruma::serde::Raw::new(&event)
                             .unwrap()
-                            .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                            .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
                     ),
                 );
             })

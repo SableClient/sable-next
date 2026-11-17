@@ -972,7 +972,7 @@ impl Handler for CreatePollParams {
         )
         .ok_or(RpcCode::InvalidPoll)?;
         let content =
-            matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent::from(
+            ruma::events::poll::unstable_start::UnstablePollStartEventContent::from(
                 content,
             );
 
@@ -1009,7 +1009,7 @@ impl Handler for VotePollParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let content =
-            matrix_sdk::ruma::events::poll::unstable_response::UnstablePollResponseEventContent::new(
+            ruma::events::poll::unstable_response::UnstablePollResponseEventContent::new(
                 self.answers,
                 self.event_id,
             );
@@ -1044,7 +1044,7 @@ impl Handler for EndPollParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         let content =
-            matrix_sdk::ruma::events::poll::unstable_end::UnstablePollEndEventContent::new(
+            ruma::events::poll::unstable_end::UnstablePollEndEventContent::new(
                 "The poll has closed.",
                 self.event_id,
             );

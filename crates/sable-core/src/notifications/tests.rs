@@ -801,7 +801,7 @@ async fn a_cold_push_in_an_all_messages_room_is_shown_under_a_mentions_default()
         .insert(
             NewPushRule::Room(NewSimplePushRule::new(
                 room_id!("!cold:example.org").to_owned(),
-                vec![matrix_sdk::ruma::push::Action::Notify],
+                vec![ruma::push::Action::Notify],
             )),
             None,
             None,
@@ -999,11 +999,7 @@ async fn a_push_in_a_joined_room_is_fetched_without_syncing_account_data() {
     let _sync = fixture
         .server
         .mock_sliding_sync()
-        .ok(
-            matrix_sdk::ruma::api::client::sync::sync_events::msc4186::Response::new(
-                "1".to_owned(),
-            ),
-        )
+        .ok(ruma::api::client::sync::sync_events::msc4186::Response::new("1".to_owned()))
         .never()
         .mount_as_scoped()
         .await;
@@ -1487,7 +1483,7 @@ async fn a_room_with_media_previews_off_gets_no_push_image() {
 }
 
 fn media_room(
-    account_data: Option<Raw<matrix_sdk::ruma::events::AnyRoomAccountDataEvent>>,
+    account_data: Option<Raw<ruma::events::AnyRoomAccountDataEvent>>,
 ) -> JoinedRoomBuilder {
     let factory = matrix_sdk_test::event_factory::EventFactory::new()
         .room(room_id!("!cold:example.org"))
@@ -1706,7 +1702,7 @@ async fn push_sender_names_follow_plain_and_sealed_profile_overrides() {
                 UNSTABLE, &json!({"@sender:example.org":{"displayname":"Locked"}})
             ).unwrap()}))
                 .unwrap()
-                .cast_unchecked::<matrix_sdk::ruma::events::AnyGlobalAccountDataEvent>(),
+                .cast_unchecked::<ruma::events::AnyGlobalAccountDataEvent>(),
             );
         })
         .await;
@@ -1757,7 +1753,7 @@ async fn push_sender_names_follow_plain_and_sealed_profile_overrides() {
                 builder.add_global_account_data(
                     Raw::new(&json!({"type":event_type,"content":content}))
                         .unwrap()
-                        .cast_unchecked::<matrix_sdk::ruma::events::AnyGlobalAccountDataEvent>(),
+                        .cast_unchecked::<ruma::events::AnyGlobalAccountDataEvent>(),
                 );
             })
             .await;

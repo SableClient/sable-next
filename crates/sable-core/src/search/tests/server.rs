@@ -7,7 +7,7 @@ use wiremock::{Mock, ResponseTemplate};
 
 use super::{logged_in, reingest_whole_room};
 
-fn one_server_hit(room_id: &matrix_sdk::ruma::OwnedRoomId) -> serde_json::Value {
+fn one_server_hit(room_id: &ruma::OwnedRoomId) -> serde_json::Value {
     json!({
         "search_categories": {
             "room_events": {
@@ -29,7 +29,7 @@ fn one_server_hit(room_id: &matrix_sdk::ruma::OwnedRoomId) -> serde_json::Value 
     })
 }
 
-fn scoped_to(room_id: &matrix_sdk::ruma::OwnedRoomId) -> crate::search::IndexFilter {
+fn scoped_to(room_id: &ruma::OwnedRoomId) -> crate::search::IndexFilter {
     crate::search::IndexFilter {
         rooms: vec![room_id.clone()],
         ..crate::search::IndexFilter::default()

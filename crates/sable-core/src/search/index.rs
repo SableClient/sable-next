@@ -1991,7 +1991,7 @@ mod tests {
     #[test]
     fn test_a_room_filter_excludes_other_rooms() {
         let (mut index, room) = filtered_index();
-        let other = matrix_sdk::ruma::RoomId::parse("!other:localhost").expect("room id");
+        let other = ruma::RoomId::parse("!other:localhost").expect("room id");
         index
             .rooms
             .entry(other)
@@ -2155,7 +2155,7 @@ mod tests {
                 pattern: Some("(unclosed".to_owned()),
                 ..super::IndexFilter::default()
             }),
-            [] as [String; 0]
+            Vec::<String>::new()
         );
     }
 
@@ -2197,7 +2197,7 @@ mod tests {
     #[test]
     fn test_a_denied_room_is_skipped_even_with_no_room_filter() {
         let (mut index, room) = filtered_index();
-        let other = matrix_sdk::ruma::RoomId::parse("!other:localhost").expect("room id");
+        let other = ruma::RoomId::parse("!other:localhost").expect("room id");
         index
             .rooms
             .entry(other.clone())
@@ -2227,7 +2227,7 @@ mod tests {
 
     #[test]
     fn test_attachment_pages_walk_every_picture_once_across_a_timestamp_tie() {
-        let room = matrix_sdk::ruma::RoomId::parse("!pictures:localhost").expect("room id");
+        let room = ruma::RoomId::parse("!pictures:localhost").expect("room id");
         let mut index = MessageIndex::new();
         let room_index = index
             .rooms
@@ -2253,7 +2253,7 @@ mod tests {
 
     #[test]
     fn test_attachment_pages_reach_into_an_unloaded_chunk() {
-        let room = matrix_sdk::ruma::RoomId::parse("!gallery:localhost").expect("room id");
+        let room = ruma::RoomId::parse("!gallery:localhost").expect("room id");
         let mut room_index = super::RoomIndex::new();
         for seed in 0..2_500_u64 {
             room_index.upsert(picture(&format!("p{seed}"), "@kris:localhost", seed));
@@ -2289,7 +2289,7 @@ mod tests {
 
     #[test]
     fn test_attachment_pages_skip_ignored_senders() {
-        let room = matrix_sdk::ruma::RoomId::parse("!pictures:localhost").expect("room id");
+        let room = ruma::RoomId::parse("!pictures:localhost").expect("room id");
         let mut index = MessageIndex::new();
         let room_index = index
             .rooms
@@ -2311,7 +2311,7 @@ mod tests {
 
     #[test]
     fn test_the_memory_budget_unloads_the_oldest_chunk_and_keeps_it_on_disk() {
-        let room = matrix_sdk::ruma::RoomId::parse("!budget:localhost").expect("room id");
+        let room = ruma::RoomId::parse("!budget:localhost").expect("room id");
         let room_index = budgeted_room(5_000, 0);
         let full = room_index.bytes;
         let mut index = MessageIndex::with_budgets(full / 2, u64::MAX);
@@ -2327,8 +2327,8 @@ mod tests {
 
     #[test]
     fn test_the_memory_budget_spans_rooms_rather_than_each_room_separately() {
-        let busy = matrix_sdk::ruma::RoomId::parse("!busy:localhost").expect("room id");
-        let quiet = matrix_sdk::ruma::RoomId::parse("!quiet:localhost").expect("room id");
+        let busy = ruma::RoomId::parse("!busy:localhost").expect("room id");
+        let quiet = ruma::RoomId::parse("!quiet:localhost").expect("room id");
         let busy_index = budgeted_room(2_500, 1_000_000);
         let quiet_index = budgeted_room(2_500, 0);
         let budget = busy_index.bytes + quiet_index.bytes / 2;
@@ -2344,7 +2344,7 @@ mod tests {
 
     #[test]
     fn test_a_dirty_chunk_is_never_unloaded() {
-        let room = matrix_sdk::ruma::RoomId::parse("!dirty:localhost").expect("room id");
+        let room = ruma::RoomId::parse("!dirty:localhost").expect("room id");
         let mut room_index = super::RoomIndex::new();
         seed_room(&mut room_index, 3_000);
         let mut index = MessageIndex::with_budgets(1, u64::MAX);
@@ -2357,7 +2357,7 @@ mod tests {
 
     #[test]
     fn test_four_gib_disk_budget_and_totals() {
-        let room = matrix_sdk::ruma::RoomId::parse("!large:localhost").expect("room id");
+        let room = ruma::RoomId::parse("!large:localhost").expect("room id");
         let mut room_index = super::RoomIndex::new();
         // Each chunk fits in 32 bits; the total must also work on wasm32.
         room_index.chunk_meta.insert(0, (2_147_483_648, 1));
@@ -2374,7 +2374,7 @@ mod tests {
 
     #[test]
     fn test_the_disk_budget_reports_the_index_full() {
-        let room = matrix_sdk::ruma::RoomId::parse("!full:localhost").expect("room id");
+        let room = ruma::RoomId::parse("!full:localhost").expect("room id");
         let mut room_index = budgeted_room(10, 0);
         room_index
             .chunk_meta

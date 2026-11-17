@@ -21,7 +21,7 @@ Profiles now can contain `io.fsky.nyx.pronouns`. The format of this field is def
 }
 ```
 
-If this MSC is stabilised, this key will change to `m.pronouns`, so clients SHOULD also accept this key for future compatability.
+If this MSC is stabilised, this key will change to `m.pronouns`, so clients SHOULD also accept this key for future compatibility.
 
 ### Username colors
 
@@ -38,7 +38,7 @@ Profiles now can contain `eu.she-a.color`. The format of this field is defined b
 }
 ```
 
-If this MSC is stabilised, this key will change to `m.color_preference`, so clients SHOULD also accept this key for future compatability.
+If this MSC is stabilised, this key will change to `m.color_preference`, so clients SHOULD also accept this key for future compatibility.
 
 ## PluralKit import
 

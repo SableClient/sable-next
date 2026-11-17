@@ -493,8 +493,7 @@ async fn sticky_room_members(room: &Room) -> Vec<CallMember> {
                 .ok()
                 .flatten()
                 .is_some_and(|user| {
-                    user.membership()
-                        == &matrix_sdk::ruma::events::room::member::MembershipState::Join
+                    user.membership() == &ruma::events::room::member::MembershipState::Join
                 })
         {
             continue;
@@ -769,7 +768,7 @@ impl Core {
             {
                 tracing::warn!(?error, "could not invite the room to the call");
             }
-        } else if own.mode == crate::protocol::CallMode::Matrix2 {
+        } else if own.mode == CallMode::Matrix2 {
             tracing::warn!("call invitation not sent: no open call slot or sticky event support");
         } else {
             let kind = if direct {
@@ -1296,7 +1295,7 @@ mod tests {
 
     #[test]
     fn stable_transport_discovery_reads_the_stable_response() {
-        let transport: matrix_sdk::ruma::api::client::rtc::RtcTransport = serde_json::from_value(
+        let transport: ruma::api::client::rtc::RtcTransport = serde_json::from_value(
             serde_json::json!({"type":"m.livekit", "url":"wss://focus.example"}),
         )
         .unwrap();

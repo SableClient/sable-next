@@ -496,8 +496,8 @@ pub(crate) fn join_rule_content(
     ))
 }
 
-pub(crate) fn state_event_content(raw: &str) -> Option<serde_json::Value> {
-    let value = serde_json::from_str::<serde_json::Value>(raw).ok()?;
+pub(crate) fn state_event_content(raw: &str) -> Option<Value> {
+    let value = serde_json::from_str::<Value>(raw).ok()?;
     let is_event = value
         .as_object()
         .is_some_and(|object| object.contains_key("type") || object.contains_key("event_id"));
@@ -531,7 +531,7 @@ pub(crate) fn voice_power_level_override() -> PowerLevelsOverrideOut {
 }
 
 fn room_state_by_type(
-    events: &[Raw<matrix_sdk::ruma::events::AnyStateEvent>],
+    events: &[Raw<ruma::events::AnyStateEvent>],
 ) -> HashMap<String, Vec<RoomStateEventView>> {
     let mut state: HashMap<String, Vec<RoomStateEventView>> = HashMap::new();
     for raw in events {
@@ -543,7 +543,7 @@ fn room_state_by_type(
         }
         let (Some(state_key), Some(content)) = (
             raw.get_field::<String>("state_key").ok().flatten(),
-            raw.get_field::<serde_json::Value>("content").ok().flatten(),
+            raw.get_field::<Value>("content").ok().flatten(),
         ) else {
             continue;
         };
@@ -555,14 +555,14 @@ fn room_state_by_type(
     state
 }
 
-fn has_out_of_range_integer(value: &serde_json::Value) -> bool {
+fn has_out_of_range_integer(value: &Value) -> bool {
     match value {
-        serde_json::Value::Number(number) => number.as_i64().map_or_else(
+        Value::Number(number) => number.as_i64().map_or_else(
             || number.is_u64(),
             |int| !(-MAX_SAFE_INTEGER..=MAX_SAFE_INTEGER).contains(&int),
         ),
-        serde_json::Value::Array(values) => values.iter().any(has_out_of_range_integer),
-        serde_json::Value::Object(map) => map.values().any(has_out_of_range_integer),
+        Value::Array(values) => values.iter().any(has_out_of_range_integer),
+        Value::Object(map) => map.values().any(has_out_of_range_integer),
         _ => false,
     }
 }
@@ -573,7 +573,7 @@ impl Core {
     pub(crate) async fn set_account_data(
         &self,
         event_type: &str,
-        content: &impl serde::Serialize,
+        content: &impl Serialize,
     ) -> Result<(), RpcError> {
         self.remember_account_data_type(event_type).await;
         self.put_global_account_data(event_type.into(), content, "set_account_data")
@@ -589,7 +589,7 @@ impl Core {
         room_id: OwnedRoomId,
         event_type: &str,
         state_key: &str,
-        content: &impl serde::Serialize,
+        content: &impl Serialize,
     ) -> Result<OwnedEventId, RpcError> {
         let content = &serde_json::to_value(content).or_failed(self, "send_state")?;
         if has_out_of_range_integer(content) {
@@ -620,7 +620,7 @@ impl Core {
         }
         if event_type == "m.room.member"
             && content.get("membership").and_then(|value| value.as_str()) == Some("join")
-            && let Ok(user_id) = matrix_sdk::ruma::OwnedUserId::try_from(state_key)
+            && let Ok(user_id) = ruma::OwnedUserId::try_from(state_key)
         {
             let text = |key| {
                 content
@@ -705,11 +705,11 @@ impl Core {
                 let (state_key, content) = match raw {
                     RawAnySyncOrStrippedState::Sync(event) => (
                         event.get_field::<String>("state_key"),
-                        event.get_field::<serde_json::Value>("content"),
+                        event.get_field::<Value>("content"),
                     ),
                     RawAnySyncOrStrippedState::Stripped(event) => (
                         event.get_field::<String>("state_key"),
-                        event.get_field::<serde_json::Value>("content"),
+                        event.get_field::<Value>("content"),
                     ),
                 };
                 Some(RoomStateEventView {
@@ -743,7 +743,7 @@ impl Core {
         room_id: OwnedRoomId,
         event_type: String,
         state_key: String,
-    ) -> Result<Option<serde_json::Value>, RpcError> {
+    ) -> Result<Option<Value>, RpcError> {
         let written =
             self.probed_state()
                 .written(&room_id, &event_type, &state_key, crate::now_ms());
@@ -892,12 +892,9 @@ mod tests {
         );
         assert_eq!(
             abbreviations(Some(&json!({ "entries": "nope" }))),
-            [] as [crate::protocol::AbbreviationView; 0]
+            Vec::<AbbreviationView>::new()
         );
-        assert_eq!(
-            abbreviations(None),
-            [] as [crate::protocol::AbbreviationView; 0]
-        );
+        assert_eq!(abbreviations(None), Vec::<AbbreviationView>::new());
     }
 
     #[test]

@@ -211,10 +211,10 @@ except those marked deployment only.
 - `callCameraResolution` (Camera resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `auto`. Deployment only.
 - `callCameraBitrate` (Camera maximum bitrate): One of `auto`, `250`, `500`, `1000`, `2000`, `4000`, `8000`, `16000`. Default `auto`. Deployment only.
 - `callCameraCodec` (Camera codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `auto`. Deployment only.
-- `callScreenResolution` (Screen sharing resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `720`. Deployment only.
+- `callScreenResolution` (Screen sharing resolution): One of `auto`, `360`, `480`, `720`, `1080`, `1440`, `2160`. Default `1080`. Deployment only.
 - `callScreenBitrate` (Screen sharing maximum bitrate): One of `auto`, `250`, `500`, `1000`, `2000`, `4000`, `8000`, `16000`. Default `auto`. Deployment only.
 - `callScreenFramerate` (Screen sharing frame rate): One of `auto`, `15`, `30`, `60`. Default `30`. Deployment only.
-- `callScreenCodec` (Screen sharing codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `h264`. Deployment only.
+- `callScreenCodec` (Screen sharing codec): One of `auto`, `vp8`, `h264`, `vp9`, `av1`. Default `vp8`. Deployment only.
 - `callSimulcast` (Use simulcast): `true` or `false`. Default `true`. Deployment only.
 - `webRtcIpPolicy` (Network interfaces for calls): One of `default`, `default_public_and_private_interfaces`, `default_public_interface_only`, `disable_non_proxied_udp`. Default `default`. Deployment only.
 

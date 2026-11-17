@@ -55,7 +55,7 @@ enum Wake {
 }
 
 async fn next_queue_update(
-    updates: &mut Option<tokio::sync::broadcast::Receiver<RoomSendQueueUpdate>>,
+    updates: &mut Option<broadcast::Receiver<RoomSendQueueUpdate>>,
 ) -> Option<RoomSendQueueUpdate> {
     let Some(receiver) = updates.as_mut() else {
         return future::pending().await;
@@ -129,9 +129,7 @@ impl RoomListWorker {
     ) {
         let (sender, receiver) = mpsc::unbounded_channel();
         let handle = self.client.add_event_handler(
-            move |raw: matrix_sdk::ruma::serde::Raw<
-                matrix_sdk::ruma::events::AnySyncStateEvent,
-            >,
+            move |raw: ruma::serde::Raw<ruma::events::AnySyncStateEvent>,
                   room: matrix_sdk::Room| {
                 let sender = sender.clone();
                 async move {
@@ -174,9 +172,7 @@ impl RoomListWorker {
     ) {
         let (sender, receiver) = mpsc::unbounded_channel();
         let handle = self.client.add_event_handler(
-            move |raw: matrix_sdk::ruma::serde::Raw<
-                matrix_sdk::ruma::events::AnyRoomAccountDataEvent,
-            >,
+            move |raw: ruma::serde::Raw<ruma::events::AnyRoomAccountDataEvent>,
                   room: matrix_sdk::Room| {
                 let sender = sender.clone();
                 async move {
@@ -435,7 +431,7 @@ impl RoomListWorker {
                 })
             })
             .collect();
-        let previous: std::collections::HashSet<_> = self
+        let previous: HashSet<_> = self
             .rows
             .rows()
             .iter()
@@ -520,7 +516,7 @@ struct TimelineWorker {
     overlay: Arc<parking_lot::Mutex<TimelineOverlay>>,
     user_id: Option<OwnedUserId>,
     content: view::LocalContent,
-    queue_updates: Option<tokio::sync::broadcast::Receiver<RoomSendQueueUpdate>>,
+    queue_updates: Option<broadcast::Receiver<RoomSendQueueUpdate>>,
 }
 
 impl TimelineWorker {
@@ -958,7 +954,7 @@ impl Core {
     pub(crate) async fn overlay_timeline_nicknames(
         &self,
         nicknames: &crate::nicknames::Nicknames,
-        users: &[matrix_sdk::ruma::OwnedUserId],
+        users: &[OwnedUserId],
     ) {
         let subscriptions = self.subscriptions.lock().await;
         for (subscription, entry) in subscriptions.iter() {

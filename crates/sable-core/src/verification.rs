@@ -670,7 +670,7 @@ pub(crate) async fn local_own_devices(client: &matrix_sdk::Client) -> Vec<Device
 
 fn local_device_views(
     devices: &matrix_sdk::encryption::identities::UserDevices,
-    own_device_id: Option<&matrix_sdk::ruma::DeviceId>,
+    own_device_id: Option<&DeviceId>,
 ) -> Vec<DeviceView> {
     devices
         .devices()

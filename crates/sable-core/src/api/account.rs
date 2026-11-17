@@ -226,7 +226,7 @@ async fn fetch_mutual_rooms(
         let response = match client.send(request).await {
             Ok(response) => response,
             Err(matrix_sdk::HttpError::IntoHttp(
-                matrix_sdk::ruma::api::error::IntoHttpError::NoUnstablePath,
+                ruma::api::error::IntoHttpError::NoUnstablePath,
             )) => return Ok(Vec::new()),
             Err(error) => return Err(error),
         };
@@ -367,7 +367,7 @@ impl Handler for SetDisplayNameParams {
             .unstable_features()
             .await
             .or_failed(core, "set_display_name")?
-            .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
+            .contains(&ruma::api::FeatureFlag::from(
                 "computer.gingershaped.msc4466",
             ))
         {
@@ -420,7 +420,7 @@ impl Handler for SetAvatarUrlParams {
             .unstable_features()
             .await
             .or_failed(core, "set_avatar_url")?
-            .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
+            .contains(&ruma::api::FeatureFlag::from(
                 "computer.gingershaped.msc4466",
             ))
         {

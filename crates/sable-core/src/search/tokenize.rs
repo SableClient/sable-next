@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_a_script_without_spaces_still_yields_terms() {
-        assert_ne!(terms("สวัสดี"), [] as [String; 0]);
+        assert_ne!(terms("สวัสดี"), Vec::<String>::new());
     }
 
     #[test]
@@ -140,7 +140,7 @@ mod tests {
             let document = terms(sentence);
             for query in ["中文", "搜索", "功能", "加密", "消息", "索引"] {
                 let query_terms = terms(query);
-                assert_ne!(query_terms, [] as [String; 0]);
+                assert_ne!(query_terms, Vec::<String>::new());
                 assert!(
                     query_terms.iter().all(|term| document.contains(term)),
                     "{query:?} tokenized to {query_terms:?}, which the document {document:?} cannot match"
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_missing_chinese_dictionary_keeps_latin_terms() {
         assert_eq!(super::tokenize_with("deploy 中文搜索", None), ["deploy"]);
-        assert_eq!(super::tokenize_with("中文搜索", None), [] as [&str; 0]);
+        assert_eq!(super::tokenize_with("中文搜索", None), Vec::<&str>::new());
     }
 
     #[test]

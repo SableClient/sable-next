@@ -30,7 +30,6 @@
     "no-shadow": "off",
     "no-underscore-dangle": "off",
     "no-new": "off",
-    "no-unmodified-loop-condition": "off",
     "unicorn/consistent-function-scoping": "off",
     "unicorn/prefer-add-event-listener": "off",
     "unicorn/no-array-sort": "off",

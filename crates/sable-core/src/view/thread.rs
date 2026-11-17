@@ -270,7 +270,7 @@ fn embedded_reply_preview(event: &EmbeddedEvent) -> Preview {
             let actor = forwarded
                 .get("sender")
                 .and_then(serde_json::Value::as_str)
-                .and_then(|sender| matrix_sdk::ruma::UserId::parse(sender).ok());
+                .and_then(|sender| ruma::UserId::parse(sender).ok());
             if let Some(body) = &mut body {
                 *body = format!(
                     "{} {body}",

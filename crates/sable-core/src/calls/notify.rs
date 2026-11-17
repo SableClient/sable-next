@@ -40,16 +40,16 @@ pub(crate) fn announcement(
     membership_event_id: &EventId,
     kind: NotificationKind,
     ring: &[OwnedUserId],
-) -> Option<matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnyMessageLikeEventContent>> {
+) -> Option<ruma::serde::Raw<ruma::events::AnyMessageLikeEventContent>> {
     let content = notification_content(membership_event_id, kind, ring);
-    matrix_sdk::ruma::serde::Raw::new(&AnnouncementOut {
+    ruma::serde::Raw::new(&AnnouncementOut {
         content,
         text: [TextOut {
             body: ANNOUNCEMENT_FALLBACK_TEXT,
         }],
     })
     .ok()
-    .map(matrix_sdk::ruma::serde::Raw::cast_unchecked)
+    .map(ruma::serde::Raw::cast_unchecked)
 }
 
 #[derive(serde::Serialize)]
@@ -69,12 +69,12 @@ struct AnnouncementOut {
 #[derive(serde::Serialize)]
 pub(super) struct DeclineOut {
     #[serde(flatten)]
-    pub(super) content: matrix_sdk::ruma::events::rtc::decline::RtcDeclineEventContent,
+    pub(super) content: ruma::events::rtc::decline::RtcDeclineEventContent,
     #[serde(rename = "m.mentions")]
     pub(super) mentions: serde_json::Map<String, serde_json::Value>,
 }
 
-pub(crate) fn is_call_event_type<T>(raw: &matrix_sdk::ruma::serde::Raw<T>) -> bool {
+pub(crate) fn is_call_event_type<T>(raw: &ruma::serde::Raw<T>) -> bool {
     matches!(
         raw.get_field::<String>("type").ok().flatten().as_deref(),
         Some(
@@ -87,7 +87,7 @@ pub(crate) fn is_call_event_type<T>(raw: &matrix_sdk::ruma::serde::Raw<T>) -> bo
     )
 }
 
-pub(crate) fn is_call_membership_event_type<T>(raw: &matrix_sdk::ruma::serde::Raw<T>) -> bool {
+pub(crate) fn is_call_membership_event_type<T>(raw: &ruma::serde::Raw<T>) -> bool {
     raw.get_field::<String>("type")
         .ok()
         .flatten()
@@ -102,10 +102,8 @@ pub(crate) fn is_call_membership_event_type<T>(raw: &matrix_sdk::ruma::serde::Ra
 pub(super) async fn make_decline_event(
     room: &matrix_sdk::Room,
     event_id: &EventId,
-) -> Result<
-    matrix_sdk::ruma::events::rtc::decline::RtcDeclineEventContent,
-    matrix_sdk::room::calls::CallError,
-> {
+) -> Result<ruma::events::rtc::decline::RtcDeclineEventContent, matrix_sdk::room::calls::CallError>
+{
     use matrix_sdk::room::calls::CallError;
     use matrix_sdk::ruma::events::rtc::decline::RtcDeclineEventContent;
     use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, SyncMessageLikeEvent};
@@ -144,7 +142,7 @@ pub(super) async fn make_decline_event(
     }
 }
 
-pub(super) fn parse(raw: &str) -> Option<matrix_sdk::ruma::events::AnySyncMessageLikeEvent> {
+pub(super) fn parse(raw: &str) -> Option<ruma::events::AnySyncMessageLikeEvent> {
     let mut event: serde_json::Value = serde_json::from_str(raw).ok()?;
     match event.get("type")?.as_str()? {
         "m.rtc.notification" | NOTIFICATION_EVENT_TYPE => {
@@ -208,7 +206,7 @@ mod tests {
             "m.rtc.decline",
             super::DECLINE_EVENT_TYPE,
         ] {
-            let raw = matrix_sdk::ruma::serde::Raw::new(&json!({"type":event_type})).unwrap();
+            let raw = ruma::serde::Raw::new(&json!({"type":event_type})).unwrap();
             assert!(super::is_call_event_type(&raw), "{event_type}");
         }
     }

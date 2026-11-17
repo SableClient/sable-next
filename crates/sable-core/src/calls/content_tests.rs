@@ -5,7 +5,7 @@ use crate::calls::runtime::tests::member;
 use crate::protocol::{CallIntent, CallMode};
 
 fn content(
-    room_id: &matrix_sdk::ruma::OwnedRoomId,
+    room_id: &ruma::OwnedRoomId,
     own: &CallMember,
     intent: Option<CallIntent>,
 ) -> serde_json::Value {
@@ -13,7 +13,7 @@ fn content(
 }
 
 fn content_at(
-    room_id: &matrix_sdk::ruma::OwnedRoomId,
+    room_id: &ruma::OwnedRoomId,
     own: &CallMember,
     intent: Option<CallIntent>,
     now_ms: u64,
@@ -150,7 +150,7 @@ fn renewal_extends_membership_beyond_four_hours_without_changing_session_identit
             body["expires"].as_u64().unwrap() + created,
             now + 14_400_000
         );
-        let membership: matrix_sdk::ruma::events::call::member::CallMemberEventContent =
+        let membership: ruma::events::call::member::CallMemberEventContent =
             serde_json::from_value(body).unwrap();
         assert_eq!(
             serde_json::to_value(membership).unwrap()["created_ts"],
@@ -165,13 +165,13 @@ fn the_call_intent_rides_where_each_membership_format_reads_it() {
     let legacy = content(
         &room_id,
         &member(CallMode::Compatibility, 7, &["https://sfu.example.org"]),
-        Some(crate::protocol::CallIntent::Video),
+        Some(CallIntent::Video),
     );
     assert_eq!(legacy["m.call.intent"], "video");
 
     let mut sticky = member(CallMode::Matrix2, 8, &["https://sfu.example.org"]);
     sticky.member_id = Some("member".to_owned());
-    let sticky = content(&room_id, &sticky, Some(crate::protocol::CallIntent::Audio));
+    let sticky = content(&room_id, &sticky, Some(CallIntent::Audio));
     assert_eq!(sticky["application"]["m.call.intent"], "audio");
     assert!(sticky.get("m.call.intent").is_none());
 }

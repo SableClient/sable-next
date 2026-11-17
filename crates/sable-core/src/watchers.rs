@@ -158,7 +158,7 @@ impl Core {
                             restarted.stop().await;
                             core.emit_if_current(
                                 generation,
-                                CoreEvent::SyncStatus(crate::protocol::SyncStatus::Error {
+                                CoreEvent::SyncStatus(SyncStatus::Error {
                                     message: "This homeserver does not support Sliding Sync."
                                         .to_owned(),
                                 }),
@@ -168,7 +168,7 @@ impl Core {
                         if steady {
                             failures = 0;
                         }
-                        crate::watchers::retry_backoff(failures).await;
+                        retry_backoff(failures).await;
                         failures = failures.saturating_add(1);
                         core.resume_sync(&restarted).await;
                     }
@@ -635,7 +635,7 @@ impl Core {
         if event.content.membership != MembershipState::Join {
             return;
         }
-        let Ok(user_id) = matrix_sdk::ruma::OwnedUserId::try_from(event.state_key.as_str()) else {
+        let Ok(user_id) = ruma::OwnedUserId::try_from(event.state_key.as_str()) else {
             return;
         };
         let display_name = event.content.displayname.clone().and_then(visible_name);
@@ -803,7 +803,7 @@ struct ForegroundNotifier {
     client: matrix_sdk::Client,
     notifications: NotificationClient,
     generation: u64,
-    alerted_invites: std::collections::HashSet<matrix_sdk::ruma::OwnedRoomId>,
+    alerted_invites: std::collections::HashSet<ruma::OwnedRoomId>,
     alerted_events: std::collections::HashMap<OwnedEventId, MilliSecondsSinceUnixEpoch>,
 }
 
@@ -979,15 +979,14 @@ mod tests {
 
     #[test]
     fn a_fresh_redecrypted_event_that_notifies_is_forwarded_once_and_stale_ones_are_not() {
-        let raw: Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent> =
-            serde_json::from_value(json!({
-                "type": "m.room.message",
-                "event_id": "$late",
-                "sender": ALICE,
-                "origin_server_ts": 100_000,
-                "content": { "msgtype": "m.text", "body": "hi @bob" }
-            }))
-            .expect("event");
+        let raw: Raw<ruma::events::AnySyncTimelineEvent> = serde_json::from_value(json!({
+            "type": "m.room.message",
+            "event_id": "$late",
+            "sender": ALICE,
+            "origin_server_ts": 100_000,
+            "content": { "msgtype": "m.text", "body": "hi @bob" }
+        }))
+        .expect("event");
         let event = TimelineEvent::from_plaintext(raw.clone());
         let at = |ms: u64| MilliSecondsSinceUnixEpoch(ms.try_into().expect("timestamp"));
 

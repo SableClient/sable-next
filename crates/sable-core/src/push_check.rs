@@ -69,7 +69,7 @@ pub fn notify_body(
 }
 
 #[cfg(not(target_family = "wasm"))]
-fn transient(error: &matrix_sdk::reqwest::Error) -> bool {
+fn transient(error: &reqwest::Error) -> bool {
     error.is_connect() || error.is_dns() || error.is_timeout()
 }
 
@@ -77,7 +77,7 @@ fn transient(error: &matrix_sdk::reqwest::Error) -> bool {
 async fn retry_transient<T, F, Fut>(request: F, delays: &[Duration]) -> Result<T, CoreError>
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, matrix_sdk::reqwest::Error>>,
+    Fut: Future<Output = Result<T, reqwest::Error>>,
 {
     request
         .retry(delays.iter().copied())
@@ -97,17 +97,14 @@ pub enum GatewayAnswer {
 
 #[cfg(not(target_family = "wasm"))]
 async fn notify_endpoint(url: &str, sealed: Vec<u8>) -> Result<bool, CoreError> {
-    let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
+    let http = crate::tls::apply(reqwest::Client::builder())
         .build()
         .backend()?;
     let response = retry_transient(
         || async {
             http.post(url)
-                .header(
-                    matrix_sdk::reqwest::header::CONTENT_TYPE,
-                    "application/octet-stream",
-                )
-                .header(matrix_sdk::reqwest::header::CONTENT_ENCODING, "aes128gcm")
+                .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
+                .header(reqwest::header::CONTENT_ENCODING, "aes128gcm")
                 .header("TTL", "60")
                 .body(sealed.clone())
                 .send()
@@ -199,17 +196,14 @@ async fn notify(url: &str, body: &impl Serialize) -> Result<GatewayAnswer, CoreE
         rejected: Vec<String>,
     }
 
-    let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
+    let http = crate::tls::apply(reqwest::Client::builder())
         .build()
         .backend()?;
     let body = serde_json::to_string(body).backend()?;
     let response = retry_transient(
         || async {
             http.post(url)
-                .header(
-                    matrix_sdk::reqwest::header::CONTENT_TYPE,
-                    "application/json",
-                )
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
                 .body(body.clone())
                 .send()
                 .await
@@ -299,7 +293,7 @@ pub async fn discover_gateway(endpoint: &str) -> Option<String> {
     url.set_path(crate::notifications::GATEWAY_PATH);
     url.set_query(None);
     let gateway = crate::notifications::gateway(url.as_str()).ok()?;
-    let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
+    let http = crate::tls::apply(reqwest::Client::builder())
         .timeout(DISCOVERY_TIMEOUT)
         .build()
         .ok()?;
@@ -307,7 +301,7 @@ pub async fn discover_gateway(endpoint: &str) -> Option<String> {
         .get(&gateway)
         .send()
         .await
-        .and_then(matrix_sdk::reqwest::Response::error_for_status)
+        .and_then(reqwest::Response::error_for_status)
         .inspect_err(|error| tracing::debug!(%error, %gateway, "push gateway discovery failed"))
         .ok()?;
     let body = response.bytes().await.ok()?;
@@ -527,7 +521,7 @@ mod tests {
     #[tokio::test]
     async fn a_gateway_request_retries_transient_connection_failures() {
         let attempts = Arc::new(AtomicUsize::new(0));
-        let client = matrix_sdk::reqwest::Client::builder()
+        let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(1))
             .build()
             .unwrap();
@@ -560,16 +554,12 @@ mod tests {
             .mount(&server)
             .await;
         let attempts = AtomicUsize::new(0);
-        let client = matrix_sdk::reqwest::Client::new();
+        let client = reqwest::Client::new();
         let result = retry_transient(
             || {
                 attempts.fetch_add(1, Ordering::Relaxed);
                 let request = client.get(server.uri()).send();
-                async {
-                    request
-                        .await
-                        .and_then(matrix_sdk::reqwest::Response::error_for_status)
-                }
+                async { request.await.and_then(reqwest::Response::error_for_status) }
             },
             &[Duration::ZERO, Duration::ZERO],
         )

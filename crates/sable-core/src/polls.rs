@@ -106,7 +106,7 @@ mod tests {
 
         assert!(matches!(
             content.poll_start.kind,
-            matrix_sdk::ruma::events::poll::start::PollKind::Undisclosed
+            ruma::events::poll::start::PollKind::Undisclosed
         ));
     }
 }

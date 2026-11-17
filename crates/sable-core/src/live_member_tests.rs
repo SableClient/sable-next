@@ -1,11 +1,3 @@
-#![expect(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-
 use std::time::Duration;
 
 use matrix_sdk::{RoomMemberships, ruma::OwnedRoomId};

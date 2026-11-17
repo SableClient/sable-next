@@ -279,7 +279,7 @@ impl Core {
 async fn backups_marked_disabled(client: &Client) -> Result<bool, matrix_sdk::Error> {
     use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 
-    let field = |raw: matrix_sdk::ruma::serde::Raw<_>, key: &str| {
+    let field = |raw: ruma::serde::Raw<_>, key: &str| {
         raw.deserialize_as::<serde_json::Value>()
             .ok()
             .and_then(|content| content.get(key)?.as_bool())

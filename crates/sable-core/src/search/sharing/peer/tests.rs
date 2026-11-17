@@ -534,7 +534,7 @@ async fn a_session_ending_during_a_copy_does_not_deadlock() {
 
     let saving = core.save_rooms(&client, Vec::new());
     tokio::pin!(saving);
-    tokio::time::timeout(std::time::Duration::from_secs(5), saving)
+    tokio::time::timeout(Duration::from_secs(5), saving)
         .await
         .expect("a copy must be able to save while a session is ending");
     drop(copying);
@@ -551,12 +551,9 @@ async fn a_peer_message_handled_while_a_session_ends_does_not_deadlock() {
     tokio::pin!(ending);
     assert!(futures_util::poll!(ending.as_mut()).is_pending());
 
-    tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        core.next_search_peer(&client, None),
-    )
-    .await
-    .expect("handling a peer message must not wait for the session it holds");
+    tokio::time::timeout(Duration::from_secs(5), core.next_search_peer(&client, None))
+        .await
+        .expect("handling a peer message must not wait for the session it holds");
     drop(handling);
     assert!(ending.await.is_some());
 }
@@ -712,7 +709,7 @@ async fn verified_devices_copy_history_and_changes() {
         .make_edit_event(
             &event_id,
             matrix_sdk::room::edit::EditedContent::RoomMessage(
-                matrix_sdk::ruma::events::room::message::RoomMessageEventContentWithoutRelation::text_plain(
+                ruma::events::room::message::RoomMessageEventContentWithoutRelation::text_plain(
                     "needle revised",
                 ),
             ),
@@ -783,9 +780,10 @@ async fn browsers_transfer_verified_search_history() {
             .get_room(&room)
             .unwrap()
             .send(
-                matrix_sdk::ruma::events::room::message::RoomMessageEventContent::text_plain(
-                    format!("needle extra {n} {}", STANDARD_NO_PAD.encode(noise)),
-                ),
+                ruma::events::room::message::RoomMessageEventContent::text_plain(format!(
+                    "needle extra {n} {}",
+                    STANDARD_NO_PAD.encode(noise)
+                )),
             )
             .await
             .unwrap();

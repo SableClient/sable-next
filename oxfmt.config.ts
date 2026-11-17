@@ -7,8 +7,6 @@ export default {
   trailingComma: 'es5',
   svelte: true,
   ignorePatterns: [
-    '.agents/skills',
-    '.impeccable',
     'vendor',
     'plugins/tauri-plugin-sable-push/permissions',
     'src/generated',

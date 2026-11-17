@@ -10,7 +10,7 @@ static PROXY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 /// When `url` is not a proxy `reqwest` can use, or a proxy was already set.
 #[cfg(not(target_family = "wasm"))]
 pub fn set_proxy(url: String) -> Result<(), CoreError> {
-    matrix_sdk::reqwest::Proxy::all(&url).backend()?;
+    reqwest::Proxy::all(&url).backend()?;
     PROXY
         .set(url)
         .map_err(|_| CoreError::invalid("the proxy is already set"))
@@ -18,7 +18,7 @@ pub fn set_proxy(url: String) -> Result<(), CoreError> {
 
 #[cfg(not(target_family = "wasm"))]
 fn with_proxy(builder: ClientBuilder) -> ClientBuilder {
-    match PROXY.get().map(matrix_sdk::reqwest::Proxy::all) {
+    match PROXY.get().map(reqwest::Proxy::all) {
         Some(Ok(proxy)) => builder.proxy(proxy),
         _ => builder,
     }
@@ -68,7 +68,7 @@ pub(crate) fn apply_sdk(builder: matrix_sdk::ClientBuilder) -> matrix_sdk::Clien
 
     // Pings evict a connection left on the network the device switched away from.
     let Ok(client) = apply(
-        matrix_sdk::reqwest::Client::builder()
+        reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .http2_keep_alive_interval(Duration::from_secs(15))
             .http2_keep_alive_timeout(Duration::from_secs(10)),

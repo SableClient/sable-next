@@ -144,10 +144,7 @@ fn member_service<'a>(member: &'a CallMember, members: &'a [CallMember]) -> Opti
         .map(String::as_str)
 }
 
-fn state_key(
-    room: &Room,
-    own: &CallMember,
-) -> matrix_sdk::ruma::events::call::member::CallMemberStateKey {
+fn state_key(room: &Room, own: &CallMember) -> ruma::events::call::member::CallMemberStateKey {
     super::membership_state_key(
         &own.user_id,
         own.own_device_id(),
@@ -161,14 +158,14 @@ async fn publish_membership(
     room: &Room,
     own: &CallMember,
     intent: Option<CallIntent>,
-) -> Result<matrix_sdk::ruma::OwnedEventId, matrix_sdk::Error> {
+) -> Result<ruma::OwnedEventId, matrix_sdk::Error> {
     let room_id = room.room_id().to_owned();
     let body = content(&room_id, own, intent);
     if own.mode == CallMode::Matrix2 {
         sticky::send_wire(room, &body, own.wire).await
     } else {
         let key = state_key(room, own);
-        let raw = matrix_sdk::ruma::serde::Raw::new(&body)?.cast_unchecked();
+        let raw = ruma::serde::Raw::new(&body)?.cast_unchecked();
         Ok(room
             .send_state_event_raw(&StateEventType::CallMember.to_string(), key.as_ref(), raw)
             .await?
@@ -201,7 +198,7 @@ async fn retract(core: &Core, room: &Room, own: &CallMember, delay: Option<Strin
 }
 
 struct Published {
-    event: matrix_sdk::ruma::OwnedEventId,
+    event: ruma::OwnedEventId,
     provision: sfu::Provisioned,
     delay: Option<String>,
     postpone: Option<crate::Task>,
@@ -442,7 +439,7 @@ async fn confirm_join(
     room: &Room,
     state: &Mutex<State>,
     provision: &sfu::Provisioned,
-    membership_event: &matrix_sdk::ruma::OwnedEventId,
+    membership_event: &ruma::OwnedEventId,
 ) -> Option<(String, Vec<CallBackendView>)> {
     let own = state.lock().await.own.clone();
     let publisher_id = backend_id(&room.room_id().to_owned(), own.foci.first()?);
@@ -725,8 +722,7 @@ async fn verified_members(
                 .ok()
                 .flatten()
                 .is_some_and(|user| {
-                    user.membership()
-                        == &matrix_sdk::ruma::events::room::member::MembershipState::Join
+                    user.membership() == &ruma::events::room::member::MembershipState::Join
                 })
         {
             verified.push(member);
@@ -851,7 +847,7 @@ async fn provision_missing(
     room: &Room,
     shared: &Mutex<State>,
     own: &CallMember,
-    missing: Vec<(String, String, Option<matrix_sdk::ruma::OwnedServerName>)>,
+    missing: Vec<(String, String, Option<OwnedServerName>)>,
 ) {
     for (id, service, server_name) in missing {
         let provision = if own.mode == CallMode::Matrix2 && own.wire == membership::RtcWire::Stable
@@ -1416,9 +1412,7 @@ fn watch_members(
 ) -> EventHandlerDropGuard {
     let handle = client.add_room_event_handler(
         room_id,
-        move |_: matrix_sdk::ruma::serde::Raw<
-            matrix_sdk::ruma::events::call::member::SyncCallMemberEvent,
-        >| {
+        move |_: ruma::serde::Raw<ruma::events::call::member::SyncCallMemberEvent>| {
             let wake = wake.clone();
             async move { wake.notify_one() }
         },
@@ -1434,8 +1428,7 @@ fn watch_redactions(
 ) -> EventHandlerDropGuard {
     let handle = client.add_room_event_handler(
         room_id,
-        move |event: matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent,
-              room: Room| {
+        move |event: ruma::events::room::redaction::SyncRoomRedactionEvent, room: Room| {
             let state = state.clone();
             let wake = wake.clone();
             async move {

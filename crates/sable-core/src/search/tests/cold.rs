@@ -224,7 +224,7 @@ async fn test_an_older_page_is_capped_and_resumes_inside_the_chunk() {
 
 #[test]
 fn test_the_disk_budget_drops_the_oldest_chunk_and_raises_the_floor() {
-    let room = matrix_sdk::ruma::RoomId::parse("!disk:localhost").expect("room id");
+    let room = ruma::RoomId::parse("!disk:localhost").expect("room id");
     let room_index = budgeted_room(3_000, 0);
     let chunks = room_index.chunks.len();
     assert!(chunks > 2);

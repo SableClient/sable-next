@@ -51,7 +51,7 @@ fn changed(event: &TimelineEvent, field: &str, value: serde_json::Value) -> Time
     TimelineEvent::from_plaintext(serde_json::from_value(raw).unwrap())
 }
 
-async fn restart(mut index: MessageIndex, room: &matrix_sdk::ruma::OwnedRoomId) -> MessageIndex {
+async fn restart(mut index: MessageIndex, room: &ruma::OwnedRoomId) -> MessageIndex {
     let (flush, _, _) = index.take_flush(room).unwrap();
     let manifest = serde_json::from_slice(&serde_json::to_vec(&flush.manifest).unwrap()).unwrap();
     let mut restored = MessageIndex::new();
@@ -164,7 +164,7 @@ async fn test_cold_edit_rollback_survives_save() {
     };
     let mut raw = serde_json::to_value(redaction().raw()).unwrap();
     raw["content"]["redacts"] = json!("$edit");
-    let redaction: matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent> =
+    let redaction: ruma::serde::Raw<ruma::events::AnySyncTimelineEvent> =
         serde_json::from_value(raw).unwrap();
     server
         .sync_room(

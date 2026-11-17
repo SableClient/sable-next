@@ -383,7 +383,7 @@ impl SearchSharing {
         };
     }
 
-    pub(crate) fn restoring(&self, room: &matrix_sdk::ruma::RoomId) -> bool {
+    pub(crate) fn restoring(&self, room: &ruma::RoomId) -> bool {
         self.state
             .lock()
             .restoring

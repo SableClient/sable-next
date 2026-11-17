@@ -929,11 +929,11 @@
     >
       {#if favourites.length > 0}
         {#if !collapsed}
-          <!-- svelte-ignore a11y_role_has_required_aria_props -->
           <button
             type="button"
             role="treeitem"
             aria-level="1"
+            aria-selected="false"
             class="rooms-heading selection-layer"
             aria-expanded={!favouritesClosed}
             data-state={favouritesClosed ? 'closed' : 'open'}
@@ -956,11 +956,11 @@
       {/if}
 
       {#if !collapsed}
-        <!-- svelte-ignore a11y_role_has_required_aria_props -->
         <button
           type="button"
           role="treeitem"
           aria-level="1"
+          aria-selected="false"
           class="rooms-heading selection-layer"
           aria-expanded={!roomsClosed}
           data-state={roomsClosed ? 'closed' : 'open'}

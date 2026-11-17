@@ -870,11 +870,11 @@
     {@attach dropTarget(ref, false)}
   >
     <div class="folder-card">
-      <!-- svelte-ignore a11y_role_has_required_aria_props -->
       <button
         type="button"
         role="treeitem"
         aria-level="1"
+        aria-selected="false"
         aria-owns={`folder-children-${folder.id}`}
         class="folder-collapse"
         aria-expanded="true"

@@ -853,7 +853,7 @@ impl Core {
                     if every_encrypted && notifications::raw_is_encrypted(event.raw()) {
                         continue;
                     }
-                    let actions = crate::push_rules::related_actions(
+                    let actions = push_rules::related_actions(
                         &room,
                         event.raw(),
                         event.push_actions().unwrap_or_default().to_vec(),
@@ -972,11 +972,7 @@ mod tests {
         (core, client, room)
     }
 
-    fn message(
-        event_id: &str,
-        ts: u64,
-        user: Option<&matrix_sdk::ruma::UserId>,
-    ) -> serde_json::Value {
+    fn message(event_id: &str, ts: u64, user: Option<&ruma::UserId>) -> serde_json::Value {
         json!({"type": "m.room.message", "event_id": event_id, "room_id": "!room:example.org",
             "sender": User::Alice, "origin_server_ts": ts,
             "content": {"msgtype": "m.text", "body": "hello", "m.mentions": {"user_ids": user.into_iter().collect::<Vec<_>>()}}})
@@ -1395,7 +1391,7 @@ mod tests {
                                 client.user_id().unwrap(),
                                 ReceiptType::Read,
                                 ReceiptThread::Unthreaded,
-                                Some(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(300u32.into())),
+                                Some(ruma::MilliSecondsSinceUnixEpoch(300u32.into())),
                             )
                             .into_event(),
                     )
@@ -1473,7 +1469,7 @@ mod tests {
                                 client.user_id().unwrap(),
                                 ReceiptType::Read,
                                 ReceiptThread::Unthreaded,
-                                Some(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(150u32.into())),
+                                Some(ruma::MilliSecondsSinceUnixEpoch(150u32.into())),
                             )
                             .into_event(),
                     )
@@ -1579,8 +1575,7 @@ mod tests {
                 format!("extra{index}")
             };
             if index > 0 {
-                let room_id =
-                    matrix_sdk::ruma::RoomId::parse(format!("!{name}:example.org")).unwrap();
+                let room_id = ruma::RoomId::parse(format!("!{name}:example.org")).unwrap();
                 let factory = EventFactory::new().room(&room_id).sender(User::Alice);
                 server
                     .sync_room(

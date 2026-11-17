@@ -230,7 +230,7 @@ impl Core {
                 self.flush_inbox_locked(&client, &transition).await;
             }
             // Background push fetches must not report the user online.
-            self.set_sync_presence(matrix_sdk::ruma::presence::PresenceState::Offline)
+            self.set_sync_presence(ruma::presence::PresenceState::Offline)
                 .await;
             sync_service.stop().await;
             #[cfg(target_os = "ios")]
@@ -286,7 +286,7 @@ impl Core {
         self.activity.sync_allowed()
     }
 
-    async fn set_sync_presence(&self, presence: matrix_sdk::ruma::presence::PresenceState) {
+    async fn set_sync_presence(&self, presence: ruma::presence::PresenceState) {
         if let Ok(client) = self.client().await
             && let Err(error) = client.set_presence(presence, None, false).await
         {
@@ -389,10 +389,7 @@ impl Core {
     }
 
     /// Drops `work` once the stores close, so it must be started again after they reopen.
-    pub(crate) async fn until_stores_close<T>(
-        &self,
-        work: impl std::future::Future<Output = T>,
-    ) -> Option<T> {
+    pub(crate) async fn until_stores_close<T>(&self, work: impl Future<Output = T>) -> Option<T> {
         let mut open = self.activity.subscribe_stores();
         tokio::select! {
             biased;

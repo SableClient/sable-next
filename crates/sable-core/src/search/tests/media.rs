@@ -7,7 +7,7 @@ use crate::search::MessageIndex;
 
 #[test]
 fn test_a_migrated_picture_without_media_asks_to_be_hydrated_once() {
-    let room = matrix_sdk::ruma::RoomId::parse("!migrated:localhost").expect("room id");
+    let room = ruma::RoomId::parse("!migrated:localhost").expect("room id");
     let mut index = MessageIndex::new();
     index
         .rooms
@@ -21,7 +21,7 @@ fn test_a_migrated_picture_without_media_asks_to_be_hydrated_once() {
             Some(crate::protocol::SearchAttachment::Image),
             Vec::new(),
         ));
-    let page = |tried: std::collections::HashSet<matrix_sdk::ruma::OwnedEventId>| {
+    let page = |tried: std::collections::HashSet<ruma::OwnedEventId>| {
         index.attachment_page(
             &room,
             crate::protocol::RoomAttachmentKind::Media,
@@ -224,37 +224,37 @@ async fn test_room_attachments_list_each_gallery_item_under_its_tab() {
         .sync_room(
             &client,
             JoinedRoomBuilder::new(&room_id).add_timeline_event(
-                serde_json::from_value::<
-                    matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>,
-                >(serde_json::json!({
-                    "type": "m.room.message",
-                    "event_id": "$gallery",
-                    "sender": "@kris:localhost",
-                    "origin_server_ts": 1,
-                    "content": {
-                        "msgtype": "dm.filament.gallery",
-                        "body": "",
-                        "itemtypes": [
-                            {
-                                "itemtype": "m.image",
-                                "body": "beach.png",
-                                "url": "mxc://localhost/beach",
-                                "page.codeberg.everypizza.msc4193.spoiler": true
-                            },
-                            {
-                                "itemtype": "m.file",
-                                "body": "notes.pdf",
-                                "url": "mxc://localhost/notes",
-                                "info": { "mimetype": "application/pdf", "size": 4096 }
-                            },
-                            {
-                                "itemtype": "m.video",
-                                "body": "wave.mp4",
-                                "url": "mxc://localhost/wave"
-                            }
-                        ]
-                    }
-                }))
+                serde_json::from_value::<ruma::serde::Raw<ruma::events::AnySyncTimelineEvent>>(
+                    serde_json::json!({
+                        "type": "m.room.message",
+                        "event_id": "$gallery",
+                        "sender": "@kris:localhost",
+                        "origin_server_ts": 1,
+                        "content": {
+                            "msgtype": "dm.filament.gallery",
+                            "body": "",
+                            "itemtypes": [
+                                {
+                                    "itemtype": "m.image",
+                                    "body": "beach.png",
+                                    "url": "mxc://localhost/beach",
+                                    "page.codeberg.everypizza.msc4193.spoiler": true
+                                },
+                                {
+                                    "itemtype": "m.file",
+                                    "body": "notes.pdf",
+                                    "url": "mxc://localhost/notes",
+                                    "info": { "mimetype": "application/pdf", "size": 4096 }
+                                },
+                                {
+                                    "itemtype": "m.video",
+                                    "body": "wave.mp4",
+                                    "url": "mxc://localhost/wave"
+                                }
+                            ]
+                        }
+                    }),
+                )
                 .expect("gallery event"),
             ),
         )

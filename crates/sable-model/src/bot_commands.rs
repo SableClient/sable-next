@@ -1294,7 +1294,7 @@ mod tests {
             });
             parse_bot_command("@b:x", None, None, &content).unwrap()
         };
-        assert_eq!(room(json!(null)).aliases, [] as [String; 0]);
+        assert_eq!(room(json!(null)).aliases, Vec::<String>::new());
         for via in [json!("a"), json!({"a": 1}), json!(null)] {
             let Some(ArgumentValue::One(LiteralValue::Room(reference))) =
                 room(via).parameters[0].default_value.clone()

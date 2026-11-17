@@ -527,10 +527,7 @@ mod tests {
 
     /// Mounts a homeserver's `/versions` and `/capabilities`, whose contents
     /// are the caller's choice, and returns a logged-in client against them.
-    async fn homeserver(
-        unstable_features: JsonValue,
-        capabilities: JsonValue,
-    ) -> matrix_sdk::Client {
+    async fn homeserver(unstable_features: JsonValue, capabilities: JsonValue) -> Client {
         use matrix_sdk::test_utils::mocks::MatrixMockServer;
         use wiremock::matchers::{method, path};
         use wiremock::{Mock, ResponseTemplate};

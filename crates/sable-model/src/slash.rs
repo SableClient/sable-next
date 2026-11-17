@@ -1017,10 +1017,7 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(
-            pronoun_sets("Clear"),
-            [] as [crate::member_look::PronounView; 0]
-        );
+        assert_eq!(pronoun_sets("Clear"), Vec::<PronounView>::new());
     }
 
     #[test]

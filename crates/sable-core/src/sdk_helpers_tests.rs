@@ -986,7 +986,7 @@ async fn healthy_space_summary_does_not_fetch_missing_tombstone_state() {
     let summary = crate::view::room_list_item(
         &item,
         &cache,
-        &matrix_sdk::ruma::push::Ruleset::new(),
+        &ruma::push::Ruleset::new(),
         &crate::nicknames::Nicknames::default(),
     );
     assert_eq!(summary.room_kind, Some(RoomKind::Space));
@@ -1051,8 +1051,6 @@ async fn unreadable_space_children_keep_the_last_edges() {
     assert_eq!(cache[room_id].children.len(), 2);
     assert!(cache[room_id].children_stale);
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn space_client(server: &MatrixMockServer, store: &std::path::Path) -> matrix_sdk::Client {
     let client = server
         .client_builder()
@@ -1085,8 +1083,6 @@ async fn space_client(server: &MatrixMockServer, store: &std::path::Path) -> mat
         .await;
     client
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn next_room_list_diff(
     events: &mut tokio::sync::mpsc::UnboundedReceiver<CoreEvent>,
     subscription: crate::protocol::SubscriptionId,
@@ -2166,7 +2162,7 @@ async fn a_new_dm_makes_the_invitee_a_creator() {
         .mount(server.server())
         .await;
     Mock::given(method("PUT"))
-        .and(wiremock::matchers::path_regex(r"/account_data/m\.direct$"))
+        .and(path_regex(r"/account_data/m\.direct$"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
         .mount(server.server())
         .await;
@@ -2195,7 +2191,7 @@ async fn a_dm_with_yourself_lists_no_other_creator_and_is_still_a_dm() {
         .mount(server.server())
         .await;
     Mock::given(method("GET"))
-        .and(wiremock::matchers::path_regex(r"/account_data/m\.direct$"))
+        .and(path_regex(r"/account_data/m\.direct$"))
         .respond_with(
             ResponseTemplate::new(404).set_body_json(
                 json!({"errcode": "M_NOT_FOUND", "error": "Account data not found"}),
@@ -2204,7 +2200,7 @@ async fn a_dm_with_yourself_lists_no_other_creator_and_is_still_a_dm() {
         .mount(server.server())
         .await;
     Mock::given(method("PUT"))
-        .and(wiremock::matchers::path_regex(r"/account_data/m\.direct$"))
+        .and(path_regex(r"/account_data/m\.direct$"))
         .and(wiremock::matchers::body_partial_json(
             json!({ own.as_str(): ["!notes:example.org"] }),
         ))
@@ -2280,7 +2276,7 @@ async fn our_own_membership_is_fetched_for_small_rooms_that_lack_it() {
                 .add_joined_room(JoinedRoomBuilder::new(large).set_joined_members_count(500));
         })
         .await;
-    let member: Raw<matrix_sdk::ruma::events::AnyStateEvent> = EventFactory::new()
+    let member: Raw<ruma::events::AnyStateEvent> = EventFactory::new()
         .room(direct)
         .event(RoomMemberEventContent::new(MembershipState::Join))
         .sender(&own)
@@ -2425,8 +2421,8 @@ async fn an_encrypted_thumbnail_downloads_the_original() {
     let mut ciphertext = Vec::new();
     encryptor.read_to_end(&mut ciphertext).unwrap();
     let keys = encryptor.finish();
-    let file = matrix_sdk::ruma::events::room::EncryptedFile::new(
-        matrix_sdk::ruma::OwnedMxcUri::from("mxc://example.org/sealed"),
+    let file = ruma::events::room::EncryptedFile::new(
+        ruma::OwnedMxcUri::from("mxc://example.org/sealed"),
         keys.encryption_info,
         keys.hashes,
     );
@@ -2445,10 +2441,8 @@ async fn an_encrypted_thumbnail_downloads_the_original() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let source = serde_json::to_string(&matrix_sdk::ruma::events::room::MediaSource::Encrypted(
-        Box::new(file),
-    ))
-    .unwrap();
+    let source =
+        serde_json::to_string(&ruma::events::room::MediaSource::Encrypted(Box::new(file))).unwrap();
 
     assert_eq!(
         core.fetch_media(source.clone(), 800, 600, false)
@@ -2484,7 +2478,7 @@ async fn corrupt_encrypted_media_is_rejected_before_returning_plaintext() {
     encryptor.read_to_end(&mut ciphertext).unwrap();
     let keys = encryptor.finish();
     ciphertext[0] ^= 1;
-    let file = matrix_sdk::ruma::events::room::EncryptedFile::new(
+    let file = ruma::events::room::EncryptedFile::new(
         "mxc://example.org/corrupt".into(),
         keys.encryption_info,
         keys.hashes,
@@ -2498,10 +2492,8 @@ async fn corrupt_encrypted_media_is_rejected_before_returning_plaintext() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let source = serde_json::to_string(&matrix_sdk::ruma::events::room::MediaSource::Encrypted(
-        Box::new(file),
-    ))
-    .unwrap();
+    let source =
+        serde_json::to_string(&ruma::events::room::MediaSource::Encrypted(Box::new(file))).unwrap();
     assert!(matches!(
         core.fetch_media(source, 0, 0, false).await,
         Err(RpcError {
@@ -3189,8 +3181,6 @@ async fn forgotten_media_is_fetched_again() {
     core.forget_media(source.clone()).await.unwrap();
     core.fetch_media(source, 0, 0, false).await.unwrap();
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn space_child_writes(
     child: Option<serde_json::Value>,
     command: impl Handler,
@@ -3211,7 +3201,7 @@ async fn space_child_writes(
     }
     server.sync_room(&client, space).await;
     Mock::given(method("PUT"))
-        .and(wiremock::matchers::path_regex(
+        .and(path_regex(
             r"^/_matrix/client/v3/rooms/[^/]+/state/m\.space\.child/",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$written"})))
@@ -3362,8 +3352,6 @@ async fn forgetting_an_invalid_uri_is_refused() {
         })
     ));
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn sync_secret_storage_key(
     server: &MatrixMockServer,
     client: &matrix_sdk::Client,
@@ -3795,8 +3783,6 @@ async fn account_data_types_include_what_the_server_lists_but_sync_never_deliver
             .any(|event_type| event_type == "org.example.legacy")
     );
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn last_put_body(server: &MatrixMockServer, event_type: &str) -> serde_json::Value {
     let requests = server.server().received_requests().await.unwrap();
     let request = requests
@@ -3920,7 +3906,7 @@ async fn markdown_to_content_needs_no_session() {
     assert_eq!(content.body, "**hi** Ana");
     assert_eq!(
         content.formatted_body.as_deref(),
-        Some("<strong>hi</strong> <a href=\"https://matrix.to/#/@ana:example.org\">Ana</a>")
+        Some("<strong>hi</strong> <a href=\"matrix:u/ana:example.org\">Ana</a>")
     );
     assert_eq!(content.mentions.user_ids, ["@ana:example.org"]);
 }
@@ -4911,7 +4897,7 @@ async fn opening_a_room_returns_its_power_levels() {
         )
         .await;
     Mock::given(method("GET"))
-        .and(wiremock::matchers::path_regex(r"/state(/[^/]+/)?$"))
+        .and(path_regex(r"/state(/[^/]+/)?$"))
         .respond_with(ResponseTemplate::new(404).set_body_json(json!({
             "errcode": "M_NOT_FOUND", "error": "not found"
         })))
@@ -4954,16 +4940,16 @@ async fn missing_media_is_reported_apart_from_a_failing_server() {
     assert!(matches!(
         core.fetch_media("mxc://example.org/gone".to_owned(), 0, 0, true)
             .await,
-        Err(crate::protocol::RpcError {
-            code: crate::protocol::RpcCode::MediaNotFound,
+        Err(RpcError {
+            code: RpcCode::MediaNotFound,
             ..
         })
     ));
     assert!(matches!(
         core.fetch_media("mxc://example.org/flaky".to_owned(), 0, 0, true)
             .await,
-        Err(crate::protocol::RpcError {
-            code: crate::protocol::RpcCode::Unavailable,
+        Err(RpcError {
+            code: RpcCode::Unavailable,
             ..
         })
     ));

@@ -18,16 +18,13 @@ use crate::protocol::{
 use crate::Core;
 
 #[cfg(not(target_family = "wasm"))]
-pub(crate) type Cause = Box<dyn std::error::Error + Send + Sync>;
+pub(crate) type Cause = Box<dyn Error + Send + Sync>;
 #[cfg(target_family = "wasm")]
-pub(crate) type Cause = Box<dyn std::error::Error>;
+pub(crate) type Cause = Box<dyn Error>;
 
-pub(crate) trait Source:
-    std::error::Error + SendOutsideWasm + SyncOutsideWasm + 'static
-{
-}
+pub(crate) trait Source: Error + SendOutsideWasm + SyncOutsideWasm + 'static {}
 
-impl<T: std::error::Error + SendOutsideWasm + SyncOutsideWasm + 'static> Source for T {}
+impl<T: Error + SendOutsideWasm + SyncOutsideWasm + 'static> Source for T {}
 
 /// One layer of a failure. SDK errors are not `Send` on the web, so a report
 /// keeps what each error said rather than the error.
@@ -55,7 +52,7 @@ impl Layer {
     }
 }
 
-impl std::fmt::Display for Layer {
+impl Display for Layer {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(&self.message)
     }
@@ -178,7 +175,7 @@ impl CoreError {
     }
 }
 
-impl std::fmt::Display for CoreError {
+impl Display for CoreError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let messages: Vec<_> = self.layers().map(|layer| layer.message.as_str()).collect();
         formatter.write_str(&messages.join(": "))
@@ -283,7 +280,7 @@ fn http_failure(error: &(dyn Error + 'static)) -> Option<HttpFailureView> {
     }
     let transport = match http_error(error) {
         Some(matrix_sdk::HttpError::Reqwest(transport)) => Some(transport),
-        _ => error.downcast_ref::<matrix_sdk::reqwest::Error>(),
+        _ => error.downcast_ref::<reqwest::Error>(),
     }?;
     Some(HttpFailureView {
         status: transport.status().map(|status| status.as_u16()),
@@ -431,9 +428,7 @@ fn rejects_session(refresh: &matrix_sdk::RefreshTokenError) -> bool {
     }
 }
 
-fn client_api_error<'a>(
-    error: &'a (dyn Error + 'static),
-) -> Option<&'a matrix_sdk::ruma::api::error::Error> {
+fn client_api_error<'a>(error: &'a (dyn Error + 'static)) -> Option<&'a ruma::api::error::Error> {
     error.downcast_ref::<matrix_sdk::Error>().map_or_else(
         || {
             error
@@ -444,7 +439,7 @@ fn client_api_error<'a>(
     )
 }
 
-fn classify_api_error(api_error: &matrix_sdk::ruma::api::error::Error) -> Option<Expected> {
+fn classify_api_error(api_error: &ruma::api::error::Error) -> Option<Expected> {
     use tracing::Level;
 
     let status = api_error.status_code;
@@ -818,7 +813,7 @@ mod tests {
         let body: StandardErrorBody =
             serde_json::from_value(serde_json::json!({ "errcode": errcode, "error": "refused" }))
                 .unwrap();
-        let error = matrix_sdk::ruma::api::error::Error::new(
+        let error = ruma::api::error::Error::new(
             http::StatusCode::from_u16(status).unwrap(),
             ErrorBody::Standard(body),
         );
@@ -934,9 +929,9 @@ mod tests {
                 "DEBUG",
             ),
             (
-                HttpError::RefreshToken(matrix_sdk::RefreshTokenError::MatrixAuth(
-                    std::sync::Arc::new(api_error(503, "M_UNKNOWN")),
-                )),
+                HttpError::RefreshToken(matrix_sdk::RefreshTokenError::MatrixAuth(Arc::new(
+                    api_error(503, "M_UNKNOWN"),
+                ))),
                 |e| matches!(e, RpcCode::Unavailable),
                 "WARN",
             ),
@@ -1350,7 +1345,7 @@ mod tests {
     #[test]
     fn a_huge_body_is_cut_and_only_the_root_cause_keeps_its_debug() {
         let body = "x".repeat(3 * super::DETAIL_LIMIT);
-        let error = matrix_sdk::ruma::api::error::Error::new(
+        let error = ruma::api::error::Error::new(
             http::StatusCode::BAD_GATEWAY,
             ErrorBody::NotJson {
                 bytes: body.into(),

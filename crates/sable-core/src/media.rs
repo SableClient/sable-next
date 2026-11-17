@@ -621,9 +621,9 @@ async fn download_persona_avatar(url: &str) -> Result<(String, Vec<u8>), RpcErro
         return Err(RpcCode::InvalidMedia.into());
     }
     // Do not send Matrix credentials to avatar hosts.
-    let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
+    let http = crate::tls::apply(reqwest::Client::builder())
         .timeout(Duration::from_secs(30))
-        .redirect(matrix_sdk::reqwest::redirect::Policy::limited(5))
+        .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .map_err(|error| {
             crate::errors::coded("persona_avatar_client", RpcCode::Unavailable, &error)
@@ -632,7 +632,7 @@ async fn download_persona_avatar(url: &str) -> Result<(String, Vec<u8>), RpcErro
         .get(url)
         .send()
         .await
-        .and_then(matrix_sdk::reqwest::Response::error_for_status)
+        .and_then(reqwest::Response::error_for_status)
         .map_err(|error| {
             tracing::warn!("persona avatar download failed: {}", error.without_url());
             RpcCode::Unavailable
@@ -645,7 +645,7 @@ async fn download_persona_avatar(url: &str) -> Result<(String, Vec<u8>), RpcErro
     }
     let mime = response
         .headers()
-        .get(matrix_sdk::reqwest::header::CONTENT_TYPE)
+        .get(reqwest::header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .unwrap_or("image/*")
         .to_owned();
@@ -724,7 +724,8 @@ fn attachment_extra_content(
     (!extra.is_empty()).then_some(extra)
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod avatar_import_tests {
     use super::download_persona_avatar;
     use wiremock::{Mock, MockServer, ResponseTemplate, matchers::path};
@@ -853,7 +854,7 @@ impl Drop for ProbeGuard<'_> {
 
 async fn media_timeout<T>(
     limit: Duration,
-    future: impl std::future::Future<Output = T>,
+    future: impl Future<Output = T>,
 ) -> matrix_sdk::Result<T> {
     matrix_sdk::timeout::timeout(future, limit)
         .await
@@ -862,7 +863,7 @@ async fn media_timeout<T>(
 
 async fn with_retries<T, Fut>(attempt: impl FnMut() -> Fut) -> matrix_sdk::Result<T>
 where
-    Fut: std::future::Future<Output = matrix_sdk::Result<T>>,
+    Fut: Future<Output = matrix_sdk::Result<T>>,
 {
     attempt
         .retry(MEDIA_RETRY_DELAYS.into_iter())

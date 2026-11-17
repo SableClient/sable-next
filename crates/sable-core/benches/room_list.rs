@@ -19,9 +19,9 @@ async fn rooms(server: &MatrixMockServer, count: usize) -> Vec<VectorDiff<RoomLi
     let client = server.client_builder().build().await;
     let mut diffs = Vec::with_capacity(count);
     for index in 0..count {
-        let room_id = matrix_sdk::ruma::OwnedRoomId::try_from(format!("!room{index}:example.org"))
+        let room_id = ruma::OwnedRoomId::try_from(format!("!room{index}:example.org"))
             .expect("valid room id");
-        let avatar = matrix_sdk::ruma::OwnedMxcUri::from(format!("mxc://example.org/{index}"));
+        let avatar = ruma::OwnedMxcUri::from(format!("mxc://example.org/{index}"));
         let factory = EventFactory::new().room(&room_id).sender(User::Alice);
         let room = server
             .sync_room(

@@ -780,7 +780,7 @@ mod codec_tests {
                 .unwrap(),
             Some(legacy)
         );
-        let rooms: Vec<matrix_sdk::ruma::OwnedRoomId> = serde_json::from_slice(
+        let rooms: Vec<ruma::OwnedRoomId> = serde_json::from_slice(
             &decode(
                 store
                     .get_custom_value(&super::rooms_key())

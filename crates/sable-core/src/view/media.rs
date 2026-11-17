@@ -213,7 +213,7 @@ pub(crate) fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<Stri
 /// Strips both fallback halves from a media caption, as for text messages.
 pub(super) fn caption_view(
     caption: Option<&str>,
-    formatted: Option<&matrix_sdk::ruma::events::room::message::FormattedBody>,
+    formatted: Option<&ruma::events::room::message::FormattedBody>,
     profile: Option<&PerMessageProfileView>,
 ) -> (Option<String>, Option<String>) {
     let name = profile

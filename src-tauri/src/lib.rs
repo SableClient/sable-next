@@ -190,23 +190,17 @@ impl Carried for Request<'_> {
     }
 }
 
-async fn carried_attachment(
-    core: &sable_core::Core,
-    request: &impl Carried,
-) -> Result<(), RpcError> {
+async fn carried_attachment(core: &Core, request: &impl Carried) -> Result<(), RpcError> {
     core.send_attachment(request.metadata()?, request.bytes()?)
         .await
 }
 
-async fn carried_upload(
-    core: &sable_core::Core,
-    request: &impl Carried,
-) -> Result<String, RpcError> {
+async fn carried_upload(core: &Core, request: &impl Carried) -> Result<String, RpcError> {
     let mime = request.header("mime").ok_or(RpcCode::InvalidMedia)?;
     core.upload_media(mime, request.bytes()?).await
 }
 
-async fn carried_gallery(core: &sable_core::Core, request: &impl Carried) -> Result<(), RpcError> {
+async fn carried_gallery(core: &Core, request: &impl Carried) -> Result<(), RpcError> {
     core.send_gallery(request.metadata()?, request.bytes()?)
         .await
 }

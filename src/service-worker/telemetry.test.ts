@@ -7,7 +7,9 @@ vi.mock('@sentry/sveltekit', async () => {
   const { createRequire } = await import('node:module');
   const require = createRequire(import.meta.url);
   const sdk = (await import(
-    require.resolve('@sentry/browser', { paths: [require.resolve('@sentry/sveltekit')] })
+    require.resolve('@sentry/browser', {
+      paths: [require.resolve('@sentry/svelte', { paths: [require.resolve('@sentry/sveltekit')] })],
+    })
   )) as typeof import('@sentry/sveltekit');
   return {
     ...sdk,

@@ -111,7 +111,7 @@ async fn request_ticket(service: &str, token: &OpenIdTokenView) -> Result<Ticket
     }
     tracing::info!("tunnel ticket answered {status}");
     Ok(Ticket::Refused {
-        token_rejected: status == matrix_sdk::reqwest::StatusCode::UNAUTHORIZED,
+        token_rejected: status == reqwest::StatusCode::UNAUTHORIZED,
     })
 }
 

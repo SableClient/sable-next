@@ -452,7 +452,7 @@ mod server_tests {
 
         assert_eq!(
             sidebar(&client).await.expect("layout"),
-            [] as [sable_model::sidebar::SidebarItemView; 0]
+            Vec::<SidebarItemView>::new()
         );
     }
 

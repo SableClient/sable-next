@@ -28,8 +28,8 @@ pub(crate) fn is_mxc(source: &str) -> bool {
     source.starts_with("mxc://")
 }
 
-pub(crate) fn service_client() -> Result<matrix_sdk::reqwest::Client, RpcError> {
-    let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
+pub(crate) fn service_client() -> Result<reqwest::Client, RpcError> {
+    let builder = crate::tls::apply(reqwest::Client::builder());
     #[cfg(not(target_family = "wasm"))]
     let builder = builder.timeout(std::time::Duration::from_secs(10));
     builder.build().map_err(|error| {
@@ -390,7 +390,7 @@ impl Core {
         previews: &[UrlPreviewView],
     ) -> HashMap<String, PreviewImage> {
         let mut images = HashMap::new();
-        let mut wanted: Vec<WantedImage> = Vec::new();
+        let mut wanted: Vec<WantedImage<'_>> = Vec::new();
         for preview in previews {
             for image in preview_images(preview) {
                 if let Some(known) = wanted.iter_mut().find(|known| known.source == image.source) {
@@ -502,7 +502,7 @@ mod tests {
         let images = std::collections::HashMap::from([(
             previews[0].image.clone().unwrap(),
             super::PreviewImage {
-                source: matrix_sdk::ruma::events::room::MediaSource::Plain(
+                source: ruma::events::room::MediaSource::Plain(
                     "mxc://example.org/persistent".into(),
                 ),
                 size: 42,
@@ -704,7 +704,7 @@ mod tests {
 
     #[test]
     fn a_bundled_post_carries_its_uploaded_images_like_og_image() {
-        let file: matrix_sdk::ruma::events::room::EncryptedFile =
+        let file: ruma::events::room::EncryptedFile =
             serde_json::from_value(encrypted_file("mxc://example.org/face")).unwrap();
         let mut preview = preview("https://bsky.app/x");
         preview.post = Some(crate::protocol::PostView {
@@ -736,23 +736,21 @@ mod tests {
             (
                 "https://cdn/face.jpg".to_owned(),
                 super::PreviewImage {
-                    source: matrix_sdk::ruma::events::room::MediaSource::Encrypted(Box::new(file)),
+                    source: ruma::events::room::MediaSource::Encrypted(Box::new(file)),
                     size: 5,
                 },
             ),
             (
                 "https://cdn/cat.png".to_owned(),
                 super::PreviewImage {
-                    source: matrix_sdk::ruma::events::room::MediaSource::Plain(
-                        "mxc://example.org/cat".into(),
-                    ),
+                    source: ruma::events::room::MediaSource::Plain("mxc://example.org/cat".into()),
                     size: 9,
                 },
             ),
             (
                 "https://cdn/still.jpg".to_owned(),
                 super::PreviewImage {
-                    source: matrix_sdk::ruma::events::room::MediaSource::Plain(
+                    source: ruma::events::room::MediaSource::Plain(
                         "mxc://example.org/still".into(),
                     ),
                     size: 4,

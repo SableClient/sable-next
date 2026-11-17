@@ -1318,7 +1318,7 @@ fn refresh_tag(client: &matrix_sdk::Client) -> String {
 
 fn oauth_device_delete_url(
     metadata: &AuthorizationServerMetadata,
-    device_id: &matrix_sdk::ruma::DeviceId,
+    device_id: &ruma::DeviceId,
 ) -> Result<String, RpcError> {
     use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::{
         AccountManagementAction, AccountManagementActionData, DeviceDeleteData,
@@ -1337,7 +1337,7 @@ fn oauth_device_delete_url(
 }
 
 fn oauth_account_deactivate_url(
-    metadata: &matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AuthorizationServerMetadata,
+    metadata: &AuthorizationServerMetadata,
 ) -> Result<String, RpcError> {
     use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::{
         AccountManagementAction, AccountManagementActionData,
@@ -1404,7 +1404,8 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::Co
     Ok(())
 }
 
-#[cfg(all(test, not(target_family = "wasm")))]
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 mod regression_tests {
     use crate::api::encryption::DeleteDeviceParams;
     use crate::session::{self, Credentials, PersistedAccount};
@@ -1455,8 +1456,6 @@ mod regression_tests {
             Ok(())
         }
     }
-
-    #[expect(clippy::unwrap_used, reason = "test code")]
     async fn core_with_room() -> (tempfile::TempDir, MatrixMockServer, Arc<Core>, Room) {
         let server = MatrixMockServer::new().await;
         server
@@ -1739,7 +1738,7 @@ mod regression_tests {
         });
         *core.accounts.lock().await = Some(registry);
         let pending = core.claim_session_generation().await;
-        let mut rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
+        let mut rejected = ruma::api::error::UnknownTokenErrorData::new();
         rejected.soft_logout = true;
         assert!(core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
         tokio::task::yield_now().await;
@@ -1843,7 +1842,7 @@ mod regression_tests {
             device_invalidated: false,
         });
         *core.accounts.lock().await = Some(registry);
-        let rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
+        let rejected = ruma::api::error::UnknownTokenErrorData::new();
         assert!(core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
         tokio::time::timeout(std::time::Duration::from_secs(5), async {
             loop {
@@ -2139,7 +2138,7 @@ mod regression_tests {
                 server.server().uri(),
                 "first".to_owned(),
                 &generation,
-                &crate::session::store_lease(&core.store_id).await,
+                &session::store_lease(&core.store_id).await,
             )
             .await
             .unwrap();
@@ -2181,7 +2180,7 @@ mod regression_tests {
                 server.server().uri(),
                 "first".to_owned(),
                 &generation,
-                &crate::session::store_lease(&core.store_id).await,
+                &session::store_lease(&core.store_id).await,
             ),
         )
         .await
@@ -2214,7 +2213,7 @@ mod regression_tests {
             server.server().uri(),
             "first".to_owned(),
             &generation,
-            &crate::session::store_lease(&core.store_id).await,
+            &session::store_lease(&core.store_id).await,
         )
         .await
         .unwrap();
@@ -2310,10 +2309,8 @@ mod regression_tests {
         use crate::session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession};
 
         let server = MatrixMockServer::new().await;
-        let base = std::env::temp_dir().join(format!(
-            "sable-offline-{}",
-            matrix_sdk::ruma::TransactionId::new()
-        ));
+        let base =
+            std::env::temp_dir().join(format!("sable-offline-{}", ruma::TransactionId::new()));
         let base_id = base.to_str().unwrap().to_owned();
         let (core, _events) = Core::new(base_id.clone(), Box::new(MemorySessionStore::default()));
         let mut registry = AccountRegistry::empty();
@@ -2367,10 +2364,7 @@ mod regression_tests {
         use matrix_sdk_base::crypto::store::CryptoStore as _;
 
         let server = MatrixMockServer::new().await;
-        let base = std::env::temp_dir().join(format!(
-            "sable-reset-{}",
-            matrix_sdk::ruma::TransactionId::new()
-        ));
+        let base = std::env::temp_dir().join(format!("sable-reset-{}", ruma::TransactionId::new()));
         let base_id = base.to_str().unwrap().to_owned();
         let (core, _events) = Core::new(base_id.clone(), Box::new(MemorySessionStore::default()));
         let mut registry = AccountRegistry::empty();
@@ -2580,7 +2574,7 @@ mod regression_tests {
         server.mock_versions().ok().mount().await;
         let base = std::env::temp_dir().join(format!(
             "sable-restore-refresh-{}",
-            matrix_sdk::ruma::TransactionId::new()
+            ruma::TransactionId::new()
         ));
         let base_id = base.to_str().unwrap().to_owned();
         let (core, _events) = Core::new(base_id.clone(), Box::new(MemorySessionStore::default()));
@@ -2639,8 +2633,6 @@ mod regression_tests {
         drop(client);
         std::fs::remove_dir_all(&store_id).unwrap();
     }
-
-    #[expect(clippy::unwrap_used, reason = "test code")]
     async fn logged_in_core() -> (tempfile::TempDir, Arc<Core>, PersistedAccount) {
         use crate::session::{AccountRegistry, current_session};
         let (_store, server, _, room) = core_with_room().await;
@@ -2666,8 +2658,6 @@ mod regression_tests {
             )
             .is_ok_and(|tokens| tokens.is_some())
     }
-
-    #[expect(clippy::unwrap_used, reason = "test code")]
     async fn restorable_core() -> (
         MatrixMockServer,
         tempfile::TempDir,
@@ -2833,8 +2823,7 @@ mod regression_tests {
         core.write_registry(&registry).await.unwrap();
 
         let saved = core.sessions.load().await.unwrap().unwrap();
-        let (saved, _) =
-            crate::session::AccountRegistry::from_bytes(&saved, &core.store_id).unwrap();
+        let (saved, _) = session::AccountRegistry::from_bytes(&saved, &core.store_id).unwrap();
         let tokens = |id: &str| {
             saved
                 .accounts
@@ -2871,10 +2860,7 @@ mod regression_tests {
         assert!(!has_login_file(&base, &account));
     }
 
-    fn saved_refresh_token(
-        core: &Core,
-        account: &crate::session::PersistedAccount,
-    ) -> Option<String> {
+    fn saved_refresh_token(core: &Core, account: &PersistedAccount) -> Option<String> {
         crate::credentials::LoginTokens::new(std::path::Path::new(&core.store_id))
             .read(
                 &account.account_id,
@@ -2981,7 +2967,7 @@ mod regression_tests {
             server.server().uri(),
             "second".to_owned(),
             &generation,
-            &crate::session::store_lease("unused").await,
+            &session::store_lease("unused").await,
         )
         .await
         .expect_err("switch must report the failed registry write");

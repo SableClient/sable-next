@@ -264,10 +264,8 @@ mod tests {
 
     #[cfg(not(target_family = "wasm"))]
     fn test_core(prefix: &str) -> (Arc<Core>, std::path::PathBuf) {
-        let directory = std::env::temp_dir().join(format!(
-            "{prefix}-{}",
-            matrix_sdk::ruma::TransactionId::new()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("{prefix}-{}", ruma::TransactionId::new()));
         let (core, _events) = Core::new(
             directory.to_str().unwrap(),
             Box::new(crate::store::MemorySessionStore::default()),

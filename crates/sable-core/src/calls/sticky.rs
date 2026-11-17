@@ -389,7 +389,7 @@ pub(super) async fn send(
     _client: &Client,
     room: &Room,
     content: impl serde::Serialize,
-) -> Result<ruma::OwnedEventId, matrix_sdk::Error> {
+) -> Result<OwnedEventId, matrix_sdk::Error> {
     send_wire(room, content, super::membership::RtcWire::Deployed).await
 }
 
@@ -397,7 +397,7 @@ pub(super) async fn send_wire(
     room: &Room,
     content: impl serde::Serialize,
     wire: super::membership::RtcWire,
-) -> Result<ruma::OwnedEventId, matrix_sdk::Error> {
+) -> Result<OwnedEventId, matrix_sdk::Error> {
     let content = serde_json::to_value(content)?;
     match room.latest_encryption_state().await? {
         matrix_sdk::EncryptionState::NotEncrypted => {}

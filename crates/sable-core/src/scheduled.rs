@@ -228,9 +228,7 @@ impl Core {
         Ok(response
             .delayed_events
             .into_iter()
-            .filter(|item| {
-                item.event_type == matrix_sdk::ruma::events::TimelineEventType::RoomMessage
-            })
+            .filter(|item| item.event_type == ruma::events::TimelineEventType::RoomMessage)
             .filter(|item| item.finalized_ts.is_none())
             .filter(|item| room_id.is_none_or(|wanted| &item.room_id == wanted))
             .filter_map(|item| {
@@ -240,15 +238,15 @@ impl Core {
                     .ok()?;
                 let delay_ms = u64::try_from(item.delay.as_millis()).unwrap_or(u64::MAX);
                 let formatted = match &content.msgtype {
-                    matrix_sdk::ruma::events::room::message::MessageType::Text(text) => text
+                    ruma::events::room::message::MessageType::Text(text) => text
                         .formatted
                         .as_ref()
                         .map(|formatted| formatted.body.clone()),
-                    matrix_sdk::ruma::events::room::message::MessageType::Notice(notice) => notice
+                    ruma::events::room::message::MessageType::Notice(notice) => notice
                         .formatted
                         .as_ref()
                         .map(|formatted| formatted.body.clone()),
-                    matrix_sdk::ruma::events::room::message::MessageType::Emote(emote) => emote
+                    ruma::events::room::message::MessageType::Emote(emote) => emote
                         .formatted
                         .as_ref()
                         .map(|formatted| formatted.body.clone()),

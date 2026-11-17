@@ -37,8 +37,6 @@ impl Device {
             }
         }
     }
-
-    #[expect(clippy::unwrap_used, reason = "test code")]
     async fn assert_verified(&mut self) {
         tokio::time::timeout(Duration::from_secs(10), async {
             while !self.encryption.as_ref().is_some_and(|status| {
@@ -80,13 +78,11 @@ impl Device {
         })
     }
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn device(server: &MatrixMockServer, id: &str) -> Device {
     let client = server
         .client_builder_for_crypto_end_to_end(
             &owned_user_id!("@alice:example.org"),
-            <&matrix_sdk::ruma::DeviceId>::from(id),
+            <&ruma::DeviceId>::from(id),
         )
         .build()
         .await;
@@ -142,8 +138,6 @@ async fn deliver(
         }
     }
 }
-
-#[expect(clippy::unwrap_used, reason = "test code")]
 async fn two_devices(
     server: &MatrixMockServer,
     cross_signed: bool,

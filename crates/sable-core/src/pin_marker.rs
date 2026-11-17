@@ -145,7 +145,7 @@ impl Core {
         room_id: &OwnedRoomId,
         marker: &PinMarker,
     ) -> Result<(), RpcError> {
-        let raw = matrix_sdk::ruma::serde::Raw::new(&marker_content(marker))
+        let raw = ruma::serde::Raw::new(&marker_content(marker))
             .or_failed(self, "pin_marker")?
             .cast_unchecked();
         self.room(room_id)

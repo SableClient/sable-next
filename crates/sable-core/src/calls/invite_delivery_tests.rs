@@ -73,11 +73,7 @@ async fn setup_room(
                             .power_levels()
                             .set_users([(client.user_id().unwrap().to_owned(), 100_i8)]),
                     )
-                    .add_state_event(
-                        matrix_sdk::ruma::serde::Raw::new(&slot)
-                            .unwrap()
-                            .cast_unchecked(),
-                    ),
+                    .add_state_event(Raw::new(&slot).unwrap().cast_unchecked()),
             );
             if direct {
                 builder.add_global_account_data(
@@ -132,14 +128,12 @@ async fn sends(server: &MatrixMockServer) -> Vec<Request> {
 
 async fn sticky_update(room: &Room, value: Value) {
     let mut response =
-        matrix_sdk::ruma::api::client::sync::sync_events::msc4186::Response::new("next".to_owned());
+        ruma::api::client::sync::sync_events::msc4186::Response::new("next".to_owned());
     let mut events =
-        matrix_sdk::ruma::api::client::sync::sync_events::msc4186::response::StickyEventsRoom::default();
-    events.events.push(
-        matrix_sdk::ruma::serde::Raw::new(&value)
-            .unwrap()
-            .cast_unchecked(),
-    );
+        ruma::api::client::sync::sync_events::msc4186::response::StickyEventsRoom::default();
+    events
+        .events
+        .push(Raw::new(&value).unwrap().cast_unchecked());
     response
         .extensions
         .sticky_events

@@ -36,7 +36,7 @@ mod tests {
         let mut chunker = Chunker::default();
         assert_eq!(
             collect(&mut chunker, &vec![1; CHUNK_BYTES - 8]),
-            [] as [Vec<u8>; 0]
+            Vec::<Vec<u8>>::new()
         );
         let chunks = collect(&mut chunker, &[2; 8]);
         assert_eq!(chunks.len(), 1);

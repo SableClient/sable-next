@@ -710,9 +710,9 @@ mod tests {
     fn a_negated_sender_is_denied_by_identity() {
         let filter = filter("deploy -from:kris");
 
-        assert_eq!(filter.senders, [] as [String; 0]);
+        assert_eq!(filter.senders, Vec::<String>::new());
         assert_eq!(filter.not_senders, ["@kris:example.org"]);
-        assert_eq!(filter.exclude, [] as [String; 0]);
+        assert_eq!(filter.exclude, Vec::<String>::new());
         assert_eq!(unresolved("deploy -from:nobody"), ["nobody"]);
     }
 
@@ -721,7 +721,7 @@ mod tests {
         let filter = filter("deploy -staging");
 
         assert_eq!(filter.exclude, ["staging"]);
-        assert_eq!(filter.not_senders, [] as [String; 0]);
+        assert_eq!(filter.not_senders, Vec::<String>::new());
     }
 
     #[test]
@@ -754,7 +754,7 @@ mod tests {
     fn a_negated_room_is_denied_by_identity() {
         let filter = filter("deploy -in:dev");
 
-        assert_eq!(filter.rooms, [] as [String; 0]);
+        assert_eq!(filter.rooms, Vec::<String>::new());
         assert_eq!(filter.not_rooms, ["!dev:example.org"]);
     }
 
@@ -774,15 +774,15 @@ mod tests {
 
     #[test]
     fn pins_threads_and_their_negations() {
-        assert_eq!(self::filter("pinned:true").pinned, Some(true));
-        assert_eq!(self::filter("has:pin").pinned, Some(true));
-        assert_eq!(self::filter("pinned:false").pinned, Some(false));
-        assert_eq!(self::filter("-has:pin").pinned, Some(false));
-        assert_eq!(self::filter("deploy").pinned, None);
+        assert_eq!(filter("pinned:true").pinned, Some(true));
+        assert_eq!(filter("has:pin").pinned, Some(true));
+        assert_eq!(filter("pinned:false").pinned, Some(false));
+        assert_eq!(filter("-has:pin").pinned, Some(false));
+        assert_eq!(filter("deploy").pinned, None);
         assert_eq!(unresolved("pinned:maybe"), ["maybe"]);
 
-        assert_eq!(self::filter("is:thread").in_thread, Some(true));
-        assert_eq!(self::filter("-is:thread").in_thread, Some(false));
+        assert_eq!(filter("is:thread").in_thread, Some(true));
+        assert_eq!(filter("-is:thread").in_thread, Some(false));
         assert_eq!(unresolved("is:starred"), ["starred"]);
     }
 

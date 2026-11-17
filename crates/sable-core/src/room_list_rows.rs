@@ -118,8 +118,7 @@ impl RoomListRows {
 
     /// Forgets what the cache holds for rooms that left the list.
     pub(crate) fn evict<S: BuildHasher>(&self, cache: &mut HashMap<OwnedRoomId, RoomInfo, S>) {
-        let listed: std::collections::HashSet<_> =
-            self.rows.iter().map(|row| &row.room_id).collect();
+        let listed: HashSet<_> = self.rows.iter().map(|row| &row.room_id).collect();
         cache.retain(|room_id, _| listed.contains(room_id));
     }
 

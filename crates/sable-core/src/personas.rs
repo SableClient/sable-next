@@ -856,7 +856,7 @@ fn catalog_from_backup(backup: &str) -> Option<Value> {
 #[cfg(not(target_family = "wasm"))]
 async fn space_associations(
     client: &matrix_sdk::Client,
-    room_id: &matrix_sdk::ruma::RoomId,
+    room_id: &ruma::RoomId,
     associations: &BTreeMap<String, RoomAssociation>,
 ) -> Vec<RoomAssociation> {
     let mut rooms = vec![room_id.to_owned()];
@@ -954,7 +954,7 @@ async fn proxying_enabled(client: &matrix_sdk::Client) -> bool {
 #[cfg(not(target_family = "wasm"))]
 pub(crate) async fn notification_reply(
     client: &matrix_sdk::Client,
-    room_id: &matrix_sdk::ruma::RoomId,
+    room_id: &ruma::RoomId,
     body: &str,
 ) -> matrix_sdk::Result<(String, Option<PerMessageProfileView>)> {
     async fn data(
@@ -1091,7 +1091,7 @@ impl Core {
         content: &AnyMessageLikeEventContent,
         profile: Option<&PerMessageProfileView>,
         forum_title: Option<String>,
-        retained: serde_json::Map<String, Value>,
+        retained: Map<String, Value>,
     ) -> Result<(), RpcError> {
         let event_type = content.event_type().to_string();
         let title = crate::outgoing::forum_title_value(forum_title);

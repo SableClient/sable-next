@@ -145,7 +145,7 @@ struct StableFocus {
     kind: &'static str,
     url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    server_name: Option<matrix_sdk::ruma::OwnedServerName>,
+    server_name: Option<ruma::OwnedServerName>,
 }
 
 #[derive(Serialize)]

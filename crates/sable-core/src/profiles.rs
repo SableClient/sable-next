@@ -13,7 +13,7 @@ use crate::protocol::{
     AnimalIdentityView, BrightnessView, ProfileFieldView, ProfileView, PronounView, StatusView,
 };
 
-type ProfileResponse = matrix_sdk::ruma::api::client::profile::get_profile::v3::Response;
+type ProfileResponse = ruma::api::client::profile::get_profile::v3::Response;
 
 const STATUS_FIELD: &str = "org.matrix.msc4426.status";
 const STABLE_STATUS_FIELD: &str = "m.status";

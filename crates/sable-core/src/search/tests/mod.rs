@@ -18,7 +18,7 @@ use crate::search::MessageIndex;
 
 pub(super) async fn in_restored_room(
     index: &mut MessageIndex,
-    room_id: &matrix_sdk::ruma::OwnedRoomId,
+    room_id: &ruma::OwnedRoomId,
     query: &str,
     limit: usize,
 ) -> Vec<crate::search::Hit> {
@@ -39,7 +39,7 @@ pub(super) async fn in_restored_room(
 
 pub(super) fn in_room(
     index: &MessageIndex,
-    room_id: &matrix_sdk::ruma::OwnedRoomId,
+    room_id: &ruma::OwnedRoomId,
     query: &str,
     limit: usize,
     offset: usize,
@@ -59,7 +59,7 @@ pub(super) fn in_room(
 pub(super) async fn reingest_whole_room(
     index: &mut MessageIndex,
     cache: &matrix_sdk::event_cache::RoomEventCache,
-    room_id: &matrix_sdk::ruma::OwnedRoomId,
+    room_id: &ruma::OwnedRoomId,
 ) {
     let events = cache.events().await.expect("cached events");
     index
@@ -73,14 +73,14 @@ pub(super) fn document(
     sender: &str,
     ts: u64,
     attachment: Option<crate::protocol::SearchAttachment>,
-    mentions: Vec<matrix_sdk::ruma::OwnedUserId>,
+    mentions: Vec<ruma::OwnedUserId>,
 ) -> crate::search::Document {
     crate::search::Document {
         event_id: EventId::parse(format!("${seed}")).expect("event id"),
         has_link: crate::search::document::contains_link(body),
         body: body.to_owned(),
         folded: String::new(),
-        sender: matrix_sdk::ruma::UserId::parse(sender).expect("user id"),
+        sender: ruma::UserId::parse(sender).expect("user id"),
         origin_server_ts: ts,
         attachments: attachment.into_iter().collect(),
         mentions,
@@ -93,8 +93,8 @@ pub(super) fn document(
     }
 }
 
-pub(super) fn filtered_index() -> (MessageIndex, matrix_sdk::ruma::OwnedRoomId) {
-    let room = matrix_sdk::ruma::RoomId::parse("!filters:localhost").expect("room id");
+pub(super) fn filtered_index() -> (MessageIndex, ruma::OwnedRoomId) {
+    let room = ruma::RoomId::parse("!filters:localhost").expect("room id");
     let mut index = MessageIndex::new();
     let room_index = index
         .rooms
@@ -157,8 +157,8 @@ pub(super) fn picture(seed: &str, sender: &str, ts: u64) -> crate::search::Docum
 
 pub(super) fn attachment_pages(
     index: &MessageIndex,
-    room: &matrix_sdk::ruma::RoomId,
-    not_senders: &[matrix_sdk::ruma::OwnedUserId],
+    room: &ruma::RoomId,
+    not_senders: &[ruma::OwnedUserId],
     limit: usize,
 ) -> Vec<Vec<String>> {
     attachment_pages_with(index, room, not_senders, limit, &mut |_| None)
@@ -166,8 +166,8 @@ pub(super) fn attachment_pages(
 
 pub(super) fn attachment_pages_with(
     index: &MessageIndex,
-    room: &matrix_sdk::ruma::RoomId,
-    not_senders: &[matrix_sdk::ruma::OwnedUserId],
+    room: &ruma::RoomId,
+    not_senders: &[ruma::OwnedUserId],
     limit: usize,
     load: &mut dyn FnMut(
         crate::search::persist::ChunkId,
@@ -175,7 +175,7 @@ pub(super) fn attachment_pages_with(
 ) -> Vec<Vec<String>> {
     let mut pages = Vec::new();
     let mut work = crate::search::index::PageWork::default();
-    let mut before: Option<(u64, matrix_sdk::ruma::OwnedEventId)> = None;
+    let mut before: Option<(u64, ruma::OwnedEventId)> = None;
     loop {
         let step = index.attachment_page(
             room,

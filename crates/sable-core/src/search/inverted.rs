@@ -215,20 +215,20 @@ mod tests {
     #[test]
     fn test_short_words_must_match_exactly() {
         let index = index(&["the cat sat"]);
-        assert_eq!(ranked(&index, "cot"), [] as [u32; 0]);
+        assert_eq!(ranked(&index, "cot"), Vec::<u32>::new());
     }
 
     #[test]
     fn test_the_first_letter_must_match() {
         let index = index(&["a great delegate"]);
-        assert_eq!(ranked(&index, "selegate"), [] as [u32; 0]);
+        assert_eq!(ranked(&index, "selegate"), Vec::<u32>::new());
     }
 
     #[test]
     fn test_words_with_digits_must_match_exactly() {
         let index = index(&["release 20240 ticket1420"]);
-        assert_eq!(ranked(&index, "20250"), [] as [u32; 0]);
-        assert_eq!(ranked(&index, "ticket1402"), [] as [u32; 0]);
+        assert_eq!(ranked(&index, "20250"), Vec::<u32>::new());
+        assert_eq!(ranked(&index, "ticket1402"), Vec::<u32>::new());
     }
 
     #[test]

@@ -422,7 +422,7 @@ fn collect(
 
 fn latest_entries(mut entries: Vec<CalendarEntryView>) -> Vec<CalendarEntryView> {
     entries.sort_by_key(|entry| std::cmp::Reverse(entry.timestamp));
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     entries.retain(|entry| {
         EntryKeys::deserialize(&entry.event)
             .ok()

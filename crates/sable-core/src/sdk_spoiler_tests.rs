@@ -18,12 +18,6 @@ fn spoiler_content(spoiler: bool) -> Option<serde_json::Map<String, serde_json::
     spoiler.then(|| serde_json::Map::from_iter([(SPOILER_PROPERTY.to_owned(), true.into())]))
 }
 
-#[expect(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::missing_assert_message,
-    reason = "test code"
-)]
 async fn uploading_contents(queue: impl AsyncFnOnce(&Room)) -> Vec<TimelineItemContentView> {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

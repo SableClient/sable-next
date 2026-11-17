@@ -1269,8 +1269,8 @@ mod tests {
     fn encrypted(
         event_id: &str,
         session_id: &str,
-    ) -> matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnyTimelineEvent> {
-        matrix_sdk::ruma::serde::Raw::new(&serde_json::json!({
+    ) -> ruma::serde::Raw<ruma::events::AnyTimelineEvent> {
+        ruma::serde::Raw::new(&serde_json::json!({
             "type": "m.room.encrypted",
             "event_id": event_id,
             "room_id": room(),
@@ -1818,14 +1818,11 @@ mod tests {
         server
             .mock_room_messages()
             .ok(RoomMessagesResponseTemplate::default()
-                .events(vec![
-                    factory.text_msg("deleted history").server_ts(
-                        matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(
-                            matrix_sdk::ruma::UInt::try_from(super::now_ms() - 1_000)
-                                .expect("a timestamp"),
-                        ),
+                .events(vec![factory.text_msg("deleted history").server_ts(
+                    ruma::MilliSecondsSinceUnixEpoch(
+                        ruma::UInt::try_from(super::now_ms() - 1_000).expect("a timestamp"),
                     ),
-                ])
+                )])
                 .end_token("deeper"))
             .mount()
             .await;
@@ -1878,14 +1875,11 @@ mod tests {
         server
             .mock_room_messages()
             .ok(RoomMessagesResponseTemplate::default()
-                .events(vec![
-                    factory.text_msg("imported history").server_ts(
-                        matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(
-                            matrix_sdk::ruma::UInt::try_from(super::now_ms() - 1_000)
-                                .expect("a timestamp"),
-                        ),
+                .events(vec![factory.text_msg("imported history").server_ts(
+                    ruma::MilliSecondsSinceUnixEpoch(
+                        ruma::UInt::try_from(super::now_ms() - 1_000).expect("a timestamp"),
                     ),
-                ])
+                )])
                 .end_token("deeper"))
             .mount()
             .await;
@@ -1943,14 +1937,11 @@ mod tests {
         server
             .mock_room_messages()
             .ok(RoomMessagesResponseTemplate::default()
-                .events(vec![
-                    factory.text_msg("imported history").server_ts(
-                        matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(
-                            matrix_sdk::ruma::UInt::try_from(super::now_ms() - 1_000)
-                                .expect("a timestamp"),
-                        ),
+                .events(vec![factory.text_msg("imported history").server_ts(
+                    ruma::MilliSecondsSinceUnixEpoch(
+                        ruma::UInt::try_from(super::now_ms() - 1_000).expect("a timestamp"),
                     ),
-                ])
+                )])
                 .end_token("deeper"))
             .mount()
             .await;
@@ -2015,9 +2006,7 @@ mod tests {
             .mock_room_messages()
             .ok(RoomMessagesResponseTemplate::default()
                 .events(vec![factory.text_msg("deleted history").server_ts(
-                    matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(matrix_sdk::ruma::UInt::from(
-                        10_u32,
-                    )),
+                    ruma::MilliSecondsSinceUnixEpoch(ruma::UInt::from(10_u32)),
                 )])
                 .end_token("deeper"))
             .mount()
@@ -2176,10 +2165,10 @@ mod tests {
     #[test]
     fn test_an_expired_shared_resume_token_restarts_from_the_live_timeline() {
         let room = matrix_sdk::ruma::room_id!("!resume:localhost").to_owned();
-        let mut progress = super::CrawlProgress::default();
-        progress.restore(std::collections::BTreeMap::from([(
+        let mut progress = CrawlProgress::default();
+        progress.restore(BTreeMap::from([(
             room.clone(),
-            super::StoredCrawlRoom {
+            StoredCrawlRoom {
                 shared_resume: true,
                 frontier: Some(10),
                 gapped: false,

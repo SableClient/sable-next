@@ -246,7 +246,7 @@ mod tests {
             via_servers(&members(&[("@a:one.example", 0)])),
             ["one.example"]
         );
-        assert_eq!(via_servers(&[]), [] as [String; 0]);
+        assert_eq!(via_servers(&[]), Vec::<String>::new());
     }
 
     #[test]
@@ -267,7 +267,7 @@ mod tests {
     fn skips_a_user_id_with_no_server() {
         assert_eq!(
             via_servers(&members(&[("malformed", 100)])),
-            [] as [String; 0]
+            Vec::<String>::new()
         );
     }
 

@@ -246,7 +246,7 @@ struct StoredOverrides {
 async fn stored_overrides(
     client: &matrix_sdk::Client,
     fetch: bool,
-    key: impl std::future::Future<Output = Option<crate::sealed_account_data::AccountDataKey>>,
+    key: impl Future<Output = Option<crate::sealed_account_data::AccountDataKey>>,
 ) -> matrix_sdk::Result<StoredOverrides> {
     let stable =
         crate::sealed_account_data::read_account_data(client, PROFILE_OVERRIDES_EVENT, fetch)
