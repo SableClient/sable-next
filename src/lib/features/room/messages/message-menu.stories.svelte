@@ -2,6 +2,9 @@
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
+  import { provideCoreClient } from '#lib/core/context.js';
+  import type { CoreClient } from '#lib/core/client.svelte.js';
+  import { createRpc } from '#src/generated/protocol';
   import MessageQuickReactions from '#lib/features/room/messages/MessageQuickReactions.svelte';
   import { messageMenuRows } from '#lib/features/room/messages/message-menu-items.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
@@ -25,6 +28,20 @@
     onReadReceipts: noop,
     onDelete: noop,
   });
+</script>
+
+<script lang="ts">
+  const frequent = ['👍', '❤️', '😂', '🎉', '👀', '🙏', '🔥', '😮'];
+  const core = {
+    session: null,
+    subscribeEvents: () => () => {},
+    rpc: createRpc((method) =>
+      method === 'messages.frequent_reactions'
+        ? Promise.resolve(frequent)
+        : new Promise<never>(() => {})
+    ),
+  } as unknown as CoreClient;
+  provideCoreClient(core);
 </script>
 
 <Story name="Desktop context menu" asChild>
