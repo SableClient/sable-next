@@ -7,7 +7,7 @@
   import { formatClockDuration } from '#lib/ui/clock-duration.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
-  import { downsampleWaveform } from './voice-waveform';
+  import { downsampleWaveform } from '#lib/ui/voice-waveform.js';
   import { extensionForMimeType, loadVoiceRecorder } from './voice-recorder-support';
   import type { VoiceMediaRecorder } from './voice-recorder-types';
 

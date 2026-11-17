@@ -10,6 +10,7 @@ import type { CoreEvent } from '#src/generated/protocol';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { WAVEFORM_BUCKETS } from '#lib/ui/voice-waveform.js';
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('pdfjs-dist', () => ({
@@ -172,7 +173,7 @@ test('renders a voice message with a waveform when a waveform is present', async
   await settle();
 
   expect(document.querySelector('.voice-message-player')).not.toBeNull();
-  expect(document.querySelectorAll('.voice-bar')).toHaveLength(5);
+  expect(document.querySelectorAll('.voice-bar')).toHaveLength(WAVEFORM_BUCKETS);
   expect(document.querySelector('audio.media-content')).toBeNull();
 });
 

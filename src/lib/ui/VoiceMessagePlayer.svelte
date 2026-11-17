@@ -10,6 +10,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Pill from '#lib/ui/primitives/Pill.svelte';
   import { voicePlayback } from '#lib/ui/voice-playback.svelte.js';
+  import { downsampleWaveform } from '#lib/ui/voice-waveform.js';
 
   const SCRUB_RESOLUTION = 1000;
 
@@ -29,7 +30,8 @@
 
   let duration = $derived(measuredDuration ?? (durationMs !== null ? durationMs / 1000 : 0));
   let progress = $derived(duration > 0 ? Math.min(1, currentTime / duration) : 0);
-  let activeBars = $derived(Math.round(progress * waveform.length));
+  let bars = $derived(downsampleWaveform(waveform));
+  let activeBars = $derived(Math.round(progress * bars.length));
 
   function toggle(): void {
     if (!audio) return;
@@ -78,7 +80,7 @@
   </IconButton>
   <div class="voice-track">
     <div class="voice-waveform" aria-hidden="true">
-      {#each waveform as level, index (index)}
+      {#each bars as level, index (index)}
         <span
           class={['voice-bar', { played: index < activeBars }]}
           style:height={`${String(Math.max(0.12, level) * 100)}%`}
