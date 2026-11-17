@@ -934,7 +934,13 @@ impl Core {
         ))
     }
 
+    /// The manager records signed terms per token, so a fresh one opens the page unsigned.
     async fn scalar_token(&self, api_url: &str) -> Option<String> {
+        let user = self.client().await.ok()?.user_id()?.to_owned();
+        let key = (user, api_url.to_owned());
+        if let Some(token) = self.scalar_tokens.lock().get(&key) {
+            return Some(token.clone());
+        }
         let token = self.openid_token().await.ok()?;
         let response = self
             .client()
@@ -958,11 +964,13 @@ impl Core {
         if !response.status().is_success() {
             return None;
         }
-        serde_json::from_str::<Value>(&response.text().await.ok()?)
+        let token = serde_json::from_str::<Value>(&response.text().await.ok()?)
             .ok()?
             .get("scalar_token")?
-            .as_str()
-            .map(str::to_owned)
+            .as_str()?
+            .to_owned();
+        self.scalar_tokens.lock().insert(key, token.clone());
+        Some(token)
     }
 
     pub(crate) async fn known_room_ids(&self) -> Result<Vec<OwnedRoomId>, RpcError> {
@@ -1870,6 +1878,7 @@ mod tests {
         Mock::given(method("POST"))
             .and(path("/scalar/api/register"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({"scalar_token": "s3"})))
+            .expect(1)
             .mount(server.server())
             .await;
         Mock::given(method("GET"))
@@ -1891,6 +1900,7 @@ mod tests {
             .await;
         Mock::given(method("POST"))
             .and(path("/scalar/api/_matrix/integrations/v1/terms"))
+            .and(header("Authorization", "Bearer s3"))
             .and(body_json(json!({"user_accepts": ["https://im/tos"]})))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
             .expect(1)
@@ -1908,6 +1918,11 @@ mod tests {
         let pending = core.integration_manager_terms().await.unwrap();
 
         assert_eq!(pending, Vec::new());
+        let url = core
+            .integration_manager_url(&room_id!("!room:example.org").to_owned())
+            .await
+            .unwrap();
+        assert!(url.contains("scalar_token=s3"));
     }
 
     #[test]
