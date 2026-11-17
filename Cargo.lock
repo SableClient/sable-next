@@ -411,6 +411,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-geolocation",
  "tauri-plugin-livekit-mobile",
+ "tauri-plugin-native-audio",
  "tauri-plugin-notifications",
  "tauri-plugin-opener",
  "tauri-plugin-os",
@@ -9895,6 +9896,15 @@ dependencies = [
  "tauri-plugin",
  "thiserror 2.0.21",
  "tokio",
+]
+
+[[package]]
+name = "tauri-plugin-native-audio"
+version = "1.0.5"
+source = "git+https://github.com/SableClient/tauri-plugin-native-audio.git?rev=1bbab74ed550b8395fdd287a25542c2b99624597#1bbab74ed550b8395fdd287a25542c2b99624597"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]

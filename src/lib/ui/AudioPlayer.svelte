@@ -18,6 +18,7 @@
   import SpeakerXIcon from 'phosphor-svelte/lib/SpeakerXIcon';
   import { onDestroy, onMount } from 'svelte';
 
+  import { nativeAudio, playsNatively } from '#lib/platform/native-audio.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
@@ -43,16 +44,24 @@
   };
 
   let player: HTMLAudioElement | null = $state(null);
-  let duration: number | null = $state(null);
-  let isPlaying = $state(false);
+  let webDuration: number | null = $state(null);
+  let webPlaying = $state(false);
   let seekPosition = $state(0);
   let seekUserIsInteracting = $state(false);
   let animationId: number | null;
 
   let { src, label, filename, attachedTop = false }: Props = $props();
 
+  const native = playsNatively();
+  let track = $derived({ url: src, name: filename });
+  let nativeState = $derived(native ? nativeAudio.of(src) : null);
+  let isPlaying = $derived(native ? (nativeState?.playing ?? false) : webPlaying);
+  let duration = $derived(native ? (nativeState?.duration ?? null) : webDuration);
+
   const updateTime = () => {
-    if (!seekUserIsInteracting && player) {
+    if (!seekUserIsInteracting && native) {
+      seekPosition = nativeState && !nativeState.ended ? nativeState.currentTime : 0;
+    } else if (!seekUserIsInteracting && player) {
       seekPosition = player?.currentTime || 0;
     }
     animationId = requestAnimationFrame(updateTime);
@@ -77,21 +86,23 @@
   class="audio-container {attachedTop ? 'audio-container-attached' : 'audio-container-unattached'}"
   aria-label={label}
 >
-  <audio
-    bind:this={player}
-    {src}
-    preload="metadata"
-    aria-hidden="true"
-    onloadedmetadata={() => {
-      if (player?.duration) {
-        duration = player.duration;
-      }
-    }}
-    onplay={() => (isPlaying = true)}
-    onpause={() => (isPlaying = false)}
-    onended={() => (isPlaying = false)}
-  >
-  </audio>
+  {#if !native}
+    <audio
+      bind:this={player}
+      {src}
+      preload="metadata"
+      aria-hidden="true"
+      onloadedmetadata={() => {
+        if (player?.duration) {
+          webDuration = player.duration;
+        }
+      }}
+      onplay={() => (webPlaying = true)}
+      onpause={() => (webPlaying = false)}
+      onended={() => (webPlaying = false)}
+    >
+    </audio>
+  {/if}
   {#if !attachedTop}
     <div class="audio-header">
       <FileAudioIcon size={24} />
@@ -105,7 +116,9 @@
       type="button"
       aria-label={i18n.t(isPlaying ? 'timeline.pauseAudio' : 'timeline.playAudio', { name: label })}
       onclick={() => {
-        if (!isPlaying) {
+        if (native) {
+          void nativeAudio.toggle(track);
+        } else if (!isPlaying) {
           try {
             player?.play();
           } catch (err) {
@@ -138,13 +151,16 @@
       onpointerup={() => (seekUserIsInteracting = false)}
       onpointercancel={() => (seekUserIsInteracting = false)}
       oninput={(e) => {
-        if (player) {
+        if (native) {
+          seekPosition = +e.currentTarget.value;
+          void nativeAudio.seek(track, seekPosition);
+        } else if (player) {
           player.currentTime = +e.currentTarget.value;
           seekPosition = +e.currentTarget.value;
         }
       }}
     />
-    {#if volumeAdjustable}
+    {#if volumeAdjustable && !native}
       <ResponsivePopover
         side="top"
         align="center"

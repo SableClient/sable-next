@@ -194,17 +194,12 @@ export async function shareFile(
       await electron.shareFile({ name, bytes });
       return 'saved';
     }
-    const [{ appCacheDir, join }, { mkdir, remove, writeFile }, { shareFile: shareNative }] =
-      await Promise.all([
-        import('@tauri-apps/api/path'),
-        import('@tauri-apps/plugin-fs'),
-        import('@choochmeque/tauri-plugin-sharekit-api'),
-      ]);
+    const [{ remove }, { shareFile: shareNative }] = await Promise.all([
+      import('@tauri-apps/plugin-fs'),
+      import('@choochmeque/tauri-plugin-sharekit-api'),
+    ]);
 
-    const directory = await join(await appCacheDir(), 'outgoing-share');
-    await mkdir(directory, { recursive: true });
-    const path = await join(directory, cacheName(name));
-    await writeFile(path, bytes);
+    const path = await writeCacheFile('outgoing-share', name, bytes);
 
     try {
       await shareNative(path, {
@@ -222,6 +217,23 @@ export async function shareFile(
     console.debug('[sable files] share failed', error);
     return 'failed';
   }
+}
+
+/** Native code cannot read a blob URL, so the bytes go to a file in the app cache first. */
+export async function writeCacheFile(
+  folder: string,
+  name: string,
+  bytes: Uint8Array
+): Promise<string> {
+  const [{ appCacheDir, join }, { mkdir, writeFile }] = await Promise.all([
+    import('@tauri-apps/api/path'),
+    import('@tauri-apps/plugin-fs'),
+  ]);
+  const directory = await join(await appCacheDir(), folder);
+  await mkdir(directory, { recursive: true });
+  const path = await join(directory, cacheName(name));
+  await writeFile(path, bytes);
+  return path;
 }
 
 function cacheName(name: string): string {

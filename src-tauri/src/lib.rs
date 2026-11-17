@@ -771,7 +771,9 @@ fn with_platform_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
     #[cfg(feature = "geolocation")]
     let builder = builder.plugin(tauri_plugin_geolocation::init());
 
-    let builder = builder.plugin(tauri_plugin_sharekit::init());
+    let builder = builder
+        .plugin(tauri_plugin_sharekit::init())
+        .plugin(tauri_plugin_native_audio::init());
 
     #[cfg(target_os = "android")]
     let builder = builder.plugin(tauri_plugin_android_fs::init());

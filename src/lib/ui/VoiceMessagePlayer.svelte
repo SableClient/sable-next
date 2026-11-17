@@ -6,6 +6,7 @@
   import SpeakerXIcon from 'phosphor-svelte/lib/SpeakerXIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { nativeAudio, playsNatively } from '#lib/platform/native-audio.svelte.js';
   import { formatClockDuration } from '#lib/ui/clock-duration.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Pill from '#lib/ui/primitives/Pill.svelte';
@@ -23,35 +24,56 @@
 
   let { url, body, durationMs, waveform }: Props = $props();
 
+  const native = playsNatively();
   let audio: HTMLAudioElement | undefined = $state();
-  let playing = $state(false);
-  let currentTime = $state(0);
+  let webPlaying = $state(false);
+  let webTime = $state(0);
   let measuredDuration = $state<number | null>(null);
+  let nativeState = $derived(native ? nativeAudio.of(url) : null);
+  let playing = $derived(native ? (nativeState?.playing ?? false) : webPlaying);
+  let currentTime = $derived(
+    native ? (nativeState && !nativeState.ended ? nativeState.currentTime : 0) : webTime
+  );
+  let track = $derived({ url, name: body });
 
-  let duration = $derived(measuredDuration ?? (durationMs !== null ? durationMs / 1000 : 0));
+  let duration = $derived(
+    nativeState?.duration ?? measuredDuration ?? (durationMs !== null ? durationMs / 1000 : 0)
+  );
   let progress = $derived(duration > 0 ? Math.min(1, currentTime / duration) : 0);
   let bars = $derived(downsampleWaveform(waveform));
   let activeBars = $derived(Math.round(progress * bars.length));
 
   function toggle(): void {
+    if (native) {
+      void nativeAudio.toggle(track, voicePlayback.speed);
+      return;
+    }
     if (!audio) return;
     if (playing) audio.pause();
     else void audio.play();
   }
 
   function seek(event: Event): void {
-    if (!audio) return;
     const input = event.currentTarget;
     if (!(input instanceof HTMLInputElement)) return;
     const next = (Number(input.value) / SCRUB_RESOLUTION) * duration;
+    if (native) {
+      void nativeAudio.seek(track, next);
+      return;
+    }
+    if (!audio) return;
     audio.currentTime = next;
-    currentTime = next;
+    webTime = next;
   }
 
   function setVolume(event: Event): void {
     const input = event.currentTarget;
     if (input instanceof HTMLInputElement) voicePlayback.setVolume(Number(input.value));
   }
+
+  $effect(() => {
+    if (native) void nativeAudio.setRate(url, voicePlayback.speed);
+  });
 
   $effect(() => {
     if (!audio) return;
@@ -106,49 +128,51 @@
   >
     {voicePlayback.speed}×
   </Pill>
-  <label class="voice-volume">
-    {#if voicePlayback.volume === 0}
-      <SpeakerXIcon />
-    {:else if voicePlayback.volume < 0.5}
-      <SpeakerLowIcon />
-    {:else}
-      <SpeakerHighIcon />
-    {/if}
-    <input
-      type="range"
-      min="0"
-      max="1"
-      step="0.05"
-      value={voicePlayback.volume}
-      oninput={setVolume}
-      aria-label={i18n.t('timeline.voiceMessageVolume')}
-    />
-  </label>
-  <audio
-    bind:this={audio}
-    src={url}
-    preload="metadata"
-    onplay={() => {
-      playing = true;
-    }}
-    onpause={() => {
-      playing = false;
-    }}
-    onended={() => {
-      playing = false;
-      currentTime = 0;
-    }}
-    ontimeupdate={() => {
-      if (audio) currentTime = audio.currentTime;
-    }}
-    onloadedmetadata={() => {
-      if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
-        measuredDuration = audio.duration;
-      }
-    }}
-  >
-    {body}
-  </audio>
+  {#if !native}
+    <label class="voice-volume">
+      {#if voicePlayback.volume === 0}
+        <SpeakerXIcon />
+      {:else if voicePlayback.volume < 0.5}
+        <SpeakerLowIcon />
+      {:else}
+        <SpeakerHighIcon />
+      {/if}
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        value={voicePlayback.volume}
+        oninput={setVolume}
+        aria-label={i18n.t('timeline.voiceMessageVolume')}
+      />
+    </label>
+    <audio
+      bind:this={audio}
+      src={url}
+      preload="metadata"
+      onplay={() => {
+        webPlaying = true;
+      }}
+      onpause={() => {
+        webPlaying = false;
+      }}
+      onended={() => {
+        webPlaying = false;
+        webTime = 0;
+      }}
+      ontimeupdate={() => {
+        if (audio) webTime = audio.currentTime;
+      }}
+      onloadedmetadata={() => {
+        if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
+          measuredDuration = audio.duration;
+        }
+      }}
+    >
+      {body}
+    </audio>
+  {/if}
 </div>
 
 <style>

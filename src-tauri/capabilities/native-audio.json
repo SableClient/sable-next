@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "native-audio-capability",
+  "description": "plays voice messages and audio files through the system player",
+  "platforms": ["android", "iOS"],
+  "windows": ["main"],
+  "permissions": [
+    "native-audio:default",
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [{ "path": "$APPCACHE/native-audio" }]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "$APPCACHE/native-audio/*" }]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [{ "path": "$APPCACHE/native-audio/*" }]
+    }
+  ]
+}

@@ -99,6 +99,8 @@ tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/Sable
 # `navigator.share` reaches no webview we ship, so the system share sheet only
 # comes from the native side.
 tauri-plugin-sharekit = "=0.4.0-rc.8"
+# The webviews mute `<audio>` in the background, the system player keeps going.
+tauri-plugin-native-audio = { version = "1.0.5", git = "https://github.com/SableClient/tauri-plugin-native-audio.git", rev = "1bbab74ed550b8395fdd287a25542c2b99624597" }
 
 [target."cfg(target_os = \"ios\")".dependencies]
 # backtrace 0.3.76 needs dyld bindings that libc 0.2.190 removed on iOS.
