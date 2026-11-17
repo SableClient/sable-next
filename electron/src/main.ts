@@ -48,6 +48,7 @@ import { claimSchemes } from './linux-schemes';
 import { historyDirection, openAppLink, openExternal, originOf } from './navigation';
 import { enforcePermissions } from './permissions';
 import { flushWritesBeforeQuit, writeJson } from './persistence';
+import { spellCheckerLanguages } from './spellcheck';
 import { writeDownload } from './downloads';
 import { shareFile } from './share';
 import { readThemeFile } from './theme-files';
@@ -983,13 +984,10 @@ if (!app.requestSingleInstanceLock()) {
     );
     registerScreenShare();
     if (process.platform !== 'darwin') {
-      const available = new Set(session.defaultSession.availableSpellCheckerLanguages);
-      const languages = app
-        .getPreferredSystemLanguages()
-        .flatMap((language) => [language, language.split('-')[0]])
-        .filter(
-          (language, index, all) => available.has(language) && all.indexOf(language) === index
-        );
+      const languages = spellCheckerLanguages(
+        app.getPreferredSystemLanguages(),
+        session.defaultSession.availableSpellCheckerLanguages
+      );
       if (languages.length > 0) session.defaultSession.setSpellCheckerLanguages(languages);
     }
     registerUpdater(isAppFrame);
