@@ -51,6 +51,8 @@
 
   .transfer-cancel {
     color: var(--surface-var-on-container);
+    flex: none;
     font-size: var(--font-size-small);
+    white-space: nowrap;
   }
 </style>
