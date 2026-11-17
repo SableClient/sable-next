@@ -1,13 +1,16 @@
 name: Build Windows and Linux aarch64 Electron apps
 on:
-  schedule:
-    - cron: '0 0,12 * * *'
   push:
     tags: ['v*']
+  # Forgejo schedules nightlies and dispatches this with the commit it built.
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to build and attach bundles to (e.g. v1.2.3). Empty builds a nightly from HEAD.'
+        description: 'Release tag to build and attach bundles to (e.g. v1.2.3). Empty builds a nightly.'
+        required: false
+        type: string
+      sha:
+        description: 'main commit a nightly builds. Empty builds HEAD.'
         required: false
         type: string
 permissions: {}
@@ -35,34 +38,43 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       ref: ${{ steps.meta.outputs.ref }}
       nightly: ${{ steps.meta.outputs.nightly }}
-      skip: ${{ steps.gate.outputs.skip }}
+      sha: ${{ steps.meta.outputs.sha }}
     steps:
+      # The push mirror from Forgejo can trail the dispatch.
+      - name: Wait for the commit to reach GitHub
+        if: ${{ inputs.sha != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          for _ in $(seq 40); do
+            gh api "repos/$GITHUB_REPOSITORY/commits/$SHA" --silent && exit 0
+            sleep 15
+          done
+          echo "::error::$SHA never reached GitHub." >&2
+          exit 1
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.sha }}
           persist-credentials: false
       - name: Resolve release meta
         id: meta
         uses: ./.github/actions/resolve-release-meta
         with:
           input-tag: ${{ inputs.tag }}
-      - name: Skip scheduled build without new commits
-        id: gate
-        if: ${{ github.event_name == 'schedule' }}
-        run: |
-          age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
-          if [ "$age" -gt 43200 ]; then echo 'skip=true' >> "$GITHUB_OUTPUT"; fi
+          git-sha: ${{ inputs.sha }}
       - name: Wait for release to exist
         if: ${{ steps.meta.outputs.nightly != 'true' }}
         env:
           TAG: ${{ steps.meta.outputs.tag }}
         run: node scripts/ci/forgejo-release.mjs wait --attempts 60 --interval 15
       - name: Create nightly prerelease
-        if: ${{ steps.meta.outputs.nightly == 'true' && steps.gate.outputs.skip != 'true' }}
+        if: ${{ steps.meta.outputs.nightly == 'true' }}
         env:
           TAG: ${{ steps.meta.outputs.tag }}
           VERSION: ${{ steps.meta.outputs.version }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ steps.meta.outputs.sha }}
         run: |
           node scripts/ci/forgejo-release.mjs ensure \
             --tag "$TAG" \
@@ -73,7 +85,6 @@ jobs:
   build-web:
     name: Build web assets
     needs: setup-release
-    if: ${{ needs.setup-release.outputs.skip != 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
@@ -123,13 +134,16 @@ jobs:
           - name: Windows x86_64
             runner: windows-latest
             platform: --win
+          - name: Linux x86_64
+            runner: ubuntu-24.04
+            platform: --linux
           - name: Linux aarch64
             runner: ubuntu-24.04-arm
             platform: --linux
     env:
       VERSION: ${{ needs.setup-release.outputs.version }}
       TAG: ${{ needs.setup-release.outputs.tag }}
-      SHA: ${{ github.sha }}
+      SHA: ${{ needs.setup-release.outputs.sha }}
       # Baked into the main process by electron/build.mjs.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -153,17 +167,28 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential libclang-dev libpipewire-0.3-dev pkg-config rpm
+          # The Electron binary links these even under ELECTRON_RUN_AS_NODE.
+          sudo apt-get install --no-install-recommends -y libnss3 libgtk-3-0 libgbm1 libasound2t64
       - name: Set up app
         uses: ./.github/actions/setup
         with:
           rust: 'true'
-          rust-cache-key: electron-${{ runner.os }}
+          rust-cache-key: electron-${{ runner.os }}-${{ runner.arch }}
           install-mise-tools: 'false'
       - name: Package
         shell: bash
         env:
           PLATFORM: ${{ matrix.platform }}
         run: pnpm --dir electron package "$PLATFORM"
+      - name: Upload native addon symbols
+        if: ${{ runner.os == 'Linux' }}
+        run: node scripts/ci/upload-sentry-symbols.mjs electron/dist
+      - name: Verify native core shutdown
+        if: ${{ runner.os == 'Linux' }}
+        run: SABLE_NODE_ADDON="$PWD/electron/dist/sable_node.node" node --test crates/sable-node/tests/native-lifecycle.mjs
+      - name: Verify native core shutdown in Electron
+        if: ${{ runner.os == 'Linux' }}
+        run: ELECTRON_RUN_AS_NODE=1 SABLE_NODE_ADDON="$PWD/electron/dist/sable_node.node" pnpm --dir electron exec electron --test "$PWD/crates/sable-node/tests/native-lifecycle.mjs"
       - name: Attest bundles
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -177,27 +202,37 @@ jobs:
       - name: Publish Electron bundles and update metadata
         shell: bash
         run: node electron/publish-updates.mjs
-  build-nightly-flatpak:
-    name: Build nightly ${{ matrix.flavor }} Flatpak ${{ matrix.arch }}
-    needs: setup-release
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+      - name: Publish deb and rpm to the package registries
+        if: ${{ runner.os == 'Linux' }}
+        env:
+          PACKAGES_USER: ${{ secrets.PACKAGES_USER }}
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+          NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+        run: |
+          channel=stable
+          [ "$NIGHTLY" != 'true' ] || channel=nightly
+          api="$FORGEJO_URL/api/packages/${FORGEJO_REPOSITORY%%/*}"
+          upload() {
+            code=$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' --user "$PACKAGES_USER:$PACKAGES_TOKEN" \
+              --upload-file "$1" "$2")
+            # 409 means this exact version is already published.
+            case "$code" in 201|409) ;; *) echo "Upload of $1 failed with HTTP $code" >&2; exit 1 ;; esac
+          }
+          for deb in electron/release/*.deb; do
+            upload "$deb" "$api/debian/pool/$channel/main/upload"
+          done
+          for rpm in electron/release/*.rpm; do
+            upload "$rpm" "$api/rpm/$channel/upload?sign=true"
+          done
+  flatpak-manifest:
+    name: Render the nightly Flatpak manifest
+    needs: [setup-release, electron]
     if: ${{ needs.setup-release.outputs.nightly == 'true' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - flavor: electron
-            arch: x86_64
-            runner: ubuntu-24.04
-            tarball: sable-@VERSION@-x64.tar.gz
-            manifest: electron/nightly/moe.sable.next.electron.Nightly.yml
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
-      ARCH: ${{ matrix.arch }}
-      TARBALL: ${{ matrix.tarball }}
-      MANIFEST: packaging/flatpak/${{ matrix.manifest }}
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
     steps:
@@ -206,97 +241,37 @@ jobs:
         with:
           ref: ${{ needs.setup-release.outputs.ref }}
           persist-credentials: false
-      # x86_64 is built on Forgejo, so its tarball can lag this run or never
-      # arrive. That arch is skipped rather than failing the nightly.
-      - name: Measure the release tarball
-        id: tarball
-        shell: bash
-        run: |
-          tarball="${TARBALL//@VERSION@/$VERSION}"
-          if ! node scripts/ci/forgejo-release.mjs wait-assets \
-                 --names "$tarball" --attempts 140 --interval 30; then
-            echo "::warning::$tarball never appeared; skipping the $ARCH Flatpak."
-            exit 0
-          fi
-          mkdir -p tarball
-          node scripts/ci/forgejo-release.mjs download --pattern "$tarball" --dir tarball
-          {
-            echo "SHA256=$(sha256sum "tarball/$tarball" | awk '{print $1}')"
-            echo "SIZE=$(stat -c %s "tarball/$tarball")"
-          } >> "$GITHUB_ENV"
-          echo 'built=true' >> "$GITHUB_OUTPUT"
       - name: Set up app
-        if: ${{ steps.tarball.outputs.built == 'true' }}
         uses: ./.github/actions/setup
         with:
           install-mise-tools: 'false'
-      - name: Install flatpak-builder
-        if: ${{ steps.tarball.outputs.built == 'true' }}
-        shell: bash
+      # extra-data installs download this exact file, so hash the published copy.
+      - name: Render the manifest from the published tarball
         run: |
-          sudo apt-get update
-          # elfutils supplies eu-strip, which flatpak-builder needs.
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
-          flatpak remote-add --user --if-not-exists flathub \
-            https://dl.flathub.org/repo/flathub.flatpakrepo
-      - name: Render the manifest
-        if: ${{ steps.tarball.outputs.built == 'true' }}
-        shell: bash
-        run: |
-          if [ "$ARCH" = 'x86_64' ]; then
-            node scripts/ci/render-flatpak-nightly.mjs "$VERSION" "$TAG" "$SHA256:$SIZE" -
-          else
-            node scripts/ci/render-flatpak-nightly.mjs "$VERSION" "$TAG" - "$SHA256:$SIZE"
-          fi
-      - name: Build the Flatpak
-        if: ${{ steps.tarball.outputs.built == 'true' }}
-        shell: bash
-        run: |
-          # rofiles-fuse is unavailable on hosted runners.
-          flatpak-builder \
-            --user \
-            --install-deps-from=flathub \
-            --force-clean \
-            --disable-rofiles-fuse \
-            --default-branch=master \
-            --repo=repo \
-            builddir "$MANIFEST"
-      - name: Confirm the release tarball was not replaced
-        if: ${{ steps.tarball.outputs.built == 'true' }}
-        shell: bash
-        run: |
-          tarball="${TARBALL//@VERSION@/$VERSION}"
-          url="$FORGEJO_URL/$FORGEJO_REPOSITORY/releases/download/$TAG/$tarball"
-          live="$(curl -fsSLI "$url" | tr -d '\r' | awk 'tolower($1) == "content-length:" {size = $2} END {print size}')"
-          if [ "$live" != "$SIZE" ]; then
-            echo "::error::$tarball is $live bytes on the release but the manifest recorded $SIZE."
-            exit 1
-          fi
-      - name: Upload the exported repo
-        if: ${{ steps.tarball.outputs.built == 'true' }}
+          tarball="sable-$VERSION-x64.tar.gz"
+          node scripts/ci/forgejo-release.mjs download --pattern "$tarball" --dir tarball
+          node scripts/ci/render-flatpak-nightly.mjs "$VERSION" "$TAG" \
+            "$(sha256sum "tarball/$tarball" | cut -d' ' -f1):$(stat -c %s "tarball/$tarball")" -
+      - name: Upload the rendered manifest
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: flatpak-nightly-repo-${{ matrix.flavor == 'electron' && 'electron-' || '' }}${{ matrix.arch }}
-          path: repo
+          name: flatpak-manifest
+          path: |
+            packaging/flatpak/electron/nightly/moe.sable.next.electron.Nightly.yml
+            packaging/flatpak/electron/nightly/moe.sable.next.electron.Nightly.metainfo.xml
           if-no-files-found: error
           retention-days: 1
-          include-hidden-files: true
-  publish-nightly-flatpak:
-    name: Publish the nightly Flatpak repo
-    needs: [setup-release, build-nightly-flatpak]
-    runs-on: ubuntu-26.04
-    timeout-minutes: 30
-    if: ${{ !cancelled() && needs.setup-release.outputs.nightly == 'true' && needs.setup-release.outputs.skip != 'true' }}
+  flatpak:
+    name: Build the nightly Flatpak repo
+    needs: [setup-release, flatpak-manifest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     permissions:
-      actions: read
       contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08@sha256:6ed6921bb5a9e1a916989971844f159b854b7b225880c381fa34f7a158863039
+      options: --privileged
     env:
-      TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
     steps:
       - name: Check out repository
@@ -304,111 +279,37 @@ jobs:
         with:
           ref: ${{ needs.setup-release.outputs.ref }}
           persist-credentials: false
-      - name: Check for the signing key and the built repos
-        id: gate
-        shell: bash
-        env:
-          FLATPAK_GPG_KEY: ${{ secrets.FLATPAK_GPG_KEY }}
-          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -z "${FLATPAK_GPG_KEY:-}" ] || [ -z "${FLATPAK_GPG_KEY_ID:-}" ]; then
-            echo "::notice::FLATPAK_GPG_KEY/FLATPAK_GPG_KEY_ID are not set; skipping the Flatpak publish."
-            echo 'enabled=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # The repo is rebuilt from scratch, so publishing one arch delists the other.
-          built="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-                     --paginate --jq '.artifacts[].name')"
-          if ! printf '%s\n' "$built" | grep -qx 'flatpak-nightly-repo-electron-x86_64'; then
-            echo '::notice::No x86_64 Flatpak repo; skipping the publish.'
-            echo 'enabled=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          url="$FORGEJO_URL/$FORGEJO_REPOSITORY/releases/download/$TAG/sable-$VERSION-x64.tar.gz"
-          for attempt in $(seq 20); do
-            if curl -fsSL -r 0-0 -o /dev/null "$url"; then
-              unset url
-              break
-            fi
-            echo "Waiting for $url ($attempt/20)…"
-            sleep 30
-          done
-          if [ -n "${url:-}" ]; then
-            echo "::notice::$url is not public yet; skipping the publish."
-            echo 'enabled=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo 'enabled=true' >> "$GITHUB_OUTPUT"
-      - name: Install flatpak
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak ostree
-      - name: Download the exported repos
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
+      - name: Download the rendered manifest
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: flatpak-nightly-repo-*
-          path: arch-repos
+          name: flatpak-manifest
+          path: packaging/flatpak/electron/nightly
       - name: Import the signing key
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        shell: bash
         env:
           FLATPAK_GPG_KEY: ${{ secrets.FLATPAK_GPG_KEY }}
-        run: |
-          export GNUPGHOME="$RUNNER_TEMP/gnupg"
-          mkdir -p "$GNUPGHOME"
-          chmod 700 "$GNUPGHOME"
-          printf '%s\n' "$FLATPAK_GPG_KEY" | gpg --batch --import
-          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
-      - name: Assemble and sign the repo
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        shell: bash
+        run: printf '%s\n' "$FLATPAK_GPG_KEY" | gpg --batch --import
+      - name: Build and sign the Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
+        with:
+          manifest-path: packaging/flatpak/electron/nightly/moe.sable.next.electron.Nightly.yml
+          repo-dir: site/repo
+          build-bundle: 'false'
+          upload-artifact: 'false'
+          gpg-sign: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+      - name: Sign the repo summary and write the landing page
         env:
           FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
         run: |
-          # A fresh repo each night: older commits point at pruned assets.
-          mkdir -p site/repo
-          ostree --repo=site/repo init --mode=archive-z2
-          # download-artifact extracts a solo pattern match directly into the
-          # path; multiple matches land in per-artifact subdirectories.
-          if [ -e arch-repos/config ]; then
-            repos=(arch-repos/)
-          else
-            repos=(arch-repos/*/)
-          fi
-          for src in "${repos[@]}"; do
-            # Zip artifacts drop empty directories; ostree needs refs/remotes
-            # to exist when listing the source repo's refs.
-            mkdir -p "$src/refs/remotes"
-            echo "Pulling $src"
-            ostree --repo=site/repo pull-local "$src"
-          done
-          # build-update-repo signs the summary, not the commits under it.
-          ostree --repo=site/repo refs | while read -r ref; do
-            commit="$(ostree --repo=site/repo rev-parse "$ref")"
-            ostree --repo=site/repo gpg-sign \
-              --gpg-homedir="$GNUPGHOME" "$commit" "$FLATPAK_GPG_KEY_ID"
-          done
           flatpak build-update-repo \
             --title='Sable Nightly' \
             --default-branch=master \
             --gpg-sign="$FLATPAK_GPG_KEY_ID" \
-            --gpg-homedir="$GNUPGHOME" \
             site/repo
-          ostree --repo=site/repo refs
-      - name: Write the .flatpakrepo and landing page
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        shell: bash
-        env:
-          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
-        run: |
+
           owner="${GITHUB_REPOSITORY%%/*}"
           name="${GITHUB_REPOSITORY##*/}"
           base="https://$(printf '%s' "$owner" | tr '[:upper:]' '[:lower:]').github.io/$name"
-          gpgkey="$(gpg --homedir "$GNUPGHOME" --export "$FLATPAK_GPG_KEY_ID" | base64 -w0)"
+          gpgkey="$(gpg --export "$FLATPAK_GPG_KEY_ID" | base64 -w0)"
 
           sed -e "s|@REPO_URL@|$base/repo/|" -e "s|@GPGKEY@|$gpgkey|" \
             packaging/flatpak/nightly/sable-next-nightly.flatpakrepo.in \
@@ -417,13 +318,27 @@ jobs:
           sed -e "s|@BASE_URL@|$base|g" -e "s|@VERSION@|$VERSION|g" \
             packaging/flatpak/nightly/index.html.in > site/index.html
       - name: Upload the Pages artifact
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
+  flatpak-deploy:
+    name: Deploy the nightly Flatpak repo
+    needs: flatpak
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Queue rather than cancel so the newest nightly is always deployed last.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deploy
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
   handoff:
     name: Publish handoff manifest

@@ -6,6 +6,10 @@ inputs:
     description: Explicit tag supplied by a workflow_dispatch trigger.
     required: false
     default: ''
+  git-sha:
+    description: Commit a dispatched nightly builds, in place of the triggering commit.
+    required: false
+    default: ''
 
 outputs:
   tag:
@@ -20,6 +24,9 @@ outputs:
   nightly:
     description: '"true" for nightly builds.'
     value: ${{ steps.meta.outputs.nightly }}
+  sha:
+    description: Commit the build is made from.
+    value: ${{ steps.meta.outputs.sha }}
 
 runs:
   using: composite
@@ -33,5 +40,5 @@ runs:
         INPUT_TAG: ${{ inputs.input-tag }}
         GIT_REF: ${{ github.ref }}
         GIT_REF_NAME: ${{ github.ref_name }}
-        GIT_SHA: ${{ github.sha }}
+        GIT_SHA: ${{ inputs.git-sha || github.sha }}
       run: node "$GITHUB_WORKSPACE/scripts/ci/release-meta.mjs" "$GITHUB_OUTPUT"

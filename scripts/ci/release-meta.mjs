@@ -31,7 +31,13 @@ function nightlyVersion(version, gitSha, date) {
 function resolveReleaseMeta({ eventName, inputTag, gitRef, gitRefName, gitSha }) {
   if (eventName === 'workflow_dispatch' && inputTag) {
     if (!RELEASE_TAG.test(inputTag)) throw new Error(`Invalid release tag: ${inputTag}`);
-    return { tag: inputTag, version: inputTag.replace(/^v/, ''), ref: inputTag, nightly: false };
+    return {
+      tag: inputTag,
+      version: inputTag.replace(/^v/, ''),
+      ref: inputTag,
+      sha: gitSha,
+      nightly: false,
+    };
   }
   if (gitRef === 'refs/heads/main') {
     if (!/^[0-9a-f]{12,}$/i.test(gitSha)) {
@@ -39,10 +45,16 @@ function resolveReleaseMeta({ eventName, inputTag, gitRef, gitRefName, gitSha })
     }
     const { version: current } = JSON.parse(readFileSync('package.json', 'utf8'));
     const version = nightlyVersion(current, gitSha, commitDate());
-    return { tag: `nightly-${version}`, version, ref: gitSha, nightly: true };
+    return { tag: `nightly-${version}`, version, ref: gitSha, sha: gitSha, nightly: true };
   }
   if (gitRefName.startsWith('v') && RELEASE_TAG.test(gitRefName)) {
-    return { tag: gitRefName, version: gitRefName.replace(/^v/, ''), ref: gitRef, nightly: false };
+    return {
+      tag: gitRefName,
+      version: gitRefName.replace(/^v/, ''),
+      ref: gitRef,
+      sha: gitSha,
+      nightly: false,
+    };
   }
   throw new Error(`No release target for ref ${gitRef || '<none>'}`);
 }

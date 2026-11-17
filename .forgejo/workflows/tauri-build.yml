@@ -72,18 +72,6 @@ jobs:
         env:
           TAG: ${{ steps.meta.outputs.tag }}
         run: node scripts/ci/forgejo-release.mjs wait --attempts 12 --interval 15
-      - name: Dispatch the GitHub build for the tag
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        env:
-          GH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
-          TAG: ${{ steps.meta.outputs.nightly != 'true' && steps.meta.outputs.tag || '' }}
-        run: |
-          [ -n "$GH_TOKEN" ] || { echo 'GH_DISPATCH_TOKEN is not set; dispatch the GitHub build for this tag by hand.' >&2; exit 1; }
-          curl -fsS -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'Accept: application/vnd.github+json' \
-            https://api.github.com/repos/SableClient/sable-next/actions/workflows/tauri-build.yml/dispatches \
-            -d "{\"ref\":\"main\",\"inputs\":{\"tag\":\"$TAG\"}}"
       - name: Create nightly prerelease
         if: ${{ steps.meta.outputs.nightly == 'true' && steps.gate.outputs.skip != 'true' }}
         env:
@@ -97,6 +85,21 @@ jobs:
             --prerelease true \
             --title "Nightly build $VERSION" \
             --notes "Nightly build from main at $SHA"
+      # GitHub builds Windows and Linux from this commit, so both sides compute
+      # the same version and attach to the same release.
+      - name: Dispatch the GitHub build
+        if: ${{ github.event_name == 'workflow_dispatch' || (steps.meta.outputs.nightly == 'true' && steps.gate.outputs.skip != 'true') }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+          NIGHTLY: ${{ steps.meta.outputs.nightly }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          SHA: ${{ steps.meta.outputs.ref }}
+        run: |
+          if [ "$NIGHTLY" = 'true' ]; then
+            node scripts/ci/github-dispatch.mjs tauri-build.yml "sha=$SHA"
+          else
+            node scripts/ci/github-dispatch.mjs tauri-build.yml "tag=$TAG"
+          fi
   build-web:
     name: Build web assets
     needs: setup-release
@@ -646,81 +649,6 @@ jobs:
       - name: Rebuild and compare
         working-directory: /shared/workdir/SableClient/sable-next
         run: scripts/ci/reproduce-android.sh "$VERSION"
-  electron-linux:
-    name: Linux x86_64 (Electron)
-    needs: [setup-release, build-web]
-    runs-on: docker
-    timeout-minutes: 60
-    env:
-      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
-      MISE_DISABLE_TOOLS: github:WebAssembly/binaryen,ubi:rustwasm/wasm-bindgen
-      VERSION: ${{ needs.setup-release.outputs.version }}
-      TAG: ${{ needs.setup-release.outputs.tag }}
-      SHA: ${{ github.sha }}
-      # Baked into the main process by electron/build.mjs.
-      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
-      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
-      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.setup-release.outputs.ref }}
-          persist-credentials: false
-      - name: Download web assets
-        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
-        with:
-          name: web-assets
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y build-essential libclang-dev libpipewire-0.3-dev pkg-config rpm
-          # The Electron binary links these even under ELECTRON_RUN_AS_NODE.
-          asound=$(apt-cache show libasound2t64 >/dev/null 2>&1 && echo libasound2t64 || echo libasound2)
-          sudo apt-get install --no-install-recommends -y libnss3 libgtk-3-0 libgbm1 "$asound"
-      - name: Set up app
-        uses: ./.forgejo/actions/setup
-        with:
-          rust: 'true'
-          rust-cache-key: electron-linux
-          install-mise-tools: 'false'
-      - name: Package
-        run: pnpm --dir electron package --linux
-      - name: Upload native addon symbols
-        run: node scripts/ci/upload-sentry-symbols.mjs electron/dist
-      - name: Verify native core shutdown
-        run: SABLE_NODE_ADDON="$PWD/electron/dist/sable_node.node" node --test crates/sable-node/tests/native-lifecycle.mjs
-      - name: Verify native core shutdown in Electron
-        run: ELECTRON_RUN_AS_NODE=1 SABLE_NODE_ADDON="$PWD/electron/dist/sable_node.node" pnpm --dir electron exec electron --test "$PWD/crates/sable-node/tests/native-lifecycle.mjs"
-      - name: Publish Electron bundles and update metadata
-        run: node electron/publish-updates.mjs
-      - name: Publish deb and rpm to the package registries
-        env:
-          PACKAGES_USER: ${{ secrets.PACKAGES_USER }}
-          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-        run: |
-          channel=stable
-          case "$VERSION" in *-nightly.*) channel=nightly ;; esac
-          api="https://git.sable.moe/api/packages/${GITHUB_REPOSITORY_OWNER}"
-          upload() {
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --user "$PACKAGES_USER:$PACKAGES_TOKEN" \
-              --upload-file "$1" "$2")
-            # 409 means this exact version is already published.
-            case "$code" in 201|409) ;; *) echo "Upload of $1 failed with HTTP $code" >&2; exit 1 ;; esac
-          }
-          for deb in electron/release/*.deb; do
-            upload "$deb" "$api/debian/pool/$channel/main/upload"
-          done
-          for rpm in electron/release/*.rpm; do
-            upload "$rpm" "$api/rpm/$channel/upload?sign=true"
-          done
-
   electron-macos:
     name: macOS arm64 (Electron)
     needs: [setup-release, build-web]
@@ -915,7 +843,7 @@ jobs:
     if: ${{ needs.setup-release.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     # github-bundles.json is published by the GitHub-side handoff job, which
-    # waits on the Windows and Linux aarch64 builds.
+    # waits on the Windows and Linux Electron builds.
     timeout-minutes: 120
     steps:
       - name: Check out repository
@@ -1102,7 +1030,7 @@ jobs:
           node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP" --protect "$protect"
   sign-release:
     name: Sign release checksums
-    needs: [setup-release, electron-linux, electron-macos, obtainium, altstore]
+    needs: [setup-release, github-bundles, electron-macos, obtainium, altstore]
     if: ${{ needs.setup-release.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1141,7 +1069,7 @@ jobs:
         run: echo '::notice::RELEASE_GPG_KEY/RELEASE_GPG_KEY_ID are not set; skipping the checksum signature.'
   distribute-aur:
     name: Publish to the AUR
-    needs: [setup-release, electron-linux]
+    needs: [setup-release, github-bundles]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -1273,7 +1201,7 @@ jobs:
           push_tap Forgejo "${HOMEBREW_TAP_TOKEN:-}" git.sable.moe/SableClient/homebrew-sable.git
   distribute-gentoo:
     name: Publish the Gentoo overlay
-    needs: [setup-release, electron-linux]
+    needs: [setup-release, github-bundles]
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
