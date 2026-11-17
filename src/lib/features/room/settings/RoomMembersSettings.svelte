@@ -645,6 +645,7 @@
   .section {
     display: grid;
     gap: var(--space-600);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .tabs {
