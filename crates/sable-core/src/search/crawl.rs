@@ -31,6 +31,7 @@ const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(3);
 pub(super) const CRAWL_MAX_AGE_MS: u64 = 26 * 7 * 24 * 60 * 60 * 1000;
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
+const COVERAGE_PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 const CRAWL_BASE_EVENTS: usize = 20_000;
 const MAX_CRAWLED_EVENTS: usize = 50_000;
 const CRAWL_LATENCY_FACTOR: u32 = 10;
@@ -457,7 +458,7 @@ impl Core {
     }
 
     async fn crawl(self: Arc<Self>, client: &matrix_sdk::Client) {
-        let mut reported: Option<SearchCoverageView> = None;
+        let mut reported: Option<(SearchCoverageView, web_time::Instant)> = None;
 
         let stored = persist::load_crawl(client).await;
         {
@@ -644,13 +645,17 @@ impl Core {
     async fn report_coverage(
         &self,
         client: &matrix_sdk::Client,
-        reported: &mut Option<SearchCoverageView>,
+        reported: &mut Option<(SearchCoverageView, web_time::Instant)>,
     ) {
         let coverage = self.search_coverage(client).await;
-        if reported.as_ref() == Some(&coverage) {
-            return;
+        if let Some((last, at)) = reported.as_ref() {
+            let progress_only =
+                last.state == coverage.state && last.rooms_failed == coverage.rooms_failed;
+            if *last == coverage || (progress_only && at.elapsed() < COVERAGE_PROGRESS_INTERVAL) {
+                return;
+            }
         }
-        *reported = Some(coverage);
+        *reported = Some((coverage, web_time::Instant::now()));
         self.emit(CoreEvent::SearchCoverage { coverage });
     }
 
