@@ -1253,7 +1253,7 @@
     margin-inline-start: auto;
   }
 
-  .message.layout-bubble .content-bubble:has(:global(.image, .media-frame-video)) {
+  .message.layout-bubble .content-bubble:has(:global(.image, .sticker, .media-frame-video)) {
     width: fit-content;
   }
 
