@@ -1216,7 +1216,11 @@ export class CoreClient {
   }
 
   private applySyncStatus(status: SyncStatus): void {
+    const reconnected = status.state === 'live' && this.sync?.state !== 'live';
     this.sync = status;
+    if (reconnected) {
+      for (const userId of [...this.profileFailures.keys()]) this.invalidateProfile(userId);
+    }
     if (status.state !== 'offline') {
       if (this.localNetworkBlocked !== null) {
         this.localNetworkClearTimer ??= setTimeout(() => {

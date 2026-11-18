@@ -1346,6 +1346,31 @@ test('failed profile lookups cool down across repeated timeline mounts and retry
   }
 });
 
+test('profile lookups that failed offline are retried when sync goes live', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  const failure = new Error('offline');
+  fake.call.mockRejectedValueOnce(failure).mockResolvedValueOnce({ display_name: 'back' });
+  const listener = vi.fn();
+  try {
+    core.onProfileChanged(listener);
+    fake.emit({ type: 'sync_status', state: 'offline' });
+    await expect(core.userProfile('@remote:example.org')).rejects.toBe(failure);
+    await expect(core.userProfile('@remote:example.org')).rejects.toBe(failure);
+
+    fake.emit({ type: 'sync_status', state: 'live' });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(listener).toHaveBeenCalledExactlyOnceWith('@remote:example.org');
+    await expect(core.userProfile('@remote:example.org')).resolves.toEqual({
+      display_name: 'back',
+    });
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
 test('a profile change drops the cached profile and tells listeners once', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();
