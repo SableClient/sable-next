@@ -65,6 +65,17 @@ test('an account added later starts from the signed-out settings, not the accoun
   expect(themes.customThemes.themes).toEqual([]);
 });
 
+test('an account added later does not take the presence status the first account inherited', async () => {
+  localStorage.setItem('sable-preferences', JSON.stringify({ presenceStatusMessage: 'Away' }));
+  const { settings, selectSettingsAccount } = await load();
+
+  selectSettingsAccount('a');
+  expect(settings.preferences.presenceStatusMessage).toBe('Away');
+
+  selectSettingsAccount('b');
+  expect(settings.preferences.presenceStatusMessage).toBe('');
+});
+
 test('an account not yet stored here starts from what it last synced', async () => {
   const { settings, themes, selectSettingsAccount, syncBaseKey, settingsDocument } = await load();
   selectSettingsAccount('b');

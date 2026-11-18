@@ -71,6 +71,15 @@ export function accountPreferencesSettled(accountId: string): boolean {
   return 'schema' in (storedAccounts()[accountId] ?? {});
 }
 
+const PRESENCE_KEYS: ReadonlySet<keyof Preferences> = new Set([
+  'presence',
+  'presenceStatusMessage',
+]);
+
+function hasOtherAccount(accountId: string | null): boolean {
+  return Object.keys(storedAccounts()).some((id) => id !== accountId);
+}
+
 function storedAccounts(): Record<string, Record<string, unknown>> {
   return (read(ACCOUNT_STORAGE_KEY) ?? {}) as Record<string, Record<string, unknown>>;
 }
@@ -92,6 +101,7 @@ export function selectPreferenceAccount(
     if (own && key in own) value = values?.[key];
     else if (settled) value = undefined;
     else if (seed && !NON_SYNCABLE_KEYS.has(key)) value = seed[key];
+    else if (PRESENCE_KEYS.has(key) && hasOtherAccount(accountId)) value = undefined;
     else value = sharedValues.get(key);
     if (value === undefined) {
       userValues.delete(key);
