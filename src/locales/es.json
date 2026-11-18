@@ -138,7 +138,6 @@
     "removeAccountConfirm": "¿Eliminar esta cuenta?",
     "unspacedEmpty": "Las salas que no están en un espacio aparecerán aquí.",
     "settings": "Ajustes",
-    "exploreSpaces": "Explorar Espacios",
     "newChat": "Nueva conversación",
     "removeAccountFailed": "No se pudo eliminar esta cuenta.",
     "removeAccountDescription": "Esto elimina la cuenta y sus datos locales de este dispositivo.",
@@ -172,16 +171,13 @@
     "showRoomList": "Mostrar lista de salas",
     "navigate": "Navegar",
     "messageSearch": "Buscar mensajes",
-    "switch": "Cambiar",
-    "joinWithAddress": "Unirse con dirección"
+    "switch": "Cambiar"
   },
   "home": {
     "startRoomDescription": "Crea una sala o espacio para tu grupo de amigos o comunidad.",
     "findCommunityDescription": "Explora salas y espacios públicos para encontrar un grupo con intereses similares.",
     "findCommunityTitle": "Encontrar una comunidad",
     "nextStepsTitle": "¿Qué te gustaría hacer?",
-    "joinConversationTitle": "Unirse a una sala o una conversación privada",
-    "joinConversationDescription": "Introduce una dirección de sala o una ID de usuario de Matrix para empezar a conversar.",
     "startRoomTitle": "Crear una sala"
   },
   "personas": {
