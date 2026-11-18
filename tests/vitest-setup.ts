@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import '@testing-library/svelte/vitest';
+import type { Window as HappyDOMWindow } from 'happy-dom';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tick } from 'svelte';
@@ -18,6 +19,19 @@ if (typeof Animation !== 'undefined') {
   Animation.prototype.cancel = function (this: Animation) {
     this.finished.catch(() => {});
     cancel.call(this);
+  };
+}
+
+if (typeof window !== 'undefined' && 'happyDOM' in window) {
+  // Nothing serves happy-dom's origin, so fetching config.json would dump ECONNREFUSED.
+  const { origin } = window.location;
+  (window as unknown as HappyDOMWindow).happyDOM.settings.fetch.interceptor = {
+    beforeAsyncRequest: ({ request, window: happyWindow }) =>
+      Promise.resolve(
+        new URL(request.url).origin === origin
+          ? new happyWindow.Response(null, { status: 404 })
+          : undefined
+      ),
   };
 }
 
