@@ -12,6 +12,7 @@
     disabled?: boolean;
     destructive?: boolean;
     checked?: boolean;
+    kind?: 'radio' | 'checkbox';
     closeOnSelect?: boolean;
     onSelect: () => void;
     children: Snippet;
@@ -22,12 +23,14 @@
     disabled = false,
     destructive = false,
     checked,
+    kind = 'radio',
     closeOnSelect = true,
     onSelect,
     children,
   }: Props = $props();
 
   const surface = useActionMenuSurface();
+  let role = $derived(checked === undefined ? 'menuitem' : `menuitem${kind}`);
   let classes = $derived([
     'menu-item',
     destructive && 'menu-item-destructive',
@@ -46,24 +49,13 @@
 </script>
 
 {#if surface.sheet}
-  <button
-    type="button"
-    role={checked === undefined ? 'menuitem' : 'menuitemradio'}
-    class={classes}
-    {disabled}
-    aria-checked={checked}
-    onclick={select}
-  >
+  <button type="button" {role} class={classes} {disabled} aria-checked={checked} onclick={select}>
     {@render children()}
   </button>
 {:else}
   <DropdownMenu.Item class={classes} {disabled} {closeOnSelect} onSelect={select}>
     {#snippet child({ props })}
-      <div
-        {...props}
-        role={checked === undefined ? 'menuitem' : 'menuitemradio'}
-        aria-checked={checked}
-      >
+      <div {...props} {role} aria-checked={checked}>
         {@render children()}
       </div>
     {/snippet}

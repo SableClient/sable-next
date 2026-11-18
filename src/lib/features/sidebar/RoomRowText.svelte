@@ -1,0 +1,65 @@
+<script lang="ts">
+  import type { RoomListItemView, StatusView } from '#src/generated/protocol';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import CalendarRowEvent from '#lib/features/calendar/CalendarRowEvent.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+
+  interface Props {
+    name: string;
+    room?: RoomListItemView;
+    preview?: string | null;
+    peerStatus?: StatusView | null;
+  }
+
+  let { name, room, preview = null, peerStatus = null }: Props = $props();
+</script>
+
+<span class="room-text">
+  <span class="room-name"><bdi>{name}</bdi></span>
+  {#if preview}
+    <span class="room-topic"><bdi>{preview}</bdi></span>
+  {:else if room?.is_direct && room.topic && preferences.showDmTopics}
+    <span class="room-topic"><bdi>{room.topic}</bdi></span>
+  {:else if peerStatus}
+    {@const peerStatusLabel = [peerStatus.emoji, peerStatus.text].filter(Boolean).join(' ')}
+    <Tooltip label={peerStatusLabel}>
+      {#snippet trigger({ props })}
+        <span {...props} class="room-topic">
+          {#if peerStatus.emoji}<span class="room-status-emoji">{peerStatus.emoji}</span
+            >{/if}{peerStatus.text}
+        </span>
+      {/snippet}
+    </Tooltip>
+  {:else if room?.room_kind === 'calendar' && preferences.showSpaceEvents}
+    <CalendarRowEvent roomId={room.room_id} />
+  {/if}
+</span>
+
+<style>
+  .room-name,
+  .room-topic {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .room-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .room-status-emoji {
+    margin-inline-end: var(--space-050);
+  }
+
+  .room-topic {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-400);
+    line-height: var(--line-height-small);
+    margin-top: calc(-1 * var(--space-050));
+    opacity: var(--opacity-p300);
+  }
+</style>

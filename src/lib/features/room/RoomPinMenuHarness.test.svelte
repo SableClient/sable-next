@@ -11,7 +11,10 @@
   import RoomPinMenu from './RoomPinMenu.svelte';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
 
-  let { menu }: { menu: ComponentProps<typeof RoomPinMenu> } = $props();
+  let { menu, revision }: { menu: ComponentProps<typeof RoomPinMenu>; revision?: string | null } =
+    $props();
+  let open = $state(false);
+  const menuProps = $derived(menu);
   const core = useCoreClient();
   provideEventItems(new EventItems(core.rpc.timeline, () => core.session?.account_id ?? null));
   provideRoomScopes(new RoomScopes(core));
@@ -19,7 +22,7 @@
 </script>
 
 <TooltipProvider>
-  <RoomPinMenu {...menu} />
+  <RoomPinMenu {...menuProps} {revision} bind:open />
   {#if mediaViewerState.eventId}
     <MediaViewer />
   {/if}

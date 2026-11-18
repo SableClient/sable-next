@@ -49,6 +49,7 @@ export class MessageSearch {
   #refreshTimer: ReturnType<typeof setTimeout> | undefined;
   #coverage: SearchCoverageView | null;
   #paginated = false;
+  #background = false;
   #generation = 0;
   #served = 0;
   #olderCursor: string | null = null;
@@ -116,7 +117,8 @@ export class MessageSearch {
   }
 
   async loadMore(): Promise<void> {
-    if (this.searching || this.exhausted || this.pageFailed || this.failed) return;
+    if (this.searching || this.#background || this.exhausted || this.pageFailed || this.failed)
+      return;
 
     this.#paginated = true;
     this.searching = true;
@@ -162,17 +164,31 @@ export class MessageSearch {
       return;
     if (!this.runnable || this.unresolved.length > 0 || this.resolved.matches_nothing) return;
     this.refreshAvailable = true;
-    if (!this.#paginated && !this.failed && !this.pageFailed) this.#queueRefresh();
+    if (this.#refreshesQuietly()) this.#queueRefresh();
+  }
+
+  #refreshesQuietly(): boolean {
+    return !this.#paginated && !this.failed && !this.pageFailed && this.hits.length < PAGE_SIZE;
   }
 
   #queueRefresh(): void {
     if (this.#refreshTimer !== undefined) return;
     this.#refreshTimer = setTimeout(() => {
       this.#refreshTimer = undefined;
-      if (!this.refreshAvailable || this.#paginated || this.failed || this.pageFailed) return;
-      if (this.searching) this.#queueRefresh();
-      else this.refresh();
+      if (!this.refreshAvailable || !this.#refreshesQuietly()) return;
+      if (this.searching || this.#background) this.#queueRefresh();
+      else void this.#refreshInBackground();
     }, REFRESH_MS);
+  }
+
+  async #refreshInBackground(): Promise<void> {
+    this.refreshAvailable = false;
+    this.#background = true;
+    try {
+      await this.#run(++this.#generation, 0, true, true);
+    } finally {
+      this.#background = false;
+    }
   }
 
   dispose(): void {
@@ -181,7 +197,12 @@ export class MessageSearch {
     this.#generation += 1;
   }
 
-  async #run(generation: number, offset = 0, preserveResults = false): Promise<void> {
+  async #run(
+    generation: number,
+    offset = 0,
+    preserveResults = false,
+    quiet = false
+  ): Promise<void> {
     const { text } = this.parsed;
 
     try {
@@ -210,6 +231,10 @@ export class MessageSearch {
     } catch (error) {
       console.warn('[sable search] searching messages failed', error);
       if (generation !== this.#generation) return;
+      if (quiet) {
+        this.refreshAvailable = true;
+        return;
+      }
       if (offset === 0) {
         if (!preserveResults) {
           this.hits = [];

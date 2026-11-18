@@ -167,7 +167,7 @@ test('the list options menu renders its checkable items (#1341)', async () => {
   const screen = await mountNav();
   await userEvent.click(screen.getByRole('button', { name: 'List options' }));
   await expect
-    .element(screen.getByRole('menuitemradio', { name: 'Group favourites' }))
+    .element(screen.getByRole('menuitemcheckbox', { name: 'Group favourites' }))
     .toBeVisible();
   await expect
     .element(screen.getByRole('menuitemradio', { name: 'Recent activity' }))

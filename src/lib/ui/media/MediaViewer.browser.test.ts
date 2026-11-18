@@ -194,6 +194,9 @@ for (const viewport of VIEWPORTS) {
     expect(menu().element().querySelector('[aria-checked="true"]')?.textContent.trim()).toBe(
       'Pixelate'
     );
+    await expect
+      .element(menu().getByRole('menuitemcheckbox', { name: 'Pixelate' }))
+      .toHaveAttribute('aria-checked', 'true');
     await userEvent.keyboard('{Escape}');
     await expect.poll(() => menu().elements().length).toBe(0);
     await expect.element(viewer).toBeVisible();

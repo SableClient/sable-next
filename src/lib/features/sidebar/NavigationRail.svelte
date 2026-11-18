@@ -11,7 +11,6 @@
   import { i18n } from '#lib/i18n.js';
   import { isPlainClick } from '#lib/ui/plain-click.js';
   import { isRoomSwitch } from '#lib/features/room/room-navigation.js';
-  import { openFindOrJoin } from '#lib/ui/find-or-join-state.svelte.js';
   import { isBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
   import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { addUnread } from '#lib/rooms/spaces.js';
@@ -35,13 +34,10 @@
     isJoinedRoomPath,
     spaceNavigationHref,
   } from './space-paths.js';
-  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
-  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
-  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
-  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -50,19 +46,19 @@
   import { rovingFocus } from '#lib/ui/roving-focus.js';
   import '#lib/ui/primitives/nav-tab.css';
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
-  import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
-  import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
-  import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
-  import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
-  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
-  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
-  import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import BridgeBadge from './BridgeBadge.svelte';
+  import RailCallMark from './RailCallMark.svelte';
+  import RailCreateMenu from './RailCreateMenu.svelte';
+  import RailDisplayMenu from './RailDisplayMenu.svelte';
+  import RailFolderMenu from './RailFolderMenu.svelte';
+  import RailFolderTiles from './RailFolderTiles.svelte';
+  import RailSectionMenu from './RailSectionMenu.svelte';
+  import { unreadLabel } from './unread-label.js';
   import UserQuickTools from './UserQuickTools.svelte';
   import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
   import AlertList, { alertListState } from './AlertList.svelte';
@@ -160,13 +156,6 @@
     return `${uid}-voice-${key}`;
   }
 
-  function unreadLabel(count: UnreadCount | undefined): string | undefined {
-    if (!count) return undefined;
-    if (count.highlight > 0) return i18n.t('nav.unreadMentions', { count: count.highlight });
-    if (count.unread > 0) return i18n.t('nav.unreadMessages', { count: count.unread });
-    return count.marked ? i18n.t('nav.markedUnread') : undefined;
-  }
-
   function describedBy(props: Record<string, unknown>, id: string): string {
     const own = props['aria-describedby'];
     return typeof own === 'string' ? `${own} ${id}` : id;
@@ -256,12 +245,6 @@
     })
   );
 
-  const createEntries = [
-    { href: resolve('create-room'), label: 'common.createRoom', icon: PlusIcon },
-    { href: resolve('create-space'), label: 'common.createSpace', icon: HouseIcon },
-    { href: null, label: 'nav.findOrJoin', icon: LinkIcon },
-    { href: resolve('explore'), label: 'nav.explore', icon: CompassIcon },
-  ] as const;
   let createOpen = $state(false);
   let createAnchor = $state.raw<HTMLElement | null>(null);
 
@@ -330,17 +313,7 @@
     displayOpen = true;
   }
 
-  const displayToggles = [
-    { key: 'showUnreadCounts', label: 'settings.showUnreadCounts' },
-    { key: 'badgeCountDMsOnly', label: 'settings.badgeCountDMsOnly' },
-    { key: 'showPingCounts', label: 'settings.showPingCounts' },
-  ] as const;
-  const viewToggles = [
-    { key: 'showHome', label: 'settings.showHome' },
-    { key: 'uniformIcons', label: 'settings.uniformIcons' },
-  ] as const;
-
-  let contextSpace = $state<RoomListItemView | null>(null);
+  let contextSpace = $state.raw<RoomListItemView | null>(null);
   let contextAnchor = $state.raw<CursorAnchor | null>(null);
   let contextOpen = $state(false);
   let sectionMenu = $state.raw<{ section: RailSection; unread: UnreadCount; dm: boolean } | null>(
@@ -631,13 +604,9 @@
     {#if bridge}<BridgeBadge {bridge} />{/if}
   {/if}
   {#if item.space && item.roomId ? callSpaces.has(item.roomId) : item.inCall}
-    <span class="call-mark" aria-hidden="true"><SpeakerHighIcon weight="fill" /></span>
+    <RailCallMark />
   {:else if item.space && item.roomId && voiceSpaces.has(item.roomId)}
-    <span class="call-mark others" id={voiceId(item.roomId)}
-      ><SpeakerHighIcon aria-hidden="true" /><span class="screen-reader-only"
-        >{i18n.t('nav.voiceActive')}</span
-      ></span
-    >
+    <RailCallMark others id={voiceId(item.roomId)} />
   {/if}
 {/snippet}
 
@@ -777,22 +746,6 @@
   {/if}
 {/snippet}
 
-{#snippet folderTiles(folder: SidebarFolder)}
-  <span class="folder-tiles" aria-hidden="true">
-    {#each knownContent(folder) as roomId (roomId)}
-      {@const space = spacesById.get(roomId)}
-      <Avatar
-        class="folder-tile"
-        id={roomId}
-        src={space?.display_avatar_url}
-        name={spaceName(space?.name ?? null, roomId)}
-        size="small"
-        uniform
-      />
-    {/each}
-  </span>
-{/snippet}
-
 {#snippet folderButton(folder: SidebarFolder, props: Record<string, unknown>)}
   <button
     {...props}
@@ -818,7 +771,7 @@
         uniform
       />
     {:else}
-      {@render folderTiles(folder)}
+      <RailFolderTiles roomIds={knownContent(folder)} spaces={spacesById} />
     {/if}
     {@render unreadMark(folderUnread(folder), false, unreadId(folder.id))}
   </button>
@@ -982,147 +935,40 @@
 </nav>
 
 {#if !mobile}
-  <ActionMenu
+  <RailDisplayMenu
     bind:open={displayOpen}
-    label={i18n.t('nav.displayOptions')}
-    class="rail-display-menu"
     anchor={displayAnchor}
-    side="right"
-    align="start"
-    preventScroll={false}
-  >
-    {#each displayToggles as toggle (toggle.key)}
-      {@const on = preferences[toggle.key]}
-      <ActionMenuItem
-        closeOnSelect={false}
-        checked={on}
-        onSelect={() => {
-          setPreference(toggle.key, !on);
-        }}
-      >
-        <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
-        <span>{i18n.t(toggle.label)}</span>
-      </ActionMenuItem>
-    {/each}
-
-    <ActionMenuSeparator />
-
-    {#each viewToggles as toggle (toggle.key)}
-      {@const on = preferences[toggle.key]}
-      <ActionMenuItem
-        closeOnSelect={false}
-        checked={on}
-        onSelect={() => {
-          setPreference(toggle.key, !on);
-        }}
-      >
-        <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
-        <span>{i18n.t(toggle.label)}</span>
-      </ActionMenuItem>
-    {/each}
-
-    {#if onCollapseFolders}
-      <ActionMenuSeparator />
-      <ActionMenuItem disabled={openFolders.size === 0} onSelect={onCollapseFolders}>
-        <span class="menu-check" aria-hidden="true"></span>
-        <span>{i18n.t('nav.folderCollapseAll')}</span>
-      </ActionMenuItem>
-    {/if}
-  </ActionMenu>
+    foldersOpen={openFolders.size > 0}
+    {onCollapseFolders}
+  />
 {/if}
 
-<ActionMenu
-  bind:open={createOpen}
-  label={i18n.t('nav.add')}
-  anchor={createAnchor}
-  side="right"
-  align="end"
->
-  {#each createEntries as entry (entry.label)}
-    <ActionMenuItem
-      onSelect={() => {
-        if (entry.href === null) openFindOrJoin();
-        else navigateTo(entry.href);
-      }}
-    >
-      <entry.icon />
-      {i18n.t(entry.label)}
-    </ActionMenuItem>
-  {/each}
-</ActionMenu>
+<RailCreateMenu bind:open={createOpen} anchor={createAnchor} onNavigate={navigateTo} />
 
 {#if sectionMenu}
   {@const menu = sectionMenu}
-  <ActionMenu
+  <RailSectionMenu
     bind:open={sectionOpen}
-    label={i18n.t('nav.listOptions')}
     anchor={sectionAnchor}
-    side="right"
-    align="start"
-  >
-    <ActionMenuItem
-      disabled={resolveUnreadBadge(menu.unread, preferences, menu.dm) === null}
-      onSelect={() => {
-        onMarkSectionRead?.(menu.section);
-      }}
-    >
-      <ChecksIcon />
-      {i18n.t('common.markAsRead')}
-    </ActionMenuItem>
-  </ActionMenu>
+    markReadDisabled={resolveUnreadBadge(menu.unread, preferences, menu.dm) === null}
+    onMarkRead={() => {
+      onMarkSectionRead?.(menu.section);
+    }}
+  />
 {/if}
 
 {#if folderMenu}
-  {@const folder = folderMenu}
-  <ActionMenu
+  <RailFolderMenu
     bind:open={folderOptionsOpen}
-    label={i18n.t('nav.listOptions')}
     anchor={folderAnchor}
-    side="right"
-    align="start"
-  >
-    <ActionMenuItem
-      onSelect={() => {
-        onMarkFolderRead?.(folder);
-      }}
-    >
-      <ChecksIcon />
-      {i18n.t('common.markAsRead')}
-    </ActionMenuItem>
-    <ActionMenuSeparator />
-    <ActionMenuItem
-      onSelect={() => {
-        onRenameFolder?.(folder);
-      }}
-    >
-      <PencilSimpleIcon />
-      {i18n.t('nav.folderRename')}
-    </ActionMenuItem>
-    {#if onChangeFolderIcon}
-      <ActionMenuItem
-        onSelect={() => {
-          onChangeFolderIcon(folder);
-        }}
-      >
-        <ImageIcon />
-        {i18n.t('nav.changeIcon')}
-      </ActionMenuItem>
-    {/if}
-    <ActionMenuItem
-      onSelect={() => {
-        onUngroupFolder?.(folder.id);
-      }}
-    >
-      <FolderOpenIcon />
-      {i18n.t('nav.folderUngroup')}
-    </ActionMenuItem>
-    {#if onCollapseFolders}
-      <ActionMenuItem disabled={openFolders.size === 0} onSelect={onCollapseFolders}>
-        <CaretUpIcon />
-        {i18n.t('nav.folderCollapseAll')}
-      </ActionMenuItem>
-    {/if}
-  </ActionMenu>
+    folder={folderMenu}
+    foldersOpen={openFolders.size > 0}
+    onMarkRead={onMarkFolderRead}
+    onRename={onRenameFolder}
+    onChangeIcon={onChangeFolderIcon}
+    onUngroup={onUngroupFolder}
+    {onCollapseFolders}
+  />
 {/if}
 
 {#if contextSpace}
@@ -1190,32 +1036,6 @@
 <style>
   .rail-slot :global(.avatar-root) {
     pointer-events: none;
-  }
-
-  .call-mark {
-    align-items: center;
-    background: var(--success-main);
-    border: var(--border-width) solid var(--bg-container);
-    border-radius: var(--radii-pill);
-    color: var(--success-on-main);
-    display: flex;
-    inset-inline-end: -0.25rem;
-    justify-content: center;
-    padding: var(--space-050);
-    position: absolute;
-    top: -0.25rem;
-    z-index: 1;
-  }
-
-  .call-mark.others {
-    background: var(--bg-container);
-    border-color: var(--success-main);
-    color: var(--success-main);
-  }
-
-  .call-mark :global(svg) {
-    height: 0.625rem;
-    width: 0.625rem;
   }
 
   .rail {
@@ -1319,21 +1139,6 @@
     outline: var(--border-width) solid var(--bg-container-line);
     outline-offset: calc(var(--border-width) * -1);
     padding: var(--space-100);
-  }
-
-  .folder-tiles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-050);
-    place-content: center;
-    width: 100%;
-  }
-
-  .folder-tiles :global(.folder-tile) {
-    --avatar-size: 1rem;
-
-    border-radius: var(--radii-300);
-    font-size: calc(var(--font-size-small) * 0.6);
   }
 
   .folder-open {

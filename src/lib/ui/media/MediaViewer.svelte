@@ -780,7 +780,11 @@
                     <ArrowClockwiseIcon />
                     {i18n.t('viewer.rotate')}
                   </ActionMenuItem>
-                  <ActionMenuItem checked={pixelated} onSelect={() => (pixelated = !pixelated)}>
+                  <ActionMenuItem
+                    kind="checkbox"
+                    checked={pixelated}
+                    onSelect={() => (pixelated = !pixelated)}
+                  >
                     <SquaresFourIcon />
                     {i18n.t('viewer.pixelate')}
                   </ActionMenuItem>

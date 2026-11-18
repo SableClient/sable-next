@@ -292,8 +292,22 @@ test('indexing progress refreshes an unchanged query and coalesces updates', asy
   search.schedule();
   await vi.advanceTimersByTimeAsync(500);
   for (let documents = 1; documents <= 10; documents++) search.updateCoverage(coverage(documents));
-  await vi.advanceTimersByTimeAsync(1_000);
+  await vi.advanceTimersByTimeAsync(999);
+  let pending: () => void = () => {};
+  messages.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        pending = () => {
+          resolve(page([hit('$indexed')]));
+        };
+      })
+  );
+  await vi.advanceTimersByTimeAsync(1);
   expect(messages).toHaveBeenCalledTimes(2);
+  expect(search.searching).toBe(false);
+  expect(search.refining).toBe(false);
+  pending();
+  await vi.advanceTimersByTimeAsync(0);
   expect(messages).toHaveBeenLastCalledWith(
     expect.objectContaining({ query: 'deploy', offset: 0 })
   );
@@ -366,6 +380,38 @@ test('indexing progress preserves loaded pages until an explicit refresh', async
   await vi.advanceTimersByTimeAsync(0);
   expect(search.hits.map((hit) => hit.event_id)).toEqual(['$fresh']);
   expect(search.refreshAvailable).toBe(false);
+});
+
+test('indexing progress leaves a full page alone until an explicit refresh', async () => {
+  const first = Array.from({ length: 30 }, (_, index) => hit(`$first${index}`));
+  const messages = vi.fn().mockResolvedValue(page(first));
+  const { core } = coreReturning(messages);
+  const search = new MessageSearch(core, () => directory);
+  search.query = 'deploy';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+  search.updateCoverage(coverage(100));
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(messages).toHaveBeenCalledTimes(1);
+  expect(search.refreshAvailable).toBe(true);
+});
+
+test('a failed background refresh stays quiet and keeps the refresh offer', async () => {
+  const messages = vi
+    .fn()
+    .mockResolvedValueOnce(page([hit('$kept')]))
+    .mockRejectedValueOnce(new Error('offline'));
+  const { core } = coreReturning(messages);
+  const search = new MessageSearch(core, () => directory);
+  search.query = 'deploy';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+  search.updateCoverage(coverage(100));
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(messages).toHaveBeenCalledTimes(2);
+  expect(search.hits.map((hit) => hit.event_id)).toEqual(['$kept']);
+  expect(search.failed).toBe(false);
+  expect(search.refreshAvailable).toBe(true);
 });
 
 test('a refresh failure keeps the current results', async () => {

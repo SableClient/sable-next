@@ -1,7 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
-  import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import type { MemberView, PinReadStateView, TimelineItemView } from '#src/generated/protocol';
@@ -17,8 +16,7 @@
 
   import { useEventItems } from './messages/event-items.svelte.js';
   import { pinErrorMessage } from './timeline/pinned-events.svelte.js';
-  import MessagePreview from './messages/MessagePreview.svelte';
-  import { opensFrom } from './messages/message-preview';
+  import RoomPinItem from './RoomPinItem.svelte';
   import { timelineMediaItems } from '#lib/ui/media/media-items.js';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
   import { VirtualWindow } from '#lib/ui/virtual-window.svelte.js';
@@ -30,7 +28,7 @@
     roomId: string;
     members: readonly MemberView[];
     canPin: boolean;
-    revision?: number;
+    revision?: string | null;
     open?: boolean;
     onUnread?: (count: number) => void;
     triggerHidden?: boolean;
@@ -41,7 +39,7 @@
     roomId,
     members,
     canPin,
-    revision = 0,
+    revision = null,
     open = $bindable(false),
     onUnread,
     triggerHidden = false,
@@ -58,7 +56,9 @@
   let settled = $state.raw<ReadonlySet<string>>(new Set());
   let unreadCount = $state(0);
   let freshIds = $state.raw<ReadonlySet<string>>(new Set());
-  let run = 0;
+  let countRun = 0;
+  let loadRun = 0;
+  let loadedRoom: string | null = null;
 
   let ordered = $derived([...shownIds].reverse());
   const pinWindow = new VirtualWindow(() => ({
@@ -90,10 +90,10 @@
     const target = roomId;
     if (!target) return;
 
-    const current = ++run;
+    const current = ++countRun;
     try {
       const state = await core.rpc.timeline.pinReadState({ room_id: target });
-      if (current !== run) return;
+      if (current !== countRun) return;
 
       adopt(state);
     } catch (error) {
@@ -105,11 +105,18 @@
     const target = roomId;
     if (!target) return;
 
-    const current = ++run;
+    const current = ++loadRun;
+    if (target !== loadedRoom) {
+      loadedRoom = target;
+      shownIds = [];
+      entries = new Map();
+      pending = new Set();
+      settled = new Set();
+    }
     loading = true;
     try {
       const ids = await core.rpc.timeline.pinnedEvents({ room_id: target });
-      if (current !== run) return;
+      if (current !== loadRun) return;
       pinnedIds = ids;
       shownIds = ids;
       entries = new Map(
@@ -120,11 +127,11 @@
       );
       pending = new Set();
       settled = new Set(entries.keys());
-      await markSeen(target, ids);
+      await markSeen(target, ids, current);
     } catch (error) {
       console.debug('[sable room] pins unavailable', error);
     } finally {
-      if (current === run) loading = false;
+      if (current === loadRun) loading = false;
     }
   }
 
@@ -132,7 +139,7 @@
     if (ids.length === 0) return;
     try {
       const items = await core.rpc.timeline.eventItems({ room_id: target, event_ids: ids });
-      if (current !== run) return;
+      if (current !== loadRun) return;
       if (items.length > 0) {
         entries = new Map([
           ...entries,
@@ -143,8 +150,9 @@
     } catch (error) {
       console.debug('[sable room] pins unavailable', error);
     } finally {
-      if (current === run) {
-        pending = new Set([...pending].filter((id) => !ids.includes(id)));
+      if (current === loadRun) {
+        const done = new Set(ids);
+        pending = new Set([...pending].filter((id) => !done.has(id)));
         settled = new Set([...settled, ...ids]);
       }
     }
@@ -156,7 +164,7 @@
       .filter((id) => !settled.has(id) && !pending.has(id));
     if (missing.length === 0) return;
     pending = new Set([...pending, ...missing]);
-    void resolve(roomId, missing, run);
+    void resolve(roomId, missing, loadRun);
   }
 
   function adopt(state: PinReadStateView): void {
@@ -166,12 +174,14 @@
     freshIds = new Set(state.fresh_ids);
   }
 
-  async function markSeen(target: string, ids: readonly string[]): Promise<void> {
+  async function markSeen(target: string, ids: readonly string[], current: number): Promise<void> {
     if (ids.length === 0) return;
     unreadCount = 0;
     onUnread?.(unreadCount);
     try {
-      adopt(await core.rpc.timeline.markPinsSeen({ room_id: target, pinned_ids: [...ids] }));
+      const state = await core.rpc.timeline.markPinsSeen({ room_id: target, pinned_ids: [...ids] });
+      if (current !== loadRun) return;
+      adopt(state);
     } catch (error) {
       console.debug('[sable room] pin marker not stored', error);
     }
@@ -189,6 +199,10 @@
       console.warn('[sable room] unpin failed', error);
       toasts.error(pinErrorMessage(error));
     }
+  }
+
+  function onUnpin(eventId: string): void {
+    void unpin(eventId);
   }
 
   function jump(eventId: string): void {
@@ -256,70 +270,18 @@
         {#each pinWindow.items as { index, key } (key)}
           {@const eventId = ordered[index]}
           <div class="pin-row" data-index={index} {@attach pinWindow.measure}>
-            <div class={['pin-item', { fresh: freshIds.has(eventId) }]}>
-              {#if !settled.has(eventId)}
-                <p class="pin-status" role="status"><Spinner small /></p>
-              {:else}
-                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-                <div
-                  class="pin-open"
-                  onclick={(event) => {
-                    if (!opensFrom(event)) return;
-                    jump(eventId);
-                  }}
-                >
-                  <MessagePreview
-                    {roomId}
-                    {eventId}
-                    item={entries.get(eventId) ?? null}
-                    {members}
-                    loadPreviewProfile
-                    timeAction={{
-                      label: i18n.t('common.jumpToMessage'),
-                      run: () => jump(eventId),
-                    }}
-                    onJumpToEvent={jump}
-                    onOpenMedia={openMedia}
-                  >
-                    {#snippet fallback()}
-                      <div class="pin-unreadable">
-                        <button
-                          class="pin-unreadable-open"
-                          type="button"
-                          aria-label={i18n.t('common.jumpToMessage')}
-                          onclick={() => jump(eventId)}
-                        >
-                          {i18n.t('room.pinsUnreadable')}
-                        </button>
-                        {#if canPin}
-                          <IconButton
-                            variant="ghost"
-                            size="small"
-                            label={i18n.t('timeline.unpinMessage')}
-                            onclick={() => void unpin(eventId)}
-                          >
-                            <PushPinSlashIcon />
-                          </IconButton>
-                        {/if}
-                      </div>
-                    {/snippet}
-                    {#snippet headerAction()}
-                      {#if canPin}
-                        <IconButton
-                          class="pin-unpin"
-                          variant="ghost"
-                          size="small"
-                          label={i18n.t('timeline.unpinMessage')}
-                          onclick={() => void unpin(eventId)}
-                        >
-                          <PushPinSlashIcon />
-                        </IconButton>
-                      {/if}
-                    {/snippet}
-                  </MessagePreview>
-                </div>
-              {/if}
-            </div>
+            <RoomPinItem
+              {roomId}
+              {eventId}
+              item={entries.get(eventId) ?? null}
+              {members}
+              {canPin}
+              fresh={freshIds.has(eventId)}
+              settled={settled.has(eventId)}
+              onJump={jump}
+              {onUnpin}
+              onOpenMedia={openMedia}
+            />
           </div>
         {/each}
         <div aria-hidden="true" style:height="{pinWindow.spaceAfter}px"></div>
@@ -422,71 +384,5 @@
   .pin-row {
     box-sizing: border-box;
     padding-bottom: var(--space-200);
-  }
-
-  .pin-item {
-    background: var(--bg-container);
-    border-radius: var(--radius-inner);
-    color: var(--bg-on-container);
-    padding: var(--space-100) var(--space-200) var(--space-100) var(--space-600);
-  }
-
-  .pin-item:is(:hover, :focus-within) {
-    background: var(--bg-container-hover);
-    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
-  }
-
-  .pin-item.fresh {
-    background: color-mix(in srgb, var(--primary-container) 30%, var(--bg-container));
-  }
-
-  .pin-item.fresh:is(:hover, :focus-within) {
-    background: color-mix(in srgb, var(--primary-container) 50%, var(--bg-container));
-  }
-
-  .pin-open {
-    cursor: pointer;
-    min-width: 0;
-  }
-
-  .pin-item :global(.pin-unpin) {
-    flex: none;
-    margin-inline-start: var(--space-050);
-  }
-
-  .pin-item :global(.message.mention-silent),
-  .pin-item :global(.message.mention-loud) {
-    margin-inline-start: calc(-1 * (var(--space-400) + var(--border-width) * 4));
-    padding-inline-start: var(--space-400);
-  }
-
-  .pin-unreadable {
-    align-items: center;
-    color: var(--surface-var-on-container);
-    display: flex;
-    gap: var(--space-100);
-    padding: var(--space-300) 0;
-  }
-
-  .pin-unreadable-open {
-    background: none;
-    border: 0;
-    color: inherit;
-    cursor: pointer;
-    flex: 1;
-    font: inherit;
-    padding: 0;
-    text-align: start;
-  }
-
-  .pin-unreadable-open:hover {
-    text-decoration: underline;
-  }
-
-  @supports not (color: color-mix(in srgb, black, white)) {
-    .pin-item.fresh,
-    .pin-item.fresh:is(:hover, :focus-within) {
-      background: var(--surface-container);
-    }
   }
 </style>
