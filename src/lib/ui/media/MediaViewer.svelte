@@ -16,7 +16,6 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { isEncryptedMedia } from '#lib/ui/media-url.js';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
-  import MediaImage from '#lib/ui/MediaImage.svelte';
   import ImageSpoilerControl from '#lib/ui/ImageSpoilerControl.svelte';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
@@ -29,33 +28,33 @@
     SWIPE_THRESHOLD,
     VELOCITY_THRESHOLD,
   } from '#lib/ui/swipe-gesture.js';
-  import { savesNatively, sharesNatively, supportsPhotoLibrary } from '#lib/platform/files.js';
+  import { sharesNatively, supportsPhotoLibrary } from '#lib/platform/files.js';
   import { isElectron } from '#lib/platform/electron.js';
   import { setSystemBarsHidden } from '#lib/platform/system-bars.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
-  import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
-  import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
-  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import PdfViewer from '#lib/ui/PdfViewer.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import { MediaViewerActions } from './media-viewer-actions';
   import { spoilerVisibility, spoilerVisibilityKey } from './spoiler-visibility.svelte.js';
   import { MediaViewerResource } from './media-viewer-resource.svelte';
+  import MediaViewerError from './MediaViewerError.svelte';
+  import MediaViewerHeading from './MediaViewerHeading.svelte';
+  import MediaViewerImageMenu from './MediaViewerImageMenu.svelte';
+  import MediaViewerNavButton from './MediaViewerNavButton.svelte';
+  import MediaViewerPending from './MediaViewerPending.svelte';
+  import MediaViewerPlayer from './MediaViewerPlayer.svelte';
+  import MediaViewerZoomControls from './MediaViewerZoomControls.svelte';
   import type { MediaItem } from './media-viewer-types';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
-  import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
-  import ImageSquareIcon from 'phosphor-svelte/lib/ImageSquareIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import FileArrowDownIcon from 'phosphor-svelte/lib/FileArrowDownIcon';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
@@ -667,64 +666,26 @@
         }}
       >
         <header class={['toolbar', { 'chrome-hidden': chromeHidden }]}>
-          <div class="heading">
-            <strong>{item.sender}</strong>
-            <Tooltip label={visibleLabel}>
-              {#snippet trigger({ props })}
-                <span {...props}
-                  >{i18n.t('viewer.position', { index: index + 1, total: items.length })} · {visibleLabel}</span
-                >
-              {/snippet}
-            </Tooltip>
-          </div>
+          <MediaViewerHeading
+            sender={item.sender}
+            position={index + 1}
+            total={items.length}
+            label={visibleLabel}
+          />
           <div class="actions">
             {#if isImage || isPdf}
               <div class="zoom-controls">
-                {#if isImage && fitRatio !== 1 && zoom !== 1}
-                  <IconButton
-                    label={i18n.t('viewer.originalSize')}
-                    size="small"
-                    variant="ghost"
-                    onclick={() => setZoom(1)}><ImageSquareIcon /></IconButton
-                  >
-                {/if}
-                <IconButton
-                  label={i18n.t('viewer.zoomOut')}
-                  size="small"
-                  variant="ghost"
-                  onclick={() => setZoom(zoom / (1 + ZOOM_STEP))}><MinusIcon /></IconButton
-                >
-                {#if editingZoom}
-                  <span class="zoom-level">
-                    <!-- svelte-ignore a11y_autofocus -->
-                    <input
-                      type="text"
-                      inputmode="numeric"
-                      aria-label={i18n.t('viewer.setZoom')}
-                      autofocus
-                      bind:value={zoomInput}
-                      onblur={commitZoomEdit}
-                      onkeydown={(event) => {
-                        if (event.key === 'Enter') commitZoomEdit();
-                      }}
-                    />%
-                  </span>
-                {:else}
-                  {@const zoomLabel = i18n.t('viewer.setZoom')}
-                  <Tooltip label={zoomLabel}>
-                    {#snippet trigger({ props })}
-                      <button {...props} class="zoom-level" type="button" onclick={beginZoomEdit}
-                        >{Math.round(zoom * 100)}%</button
-                      >
-                    {/snippet}
-                  </Tooltip>
-                {/if}
-                <IconButton
-                  label={i18n.t('viewer.zoomIn')}
-                  size="small"
-                  variant="ghost"
-                  onclick={() => setZoom(zoom * (1 + ZOOM_STEP))}><PlusIcon /></IconButton
-                >
+                <MediaViewerZoomControls
+                  {zoom}
+                  showOriginal={isImage && fitRatio !== 1 && zoom !== 1}
+                  editing={editingZoom}
+                  bind:zoomInput
+                  onoriginal={() => setZoom(1)}
+                  onzoomout={() => setZoom(zoom / (1 + ZOOM_STEP))}
+                  onzoomin={() => setZoom(zoom * (1 + ZOOM_STEP))}
+                  onedit={beginZoomEdit}
+                  oncommit={commitZoomEdit}
+                />
               </div>
             {/if}
             {#if canShare}
@@ -854,40 +815,15 @@
           onpointercancel={endPan}
         >
           {#if index > 0}
-            <IconButton
-              class="nav previous"
-              label={i18n.t('viewer.previous')}
-              size="large"
-              onclick={previous}><ArrowLeftIcon /></IconButton
-            >
+            <MediaViewerNavButton direction="previous" onclick={previous} />
           {/if}
           {#if spoilerHidden && !isImage}
             <Button class="spoiler-reveal" onclick={() => spoilerVisibility.set(spoilerKey, false)}>
               {spoiler ? `${spoiler} — ` : ''}{i18n.t('timeline.spoilerMedia')}
             </Button>
           {:else if url}
-            {#if item.kind === 'video'}
-              <!-- Matrix carries no caption track for an attachment. -->
-              <!-- svelte-ignore a11y_media_has_caption -->
-              <video
-                class="media-player"
-                controls
-                controlslist={savesNatively() ? 'nodownload' : undefined}
-                src={url}
-                aria-label={mediaLabel || i18n.t('timeline.videoAttachment')}
-              >
-                {fileName}
-              </video>
-            {:else if item.kind === 'audio'}
-              <audio
-                class="media-player"
-                controls
-                controlslist={savesNatively() ? 'nodownload' : undefined}
-                src={url}
-                aria-label={mediaLabel || i18n.t('timeline.audioAttachment')}
-              >
-                {fileName}
-              </audio>
+            {#if item.kind === 'video' || item.kind === 'audio'}
+              <MediaViewerPlayer kind={item.kind} {url} label={mediaLabel} {fileName} />
             {:else if item.kind === 'file'}
               <PdfViewer
                 src={url}
@@ -931,54 +867,17 @@
                   />
                 </div>
               {/if}
-              <ActionMenu
+              <MediaViewerImageMenu
                 bind:open={imageMenuOpen}
-                label={i18n.t('viewer.imageMenu')}
                 anchor={imageMenuAnchor}
-                side="bottom"
-                align="start"
-                preventScroll={false}
-              >
-                <ActionMenuItem onSelect={() => void mediaActions.copyImage()}>
-                  <CopyIcon />
-                  {i18n.t('viewer.copyImage')}
-                </ActionMenuItem>
-                <ActionMenuItem onSelect={() => void mediaActions.save()}>
-                  <DownloadSimpleIcon />
-                  {downloadLabel}
-                </ActionMenuItem>
-              </ActionMenu>
-            {/if}
-          {:else if failed}
-            <div class="error">
-              <strong>{i18n.t('timeline.mediaUnavailable')}</strong>
-              <span>{i18n.t('timeline.mediaUnavailableDetail')}</span>
-            </div>
-          {:else}
-            {#if preview}
-              <MediaImage
-                class="viewer-preview"
-                style={[
-                  preview.width ? `--preview-width: ${String(preview.width)}px` : '',
-                  preview.height ? `--preview-height: ${String(preview.height)}px` : '',
-                ].join(';')}
-                source={preview.source}
-                thumbnail={preview.thumbnail}
-                alt=""
-                width={800}
-                height={600}
-                intrinsicWidth={preview.width}
-                intrinsicHeight={preview.height}
-                mime={preview.mime}
-                blurhash={preview.blurhash}
+                {mediaActions}
+                {downloadLabel}
               />
             {/if}
-            <span class="loading">
-              <Spinner label={i18n.t('a11y.loading')} />
-              {#if loading.percent !== null}
-                <span>{i18n.t('timeline.downloadProgress', { percent: loading.percent })}</span>
-              {/if}
-            </span>
+          {:else if failed}
+            <MediaViewerError />
+          {:else}
+            <MediaViewerPending {preview} percent={loading.percent} />
           {/if}
           {#if isImage && spoilerHidden}
             <ImageSpoilerControl
@@ -989,9 +888,7 @@
             />
           {/if}
           {#if index < items.length - 1}
-            <IconButton class="nav next" label={i18n.t('viewer.next')} size="large" onclick={next}
-              ><ArrowRightIcon /></IconButton
-            >
+            <MediaViewerNavButton direction="next" onclick={next} />
           {/if}
         </main>
 
@@ -1068,42 +965,6 @@
     display: flex;
     gap: var(--space-150);
     min-width: 0;
-  }
-
-  .zoom-level {
-    background: none;
-    border: 0;
-    color: inherit;
-    cursor: text;
-    font: inherit;
-    min-width: 4em;
-    padding: 0;
-    text-align: center;
-  }
-
-  .zoom-level input {
-    all: unset;
-    field-sizing: content;
-    text-align: center;
-  }
-
-  .heading {
-    display: grid;
-    flex: 1;
-    gap: var(--space-050);
-    min-width: 0;
-  }
-
-  .heading strong,
-  .heading span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .heading span {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
   }
 
   .actions {
@@ -1211,20 +1072,6 @@
     transition: none;
   }
 
-  .stage .media-player {
-    max-height: 100%;
-    max-width: 100%;
-  }
-
-  :global(.nav) {
-    background: var(--surface-container-hover);
-    color: var(--surface-on-container);
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 1;
-  }
-
   .toolbar.chrome-hidden,
   .bottom-bar.chrome-hidden,
   .stage.chrome-hidden :global(.nav) {
@@ -1238,34 +1085,17 @@
     }
 
     .toolbar,
-    .bottom-bar,
-    :global(.nav) {
+    .bottom-bar {
       transition:
         opacity var(--motion-normal) var(--ease-smooth-out),
         visibility var(--motion-normal);
     }
   }
 
-  :global(.nav:hover) {
-    background: var(--surface-container-active);
-  }
-
-  :global(.previous) {
-    left: max(0.25rem, var(--safe-left));
-  }
-
-  :global(.next) {
-    right: max(0.25rem, var(--safe-right));
-  }
-
   @media (--compact-layout) {
     .stage.has-nav {
       --stage-padding-left: var(--space-200);
       --stage-padding-right: var(--space-200);
-    }
-
-    :global(.nav) {
-      display: none;
     }
 
     :global(.viewer) {
@@ -1316,37 +1146,9 @@
     display: none;
   }
 
-  .loading {
-    align-items: center;
-    background: var(--surface-container);
-    border-radius: var(--radius);
-    color: var(--surface-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-100);
-    padding: var(--space-100) var(--space-200);
-    position: relative;
-  }
-
-  .error {
-    color: var(--crit-main);
-    display: grid;
-    gap: var(--space-200);
-    text-align: center;
-  }
-
-  .error span {
-    color: var(--surface-var-on-container);
-  }
-
   @media (--app-layout) {
     :global(.viewer) {
       background: color-mix(in srgb, var(--viewer-immersive) 90%, transparent);
-    }
-
-    .error,
-    .error span {
-      color: var(--media-on-scrim);
     }
 
     .toolbar {
@@ -1373,14 +1175,6 @@
     .stage.has-nav {
       --stage-padding-left: calc(var(--space-600) + var(--control-height-500) + var(--space-200));
       --stage-padding-right: calc(var(--space-600) + var(--control-height-500) + var(--space-200));
-    }
-
-    :global(.previous) {
-      left: 1.5rem;
-    }
-
-    :global(.next) {
-      right: 1.5rem;
     }
   }
 

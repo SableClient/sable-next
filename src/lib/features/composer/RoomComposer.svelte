@@ -15,9 +15,6 @@
     PackImageView,
     PersonaView,
   } from '#src/generated/protocol';
-  import { mergeProps } from 'bits-ui';
-  import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
-  import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
   import { onDestroy, tick, untrack } from 'svelte';
 
@@ -47,8 +44,6 @@
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import BotCommandForm from './BotCommandForm.svelte';
@@ -68,7 +63,10 @@
   import ComposerSendButton from './ComposerSendButton.svelte';
   import PersonaPicker from './PersonaPicker.svelte';
   import PollComposer from './PollComposer.svelte';
+  import ComposerFormatButton from './ComposerFormatButton.svelte';
   import ComposerFormatting from './ComposerFormatting.svelte';
+  import ComposerReadOnly from './ComposerReadOnly.svelte';
+  import ComposerVoiceButton from './ComposerVoiceButton.svelte';
   import ComposerLinkDialog from './ComposerLinkDialog.svelte';
   import ComposerSpoilerDialog from './ComposerSpoilerDialog.svelte';
   import LocationComposer from './LocationComposer.svelte';
@@ -1469,13 +1467,7 @@
   class={['composer-stack', { short: composerShort && !readOnly, 'pointer-hidden': pointerHidden }]}
 >
   {#if readOnly}
-    <div class="composer-shell">
-      <div class="composer">
-        <div class="composer-row">
-          <p class="locked">{i18n.t('composer.readOnly')}</p>
-        </div>
-      </div>
-    </div>
+    <ComposerReadOnly />
   {:else}
     <div class="composer-shell">
       <div class="composer" role="group" aria-label={i18n.t('timeline.messagePlaceholder')}>
@@ -1663,25 +1655,12 @@
               </div>
             {/if}
             {#snippet formatButton()}
-              <Tooltip label={i18n.t('composer.formatting')}>
-                {#snippet trigger({ props })}
-                  <IconButton
-                    {...mergeProps(props, {
-                      onclick: () => {
-                        setPreference('formattingToolbar', !formattingOpen);
-                      },
-                    })}
-                    variant="ghost"
-                    size="small"
-                    class="composer-format selection-open"
-                    aria-pressed={formattingOpen}
-                    data-state={formattingOpen ? 'open' : 'closed'}
-                    label={i18n.t('composer.formatting')}
-                  >
-                    <TextAaIcon />
-                  </IconButton>
-                {/snippet}
-              </Tooltip>
+              <ComposerFormatButton
+                open={formattingOpen}
+                onToggle={() => {
+                  setPreference('formattingToolbar', !formattingOpen);
+                }}
+              />
             {/snippet}
             <div class="composer-after" bind:this={afterEl}>
               <ComposerBoard
@@ -1702,21 +1681,7 @@
                 }}
               />
               {#if showVoice}
-                <Tooltip label={i18n.t('composer.voiceRecord')}>
-                  {#snippet trigger({ props })}
-                    <IconButton
-                      {...mergeProps(props, {
-                        onclick: startRecording,
-                      })}
-                      variant="ghost"
-                      size="small"
-                      class="composer-voice"
-                      label={i18n.t('composer.voiceRecord')}
-                    >
-                      <MicrophoneIcon />
-                    </IconButton>
-                  {/snippet}
-                </Tooltip>
+                <ComposerVoiceButton onStart={startRecording} />
               {/if}
               <ComposerSendButton
                 {context}
@@ -1845,18 +1810,6 @@
     position: absolute;
     visibility: hidden;
     white-space: pre-wrap;
-  }
-
-  .locked {
-    align-items: center;
-    color: var(--surface-var-on-container);
-    display: flex;
-    font-size: max(var(--font-size-editor), var(--font-size-input-min));
-    grid-column: 1 / -1;
-    justify-content: center;
-    margin: 0;
-    min-height: var(--target);
-    padding: var(--space-200) var(--space-300);
   }
 
   .composer-file {

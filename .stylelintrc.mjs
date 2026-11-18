@@ -43,7 +43,10 @@ export default {
   overrides: [
     {
       // Swipes and previous/next follow the screen, not the text direction.
-      files: ['src/lib/ui/media/MediaViewer.svelte'],
+      files: [
+        'src/lib/ui/media/MediaViewer.svelte',
+        'src/lib/ui/media/MediaViewerNavButton.svelte',
+      ],
       rules: { 'csstools/use-logical': null },
     },
     {

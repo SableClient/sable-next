@@ -55,6 +55,6 @@ test('cloud backup counts, manual restore and the settings layout', async () => 
   await expect.element(screen.getByText('80 keys added or updated on this device.')).toBeVisible();
   await expect.element(screen.getByText('200 keys on this device')).toBeVisible();
 
-  const region = screen.getByRole('region', { name: 'Cloud key backup' }).element();
+  const region = screen.getByRole('region', { name: 'Key backup' }).element();
   expect(region.scrollWidth).toBeLessThanOrEqual(region.clientWidth);
 });

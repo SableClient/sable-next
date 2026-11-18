@@ -117,7 +117,7 @@ test.each([
   expect(css.element().getAttribute('href')).toBe('/settings/appearance?focus=quick-css');
 
   await userEvent.fill(field.element(), 'key backup');
-  const backup = screen.getByRole('link', { name: /Cloud key backup/ });
+  const backup = screen.getByRole('link', { name: /Key backup/ });
   await expect.element(backup).toBeVisible();
   expect(backup.element().getAttribute('href')).toBe('/settings/devices?focus=key-backup-heading');
 

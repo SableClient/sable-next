@@ -1,17 +1,13 @@
 <script lang="ts">
   import type { ReplyView } from '#src/generated/protocol';
 
-  import '../members/avatar-button.css';
   import './timeline-highlight.css';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import { senderDisplayColors } from '../members/members.js';
-  import { previewableLinks } from '../media/link-preview.js';
-  import { shownLinkPreviews } from '../media/link-preview-cache';
   import LinkEmbed from '../media/embeds/LinkEmbed.svelte';
   import { isMediaCaptionContent } from '../messages/media-caption.js';
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
-  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
@@ -30,10 +26,12 @@
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import ForwardedLine from '../messages/ForwardedLine.svelte';
   import '../members/sender-identity.css';
-  import { formatFullTimestamp, formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
+  import { formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
+  import { MessageLinkPreviews } from './message-link-previews.svelte';
   import { MessageSender } from './message-sender.svelte';
+  import { MessageTransfer } from './message-transfer.svelte';
   import { TimelineRow, type TimelineItemProps } from './timeline-row.svelte';
   import TimelineReplyPreview from './TimelineReplyPreview.svelte';
   import TimelineSendFailure from './TimelineSendFailure.svelte';
@@ -41,8 +39,9 @@
   import TimelineThreadSummary from './TimelineThreadSummary.svelte';
   import TimelineTransfer from './TimelineTransfer.svelte';
   import UndecryptableNotice from './UndecryptableNotice.svelte';
-  import MessageShieldNotice from './MessageCryptoStatus.svelte';
-  import MessageSharedBy from './MessageSharedBy.svelte';
+  import TimelineCryptoIndicators from './TimelineCryptoIndicators.svelte';
+  import TimelineMessageTime from './TimelineMessageTime.svelte';
+  import TimelineSenderAvatar from './TimelineSenderAvatar.svelte';
 
   let {
     item,
@@ -97,6 +96,7 @@
   const named = $derived(layout === 'compact' || !collapsed);
   const ownBubble = $derived(layout === 'bubble' && item.is_own && alignOwn);
 
+  const linkPreviews = new MessageLinkPreviews(() => item);
   const row = new TimelineRow(() => ({
     item,
     roomId,
@@ -109,11 +109,8 @@
     editing,
     overrideCosmetics,
     replySender,
-    hasLinkPreviews: bundledPreviews.length > 0 || previewUrls.length > 0,
-    linkPreviews:
-      bundledPreviews.length > 0
-        ? bundledPreviews
-        : previewUrls.flatMap((url) => shownLinkPreviews.get(url) ?? []),
+    hasLinkPreviews: linkPreviews.any,
+    linkPreviews: linkPreviews.shown,
     onToggleReaction,
     onMarkUnread,
     onReply,
@@ -147,43 +144,14 @@
   let emote = $derived(item.content.kind === 'message' && item.content.msgtype === 'emote');
   let notice = $derived(item.content.kind === 'message' && item.content.msgtype === 'notice');
   let jumbo = $derived(item.content.kind === 'message' ? (item.content.jumbo ?? null) : null);
-  let upload = $derived(
-    item.send_state?.status === 'sending' ? (item.send_state.progress ?? null) : null
-  );
-  let uploading = $derived(
-    row.pending &&
-      (item.content.kind === 'image' ||
-        item.content.kind === 'video' ||
-        item.content.kind === 'audio' ||
-        item.content.kind === 'file' ||
-        item.content.kind === 'gallery')
-  );
-  let galleryCount = $derived(item.content.kind === 'gallery' ? item.content.items.length : 0);
   const saving = mediaProgress(row.core, () => row.actionExecutor.savingSource);
-  let transfer = $derived.by(() => {
-    const onCancel = item.transaction_id ? cancelSend : undefined;
-    if (upload !== null) {
-      const part = upload.total > 0 ? Math.min(1, upload.current / upload.total) : 0;
-      const gallery = galleryCount > 1;
-      return {
-        label: i18n.t('timeline.uploading'),
-        max: 1,
-        value: gallery ? Math.min(1, (upload.index + part) / galleryCount) : part,
-        count: gallery
-          ? i18n.t('timeline.uploadingItem', {
-              current: Math.min(upload.index + 1, galleryCount),
-              count: galleryCount,
-            })
-          : null,
-        onCancel,
-      };
-    }
-    if (uploading) return { label: i18n.t('timeline.uploading'), onCancel };
-    if (saving.percent !== null)
-      return { label: i18n.t('timeline.downloading'), max: 100, value: saving.percent };
-    if (row.actionExecutor.savingSlow) return { label: i18n.t('timeline.downloading') };
-    return null;
-  });
+  const transfer = new MessageTransfer(() => ({
+    item,
+    pending: row.pending,
+    savingPercent: saving.percent,
+    savingSlow: row.actionExecutor.savingSlow,
+    onCancel: cancelSend,
+  }));
 
   let editable = $derived(
     !item.forwarded &&
@@ -206,28 +174,14 @@
       receiptReaders.length > 0
   );
   let nonTextContent = $derived(item.content.kind !== 'message');
-  let previewsRemoved = $derived(item.link_previews_removed === true);
-  let bundledPreviews = $derived(previewsRemoved ? [] : item.bundled_link_previews);
-  let previewUrls = $derived.by(() => {
-    if (previewsRemoved || bundledPreviews.length > 0) return [];
-    const content = item.content;
-    if (content.kind === 'message' || content.kind === 'gallery')
-      return previewableLinks(content.html, content.body);
-    if (isMediaCaptionContent(content) && content.caption !== null)
-      return previewableLinks(content.html ?? '', content.caption).filter(
-        (url) => url !== content.external_url
-      );
-    return [];
-  });
   let receiptWidth = $state(0);
   let receiptsInline = $derived(
     (!nonTextContent || item.content.kind === 'redacted') &&
       item.reactions.length === 0 &&
       !threadSummary &&
       !item.thread_root &&
-      bundledPreviews.length === 0 &&
-      previewUrls.length === 0 &&
-      upload === null &&
+      !linkPreviews.any &&
+      transfer.upload === null &&
       row.stalled === null
   );
 
@@ -300,28 +254,14 @@
   />
 {/snippet}
 
-{#snippet senderAvatarButton(size: 'tiny' | 'small')}
-  {#snippet avatar()}
-    <Avatar
-      class="message-avatar"
-      src={sender.avatar}
-      {size}
-      id={sender.tint ? null : item.sender}
-      name={sender.name}
-    />
-  {/snippet}
-  {#if item.sender && onSenderProfile}
-    <button
-      class="sender-avatar-button"
-      type="button"
-      aria-label={i18n.t('timeline.senderProfile', { name: sender.name })}
-      onclick={openSenderProfile}
-    >
-      {@render avatar()}
-    </button>
-  {:else}
-    {@render avatar()}
-  {/if}
+{#snippet senderAvatar(size: 'tiny' | 'small')}
+  <TimelineSenderAvatar
+    src={sender.avatar}
+    id={sender.tint ? null : item.sender}
+    name={sender.name}
+    {size}
+    onOpenProfile={item.sender && onSenderProfile ? sender.openProfile : undefined}
+  />
 {/snippet}
 
 {#snippet actions()}
@@ -334,21 +274,6 @@
   {/if}
   {#if !row.actionable && !row.canCancelSend && editable && item.transaction_id && row.engagement.engaged}
     <MessageActions {roomId} onEdit={row.actions.onEdit} />
-  {/if}
-{/snippet}
-
-{#snippet messageTime(format: (timestamp: number) => string)}
-  {#if row.pending}
-    <Spinner small label={i18n.t('timeline.sending')} />
-  {:else}
-    <Tooltip>
-      {#snippet content()}{formatFullTimestamp(item.timestamp)}{/snippet}
-      {#snippet trigger({ props })}
-        <time {...props} datetime={new Date(item.timestamp).toISOString()}>
-          {format(item.timestamp)}
-        </time>
-      {/snippet}
-    </Tooltip>
   {/if}
 {/snippet}
 
@@ -435,7 +360,7 @@
     {/if}
     {#if layout !== 'compact' && !collapsed}
       {#if !ownBubble}
-        {@render senderAvatarButton('small')}
+        {@render senderAvatar('small')}
       {/if}
       {@render actions()}
     {:else if layout !== 'compact' && row.pending}
@@ -443,7 +368,13 @@
         <Spinner small label={i18n.t('timeline.sending')} />
       </span>
     {:else if layout !== 'compact' && preferences.showAllTimestamps}
-      <span class="collapsed-pending collapsed-time">{@render messageTime(formatTime)}</span>
+      <span class="collapsed-pending collapsed-time"
+        ><TimelineMessageTime
+          timestamp={item.timestamp}
+          pending={row.pending}
+          format={formatTime}
+        /></span
+      >
     {/if}
     <div
       class="message-content"
@@ -451,10 +382,14 @@
     >
       {#if layout === 'compact'}
         <div class="compact-gutter" id={`${labelId}-head`}>
-          {@render messageTime(formatTime)}
+          <TimelineMessageTime
+            timestamp={item.timestamp}
+            pending={row.pending}
+            format={formatTime}
+          />
           <div class="compact-user">
             {#if avatarsInHeaders}
-              {@render senderAvatarButton('tiny')}
+              {@render senderAvatar('tiny')}
             {/if}
             <SenderName
               displayName={sender.name}
@@ -512,10 +447,18 @@
                 aria-label={timeAction.label}
                 onclick={timeAction.run}
               >
-                {@render messageTime(formatMessageTimestamp)}
+                <TimelineMessageTime
+                  timestamp={item.timestamp}
+                  pending={row.pending}
+                  format={formatMessageTimestamp}
+                />
               </button>
             {:else}
-              {@render messageTime(formatMessageTimestamp)}
+              <TimelineMessageTime
+                timestamp={item.timestamp}
+                pending={row.pending}
+                format={formatMessageTimestamp}
+              />
             {/if}
             {@render headerAction?.()}
           </div>
@@ -625,10 +568,10 @@
           </div>
         {/if}
         {#if !editor}
-          {#each bundledPreviews as preview (preview.url)}
+          {#each linkPreviews.bundled as preview (preview.url)}
             <LinkEmbed url={preview.url} bundled={preview} {encrypted} />
           {/each}
-          {#each previewUrls as url (url)}
+          {#each linkPreviews.urls as url (url)}
             <LinkEmbed {url} {encrypted} />
           {/each}
         {/if}
@@ -650,8 +593,8 @@
         {:else if item.reactions.length > 0}
           {@render reactions()}
         {/if}
-        {#if transfer}
-          <TimelineTransfer {...transfer} />
+        {#if transfer.props}
+          <TimelineTransfer {...transfer.props} />
         {/if}
         {#if row.stalled}
           <TimelineSendFailure
@@ -669,14 +612,10 @@
         {/if}
       </div>
       {#if shieldShown || item.shared_by}
-        <span class="crypto-indicators">
-          {#if item.shield && shieldShown}
-            <MessageShieldNotice shield={item.shield} />
-          {/if}
-          {#if item.shared_by}
-            <MessageSharedBy sharedBy={item.shared_by} />
-          {/if}
-        </span>
+        <TimelineCryptoIndicators
+          shield={shieldShown ? item.shield : null}
+          sharedBy={item.shared_by}
+        />
       {/if}
       {#if trailingReceiptBadge && layout !== 'bubble'}
         {@render receiptSlot()}
@@ -1003,18 +942,7 @@
     position: absolute;
   }
 
-  .crypto-indicators {
-    align-self: flex-start;
-    display: flex;
-    gap: var(--space-100);
-    margin-inline-start: var(--space-200);
-  }
-
-  .crypto-indicators > :global(button) {
-    margin-inline-start: 0;
-  }
-
-  .message-content:has(> .crypto-indicators) > .receipt-slot {
+  .message-content:has(> :global(.crypto-indicators)) > .receipt-slot {
     inset-inline-end: calc(var(--space-200) + var(--font-size-body));
   }
 
@@ -1136,7 +1064,7 @@
     color: var(--surface-var-on-container);
   }
 
-  .message-details time {
+  .message-details :global(time) {
     flex-shrink: 0;
   }
 
@@ -1204,7 +1132,7 @@
     grid-row: 2;
   }
 
-  .message.layout-compact .crypto-indicators {
+  .message.layout-compact :global(.crypto-indicators) {
     grid-column: 3;
     grid-row: 2;
   }
@@ -1240,7 +1168,7 @@
     grid-row: 1;
   }
 
-  .message.layout-compact .compact-gutter time {
+  .message.layout-compact .compact-gutter :global(time) {
     color: var(--surface-var-on-container);
     flex: none;
     font-size: var(--font-size-small);
