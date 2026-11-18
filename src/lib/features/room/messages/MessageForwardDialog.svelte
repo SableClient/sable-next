@@ -9,12 +9,11 @@
 
   interface Props {
     open?: boolean;
-    fromRoomId: string;
     metadataLocked?: boolean;
     onForward: (toRoomIds: string[], includeMetadata: boolean) => void;
   }
 
-  let { open = $bindable(false), fromRoomId, metadataLocked = false, onForward }: Props = $props();
+  let { open = $bindable(false), metadataLocked = false, onForward }: Props = $props();
   const roomList = useRoomList();
   let search = $state('');
   let includeMetadata = $state(true);
@@ -24,10 +23,7 @@
 
   let targets = $derived(
     roomList.rooms
-      .filter(
-        (room) =>
-          room.state === 'joined' && room.room_kind !== 'space' && room.room_id !== fromRoomId
-      )
+      .filter((room) => room.state === 'joined' && room.room_kind !== 'space')
       .filter((room) => room.display_name.toLowerCase().includes(search.trim().toLowerCase()))
   );
 

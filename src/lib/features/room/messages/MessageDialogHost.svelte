@@ -225,7 +225,6 @@
   {:else if entry.kind === 'forward'}
     <MessageForwardDialog
       bind:open={() => true, setOpen}
-      fromRoomId={roomId}
       metadataLocked={item.forwarded != null}
       onForward={(toRoomIds, includeMetadata) => forward(item, toRoomIds, includeMetadata)}
     />
