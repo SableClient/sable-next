@@ -54,6 +54,7 @@
 <style>
   ul {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     list-style: none;
     margin: 0;
     max-height: 20rem;
