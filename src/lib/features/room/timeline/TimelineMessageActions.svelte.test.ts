@@ -301,7 +301,7 @@ test('opens message actions on right click', async () => {
   await tick();
 
   expect(menuLabels()).toContain('Reply');
-  expect(menuLabels()).toContain('Copy link to message');
+  expect(menuLabels()).toContain('Copy external link');
 });
 
 test('picking a quick reaction from the context menu closes it', async () => {
