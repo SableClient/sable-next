@@ -10,8 +10,6 @@
     "space": "Spațiu",
     "lobby": "Anticameră",
     "newChat": "Conversație nouă",
-    "joinWithAddress": "Alătură-te cu adresă",
-    "exploreSpaces": "Explorează spații",
     "messageSearch": "Caută mesaje",
     "profile": "Profil",
     "editProfile": "Editează profilul",
@@ -220,13 +218,7 @@
     "directoryTotal_one": "{{count, number}} cameră",
     "directoryTotal_few": "{{count, number}} camere",
     "directoryTotal_other": "{{count, number}} de camere",
-    "directoryJoinByAddress": "Alătură-te cu adresă",
     "joinTitle": "Alătură-te cu adresă",
-    "joinDescription": "Introdu o adresă publică pentru a te alătura camerei sau spațiului.",
-    "joinExamplesLabel": "Adresele sunt de forma:",
-    "joinAddressLabel": "Adresă",
-    "joinAddressPlaceholder": "#camera:server",
-    "joinInvalid": "Nu pare a fi o adresă de cameră sau un link link.sable.moe",
     "settingsTitle": "Setări cameră",
     "settingsOpen": "Setări cameră",
     "settingsClose": "Închide setările camerei",
@@ -746,9 +738,7 @@
     "findCommunityTitle": "Găsește o comunitate",
     "findCommunityDescription": "Explorează camere și spații publice pentru a găsi un grup de persoane cu lucruri în comun.",
     "startRoomTitle": "Începe o cameră",
-    "startRoomDescription": "Crează o cameră sau un spațiu pentru un grup de prieteni sau o comunitate.",
-    "joinConversationTitle": "Alatură-te unei camere sau unei conversații directe",
-    "joinConversationDescription": "Scrie o adresă a unei camere sau un ID de utilizator Matrix pentru a începe o conversație."
+    "startRoomDescription": "Crează o cameră sau un spațiu pentru un grup de prieteni sau o comunitate."
   },
   "emoji": {
     "unicode": "Emoji",
@@ -803,12 +793,12 @@
       "knock_accepted": "Cererea de alăturare de la {{user}} a fost acceptată",
       "knock_retracted": "{{user}} și-a retras cererea de alăturare",
       "knock_denied": "Cererea de alăturare de la {{user}} a fost refuzată",
-      "other": "Și-a modificat {{user}} apartenența"
+      "other": "{{user}} și-a modificat apartenența"
     },
     "profileNameChanged": "{{user}} este acum {{name}}",
     "profileNameSet": "{{user}} și-a schimbat numele la {{name}}",
     "profileNameRemoved": "{{user}} și-a șters numele",
-    "profileAvatarChanged": "{{user}} și-a fost schimbată",
+    "profileAvatarChanged": "{{user}} și-a schimbat iconița",
     "hiddenEvent": "{{user}} a fost trimis eveniment {{type}}",
     "unsupported": "Eveniment necunoscut: {{description}}",
     "newMessages_one": "{{count, number}} mesaj nou",
