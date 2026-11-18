@@ -289,6 +289,15 @@ pub fn plan_room_mode(
     writes
 }
 
+#[must_use]
+pub fn plan_direct_default(rules: &Ruleset, room_id: &RoomId) -> Vec<RuleWrite> {
+    let direct = default_mode(rules, true);
+    if room_mode(rules, room_id).is_some() || direct == default_mode(rules, false) {
+        return Vec::new();
+    }
+    plan_room_mode(room_id, true, Some(direct))
+}
+
 /// # Errors
 ///
 /// When the server has no rule for this kind of room.

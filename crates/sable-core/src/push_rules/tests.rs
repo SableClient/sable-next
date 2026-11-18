@@ -8,9 +8,9 @@ use serde_json::json;
 use super::categories::event_notifies;
 use super::{
     RuleWrite, default_modes, event_notifications, keywords, level_actions, master_muted,
-    mention_notifications, new_rule, plan_add_keyword, plan_cleanup, plan_default_mode, plan_event,
-    plan_keyword_mode, plan_master, plan_mention, plan_remove_keyword, plan_room_mode,
-    pushes_every_encrypted_event, room_mode, rule_notifies,
+    mention_notifications, new_rule, plan_add_keyword, plan_cleanup, plan_default_mode,
+    plan_direct_default, plan_event, plan_keyword_mode, plan_master, plan_mention,
+    plan_remove_keyword, plan_room_mode, pushes_every_encrypted_event, room_mode, rule_notifies,
 };
 use crate::protocol::{
     EventNotificationView, MentionNotificationModeView, MentionRuleView, NotificationModeView,
@@ -98,6 +98,28 @@ fn a_room_rule_matching_the_default_is_still_an_explicit_choice() {
     );
     let settings = super::room_settings(&chosen, room, false);
     assert_eq!(settings.room, Some(NotificationModeView::All));
+}
+
+#[test]
+fn a_grown_direct_chat_follows_the_direct_default_only_when_it_differs() {
+    let room = room_id!("!bridged:example.org");
+    let rules = Ruleset::server_default(me());
+    assert!(plan_direct_default(&rules, room).is_empty());
+
+    let quiet_groups = applied(
+        rules.clone(),
+        plan_default_mode(&rules, false, NotificationModeView::Mentions).unwrap(),
+    );
+    assert_eq!(
+        describe(&plan_direct_default(&quiet_groups, room))[0],
+        r#"put !bridged:example.org ["notify",{"set_tweak":"sound","value":"default"}]"#
+    );
+
+    let chosen = applied(
+        quiet_groups,
+        plan_room_mode(room, false, Some(NotificationModeView::Mentions)),
+    );
+    assert!(plan_direct_default(&chosen, room).is_empty());
 }
 
 #[test]
