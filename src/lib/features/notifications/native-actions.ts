@@ -35,7 +35,11 @@ export async function selectNotificationAccount(
   core: AccountSwitcher,
   userId: string
 ): Promise<boolean> {
-  const account = core.accounts.find((entry) => entry.user_id === userId);
+  const owned = core.accounts.filter((entry) => entry.user_id === userId);
+  const account =
+    owned.find((entry) => entry.account_id === core.session?.account_id) ??
+    owned.find((entry) => !entry.needs_reauth) ??
+    owned.at(0);
   if (account === undefined) return false;
 
   if (core.session?.account_id !== account.account_id) {

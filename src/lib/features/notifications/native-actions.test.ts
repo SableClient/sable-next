@@ -23,7 +23,7 @@ function core(accountId = 'account-me') {
   const sendMessage = vi.fn().mockResolvedValue(undefined);
   const markRead = vi.fn().mockResolvedValue(undefined);
   const switchAccount = vi.fn();
-  const accounts = [
+  const accounts: { account_id: string; user_id: string; needs_reauth?: boolean }[] = [
     { account_id: 'account-me', user_id: '@me:example.org' },
     { account_id: 'account-other', user_id: '@other:example.org' },
   ];
@@ -40,7 +40,7 @@ function core(accountId = 'account-me') {
     return Promise.resolve();
   });
 
-  return { client, sendMessage, markRead, switchAccount };
+  return { client, accounts, sendMessage, markRead, switchAccount };
 }
 
 function target(overrides: Partial<NativeNotificationTarget> = {}): NativeNotificationTarget {
@@ -125,6 +125,33 @@ test('opening an inactive account notification switches before navigating', asyn
     expect.any(Function)
   );
   expect(switchAccount).toHaveBeenCalledBefore(open);
+});
+
+test('a notification for the active account opens without switching when a stale sign-in shares its user', async () => {
+  const { client, accounts, switchAccount } = core();
+  accounts.unshift({ account_id: 'account-stale', user_id: '@me:example.org', needs_reauth: true });
+  const open = vi.fn();
+
+  await expect(new NativeNotificationOpener(client).open(target(), open)).resolves.toBe('opened');
+
+  expect(switchAccount).not.toHaveBeenCalled();
+  expect(open).toHaveBeenCalled();
+});
+
+test('a notification for an inactive account skips a stale sign-in of the same user', async () => {
+  const { client, accounts, switchAccount } = core();
+  accounts.unshift({
+    account_id: 'account-stale',
+    user_id: '@other:example.org',
+    needs_reauth: true,
+  });
+  const open = vi.fn();
+
+  await expect(
+    new NativeNotificationOpener(client).open(target({ userId: '@other:example.org' }), open)
+  ).resolves.toBe('opened');
+
+  expect(switchAccount).toHaveBeenCalledWith('account-other');
 });
 
 test('a notification whose account cannot be switched to stays on the current room', async () => {
