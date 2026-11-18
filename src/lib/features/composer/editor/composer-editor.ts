@@ -492,7 +492,7 @@ function trailingParagraph(): Plugin {
   });
 }
 
-const URL_ONLY = /^(?:https?:\/\/|mailto:)\S+$/;
+const URL_ONLY = /^(?:https?:\/\/|mailto:|matrix:)\S+$/;
 
 const PILL_SPACE = 'pillSpace';
 
