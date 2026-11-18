@@ -1371,6 +1371,34 @@ test('profile lookups that failed offline are retried when sync goes live', asyn
   }
 });
 
+test('an own profile that failed to load offline is reloaded when sync goes live', async () => {
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': [session],
+  });
+  const core = createCoreClient(() => fake.transport);
+  fake.call.mockImplementation((method: string, params: unknown) => {
+    fake.called.push({ method, params });
+    if (method === 'account.user_profile') return Promise.reject(new Error('offline'));
+    return Promise.resolve(method === 'session.list_accounts' ? [session] : session);
+  });
+  const listener = vi.fn();
+  core.onProfileChanged(listener);
+
+  await core.start();
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.waitFor(() => {
+    expect(fake.called.some((call) => call.method === 'account.user_profile')).toBe(true);
+  });
+  await Promise.resolve();
+
+  fake.emit({ type: 'sync_status', state: 'live' });
+  await vi.waitFor(() => {
+    expect(listener).toHaveBeenCalledWith(session.user_id);
+  });
+  core.stop();
+});
+
 test('a profile change drops the cached profile and tells listeners once', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();

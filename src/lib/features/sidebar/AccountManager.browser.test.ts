@@ -403,3 +403,27 @@ test('status emoji can be picked and cleared without changing the text', async (
     .poll(() => setProfileField.mock.calls.at(-1))
     .toEqual(['org.matrix.msc4426.status', { text: 'Working', emoji: '' }]);
 });
+
+test('the own profile loads once the core reports it changed after a failed first load', async () => {
+  let notify: (userId: string) => void = () => {};
+  Object.assign(core, {
+    session: { user_id: '@alice:example.test', account_id: 'a1', homeserver: 'example.test' },
+    accounts: [],
+    userProfile: vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(profileWith({ display_name: 'Alice Online' })),
+    onProfileChanged: vi.fn((listener: (userId: string) => void) => {
+      notify = listener;
+      return () => {};
+    }),
+    cachedUserProfile: vi.fn(() => null),
+  });
+  core.commands = core;
+  const screen = await render(AccountManagerHarness);
+  await expect.element(screen.getByRole('heading', { name: '@alice:example.test' })).toBeVisible();
+
+  notify('@alice:example.test');
+
+  await expect.element(screen.getByRole('heading', { name: 'Alice Online' })).toBeVisible();
+});

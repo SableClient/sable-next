@@ -1219,7 +1219,12 @@ export class CoreClient {
     const reconnected = status.state === 'live' && this.sync?.state !== 'live';
     this.sync = status;
     if (reconnected) {
-      for (const userId of [...this.profileFailures.keys()]) this.invalidateProfile(userId);
+      const retry = [...this.profileFailures.keys()];
+      const own = this.session?.user_id;
+      if (own && this.cachedUserProfile(own, true) === null && !this.profileRequests.has(own)) {
+        retry.push(own);
+      }
+      for (const userId of retry) this.invalidateProfile(userId);
     }
     if (status.state !== 'offline') {
       if (this.localNetworkBlocked !== null) {
