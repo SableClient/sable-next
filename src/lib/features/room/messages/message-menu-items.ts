@@ -43,6 +43,7 @@ export type MessageActions = {
   onCopyText?: () => void;
   copyTextLabel?: string;
   onCopyLink?: () => void;
+  onCopyMatrixLink?: () => void;
   onCopyHref?: () => void;
   onShareHref?: () => void;
   onPin?: () => void;
@@ -136,6 +137,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.shareLink',
       icon: ShareIcon,
       run: actions.onShareHref,
+    });
+  }
+  if (actions.onCopyMatrixLink) {
+    rows.push({
+      key: 'matrix-link',
+      label: 'timeline.copyMatrixLink',
+      icon: LinkIcon,
+      run: actions.onCopyMatrixLink,
     });
   }
   if (actions.onCopyLink) {

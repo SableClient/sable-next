@@ -40,7 +40,7 @@
     onDelete: (eventId: string, reason: string | null) => void;
     roomId: string;
     onReact?: (eventId: string, key: string) => void;
-    onCopyLink: (eventId: string) => void;
+    onCopyLink: (eventId: string, format?: 'matrix' | 'external') => void;
     pinned?: boolean;
     onPin?: (eventId: string) => void;
     layout?: ForumLayout;
@@ -119,6 +119,7 @@
               .catch(() => toasts.error(i18n.t('errors.actionFailed')));
           },
     onCopyLink: () => onCopyLink(thread.eventId),
+    onCopyMatrixLink: () => onCopyLink(thread.eventId, 'matrix'),
     onPin: onPin ? () => onPin(thread.eventId) : undefined,
     pinned,
     onDelete: canDelete ? () => (deleteOpen = true) : undefined,

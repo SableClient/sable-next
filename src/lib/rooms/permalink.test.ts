@@ -300,18 +300,30 @@ function linkCore(via: string[] | Error) {
   return { core: { rpc: { rooms: { viaServers: roomViaServers } } } as never, roomViaServers };
 }
 
-test('copying a room id link asks for via servers and carries the event', async () => {
+test('copying a matrix event link asks for via servers and copies a matrix: URI', async () => {
   const writeText = vi.fn(() => Promise.resolve());
   vi.stubGlobal('navigator', { clipboard: { writeText } });
   const { core, roomViaServers } = linkCore(['a.example']);
 
   await expect(
-    copyRoomLink(core, { room_id: '!room:example.org', canonical_alias: null }, '$event')
+    copyRoomLink(core, { room_id: '!room:example.org', canonical_alias: null }, '$event', 'matrix')
   ).resolves.toBe(true);
 
   expect(roomViaServers).toHaveBeenCalledWith({ room_id: '!room:example.org' });
   expect(writeText).toHaveBeenCalledWith(
     matrixEventUri('!room:example.org', '$event', ['a.example'])
+  );
+});
+
+test('copying an external event link copies a web link carrying the event', async () => {
+  const writeText = vi.fn(() => Promise.resolve());
+  vi.stubGlobal('navigator', { clipboard: { writeText } });
+  const { core } = linkCore(['a.example']);
+
+  await copyRoomLink(core, { room_id: '!room:example.org', canonical_alias: null }, '$event');
+
+  expect(writeText).toHaveBeenCalledWith(
+    'https://link.sable.moe/#/!room%3Aexample.org/%24event?via=a.example'
   );
 });
 

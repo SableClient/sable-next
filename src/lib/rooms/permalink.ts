@@ -151,7 +151,8 @@ export function matrixEventUri(roomId: string, eventId: string, via: readonly st
 export async function copyRoomLink(
   core: Pick<CoreClient, 'rpc'>,
   room: Pick<RoomListItemView, 'room_id' | 'canonical_alias'>,
-  eventId?: string | null
+  eventId?: string | null,
+  format: 'matrix' | 'external' = 'external'
 ): Promise<boolean> {
   try {
     const via =
@@ -159,9 +160,9 @@ export async function copyRoomLink(
         ? []
         : await core.rpc.rooms.viaServers({ room_id: room.room_id });
     await copyText(
-      eventId
+      eventId && format === 'matrix'
         ? matrixEventUri(room.room_id, eventId, via)
-        : matrixToUrl(room.canonical_alias ?? room.room_id, via)
+        : matrixToUrl(eventId ? room.room_id : (room.canonical_alias ?? room.room_id), via, eventId)
     );
   } catch (error) {
     console.debug('[sable room] copy link failed', error);

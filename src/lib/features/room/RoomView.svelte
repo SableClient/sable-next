@@ -673,12 +673,12 @@
     handleMatrixLink(link, anchor);
   }
 
-  function copyEventLink(eventId: string): void {
+  function copyEventLink(eventId: string, format?: 'matrix' | 'external'): void {
     const room = {
       room_id: resolvedRoomId,
       canonical_alias: resolvedRoom?.canonical_alias ?? null,
     };
-    void copyRoomLink(core, room, eventId);
+    void copyRoomLink(core, room, eventId, format);
   }
 
   function memberDisplayName(userId: string): string | null {

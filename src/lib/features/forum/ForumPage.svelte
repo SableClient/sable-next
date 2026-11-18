@@ -264,11 +264,12 @@
     });
   }
 
-  function copyEventLink(eventId: string): void {
+  function copyEventLink(eventId: string, format?: 'matrix' | 'external'): void {
     void copyRoomLink(
       core,
       { room_id: resolvedRoomId, canonical_alias: resolvedRoom?.canonical_alias ?? null },
-      eventId
+      eventId,
+      format
     );
   }
 

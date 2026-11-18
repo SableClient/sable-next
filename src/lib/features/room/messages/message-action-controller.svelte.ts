@@ -44,7 +44,7 @@ export interface MessageCallbacks {
   onEdit?: (eventId: string, body: string, html: string | null, mediaCaption?: boolean) => void;
   onDelete?: (eventId: string, reason: string | null) => void;
   onOpenThread?: (rootEventId: string) => void;
-  onCopyLink?: (eventId: string) => void;
+  onCopyLink?: (eventId: string, format?: 'matrix' | 'external') => void;
 }
 
 interface MessageActionContext extends MessageCallbacks {
@@ -393,6 +393,11 @@ export class MessageActionExecutor {
       onCopyLink: policy.copyLink
         ? () => {
             if (item.event_id) onCopyLink?.(item.event_id);
+          }
+        : undefined,
+      onCopyMatrixLink: policy.copyLink
+        ? () => {
+            if (item.event_id) onCopyLink?.(item.event_id, 'matrix');
           }
         : undefined,
       pinned: policy.pinned,
