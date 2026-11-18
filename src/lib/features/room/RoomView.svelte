@@ -72,6 +72,7 @@
   import { RoomRules, provideRoomRulesOpener } from './room-rules.svelte.js';
   import RoomReadReceipts from './timeline/RoomReadReceipts.svelte';
   import TimelineList from './timeline/TimelineList.svelte';
+  import type { TimelineCallbacks } from './timeline/timeline-row.svelte.js';
   import { tagForLevel } from './settings/power-level-tags.js';
   import { memberListChanges } from './settings/member-list.svelte.js';
   import { provideSenderRoles, type SenderRole } from './members/sender-roles.js';
@@ -790,6 +791,31 @@
   function joinCall(): void {
     void call.join(resolvedRoomId, prescreenMedia, callSupport.fallbackUrl);
   }
+  const timelineCallbacks: TimelineCallbacks = {
+    onMarkUnread: readActions.markUnreadFrom,
+    onMatrixLink: handleMatrixLink,
+    onCopyLink: copyEventLink,
+    onSenderProfile: openProfile,
+    onMentionUser: mentionUser,
+    onRetrySend: conversation.retrySend,
+    onCancelSend: conversation.cancelSend,
+    get onToggleReaction() {
+      return canReact ? conversation.toggleReaction : undefined;
+    },
+    onDelete: conversation.redact,
+    get onReply() {
+      return canPost ? conversation.reply : undefined;
+    },
+    onSwipeMembers: toggleMembers,
+    onCancelContext: conversation.clearContext,
+    onOpenThread: openThread,
+    get onEdit() {
+      return canPost ? conversation.edit : undefined;
+    },
+    onOpenMedia: (eventId) => mediaViewerState.open(eventId, () => timeline.items, jumpToEvent),
+    onVotePoll: conversation.votePoll,
+    onEndPoll: conversation.endPoll,
+  };
 </script>
 
 <PageTitle title={pageTitle} />
@@ -825,29 +851,12 @@
       onRequestUnread={requestUnread}
       onResumeLive={resumeLive}
       onMarkRead={readActions.markAllRead}
-      onMarkUnread={readActions.markUnreadFrom}
-      onMatrixLink={handleMatrixLink}
-      onCopyLink={copyEventLink}
-      onSenderProfile={openProfile}
-      onMentionUser={mentionUser}
-      onRetrySend={conversation.retrySend}
-      onCancelSend={conversation.cancelSend}
-      onToggleReaction={canReact ? conversation.toggleReaction : undefined}
-      onDelete={conversation.redact}
-      onReply={canPost ? conversation.reply : undefined}
-      onSwipeMembers={toggleMembers}
-      onCancelContext={conversation.clearContext}
-      onOpenThread={openThread}
-      onEdit={canPost ? conversation.edit : undefined}
+      callbacks={timelineCallbacks}
       roomId={resolvedRoomId}
       members={memberLoader.members}
       onJumpToEvent={jumpToEvent}
       onReturnToPosition={savedPosition !== null ? returnToPosition : undefined}
       onJumpToLive={jumpToLive}
-      onOpenMedia={(eventId: string) =>
-        mediaViewerState.open(eventId, () => timeline.items, jumpToEvent)}
-      onVotePoll={conversation.votePoll}
-      onEndPoll={conversation.endPoll}
       readOnly={!canPost}
       canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
       canRedactOthers={roomSession.permissions?.can_redact_others ?? false}

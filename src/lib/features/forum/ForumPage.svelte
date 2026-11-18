@@ -52,6 +52,7 @@
 
   import { filterThreads, MAX_PINNED, sortThreads, type ForumView } from './forum-threads';
   import { ForumThreads } from './forum-threads.svelte.js';
+  import type { ForumThreadCallbacks } from './forum-thread-callbacks';
   import ForumHeader from './ForumHeader.svelte';
   import ForumThreadList from './ForumThreadList.svelte';
   import ForumToolbar from './ForumToolbar.svelte';
@@ -280,6 +281,21 @@
     );
   }
 
+  const threadCallbacks: ForumThreadCallbacks = {
+    onOpen: openThread,
+    get onEdit() {
+      return permissions?.can_post === false ? undefined : editThread;
+    },
+    onDelete: deleteThread,
+    get onReact() {
+      return permissions?.can_react === false ? undefined : conversation.toggleReaction;
+    },
+    onCopyLink: copyEventLink,
+    get onPin() {
+      return permissions?.can_pin ? togglePin : undefined;
+    },
+  };
+
   holdOverlayBack(() => threadRootId !== null, closeThread);
 
   function closeThread(): void {
@@ -433,16 +449,11 @@
         onRetry={() => void forumThreads.retry()}
         loading={forumThreads.loading || forumThreads.backwardPagination === 'loading'}
         canLoadMore={forumThreads.canLoadMore}
-        onOpen={openThread}
+        callbacks={threadCallbacks}
         canDelete={canDeleteThread}
-        onEdit={permissions?.can_post === false ? undefined : editThread}
-        onDelete={deleteThread}
         roomId={resolvedRoomId}
-        onReact={permissions?.can_react === false ? undefined : conversation.toggleReaction}
-        onCopyLink={copyEventLink}
         onLoadMore={loadMoreThreads}
         isPinned={(eventId) => pinnedEvents.has(eventId)}
-        onPin={permissions?.can_pin ? togglePin : undefined}
         layout={view.layout}
         filtered={query.trim() !== ''}
         onCreate={canPost ? () => void startThread() : undefined}

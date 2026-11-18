@@ -30,19 +30,14 @@
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 
+  import type { ForumThreadCallbacks } from './forum-thread-callbacks';
   import { VOTE, type ForumLayout, type ForumThread } from './forum-threads';
 
-  interface Props {
+  interface Props extends ForumThreadCallbacks {
     thread: ForumThread;
-    onOpen: (eventId: string) => void;
     canDelete: boolean;
-    onEdit?: (thread: ForumThread) => void;
-    onDelete: (eventId: string, reason: string | null) => void;
     roomId: string;
-    onReact?: (eventId: string, key: string) => void;
-    onCopyLink: (eventId: string, format?: 'matrix' | 'external') => void;
     pinned?: boolean;
-    onPin?: (eventId: string) => void;
     layout?: ForumLayout;
   }
 

@@ -35,6 +35,7 @@
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
@@ -45,13 +46,9 @@
   import { MediaViewerActions } from './media-viewer-actions';
   import { spoilerVisibility, spoilerVisibilityKey } from './spoiler-visibility.svelte.js';
   import { MediaViewerResource } from './media-viewer-resource.svelte';
-  import MediaViewerError from './MediaViewerError.svelte';
-  import MediaViewerHeading from './MediaViewerHeading.svelte';
-  import MediaViewerImageMenu from './MediaViewerImageMenu.svelte';
   import MediaViewerNavButton from './MediaViewerNavButton.svelte';
   import MediaViewerPending from './MediaViewerPending.svelte';
   import MediaViewerPlayer from './MediaViewerPlayer.svelte';
-  import MediaViewerZoomControls from './MediaViewerZoomControls.svelte';
   import type { MediaItem } from './media-viewer-types';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
@@ -61,9 +58,13 @@
   import ChatCenteredTextIcon from 'phosphor-svelte/lib/ChatCenteredTextIcon';
   import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
   import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
+  import ImageSquareIcon from 'phosphor-svelte/lib/ImageSquareIcon';
+  import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
   import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
+  import { MediaViewerView } from './media-viewer-view.svelte.js';
   import { mediaViewerState } from './media-viewer-state.svelte.js';
 
   const items = $derived(mediaViewerState.items);
@@ -117,49 +118,23 @@
       : null
   );
   let failed = $derived(resource.failed);
-  let zoom = $derived.by(() => {
+  let view = $derived.by(() => {
     void source;
-    return 1;
-  });
-  let rotation = $derived.by(() => {
-    void source;
-    return 0;
-  });
-  let pan = $derived.by<Vector2>(() => {
-    void source;
-    return { x: 0, y: 0 };
-  });
-  let pixelated = $derived.by(() => {
-    void source;
-    return untrack(() =>
-      item?.kind === 'image' || item?.kind === 'sticker'
-        ? pixelatedImage(preferences.pixelatedImages, item.width, item.height)
-        : false
+    return new MediaViewerView(
+      untrack(() =>
+        item?.kind === 'image' || item?.kind === 'sticker'
+          ? pixelatedImage(preferences.pixelatedImages, item.width, item.height)
+          : false
+      )
     );
   });
   let canSaveToPhotos = $state(false);
   let stageEl: HTMLElement | null = $state(null);
   let imageEl: HTMLImageElement | null = $state(null);
-  let fitRatio = $derived.by(() => {
-    void source;
-    return 1;
-  });
-  let fitsWindow = $derived.by(() => {
-    void source;
-    return true;
-  });
   let dragging = $state(false);
   let instant = $state(false);
-  let imageReady = $derived.by(() => {
-    void source;
-    return false;
-  });
   let imageMenuOpen = $state(false);
   let imageMenuAnchor = $state.raw<CursorAnchor | null>(null);
-  let editingZoom = $derived.by(() => {
-    void source;
-    return false;
-  });
   let zoomInput = $state('100');
   let swipeX = $state(0);
   let swipeY = $state(0);
@@ -190,14 +165,6 @@
   } | null>(null);
   let isImage = $derived(item?.kind === 'image' || item?.kind === 'sticker');
   let isPdf = $derived(item?.kind === 'file');
-  let pdfPages = $derived.by(() => {
-    void source;
-    return 0;
-  });
-  let pdfPage = $derived.by(() => {
-    void source;
-    return 1;
-  });
   let downloadLabel = $derived(
     mediaActions.savesToPhotos
       ? i18n.t('viewer.saveToPhotos')
@@ -215,7 +182,7 @@
 
   function refitOnResize(stage: HTMLElement): () => void {
     const observer = new ResizeObserver(() => {
-      if (fitsWindow && isImage) fitToStage();
+      if (view.fitsWindow && isImage) fitToStage();
     });
     observer.observe(stage);
     return () => {
@@ -269,15 +236,15 @@
   const LENS_MIN_SIZE = 96;
   const LENS_MAX_SIZE = 640;
   let maxZoom = $derived(isPdf ? 5 : 500);
-  let pannable = $derived(zoom > fitRatio * 1.001 || rotation % 360 !== 0);
+  let pannable = $derived(view.zoom > view.fitRatio * 1.001 || view.rotation % 360 !== 0);
 
   function applyZoom(next: number): void {
-    zoom = clamp(next, MIN_ZOOM, maxZoom);
+    view.zoom = clamp(next, MIN_ZOOM, maxZoom);
     void reclampPan();
   }
 
   function setZoom(next: number): void {
-    fitsWindow = false;
+    view.fitsWindow = false;
     applyZoom(next);
   }
 
@@ -292,9 +259,9 @@
   }
 
   function fitToStage(): void {
-    fitRatio = fitZoom();
+    view.fitRatio = fitZoom();
     instant = true;
-    applyZoom(fitRatio);
+    applyZoom(view.fitRatio);
     flushSync();
     if (imageEl) void getComputedStyle(imageEl).transform;
     instant = false;
@@ -302,23 +269,23 @@
 
   function onImageLoad(): void {
     fitToStage();
-    imageReady = true;
+    view.imageReady = true;
   }
 
   function rotateBy(degrees: number): void {
-    rotation += degrees;
+    view.rotation += degrees;
     void reclampPan();
   }
 
   async function reclampPan(): Promise<void> {
     await tick();
-    pan = pannable ? clampCurrentPan(pan) : { x: 0, y: 0 };
+    view.pan = pannable ? clampCurrentPan(view.pan) : { x: 0, y: 0 };
   }
 
   const PAN_STEP = 40;
 
   function panBy(dx: number, dy: number): void {
-    pan = clampCurrentPan({ x: pan.x + dx, y: pan.y + dy });
+    view.pan = clampCurrentPan({ x: view.pan.x + dx, y: view.pan.y + dy });
   }
 
   function handleKeydown(event: KeyboardEvent): void {
@@ -343,32 +310,33 @@
       if (event.key === 'ArrowUp') return panBy(0, PAN_STEP);
       if (event.key === 'ArrowDown') return panBy(0, -PAN_STEP);
     }
-    if (isPdf && pdfPages > 1) {
-      if (event.key === 'PageDown') return void (pdfPage = Math.min(pdfPages, pdfPage + 1));
-      if (event.key === 'PageUp') return void (pdfPage = Math.max(1, pdfPage - 1));
-      if (event.key === 'Home') return void (pdfPage = 1);
-      if (event.key === 'End') return void (pdfPage = pdfPages);
+    if (isPdf && view.pdfPages > 1) {
+      if (event.key === 'PageDown')
+        return void (view.pdfPage = Math.min(view.pdfPages, view.pdfPage + 1));
+      if (event.key === 'PageUp') return void (view.pdfPage = Math.max(1, view.pdfPage - 1));
+      if (event.key === 'Home') return void (view.pdfPage = 1);
+      if (event.key === 'End') return void (view.pdfPage = view.pdfPages);
     }
     if (event.key === 'ArrowLeft') previous();
     if (event.key === 'ArrowRight') next();
-    if (event.key === '+' || event.key === '=') setZoom(zoom * (1 + ZOOM_STEP));
-    if (event.key === '-') setZoom(zoom / (1 + ZOOM_STEP));
+    if (event.key === '+' || event.key === '=') setZoom(view.zoom * (1 + ZOOM_STEP));
+    if (event.key === '-') setZoom(view.zoom / (1 + ZOOM_STEP));
   }
 
   function offsetFromImageCentre(event: { clientX: number; clientY: number }): Vector2 {
     if (!stageEl) return { x: 0, y: 0 };
     const stage = stageEl.getBoundingClientRect();
     return {
-      x: stage.width / 2 - (event.clientX - stage.x - pan.x),
-      y: stage.height / 2 - (event.clientY - stage.y - pan.y),
+      x: stage.width / 2 - (event.clientX - stage.x - view.pan.x),
+      y: stage.height / 2 - (event.clientY - stage.y - view.pan.y),
     };
   }
 
   function zoomTowards(event: { clientX: number; clientY: number }, next: number): void {
     const target = clamp(next, MIN_ZOOM, maxZoom);
     const offset = offsetFromImageCentre(event);
-    const growth = target / zoom - 1;
-    pan = { x: pan.x + offset.x * growth, y: pan.y + offset.y * growth };
+    const growth = target / view.zoom - 1;
+    view.pan = { x: view.pan.x + offset.x * growth, y: view.pan.y + offset.y * growth };
     setZoom(target);
   }
 
@@ -376,7 +344,7 @@
     if (isPdf) {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
-      setZoom(zoom * wheelZoomFactor(event, event.deltaY, window.innerHeight));
+      setZoom(view.zoom * wheelZoomFactor(event, event.deltaY, window.innerHeight));
       return;
     }
     if (!isImage || spoilerHidden) return;
@@ -391,7 +359,7 @@
       }
       return;
     }
-    zoomTowards(event, zoom * factor);
+    zoomTowards(event, view.zoom * factor);
   }
 
   const DOUBLE_TAP_MS = 300;
@@ -409,13 +377,13 @@
     }
 
     lastTap = 0;
-    if (pannable || pan.x !== 0 || pan.y !== 0) {
-      pan = { x: 0, y: 0 };
-      fitsWindow = true;
+    if (pannable || view.pan.x !== 0 || view.pan.y !== 0) {
+      view.pan = { x: 0, y: 0 };
+      view.fitsWindow = true;
       fitToStage();
       return true;
     }
-    zoomTowards(event, fitRatio * 2);
+    zoomTowards(event, view.fitRatio * 2);
     return true;
   }
 
@@ -439,7 +407,7 @@
 
   function toggleFileZoom(event: MouseEvent): void {
     if (!isPdf || event.button !== 0 || event.target instanceof HTMLButtonElement) return;
-    setZoom(zoom === 1 ? 2 : 1);
+    setZoom(view.zoom === 1 ? 2 : 1);
   }
 
   function startPan(event: PointerEvent): void {
@@ -479,7 +447,7 @@
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (touches.size === 2) {
         pinchDistance = distance();
-        pinchZoom = zoom;
+        pinchZoom = view.zoom;
         pinchCenter = center();
         panPointerId = null;
         dragging = true;
@@ -499,7 +467,7 @@
     }
     if (panPointerId !== null) return;
     panPointerId = event.pointerId;
-    panOrigin = { ...pan };
+    panOrigin = { ...view.pan };
     panStartPointer = { x: event.clientX, y: event.clientY };
     dragging = true;
   }
@@ -536,7 +504,7 @@
       return;
     }
     if (panPointerId !== event.pointerId) return;
-    pan = clampCurrentPan({
+    view.pan = clampCurrentPan({
       x: panOrigin.x + (event.clientX - panStartPointer.x),
       y: panOrigin.y + (event.clientY - panStartPointer.y),
     });
@@ -563,9 +531,9 @@
       zoomTowards({ clientX: newPinchCenter.x, clientY: newPinchCenter.y }, nextZoom);
     }
     if (newPinchCenter && pinchCenter) {
-      pan = clampCurrentPan({
-        x: pan.x + (newPinchCenter.x - pinchCenter.x),
-        y: pan.y + (newPinchCenter.y - pinchCenter.y),
+      view.pan = clampCurrentPan({
+        x: view.pan.x + (newPinchCenter.x - pinchCenter.x),
+        y: view.pan.y + (newPinchCenter.y - pinchCenter.y),
       });
     }
     pinchCenter = newPinchCenter;
@@ -624,14 +592,14 @@
   }
 
   function beginZoomEdit(): void {
-    zoomInput = String(Math.round(zoom * 100));
-    editingZoom = true;
+    zoomInput = String(Math.round(view.zoom * 100));
+    view.editingZoom = true;
   }
 
   function commitZoomEdit(): void {
     const next = Number.parseInt(zoomInput, 10);
     if (!Number.isNaN(next)) setZoom(next / 100);
-    editingZoom = false;
+    view.editingZoom = false;
   }
 
   const nativeShare = sharesNatively();
@@ -666,26 +634,64 @@
         }}
       >
         <header class={['toolbar', { 'chrome-hidden': chromeHidden }]}>
-          <MediaViewerHeading
-            sender={item.sender}
-            position={index + 1}
-            total={items.length}
-            label={visibleLabel}
-          />
+          <div class="heading">
+            <strong>{item.sender}</strong>
+            <Tooltip label={visibleLabel}>
+              {#snippet trigger({ props })}
+                <span {...props}
+                  >{i18n.t('viewer.position', { index: index + 1, total: items.length })} · {visibleLabel}</span
+                >
+              {/snippet}
+            </Tooltip>
+          </div>
           <div class="actions">
             {#if isImage || isPdf}
               <div class="zoom-controls">
-                <MediaViewerZoomControls
-                  {zoom}
-                  showOriginal={isImage && fitRatio !== 1 && zoom !== 1}
-                  editing={editingZoom}
-                  bind:zoomInput
-                  onoriginal={() => setZoom(1)}
-                  onzoomout={() => setZoom(zoom / (1 + ZOOM_STEP))}
-                  onzoomin={() => setZoom(zoom * (1 + ZOOM_STEP))}
-                  onedit={beginZoomEdit}
-                  oncommit={commitZoomEdit}
-                />
+                {#if isImage && view.fitRatio !== 1 && view.zoom !== 1}
+                  <IconButton
+                    label={i18n.t('viewer.originalSize')}
+                    size="small"
+                    variant="ghost"
+                    onclick={() => setZoom(1)}><ImageSquareIcon /></IconButton
+                  >
+                {/if}
+                <IconButton
+                  label={i18n.t('viewer.zoomOut')}
+                  size="small"
+                  variant="ghost"
+                  onclick={() => setZoom(view.zoom / (1 + ZOOM_STEP))}><MinusIcon /></IconButton
+                >
+                {#if view.editingZoom}
+                  <span class="zoom-level">
+                    <!-- svelte-ignore a11y_autofocus -->
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      aria-label={i18n.t('viewer.setZoom')}
+                      autofocus
+                      bind:value={zoomInput}
+                      onblur={commitZoomEdit}
+                      onkeydown={(event) => {
+                        if (event.key === 'Enter') commitZoomEdit();
+                      }}
+                    />%
+                  </span>
+                {:else}
+                  {@const zoomLabel = i18n.t('viewer.setZoom')}
+                  <Tooltip label={zoomLabel}>
+                    {#snippet trigger({ props })}
+                      <button {...props} class="zoom-level" type="button" onclick={beginZoomEdit}
+                        >{Math.round(view.zoom * 100)}%</button
+                      >
+                    {/snippet}
+                  </Tooltip>
+                {/if}
+                <IconButton
+                  label={i18n.t('viewer.zoomIn')}
+                  size="small"
+                  variant="ghost"
+                  onclick={() => setZoom(view.zoom * (1 + ZOOM_STEP))}><PlusIcon /></IconButton
+                >
               </div>
             {/if}
             {#if canShare}
@@ -743,8 +749,8 @@
                   </ActionMenuItem>
                   <ActionMenuItem
                     kind="checkbox"
-                    checked={pixelated}
-                    onSelect={() => (pixelated = !pixelated)}
+                    checked={view.pixelated}
+                    onSelect={() => (view.pixelated = !view.pixelated)}
                   >
                     <SquaresFourIcon />
                     {i18n.t('viewer.pixelate')}
@@ -761,11 +767,11 @@
                 {#if isImage || isPdf}
                   <ActionMenuItem
                     onSelect={() => {
-                      rotation = 0;
-                      pan = { x: 0, y: 0 };
-                      fitsWindow = true;
+                      view.rotation = 0;
+                      view.pan = { x: 0, y: 0 };
+                      view.fitsWindow = true;
                       if (isImage) fitToStage();
-                      else zoom = 1;
+                      else view.zoom = 1;
                     }}
                   >
                     <ArrowCounterClockwiseIcon />
@@ -828,22 +834,22 @@
               <PdfViewer
                 src={url}
                 name={fileName}
-                page={pdfPage}
-                {zoom}
+                page={view.pdfPage}
+                zoom={view.zoom}
                 onPages={(pages) => {
-                  pdfPages = pages;
+                  view.pdfPages = pages;
                 }}
               />
             {:else}
               <img
                 bind:this={imageEl}
-                class={{ pixelated, dragging, instant, spoilered: spoilerHidden }}
+                class={{ pixelated: view.pixelated, dragging, instant, spoilered: spoilerHidden }}
                 src={url}
                 alt={spoilerHidden ? '' : mediaLabel || i18n.t('viewer.imageAlt')}
                 aria-hidden={spoilerHidden ? 'true' : undefined}
                 draggable="false"
-                style:opacity={imageReady ? undefined : 0}
-                style:transform={`translate(${String(pan.x + swipeX)}px, ${String(pan.y + swipeY)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
+                style:opacity={view.imageReady ? undefined : 0}
+                style:transform={`translate(${String(view.pan.x + swipeX)}px, ${String(view.pan.y + swipeY)}px) scale(${String(view.zoom)}) rotate(${String(view.rotation)}deg)`}
                 {@attach mediaEvents({ load: onImageLoad })}
                 oncontextmenu={mouseContextMenu(openImageMenu)}
               />
@@ -857,7 +863,7 @@
                   style:height={`${String(lensSettings.size)}px`}
                 >
                   <img
-                    class={{ pixelated }}
+                    class={{ pixelated: view.pixelated }}
                     src={url}
                     alt=""
                     draggable="false"
@@ -867,15 +873,29 @@
                   />
                 </div>
               {/if}
-              <MediaViewerImageMenu
+              <ActionMenu
                 bind:open={imageMenuOpen}
+                label={i18n.t('viewer.imageMenu')}
                 anchor={imageMenuAnchor}
-                {mediaActions}
-                {downloadLabel}
-              />
+                side="bottom"
+                align="start"
+                preventScroll={false}
+              >
+                <ActionMenuItem onSelect={() => void mediaActions.copyImage()}>
+                  <CopyIcon />
+                  {i18n.t('viewer.copyImage')}
+                </ActionMenuItem>
+                <ActionMenuItem onSelect={() => void mediaActions.save()}>
+                  <DownloadSimpleIcon />
+                  {downloadLabel}
+                </ActionMenuItem>
+              </ActionMenu>
             {/if}
           {:else if failed}
-            <MediaViewerError />
+            <div class="error">
+              <strong>{i18n.t('timeline.mediaUnavailable')}</strong>
+              <span>{i18n.t('timeline.mediaUnavailableDetail')}</span>
+            </div>
           {:else}
             <MediaViewerPending {preview} percent={loading.percent} />
           {/if}
@@ -892,23 +912,25 @@
           {/if}
         </main>
 
-        {#if isPdf && pdfPages > 1}
+        {#if isPdf && view.pdfPages > 1}
           <footer class={['bottom-bar', { 'chrome-hidden': chromeHidden }]}>
             <div class="zoom-controls">
               <IconButton
                 label={i18n.t('pdf.previousPage')}
                 size="small"
                 variant="ghost"
-                disabled={pdfPage <= 1}
-                onclick={() => (pdfPage -= 1)}><CaretLeftIcon /></IconButton
+                disabled={view.pdfPage <= 1}
+                onclick={() => (view.pdfPage -= 1)}><CaretLeftIcon /></IconButton
               >
-              <span>{i18n.t('pdf.pageIndicator', { page: pdfPage, pages: pdfPages })}</span>
+              <span
+                >{i18n.t('pdf.pageIndicator', { page: view.pdfPage, pages: view.pdfPages })}</span
+              >
               <IconButton
                 label={i18n.t('pdf.nextPage')}
                 size="small"
                 variant="ghost"
-                disabled={pdfPage >= pdfPages}
-                onclick={() => (pdfPage += 1)}><CaretRightIcon /></IconButton
+                disabled={view.pdfPage >= view.pdfPages}
+                onclick={() => (view.pdfPage += 1)}><CaretRightIcon /></IconButton
               >
             </div>
           </footer>
@@ -919,6 +941,60 @@
 {/if}
 
 <style>
+  .heading {
+    display: grid;
+    flex: 1;
+    gap: var(--space-050);
+    min-width: 0;
+  }
+
+  .heading strong,
+  .heading span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .heading span {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+  }
+
+  .error {
+    color: var(--crit-main);
+    display: grid;
+    gap: var(--space-200);
+    text-align: center;
+  }
+
+  .error span {
+    color: var(--surface-var-on-container);
+  }
+
+  .zoom-level {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: text;
+    font: inherit;
+    min-width: 4em;
+    padding: 0;
+    text-align: center;
+  }
+
+  .zoom-level input {
+    all: unset;
+    field-sizing: content;
+    text-align: center;
+  }
+
+  @media (--app-layout) {
+    .error,
+    .error span {
+      color: var(--media-on-scrim);
+    }
+  }
+
   :global(.viewer) {
     background: var(--surface-var-container);
     color: var(--surface-var-on-container);

@@ -22,30 +22,13 @@ export class MessageTransfer {
     return send_state?.status === 'sending' ? (send_state.progress ?? null) : null;
   });
 
-  readonly #uploading = $derived.by(() => {
-    const { item, pending } = this.#options();
-    return (
-      pending &&
-      (item.content.kind === 'image' ||
-        item.content.kind === 'video' ||
-        item.content.kind === 'audio' ||
-        item.content.kind === 'file' ||
-        item.content.kind === 'gallery')
-    );
-  });
-
-  readonly #galleryCount = $derived.by(() => {
-    const { content } = this.#options().item;
-    return content.kind === 'gallery' ? content.items.length : 0;
-  });
-
   readonly props = $derived.by(() => {
-    const { item, savingPercent, savingSlow, onCancel: cancel } = this.#options();
+    const { item, pending, savingPercent, savingSlow, onCancel: cancel } = this.#options();
     const onCancel = item.transaction_id ? cancel : undefined;
     const upload = this.upload;
     if (upload !== null) {
       const part = upload.total > 0 ? Math.min(1, upload.current / upload.total) : 0;
-      const galleryCount = this.#galleryCount;
+      const galleryCount = item.content.kind === 'gallery' ? item.content.items.length : 0;
       const gallery = galleryCount > 1;
       return {
         label: i18n.t('timeline.uploading'),
@@ -60,7 +43,15 @@ export class MessageTransfer {
         onCancel,
       };
     }
-    if (this.#uploading) return { label: i18n.t('timeline.uploading'), onCancel };
+    if (
+      pending &&
+      (item.content.kind === 'image' ||
+        item.content.kind === 'video' ||
+        item.content.kind === 'audio' ||
+        item.content.kind === 'file' ||
+        item.content.kind === 'gallery')
+    )
+      return { label: i18n.t('timeline.uploading'), onCancel };
     if (savingPercent !== null)
       return { label: i18n.t('timeline.downloading'), max: 100, value: savingPercent };
     if (savingSlow) return { label: i18n.t('timeline.downloading') };

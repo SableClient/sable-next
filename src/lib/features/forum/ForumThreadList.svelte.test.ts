@@ -4,6 +4,10 @@ import { userEvent } from '@testing-library/user-event';
 import { expect, onTestFinished, test, vi } from 'vitest';
 import ForumThreadList from './ForumThreadList.svelte';
 
+function noopCallbacks() {
+  return { onOpen: vi.fn(), onDelete: vi.fn(), onCopyLink: vi.fn() };
+}
+
 test('a failed empty forum offers recovery', async () => {
   const retry = vi.fn();
   render(ForumThreadList, {
@@ -12,11 +16,9 @@ test('a failed empty forum offers recovery', async () => {
     failed: true,
     canLoadMore: false,
     onRetry: retry,
-    onOpen: vi.fn(),
+    callbacks: noopCallbacks(),
     canDelete: () => false,
-    onDelete: vi.fn(),
     roomId: '!forum:example.org',
-    onCopyLink: vi.fn(),
     onLoadMore: vi.fn(),
   });
   expect(screen.getByRole('alert')).toBeVisible();
@@ -28,11 +30,9 @@ const base = {
   threads: [],
   loading: false,
   canLoadMore: false,
-  onOpen: vi.fn(),
+  callbacks: noopCallbacks(),
   canDelete: () => false,
-  onDelete: vi.fn(),
   roomId: '!forum:example.org',
-  onCopyLink: vi.fn(),
   onLoadMore: vi.fn(),
 };
 

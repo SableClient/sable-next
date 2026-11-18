@@ -12,15 +12,13 @@
   let { direction, onclick }: Props = $props();
 </script>
 
-{#if direction === 'previous'}
-  <IconButton class="nav previous" label={i18n.t('viewer.previous')} size="large" {onclick}
-    ><ArrowLeftIcon /></IconButton
-  >
-{:else}
-  <IconButton class="nav next" label={i18n.t('viewer.next')} size="large" {onclick}
-    ><ArrowRightIcon /></IconButton
-  >
-{/if}
+<IconButton
+  class={`nav ${direction}`}
+  label={i18n.t(direction === 'previous' ? 'viewer.previous' : 'viewer.next')}
+  size="large"
+  {onclick}
+  >{#if direction === 'previous'}<ArrowLeftIcon />{:else}<ArrowRightIcon />{/if}</IconButton
+>
 
 <style>
   :global(.nav) {

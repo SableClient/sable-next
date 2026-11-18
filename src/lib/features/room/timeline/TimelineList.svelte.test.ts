@@ -16,6 +16,7 @@ import { TimelineWindow, rememberTimelineView } from '#lib/timeline/timeline-win
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { TIMELINE_LAYOUT } from './timeline-layout';
 import { MAX_EMPTY_REFILLS } from './timeline-pagination.svelte.js';
+import { reactiveToggle } from '#lib/test-support/toggle.svelte.js';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/core/context.js');
@@ -3274,7 +3275,7 @@ test('Enter moves into a message and Escape returns to it', async () => {
         onRequestHistory: () => Promise.resolve(true),
         onRequestFuture: async () => {},
         onRead: async () => {},
-        onReply: () => {},
+        callbacks: { onReply: () => {} },
       },
     },
   });
@@ -3291,6 +3292,42 @@ test('Enter moves into a message and Escape returns to it', async () => {
   expect(article.contains(document.activeElement) && document.activeElement !== article).toBe(true);
   await userEvent.keyboard('{Escape}');
   expect(document.activeElement).toBe(article);
+});
+
+test('message actions follow a live change to the host callbacks', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('a')];
+  const canReply = reactiveToggle();
+  const onReply = () => {};
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+        callbacks: {
+          get onReply() {
+            return canReply.on ? onReply : undefined;
+          },
+        },
+      },
+    },
+  });
+  await runAnimationFrames();
+  const article = viewport().querySelector<HTMLElement>('article.message');
+  if (!article) throw new Error('message not rendered');
+  article.focus();
+  await flushed();
+  expect(within(article).queryByRole('button', { name: 'Reply' })).not.toBeNull();
+
+  canReply.on = false;
+  await flushed();
+  expect(within(article).queryByRole('button', { name: 'Reply' })).toBeNull();
+
+  canReply.on = true;
+  await flushed();
+  expect(within(article).queryByRole('button', { name: 'Reply' })).not.toBeNull();
 });
 
 test('Shift+F10 and the ContextMenu key raise the message context menu', async () => {

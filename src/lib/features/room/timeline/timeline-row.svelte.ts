@@ -39,14 +39,7 @@ import { TimelineItemProfiles } from './timeline-item-profiles.svelte';
 import { TimelineItemEngagement } from './timeline-item-engagement.svelte';
 import { selectedText, withSelectedText } from './timeline-item-selection';
 
-export interface TimelineItemProps extends MessageCallbacks {
-  item: TimelineItemView;
-  collapsed: boolean;
-  unreadCount?: number;
-  replyPersona?: PerMessageProfileView | null;
-  threadPersona?: PerMessageProfileView | null;
-  roomId?: string;
-  highlighted?: boolean;
+export interface TimelineCallbacks extends MessageCallbacks {
   onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   onSenderProfile?: (
     userId: string,
@@ -56,6 +49,20 @@ export interface TimelineItemProps extends MessageCallbacks {
   onMentionUser?: (userId: string, name: string) => void;
   onRetrySend?: (transactionId: string) => void;
   onCancelSend?: (transactionId: string) => void;
+  onOpenMedia?: (eventId: string) => void;
+  onVotePoll?: (eventId: string, answers: string[]) => void;
+  onEndPoll?: (eventId: string) => void;
+  onSwipeMembers?: () => void;
+}
+
+export interface TimelineItemProps extends TimelineCallbacks {
+  item: TimelineItemView;
+  collapsed: boolean;
+  unreadCount?: number;
+  replyPersona?: PerMessageProfileView | null;
+  threadPersona?: PerMessageProfileView | null;
+  roomId?: string;
+  highlighted?: boolean;
   currentUserId?: string | null;
   canRedactOwn?: boolean;
   canRedactOthers?: boolean;
@@ -73,15 +80,11 @@ export interface TimelineItemProps extends MessageCallbacks {
   avatarsInHeaders?: boolean;
   members?: readonly MemberView[];
   onJumpToEvent?: (eventId: string) => void;
-  onOpenMedia?: (eventId: string) => void;
-  onVotePoll?: (eventId: string, answers: string[]) => void;
-  onEndPoll?: (eventId: string) => void;
   events?: TimelineEventIndex;
   onMenuOpenChange?: (open: boolean) => void;
   placeholder?: boolean;
   placeholderCharacters?: number;
   overrideCosmetics?: SenderCosmetics | null;
-  onSwipeMembers?: () => void;
 }
 
 export interface TimelineRowOptions extends MessageCallbacks {

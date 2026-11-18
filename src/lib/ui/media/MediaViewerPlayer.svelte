@@ -37,7 +37,7 @@
 {/if}
 
 <style>
-  .media-player {
+  :global(.stage) .media-player {
     max-height: 100%;
     max-width: 100%;
   }

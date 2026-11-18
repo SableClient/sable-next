@@ -5,6 +5,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import { MAX_PINNED, type ForumLayout, type ForumThread } from './forum-threads';
+  import type { ForumThreadCallbacks } from './forum-thread-callbacks';
   import ForumThreadItem from './ForumThreadItem.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
@@ -15,16 +16,11 @@
     failed?: boolean;
     onRetry?: () => void;
     canLoadMore: boolean;
-    onOpen: (eventId: string) => void;
+    callbacks: ForumThreadCallbacks;
     canDelete: (thread: ForumThread) => boolean;
-    onEdit?: (thread: ForumThread) => void;
-    onDelete: (eventId: string, reason: string | null) => void;
     roomId: string;
-    onReact?: (eventId: string, key: string) => void;
-    onCopyLink: (eventId: string) => void;
     onLoadMore: () => void;
     isPinned?: (eventId: string) => boolean;
-    onPin?: (eventId: string) => void;
     layout?: ForumLayout;
     filtered?: boolean;
     onCreate?: () => void;
@@ -36,16 +32,11 @@
     failed = false,
     onRetry,
     canLoadMore,
-    onOpen,
+    callbacks,
     canDelete,
-    onEdit,
-    onDelete,
     roomId,
-    onReact,
-    onCopyLink,
     onLoadMore,
     isPinned = () => false,
-    onPin,
     layout = 'list',
     filtered = false,
     onCreate,
@@ -94,14 +85,9 @@
         {#each pinnedThreads as thread (thread.id)}
           <ForumThreadItem
             {thread}
-            {onOpen}
+            {...callbacks}
             canDelete={canDelete(thread)}
-            {onEdit}
-            {onDelete}
             {roomId}
-            {onReact}
-            {onCopyLink}
-            {onPin}
             {layout}
             pinned
           />
@@ -115,14 +101,9 @@
       {#each otherThreads as thread (thread.id)}
         <ForumThreadItem
           {thread}
-          {onOpen}
+          {...callbacks}
           canDelete={canDelete(thread)}
-          {onEdit}
-          {onDelete}
           {roomId}
-          {onReact}
-          {onCopyLink}
-          {onPin}
           {layout}
           pinned={isPinned(thread.eventId)}
         />

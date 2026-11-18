@@ -26,7 +26,7 @@
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import ForwardedLine from '../messages/ForwardedLine.svelte';
   import '../members/sender-identity.css';
-  import { formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
+  import { formatFullTimestamp, formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import { MessageLinkPreviews } from './message-link-previews.svelte';
@@ -39,8 +39,8 @@
   import TimelineThreadSummary from './TimelineThreadSummary.svelte';
   import TimelineTransfer from './TimelineTransfer.svelte';
   import UndecryptableNotice from './UndecryptableNotice.svelte';
-  import TimelineCryptoIndicators from './TimelineCryptoIndicators.svelte';
-  import TimelineMessageTime from './TimelineMessageTime.svelte';
+  import MessageShieldNotice from './MessageCryptoStatus.svelte';
+  import MessageSharedBy from './MessageSharedBy.svelte';
   import TimelineSenderAvatar from './TimelineSenderAvatar.svelte';
 
   let {
@@ -277,6 +277,21 @@
   {/if}
 {/snippet}
 
+{#snippet messageTime(format: (timestamp: number) => string)}
+  {#if row.pending}
+    <Spinner small label={i18n.t('timeline.sending')} />
+  {:else}
+    <Tooltip>
+      {#snippet content()}{formatFullTimestamp(item.timestamp)}{/snippet}
+      {#snippet trigger({ props })}
+        <time {...props} datetime={new Date(item.timestamp).toISOString()}>
+          {format(item.timestamp)}
+        </time>
+      {/snippet}
+    </Tooltip>
+  {/if}
+{/snippet}
+
 {#if placeholder}
   <article
     class={['message', 'placeholder-message', `layout-${layout}`, { collapsed }]}
@@ -368,13 +383,7 @@
         <Spinner small label={i18n.t('timeline.sending')} />
       </span>
     {:else if layout !== 'compact' && preferences.showAllTimestamps}
-      <span class="collapsed-pending collapsed-time"
-        ><TimelineMessageTime
-          timestamp={item.timestamp}
-          pending={row.pending}
-          format={formatTime}
-        /></span
-      >
+      <span class="collapsed-pending collapsed-time">{@render messageTime(formatTime)}</span>
     {/if}
     <div
       class="message-content"
@@ -382,11 +391,7 @@
     >
       {#if layout === 'compact'}
         <div class="compact-gutter" id={`${labelId}-head`}>
-          <TimelineMessageTime
-            timestamp={item.timestamp}
-            pending={row.pending}
-            format={formatTime}
-          />
+          {@render messageTime(formatTime)}
           <div class="compact-user">
             {#if avatarsInHeaders}
               {@render senderAvatar('tiny')}
@@ -447,18 +452,10 @@
                 aria-label={timeAction.label}
                 onclick={timeAction.run}
               >
-                <TimelineMessageTime
-                  timestamp={item.timestamp}
-                  pending={row.pending}
-                  format={formatMessageTimestamp}
-                />
+                {@render messageTime(formatMessageTimestamp)}
               </button>
             {:else}
-              <TimelineMessageTime
-                timestamp={item.timestamp}
-                pending={row.pending}
-                format={formatMessageTimestamp}
-              />
+              {@render messageTime(formatMessageTimestamp)}
             {/if}
             {@render headerAction?.()}
           </div>
@@ -612,10 +609,14 @@
         {/if}
       </div>
       {#if shieldShown || item.shared_by}
-        <TimelineCryptoIndicators
-          shield={shieldShown ? item.shield : null}
-          sharedBy={item.shared_by}
-        />
+        <span class="crypto-indicators">
+          {#if item.shield && shieldShown}
+            <MessageShieldNotice shield={item.shield} />
+          {/if}
+          {#if item.shared_by}
+            <MessageSharedBy sharedBy={item.shared_by} />
+          {/if}
+        </span>
       {/if}
       {#if trailingReceiptBadge && layout !== 'bubble'}
         {@render receiptSlot()}
@@ -942,7 +943,18 @@
     position: absolute;
   }
 
-  .message-content:has(> :global(.crypto-indicators)) > .receipt-slot {
+  .crypto-indicators {
+    align-self: flex-start;
+    display: flex;
+    gap: var(--space-100);
+    margin-inline-start: var(--space-200);
+  }
+
+  .crypto-indicators > :global(button) {
+    margin-inline-start: 0;
+  }
+
+  .message-content:has(> .crypto-indicators) > .receipt-slot {
     inset-inline-end: calc(var(--space-200) + var(--font-size-body));
   }
 
@@ -1064,7 +1076,7 @@
     color: var(--surface-var-on-container);
   }
 
-  .message-details :global(time) {
+  .message-details time {
     flex-shrink: 0;
   }
 
@@ -1132,7 +1144,7 @@
     grid-row: 2;
   }
 
-  .message.layout-compact :global(.crypto-indicators) {
+  .message.layout-compact .crypto-indicators {
     grid-column: 3;
     grid-row: 2;
   }
@@ -1168,7 +1180,7 @@
     grid-row: 1;
   }
 
-  .message.layout-compact .compact-gutter :global(time) {
+  .message.layout-compact .compact-gutter time {
     color: var(--surface-var-on-container);
     flex: none;
     font-size: var(--font-size-small);

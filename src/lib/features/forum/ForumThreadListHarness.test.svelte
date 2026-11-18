@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ComponentProps } from 'svelte';
+  import MessageContextMenu from '#lib/features/room/messages/MessageContextMenu.svelte';
   import {
     OpenMessageMenu,
     provideMessageMenu,
@@ -7,7 +8,8 @@
   import ForumThreadList from './ForumThreadList.svelte';
 
   let props: ComponentProps<typeof ForumThreadList> = $props();
-  provideMessageMenu(new OpenMessageMenu());
+  const menu = provideMessageMenu(new OpenMessageMenu());
 </script>
 
 <ForumThreadList {...props} />
+<MessageContextMenu {menu} />
