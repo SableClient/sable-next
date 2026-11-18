@@ -1,0 +1,3 @@
+- Self-hosted deployments can set separate light and dark branding themes with `branding.lightThemeUrl` and `branding.darkThemeUrl`.
+- Share the screen in VP8 at 1080p by default.
+- Keep the Android keyboard open while scrolling the timeline.
