@@ -10,6 +10,7 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { nativeFilePicker } from '#lib/platform/native-file-picker.js';
   import { parsePronouns } from '#lib/personas/pronouns.js';
@@ -436,7 +437,7 @@
       <div class="field">
         <span>{i18n.t('settings.banner')}</span>
         {#if banner_url}
-          <div class="profile-card-cover">
+          <div class={['profile-card-cover', { fit: preferences.bannerFit === 'image' }]}>
             <MediaImage
               class={banner_url
                 ? 'profile-card-banner'
@@ -667,10 +668,15 @@
   }
 
   .profile-card-cover {
+    height: 7rem;
     overflow: hidden;
   }
 
-  .profile-card-cover :global(.profile-card-banner) {
+  .profile-card-cover.fit {
+    height: auto;
+  }
+
+  .profile-card-cover.fit :global(.profile-card-banner) {
     max-height: 14rem;
     min-height: 4rem;
   }

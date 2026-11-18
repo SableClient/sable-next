@@ -76,7 +76,13 @@
 
 <div class="room-nav-top">
   {#if bannerShown && banner}
-    <div class="room-banner" style:--room-banner-max={`${preferences.roomBannerHeight}px`}>
+    <div
+      class={['room-banner', { fit: preferences.bannerFit === 'image' }]}
+      style:height={preferences.bannerFit === 'image'
+        ? undefined
+        : `${preferences.roomBannerHeight}px`}
+      style:--room-banner-max={`${preferences.roomBannerHeight}px`}
+    >
       <Banner source={banner} name={bannerName} width={640} height={190} />
       <ResizeHandle
         value={preferences.roomBannerHeight}
@@ -177,7 +183,14 @@
     display: block;
   }
 
-  .room-banner :global(.banner-image) {
+  .room-banner:not(.fit) :global(.banner-image),
+  .room-banner:not(.fit) :global(img) {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .room-banner.fit :global(.banner-image) {
     height: auto;
     max-height: var(--room-banner-max);
     min-height: var(--header-height);

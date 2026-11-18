@@ -295,6 +295,7 @@ const SETTINGS = {
   }),
   voiceParticipantPlacement: choice(['both', 'below', 'inline'], 'both', { account: true }),
   showRoomBanners: toggle(true, { account: true }),
+  bannerFit: choice(['fixed', 'image'], 'fixed', { account: true }),
   showDmTopics: toggle(true, { account: true }),
   messagePreviews: choice<MessagePreviews>(['off', 'direct', 'rooms', 'all'], 'off', {
     account: true,

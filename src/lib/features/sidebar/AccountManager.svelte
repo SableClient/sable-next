@@ -465,7 +465,7 @@
     border-radius: var(--radius);
   }
 
-  .account-profile :global(.profile-card .profile-card-cover:not(.has-banner)) {
+  .account-profile :global(.profile-card .profile-card-cover:not(.fit-banner)) {
     height: 8rem;
   }
 

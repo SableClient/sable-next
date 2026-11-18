@@ -133,6 +133,18 @@ export const appearanceCategory: SettingsCategory = {
       type: 'boolean',
     },
     {
+      key: 'bannerFit',
+      section: 'sidebar',
+      icon: ImageIcon,
+      name: 'settings.bannerFit',
+      description: 'settings.bannerFitHint',
+      type: 'select',
+      options: [
+        { value: 'fixed', label: 'settings.bannerFitFixed' },
+        { value: 'image', label: 'settings.bannerFitImage' },
+      ],
+    },
+    {
       key: 'showDmTopics',
       section: 'sidebar',
       icon: ChatTextIcon,

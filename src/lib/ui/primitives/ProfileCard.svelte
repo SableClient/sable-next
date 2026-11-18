@@ -139,7 +139,13 @@
   style:--profile-name-on-hero={nameOnHero}
   data-inset-owner={variant === 'sheet' ? 'bottom' : undefined}
 >
-  <div class={['profile-card-cover', { 'has-banner': banner }]} style:background={color}>
+  <div
+    class={[
+      'profile-card-cover',
+      { 'has-banner': banner, 'fit-banner': banner && preferences.bannerFit === 'image' },
+    ]}
+    style:background={color}
+  >
     {#if banner}
       <Banner source={banner} name={displayName} width={720} height={240} />
     {:else if cover}
@@ -368,6 +374,10 @@
   }
 
   .profile-card-cover.has-banner {
+    --profile-cover-height: 7rem;
+  }
+
+  .profile-card-cover.fit-banner {
     height: auto;
   }
 
@@ -377,7 +387,7 @@
     width: 100%;
   }
 
-  .profile-card-cover.has-banner :global(.banner-image) {
+  .profile-card-cover.fit-banner :global(.banner-image) {
     height: auto;
     max-height: 14rem;
     min-height: 4rem;
