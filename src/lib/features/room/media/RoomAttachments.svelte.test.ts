@@ -9,7 +9,7 @@ vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
 
-import RoomAttachments from './RoomAttachments.svelte';
+import RoomAttachmentsPanel from '../RoomAttachmentsPanel.svelte';
 
 const roomAttachments = vi.fn();
 Object.assign(core.rpc.rooms, { attachments: roomAttachments });
@@ -19,8 +19,8 @@ const tab = (name: string) => screen.getByRole('tab', { name });
 
 test('the tabs follow the arrow keys and keep one tab stop', async () => {
   roomAttachments.mockResolvedValue({ items: [], next_batch: null });
-  renderWithTooltips(RoomAttachments, {
-    props: { roomId: '!room:example.org', members: [], onJump: vi.fn() },
+  renderWithTooltips(RoomAttachmentsPanel, {
+    props: { roomId: '!room:example.org', members: [], onJump: vi.fn(), onClose: vi.fn() },
   });
   await vi.waitFor(() => {
     expect(roomAttachments).toHaveBeenCalledTimes(1);

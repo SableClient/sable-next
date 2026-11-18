@@ -10,8 +10,6 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
-  import SearchField from '#lib/ui/primitives/SearchField.svelte';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   import MessagePreview from './messages/MessagePreview.svelte';
   import MessageScope from './messages/MessageScope.svelte';
@@ -20,21 +18,18 @@
   interface Props {
     roomId: string;
     members: readonly MemberView[];
+    filter: 'mentions' | 'all';
+    query: string;
     onJump: (eventId: string) => void;
   }
 
   const PAGE_SIZE = 30;
-  const filters = [
-    { value: 'all', label: 'inbox.filterAll' },
-    { value: 'mentions', label: 'inbox.filterMentions' },
-  ] as const;
 
-  let { roomId, members, onJump }: Props = $props();
+  let { roomId, members, filter, query, onJump }: Props = $props();
   const core = useCoreClient();
   const feed = untrack(() => new InboxFeed(core.rpc.notifications, roomId));
   onDestroy(() => feed.dispose());
 
-  let filter = $state<'mentions' | 'all'>('all');
   let opened = $state<string | null>(null);
   let firstRead = $derived(
     feed.items.some((item) => !item.read) ? feed.items.findIndex((item) => item.read) : -1
@@ -45,7 +40,6 @@
     onJump(eventId);
   }
   let size = $state(PAGE_SIZE);
-  let query = $state('');
 
   function reload(): Promise<void> {
     return feed.load(filter, true, size, query.trim());
@@ -71,24 +65,7 @@
   }
 </script>
 
-<div class="controls">
-  <div class="filters" role="group" aria-label={i18n.t('inbox.filterLabel')}>
-    {#each filters as option (option.value)}
-      <Button
-        variant="ghost"
-        size="small"
-        class="choice"
-        aria-pressed={option.value === filter}
-        onclick={() => (filter = option.value)}
-      >
-        {i18n.t(option.label)}
-      </Button>
-    {/each}
-  </div>
-  <SearchField bind:value={query} label={i18n.t('room.notificationsSearch')} />
-</div>
-
-<div class="list notifications-list" {@attach scrollHint}>
+<div class="notifications-list">
   {#if feed.failed}
     <p class="status" role="alert">{i18n.t('inbox.loadFailed')}</p>
   {:else if feed.items.length === 0 && (!feed.loaded || !feed.checked)}
@@ -154,24 +131,7 @@
 </div>
 
 <style>
-  .controls {
-    border-bottom: var(--border-width) solid var(--bg-container-line);
-    display: grid;
-    flex: none;
-    gap: var(--space-200);
-    padding: var(--space-300);
-  }
-
-  .filters {
-    display: flex;
-    gap: var(--space-200);
-  }
-
-  .list {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+  .notifications-list {
     position: relative;
   }
 

@@ -5,9 +5,9 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import PanelBody from '#lib/ui/primitives/PanelBody.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
   import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
 
   interface Props {
@@ -17,8 +17,8 @@
     widthKey: string;
     width?: number;
     modal?: boolean;
-    /** `none` hands the area under the header to `children`, which then scroll themselves. */
-    body?: 'padded' | 'flush' | 'none';
+    body?: 'padded' | 'flush';
+    toolbar?: Snippet;
     icon: Snippet;
     children: Snippet;
     onClose: () => void;
@@ -32,6 +32,7 @@
     width = 26,
     modal = false,
     body: bodyStyle = 'padded',
+    toolbar,
     icon,
     children,
     onClose,
@@ -80,13 +81,9 @@
         </PanelHeaderButton>
       {/snippet}
     </PanelHeader>
-    {#if bodyStyle === 'none'}
+    <PanelBody padded={bodyStyle === 'padded'} {toolbar}>
       {@render children()}
-    {:else}
-      <div class={['side-panel-body', bodyStyle]} {@attach scrollHint}>
-        {@render children()}
-      </div>
-    {/if}
+    </PanelBody>
   </aside>
 {/snippet}
 
@@ -129,16 +126,5 @@
   .side-panel :global(.resize-handle) {
     inset-inline-start: -0.25rem;
     z-index: 1;
-  }
-
-  .side-panel-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .side-panel-body.padded {
-    padding: var(--space-300);
   }
 </style>

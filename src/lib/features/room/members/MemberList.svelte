@@ -1,15 +1,10 @@
 <script lang="ts">
   import type { MemberView } from '#src/generated/protocol';
-  import ArrowsDownUpIcon from 'phosphor-svelte/lib/ArrowsDownUpIcon';
-  import FunnelIcon from 'phosphor-svelte/lib/FunnelIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
-  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
-  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
-  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import { roleColorOnDark, roleColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
@@ -19,12 +14,8 @@
   import {
     DEFAULT_ALWAYS_LISTED_FROM,
     INITIAL_MEMBER_ROWS,
-    MEMBERSHIP_FILTERS,
     MEMBERSHIP_FILTER_EMPTY_MESSAGES,
-    MEMBERSHIP_FILTER_LABELS,
     MEMBER_ROWS_STEP,
-    MEMBER_SORTS,
-    MEMBER_SORT_LABELS,
     groupMembers,
     limitGroups,
     matchesFilter,
@@ -34,13 +25,13 @@
   } from '#lib/rooms/member-listing.js';
   import { powerTag } from './power-tags';
   import type { PowerLevelTagMap } from '../settings/power-level-tags';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   interface Props {
     roomId?: string;
     members: readonly MemberView[];
     loading: boolean;
-    searchable?: boolean;
+    search: string;
+    filter: MembershipFilter;
     powerTags?: PowerLevelTagMap | null;
     alwaysListedFrom?: number | null;
     loadMembership?: ((membership: MemberView['membership']) => Promise<MemberView[]>) | null;
@@ -52,7 +43,8 @@
     roomId,
     members,
     loading,
-    searchable = true,
+    search,
+    filter,
     powerTags = {},
     alwaysListedFrom = null,
     loadMembership = null,
@@ -68,8 +60,6 @@
     return entry !== null && entry.presence !== 'offline';
   }
 
-  let search = $state('');
-  let filter = $state<MembershipFilter>('join');
   let fetched = $state.raw<MemberView[]>([]);
   let fetching = $state(false);
   let limit = $derived.by(() => {
@@ -159,73 +149,10 @@
   });
 </script>
 
-{#if searchable}
-  <div class="controls">
-    <div class="filters">
-      {#if loadMembership}
-        <ActionMenu label={i18n.t('timeline.memberFilter')} align="start">
-          {#snippet trigger({ props })}
-            <button
-              {...props}
-              type="button"
-              class="chip selection-open"
-              aria-label={`${i18n.t('timeline.memberFilter')}: ${i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}`}
-            >
-              <FunnelIcon aria-hidden="true" />
-              <span>{i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}</span>
-            </button>
-          {/snippet}
-          {#each MEMBERSHIP_FILTERS as option (option)}
-            <ActionMenuItem
-              checked={filter === option}
-              onSelect={() => {
-                filter = option;
-              }}
-            >
-              <span class="menu-check" aria-hidden="true">{filter === option ? '✓' : ''}</span>
-              <span>{i18n.t(MEMBERSHIP_FILTER_LABELS[option])}</span>
-            </ActionMenuItem>
-          {/each}
-        </ActionMenu>
-      {/if}
-      <ActionMenu label={i18n.t('timeline.memberSort')}>
-        {#snippet trigger({ props })}
-          <button
-            {...props}
-            type="button"
-            class="chip selection-open"
-            aria-label={`${i18n.t('timeline.memberSort')}: ${i18n.t(MEMBER_SORT_LABELS[sort])}`}
-          >
-            <span>{i18n.t(MEMBER_SORT_LABELS[sort])}</span>
-            <ArrowsDownUpIcon aria-hidden="true" />
-          </button>
-        {/snippet}
-        {#each MEMBER_SORTS as option (option)}
-          <ActionMenuItem
-            checked={sort === option}
-            onSelect={() => {
-              setPreference('memberSort', option);
-            }}
-          >
-            <span class="menu-check" aria-hidden="true">{sort === option ? '✓' : ''}</span>
-            <span>{i18n.t(MEMBER_SORT_LABELS[option])}</span>
-          </ActionMenuItem>
-        {/each}
-      </ActionMenu>
-    </div>
-    <TextInput
-      bind:value={search}
-      class="member-search-input"
-      placeholder={i18n.t('timeline.searchMembers')}
-      aria-label={i18n.t('timeline.searchMembers')}
-    />
-  </div>
-{/if}
-
 {#if busy && !preview}
   <p class="status">{i18n.t('timeline.loadingMembers')}</p>
 {:else if shown.length > 0}
-  <div class="member-groups" aria-busy={busy} {@attach scrollHint}>
+  <div class="member-groups" aria-busy={busy}>
     {#each shown as group (group.key)}
       {@const tag = group.tag}
       <h3
@@ -277,73 +204,7 @@
     padding: var(--space-300) var(--space-400);
   }
 
-  .controls {
-    background: var(--bg-container);
-    display: grid;
-    gap: var(--space-200);
-    padding: var(--space-250);
-    position: sticky;
-    top: var(--header-height);
-    z-index: 1;
-  }
-
-  .filters {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    justify-content: space-between;
-  }
-
-  .filters :global(.chip) {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
-    cursor: pointer;
-    display: inline-flex;
-    font: inherit;
-    font-size: var(--font-size-small);
-    gap: var(--space-100);
-    min-height: 1.75rem;
-    padding: 0 var(--space-150);
-  }
-
-  .filters :global(.chip:hover) {
-    background: var(--bg-container-hover);
-    color: var(--bg-on-container);
-  }
-
-  .filters :global(.chip:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .filters :global(.chip svg) {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
-  .filters :global(.chip:first-child svg) {
-    color: var(--primary-main);
-  }
-
-  :global(.member-search-input) {
-    --form-control-container: var(--surface-container);
-    --form-control-container-line: var(--surface-container-line);
-    --form-control-color: var(--surface-on-container);
-
-    border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radius);
-    min-height: 2.25rem;
-    padding: 0 var(--space-300);
-    width: 100%;
-  }
-
   .member-groups {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
     padding: var(--space-100) var(--space-200) var(--space-200);
   }
 

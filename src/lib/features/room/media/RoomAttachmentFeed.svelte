@@ -7,7 +7,6 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   import { groupByMonth } from './attachment-groups';
   import { attachmentKey, type RoomAttachmentOf, type TileProps } from './room-attachments';
@@ -86,7 +85,7 @@
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) pager.loadMore();
       },
-      { root: body, rootMargin: PREFETCH_BAND }
+      { root: node.closest<HTMLElement>('.panel-body'), rootMargin: PREFETCH_BAND }
     );
     observer.observe(node);
     return () => {
@@ -104,7 +103,7 @@
     : ''}
 </p>
 
-<div class="attachments-body" aria-busy={pager.loading} bind:this={body} {@attach scrollHint}>
+<div class="attachments-body" aria-busy={pager.loading} bind:this={body}>
   {#if pager.items.length > 0}
     {#each groups as group (group.key)}
       {@const headingId = `attachments-${pager.kind}-${group.key}`}
@@ -168,12 +167,11 @@
   }
 
   .attachments-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
     padding-block-end: var(--space-300);
-    scroll-padding-block-start: var(--space-800);
+  }
+
+  .attachments-body li > :global(*) {
+    scroll-margin-block-start: var(--space-800);
   }
 
   .group-heading {

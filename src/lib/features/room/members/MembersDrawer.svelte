@@ -8,18 +8,23 @@
   import { i18n } from '#lib/i18n.js';
   import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
   import { readText, writeText } from '#lib/platform/local-json.js';
+  import type { MembershipFilter } from '#lib/rooms/member-listing.js';
+  import PanelBody from '#lib/ui/primitives/PanelBody.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
 
   import MemberList from './MemberList.svelte';
+  import MemberListControls from './MemberListControls.svelte';
 
-  interface Props extends Omit<ComponentProps<typeof MemberList>, 'count'> {
+  interface Props extends Omit<ComponentProps<typeof MemberList>, 'count' | 'search' | 'filter'> {
+    searchable?: boolean;
     modal?: boolean;
     compact?: boolean;
     title?: string;
   }
 
   let {
+    searchable = true,
     modal = false,
     compact = false,
     title = i18n.t('timeline.members'),
@@ -28,6 +33,8 @@
   const stage = usePanelStage();
 
   let count = $state(0);
+  let search = $state('');
+  let filter = $state<MembershipFilter>('join');
   let width = $state<number | null>(null);
 
   const WIDTH_STORAGE_KEY = 'sable-members-drawer-width';
@@ -80,8 +87,14 @@
     {/snippet}
   </PanelHeader>
 
-  <MemberList {...list} bind:count />
+  <PanelBody toolbar={searchable ? controls : undefined}>
+    <MemberList {...list} {search} {filter} bind:count />
+  </PanelBody>
 </aside>
+
+{#snippet controls()}
+  <MemberListControls bind:search bind:filter membership={!!list.loadMembership} />
+{/snippet}
 
 <style>
   .members-drawer {
