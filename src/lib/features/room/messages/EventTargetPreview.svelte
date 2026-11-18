@@ -53,12 +53,16 @@
   let fetched = $state<Preview | null>(null);
   let loaded = $derived(events?.get(eventId) ?? null);
   let preview = $derived(loaded ? previewOf(loaded, i18n.t) : fetched);
+  let persona = $derived(loaded?.per_message_profile ?? null);
   let name = $derived.by(() => {
     if (!preview?.sender) return i18n.t('timeline.unknownSender');
-    return (loaded?.sender_name ?? null) || memberName(members, preview.sender);
+    return (
+      persona?.display_name ||
+      // eslint-disable-next-line no-restricted-properties -- after the profile name
+      (loaded?.sender_name ?? null) ||
+      memberName(members, preview.sender)
+    );
   });
-
-  let persona = $derived(loaded?.per_message_profile ?? null);
   let sender = $derived(preview?.sender ?? null);
   const profile = new UserProfile(core, () => sender);
   let colors = $derived(

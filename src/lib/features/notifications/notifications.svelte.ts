@@ -152,9 +152,9 @@ export class NotificationCenter {
         callExpiresAtMs: event.expires_at_ms,
       },
     };
-    const name = preferences.notificationContent
-      ? (event.sender_name ?? event.room_name ?? event.sender)
-      : appName();
+    // eslint-disable-next-line no-restricted-properties -- no profile here
+    const sender = event.sender_name ?? event.room_name ?? event.sender;
+    const name = preferences.notificationContent ? sender : appName();
     const shown = callBanner(name, options, () => {
       const electron = electronBridge();
       if (electron) electron.showWindow();

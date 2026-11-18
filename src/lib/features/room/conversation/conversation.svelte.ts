@@ -55,7 +55,7 @@ import {
   resolveUrlPreview,
   usesTunnel,
 } from '#lib/features/room/media/link-preview-cache.js';
-import { projectPersona } from '#lib/personas/persona.js';
+import { projectPersona, senderDisplayName } from '#lib/personas/persona.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import { outgoingPersona } from '#lib/personas/outgoing-persona.js';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
@@ -662,7 +662,7 @@ export class Conversation {
     this.context = {
       kind: 'reply',
       eventId,
-      sender: item.per_message_profile?.display_name ?? item.sender_name ?? item.sender,
+      sender: senderDisplayName(item),
       silentReply: item.sender === this.#core.session?.user_id || !preferences.mentionInReplies,
       body: version?.body ?? (replyPreviewBody(item.content) || stateEventText(item, t)),
       html: version?.html ?? (item.content.kind === 'message' ? item.content.html : null),

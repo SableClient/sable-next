@@ -1,4 +1,5 @@
 import type { TimelineItemView } from '#src/generated/protocol';
+import { senderDisplayName } from '#lib/personas/persona.js';
 import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
 
 import type { MediaItem } from '#lib/ui/media/media-viewer-types.js';
@@ -16,7 +17,7 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
     const eventId = entry.event_id;
     if (eventId === null) return [];
     const content = entry.content;
-    const sender = entry.sender_name ?? entry.sender ?? 'Unknown sender';
+    const sender = senderDisplayName(entry) ?? 'Unknown sender';
     if (content.kind === 'gallery') {
       return content.items.flatMap((item, index): MediaItem[] => {
         const shared = {

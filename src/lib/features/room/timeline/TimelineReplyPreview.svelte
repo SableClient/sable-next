@@ -43,6 +43,7 @@
 
   let roomName = $derived.by(() => {
     const member = findMember(members, sender);
+    // eslint-disable-next-line no-restricted-properties -- before the profile name
     return member ? member.display_name : (reply.sender_name ?? target?.sender_name ?? null);
   });
   let nameBase = $derived(

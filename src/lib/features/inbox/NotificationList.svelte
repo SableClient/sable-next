@@ -343,6 +343,7 @@
               >
                 {#snippet fallback()}
                   <p class="preview">
+                    <!-- eslint-disable-next-line no-restricted-properties -- no profile here -->
                     <strong>{item.sender_name ?? senderName(item.sender)}</strong>
                     {item.body ??
                       i18n.t(item.encrypted ? 'inbox.encryptedMessage' : 'inbox.noPreview')}

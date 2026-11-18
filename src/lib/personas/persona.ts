@@ -3,8 +3,16 @@ import type {
   PersonaSelectionView,
   PersonaTriggerView,
   PersonaView,
+  TimelineItemView,
 } from '#src/generated/protocol';
 import { proxyBody } from '#lib/model/model.js';
+
+export function senderDisplayName(
+  item: Pick<TimelineItemView, 'per_message_profile' | 'sender_name' | 'sender'>
+): string | null {
+  // eslint-disable-next-line no-restricted-properties -- resolves it
+  return item.per_message_profile?.display_name ?? item.sender_name ?? item.sender;
+}
 
 export function projectPersona(persona: PersonaView, fallback: boolean): PerMessageProfileView {
   return {

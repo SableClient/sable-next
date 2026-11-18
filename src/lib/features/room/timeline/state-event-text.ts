@@ -1,5 +1,6 @@
 import { isRecord } from '#lib/guards.js';
 import { reactionKey } from '#lib/model/model.js';
+import { senderDisplayName } from '#lib/personas/persona.js';
 import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
 import { isCustomReaction, reactionText } from '../messages/reaction-emote-label';
@@ -8,7 +9,7 @@ import { relationOf } from './timeline-event-index';
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
 
 function senderLabel(item: TimelineItemView, t: Translate): string {
-  return item.sender_name ?? item.sender ?? t('timeline.unknownSender');
+  return senderDisplayName(item) ?? t('timeline.unknownSender');
 }
 
 function stateChangeText(change: StateChangeView, user: string, t: Translate): string {
@@ -108,7 +109,7 @@ function membershipText(
   t: Translate
 ): string {
   const user = content.display_name ?? content.user_id;
-  const actor = item.sender_name ?? item.sender;
+  const actor = senderDisplayName(item);
   const attributed =
     MODERATED.has(content.change) && actor !== null && item.sender !== content.user_id;
 
@@ -189,7 +190,7 @@ export function stateEventSubject(
     case 'state_event':
     case 'hidden_event':
       userId = item.sender;
-      name = item.sender_name ?? item.sender;
+      name = senderDisplayName(item);
       break;
     default:
       return null;

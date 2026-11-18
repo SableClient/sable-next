@@ -108,6 +108,7 @@ function groupUser(item: TimelineItemView): MemberGroupUser | null {
   if (content.kind === 'profile_change') {
     return {
       userId: content.user_id,
+      // eslint-disable-next-line no-restricted-properties -- the account name
       name: item.sender_name ?? content.user_id,
     };
   }

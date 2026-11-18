@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { PerMessageProfileView, TimelineItemView } from '#src/generated/protocol';
 
 import { collectForumThreads, filterThreads, sortThreads } from './forum-threads';
 import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
@@ -518,4 +518,23 @@ test.each(['timeline', 'hydrated'])('a deleted latest reply from %s is not previ
   expect(threads).toHaveLength(1);
   expect(threads[0]?.preview).toBe('root');
   expect(threads[0]?.lastBody).toBeNull();
+});
+
+test('names the latest reply by its per-message profile', () => {
+  const root = item({ id: 'root', timestamp: 100 });
+  const reply = item({
+    id: 'reply',
+    timestamp: 300,
+    thread_root: '$root',
+    sender: '@bob:example.org',
+    sender_name: 'Bob',
+    per_message_profile: {
+      id: 'p',
+      display_name: 'Silver',
+      avatar_url: null,
+      pronouns: [],
+    } as unknown as PerMessageProfileView,
+  });
+
+  expect(collectForumThreads([root, reply], null)[0]?.lastSenderName).toBe('Silver');
 });

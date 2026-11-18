@@ -213,12 +213,14 @@
   {:else if entry.kind === 'meowlnir-ban'}
     {@const management = meowlnirFor(roomId, currentUserId)}
     {#if management && item.sender}
+      <!-- eslint-disable no-restricted-properties -- bans the account -->
       <MeowlnirBanDialog
         bind:open={() => true, setOpen}
         {management}
         userId={item.sender}
         name={item.sender_name ?? item.sender}
       />
+      <!-- eslint-enable no-restricted-properties -->
     {/if}
   {:else if entry.kind === 'steal'}
     <StealEmotesDialog bind:open={() => true, setOpen} candidates={emoteCandidates(item.content)} />

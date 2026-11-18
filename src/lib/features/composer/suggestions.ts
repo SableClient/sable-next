@@ -216,6 +216,7 @@ function commandSuggestions(
   const bots = botCommands
     .filter((command) => !builtIn.has(command.command.toLowerCase()))
     .map((command) => {
+      // eslint-disable-next-line no-restricted-properties -- no profile here
       const bot = command.sender_name ?? command.sender;
       return {
         name: command.command.toLowerCase(),

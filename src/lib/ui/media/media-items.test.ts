@@ -89,3 +89,26 @@ test('a gallery item id leads back to its event', () => {
   expect(galleryEventId(galleryItemId('$gallery', 3))).toBe('$gallery');
   expect(galleryEventId('$plain:example.org')).toBe('$plain:example.org');
 });
+
+test('credits media to the per-message profile it was sent with', () => {
+  const entry = {
+    ...gallery([
+      {
+        kind: 'image',
+        filename: 'a.png',
+        caption: null,
+        source: 'mxc://example.org/a',
+        mime: 'image/png',
+        width: null,
+        height: null,
+        size: null,
+        blurhash: null,
+        thumbnail: null,
+        spoiler: null,
+      },
+    ]),
+    per_message_profile: { id: 'p', display_name: 'Silver', avatar_url: null, pronouns: [] },
+  } as unknown as TimelineItemView;
+
+  expect(timelineMediaItems([entry])[0]?.sender).toBe('Silver');
+});

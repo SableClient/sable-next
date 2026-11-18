@@ -71,5 +71,6 @@ export function body(view: NotificationView): string {
 }
 
 function sender(view: NotificationView): string {
+  // eslint-disable-next-line no-restricted-properties -- no profile here
   return view.sender_name ?? view.sender;
 }

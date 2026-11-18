@@ -1,5 +1,7 @@
 import type { TimelineItemView } from '#src/generated/protocol';
 
+import { senderDisplayName } from '#lib/personas/persona.js';
+
 export const PREVIEW_LENGTH = 140;
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -17,7 +19,7 @@ export function arrivalAnnouncement(
   t: Translate
 ): string {
   const latest = arrivals.at(-1);
-  const sender = latest?.per_message_profile?.display_name ?? latest?.sender_name ?? latest?.sender;
+  const sender = latest && senderDisplayName(latest);
   const text = arrivals.length === 1 && atLiveEdge && latest ? preview(latest) : null;
   if (text && sender) return t('timeline.newMessagePreview', { sender, preview: text });
   return t('timeline.newMessages', { count: arrivals.length });

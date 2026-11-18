@@ -39,3 +39,20 @@ test('a target names its sender in the colour of their profile', async () => {
   expect(name?.style.getPropertyValue('--name-color-on-dark')).toBe('#88aaff');
   expect(name?.style.color).toBe('');
 });
+
+test('a target sent with a per-message profile shows the profile name', () => {
+  const target = {
+    id: 'pinned',
+    event_id: '$pinned:example.org',
+    sender: '@bob:example.org',
+    sender_name: 'Bob',
+    timestamp: 0,
+    content: { kind: 'message', body: 'Pinned', html: null, msgtype: 'text' },
+    per_message_profile: { id: 'p', display_name: 'Silver', avatar_url: null, pronouns: [] },
+  } as unknown as TimelineItemView;
+  const { container } = render(EventTargetPreview, {
+    props: { eventId: '$pinned:example.org', events: new TimelineEventIndex([target], []) },
+  });
+
+  expect(container.querySelector('.target-preview .target-name')?.textContent).toContain('Silver');
+});

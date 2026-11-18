@@ -5,6 +5,7 @@ import type {
   TimelineItemView,
 } from '#src/generated/protocol';
 import { isMediaCaptionContent } from '#lib/features/room/messages/media-caption.js';
+import { senderDisplayName } from '#lib/personas/persona.js';
 
 export type ForumSort = 'active' | 'created' | 'votes';
 export type ForumLayout = 'list' | 'gallery';
@@ -212,7 +213,7 @@ export function collectForumThreads(
       eventId: rootId,
       title: root.forum_title,
       sender: root.sender,
-      senderName: root.per_message_profile?.display_name ?? root.sender_name,
+      senderName: senderDisplayName(root),
       senderAvatar: root.sender_avatar,
       isOwn: root.is_own,
       editable:
@@ -227,7 +228,7 @@ export function collectForumThreads(
       lastBody:
         (summaryLatestRedacted ? null : root.thread_summary?.latest_body) ??
         (latestReply ? bodyOf(latestReply.content) : null),
-      lastSenderName: latestReply?.sender_name ?? latestReply?.sender ?? null,
+      lastSenderName: latestReply ? senderDisplayName(latestReply) : null,
       unread: unreadByRoot.get(rootId) ?? isUnread(latest, currentUserId),
       votes: countVotes(rootReactions),
       ownVote: ownVote(rootReactions, currentUserId),

@@ -41,6 +41,10 @@ export default defineConfig([
         { property: 'findLast', message: 'Needs Chrome 97; walk the array backwards.' },
         { property: 'findLastIndex', message: 'Needs Chrome 97; walk the array backwards.' },
         { object: 'Object', property: 'groupBy', message: 'Needs Chrome 117.' },
+        {
+          property: 'sender_name',
+          message: 'Use senderDisplayName() so a per-message profile name wins.',
+        },
       ],
       'no-alert': 'error',
       'no-restricted-imports': ['error', { paths: [PHOSPHOR_BARREL] }],

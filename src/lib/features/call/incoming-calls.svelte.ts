@@ -114,6 +114,7 @@ export class IncomingCalls {
       roomId: event.room_id,
       notificationEventId: event.notification_event_id,
       sender: event.sender,
+      // eslint-disable-next-line no-restricted-properties -- no profile here
       senderName: event.sender_name,
       roomName: event.room_name,
       ring: event.ring,

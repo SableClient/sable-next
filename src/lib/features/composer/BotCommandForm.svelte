@@ -51,6 +51,7 @@
     onCancel,
   }: Props = $props();
 
+  // eslint-disable-next-line no-restricted-properties -- no profile here
   let botName = $derived(command.sender_name ?? command.sender);
   const uid = $props.id();
   const fieldId = (key: string): string => `bot-command-${uid}-${key}`;

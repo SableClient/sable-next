@@ -44,6 +44,7 @@ export class MessageSender {
     const { item, profile } = this.#options();
     const member = this.#member;
     return (
+      // eslint-disable-next-line no-restricted-properties -- the account name
       (member ? member.display_name : item.sender_name) ??
       (member ? null : profile?.display_name) ??
       item.sender ??
