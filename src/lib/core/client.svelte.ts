@@ -63,6 +63,7 @@ const profileCacheFreshMs = 2 * 60 * 1000;
 const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const SLOW_START_MS = 15_000;
+const LOCAL_NETWORK_SETTLED_MS = 30_000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
 const MAX_PROFILE_LOOKUPS = 24;
@@ -232,6 +233,7 @@ export class CoreClient {
   private readonly profileChangeListeners = new Set<(userId: string) => void>();
   private readonly changedProfiles = new Set<string>();
   private profileChangeTimer: ReturnType<typeof setTimeout> | null = null;
+  private localNetworkClearTimer: ReturnType<typeof setTimeout> | null = null;
   private profileLookups = 0;
   private readonly profileLookupQueue: {
     resolve: () => void;
@@ -995,6 +997,7 @@ export class CoreClient {
     this.qrGrantSupported = false;
     this.searchCoverage = null;
     this.searchCoverageUnavailable = false;
+    this.cancelLocalNetworkClear();
     this.localNetworkBlocked = null;
   }
 
@@ -1215,9 +1218,15 @@ export class CoreClient {
   private applySyncStatus(status: SyncStatus): void {
     this.sync = status;
     if (status.state !== 'offline') {
-      this.localNetworkBlocked = null;
+      if (this.localNetworkBlocked !== null) {
+        this.localNetworkClearTimer ??= setTimeout(() => {
+          this.localNetworkClearTimer = null;
+          this.localNetworkBlocked = null;
+        }, LOCAL_NETWORK_SETTLED_MS);
+      }
       return;
     }
+    this.cancelLocalNetworkClear();
     if (browserGatesCoreNetwork()) void this.checkLocalNetwork();
     else if (navigator.onLine) void requestAndroidLocalNetwork();
   }
@@ -1229,8 +1238,13 @@ export class CoreClient {
     const blocked =
       (await grantLocalNetworkAccess(session.homeserver)) ||
       (navigator.onLine && (await localNetworkDenied()));
-    if (revision !== this.accountRevision || this.sync?.state !== 'offline') return;
-    this.localNetworkBlocked = blocked ? homeserverUrl(session.homeserver).hostname : null;
+    if (!blocked || revision !== this.accountRevision || this.sync?.state !== 'offline') return;
+    this.localNetworkBlocked = homeserverUrl(session.homeserver).hostname;
+  }
+
+  private cancelLocalNetworkClear(): void {
+    if (this.localNetworkClearTimer !== null) clearTimeout(this.localNetworkClearTimer);
+    this.localNetworkClearTimer = null;
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {

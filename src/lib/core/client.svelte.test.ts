@@ -1089,15 +1089,27 @@ test('a restored session asks for local network access from the page', async () 
 });
 
 test('an offline core with a homeserver the page reaches reports the browser blocking it', async () => {
-  const { core, fake } = await startGated(() => Promise.resolve(new Response('{}')));
+  const { core, fake, fetchMock } = await startGated(() => Promise.resolve(new Response('{}')));
 
   fake.emit({ type: 'sync_status', state: 'offline' });
   await vi.waitFor(() => {
     expect(core.localNetworkBlocked).toBe('example.org');
   });
 
+  fetchMock.mockImplementation(() => Promise.reject(new TypeError('offline')));
   fake.emit({ type: 'sync_status', state: 'live' });
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(core.localNetworkBlocked).toBe('example.org');
+
+  vi.useFakeTimers();
+  fake.emit({ type: 'sync_status', state: 'live' });
+  vi.advanceTimersByTime(30_000);
   expect(core.localNetworkBlocked).toBeNull();
+  vi.useRealTimers();
 });
 
 test('an offline core reports the browser blocking it when the permission was denied', async () => {
