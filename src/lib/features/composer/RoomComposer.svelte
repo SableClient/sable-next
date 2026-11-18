@@ -317,7 +317,8 @@
   let multiline = $state(false);
   let pointerHidden = $state(false);
   const shortLayout = $derived(
-    compactHeight || (composerShort && (!multiline || preferences.alwaysInlineEditor))
+    !expanded &&
+      (compactHeight || (composerShort && (!multiline || preferences.alwaysInlineEditor)))
   );
   let layoutFrame: number | undefined;
   let empty = $state(true);
@@ -744,6 +745,7 @@
     const accountId = core.session?.account_id ?? '';
     const restore = () => restoreUnsent(targetKey, accountId, doc, []);
     editor.clear();
+    expanded = false;
     if (matched.command.parameters.length === 0 && matched.args !== '') {
       const body = `${typed.prefix}${matched.command.command}${matched.raw_args}`;
       if (
@@ -903,6 +905,7 @@
     inFlight += 1;
     error = null;
     editor.clear();
+    expanded = false;
     sourceMode = editor.leaveSource();
     staged = [];
     typing.stop();

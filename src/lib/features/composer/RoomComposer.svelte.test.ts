@@ -46,6 +46,7 @@ afterEach(() => {
   mediaConfig.mockReset();
   mediaConfig.mockResolvedValue({ upload_size: 100 * 1024 * 1024 });
   clearDrafts();
+  setPreference('composerForm', 'tall');
   setPreference('formattingToolbar', false);
   setPreference('composerFormatButton', true);
   setPreference('composerButtonOrder', ['gif', 'sticker', 'emoticon', 'persona', 'format']);
@@ -2124,6 +2125,37 @@ test('the expand button makes the editor taller and keeps focus in it', async ()
   expect(toggle).toHaveAttribute('aria-pressed', 'true');
   expect(document.querySelector('.editor')).toHaveClass('expanded');
   expect(document.querySelector('[contenteditable="true"]')).toHaveFocus();
+});
+
+test('an expanded composer keeps the expand button laid out while it is empty', async () => {
+  setPreference('composerForm', 'short');
+  setup({ roomId: '!room:example.org' });
+  await flushed();
+  expect(document.querySelector('.composer-row')).toHaveClass('short');
+
+  await press(screen.getByRole('button', { name: 'Expand composer' }));
+
+  expect(document.querySelector('.editor')).toHaveClass('expanded');
+  expect(document.querySelector('.composer-row')).not.toHaveClass('short');
+});
+
+test('sending a message collapses an expanded composer', async () => {
+  setPreference('composerForm', 'short');
+  draftText('hello');
+  const send = vi.fn(async () => {});
+  setup({ roomId: '!room:example.org', onSend: send });
+  await flushed();
+  await press(screen.getByRole('button', { name: 'Expand composer' }));
+  expect(document.querySelector('.editor')).toHaveClass('expanded');
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(send).toHaveBeenCalled();
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('.editor')).not.toHaveClass('expanded');
+  });
 });
 
 test('the insert menu offers scheduling once there is something to send', async () => {
