@@ -25,7 +25,7 @@ use matrix_sdk_common::serde_helpers::{extract_relation, extract_thread_root};
 
 use crate::ResultExt;
 use crate::protocol::{RpcCode, RpcError, SubscriptionId, TimelineItemView};
-use crate::view::{CUTE_EVENT_MSGTYPE, aggregation_item};
+use crate::view::aggregation_item;
 
 use crate::{CachedTimeline, Core, SubscriptionKind, ThreadKey};
 
@@ -475,17 +475,16 @@ pub(crate) fn aggregation_items(
 }
 
 fn timeline_event_filter(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
-    !is_signaling_event(event) && (default_event_filter(event, rules) || is_cute_event(event))
+    !is_signaling_event(event) && (default_event_filter(event, rules) || is_original_message(event))
 }
 
-fn is_cute_event(event: &AnySyncTimelineEvent) -> bool {
+fn is_original_message(event: &AnySyncTimelineEvent) -> bool {
     let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(message)) = event
     else {
         return false;
     };
     message.as_original().is_some_and(|message| {
-        message.content.msgtype.msgtype() == CUTE_EVENT_MSGTYPE
-            && !matches!(message.content.relates_to, Some(Relation::Replacement(_)))
+        !matches!(message.content.relates_to, Some(Relation::Replacement(_)))
     })
 }
 
@@ -620,7 +619,7 @@ mod tests {
     }
 
     #[test]
-    fn fluffychat_cute_events_reach_the_timeline() {
+    fn custom_msgtypes_reach_the_timeline() {
         let rules = ruma::room_version_rules::RoomVersionRules::V11;
         let event = |content: &str| {
             Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(format!(
@@ -635,7 +634,15 @@ mod tests {
         assert!(super::timeline_event_filter(&hug, &rules));
 
         let other = event(r#"{"msgtype":"com.example.custom","body":"x"}"#);
-        assert!(!super::timeline_event_filter(&other, &rules));
+        assert!(super::timeline_event_filter(&other, &rules));
+
+        let effect = event(r#"{"msgtype":"nic.custom.confetti","body":"hi"}"#);
+        assert!(super::timeline_event_filter(&effect, &rules));
+
+        let edit = event(
+            r#"{"msgtype":"com.example.custom","body":"* x","m.new_content":{"msgtype":"com.example.custom","body":"x"},"m.relates_to":{"rel_type":"m.replace","event_id":"$a"}}"#,
+        );
+        assert!(!super::timeline_event_filter(&edit, &rules));
     }
 
     #[test]

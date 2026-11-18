@@ -36,7 +36,7 @@ pub use search::prime_display_names;
 pub(crate) use space::space_children;
 pub use space::{hierarchy_child_edges, listing_spaces, restricted_parents, space_hierarchy_room};
 
-pub(crate) use content::{CUTE_EVENT_MSGTYPE, geo_coordinates};
+pub(crate) use content::geo_coordinates;
 pub(crate) use diff::apply_diff;
 pub(crate) use forward::{FAMEDLY_FORWARDED, FORWARDED, SABLE_FORWARDED};
 pub(crate) use media::{
