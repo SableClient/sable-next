@@ -114,6 +114,7 @@ export function devicePlatformLabel(): string {
 }
 
 export async function issuePlatform(): Promise<string> {
+  if (isElectron()) return devicePlatformLabel();
   if (!isTauri()) return issuePlatformOption(undefined);
   const { platform } = await import('@tauri-apps/plugin-os');
   return issuePlatformOption(platform());
