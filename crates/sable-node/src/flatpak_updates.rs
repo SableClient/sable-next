@@ -5,7 +5,7 @@ use napi_derive::napi;
 use super::Callback;
 
 #[napi]
-pub(crate) fn watch_flatpak_updates(notify: Callback) {
+pub fn watch_flatpak_updates(notify: Callback) {
     napi::bindgen_prelude::spawn(async move {
         if let Err(error) = watch(&notify).await {
             tracing::warn!(%error, "flatpak update monitor unavailable");
