@@ -209,6 +209,7 @@
     {thumbnailMime}
     {playback}
     {size}
+    {onOpen}
     class={className}
   />
 {:else}

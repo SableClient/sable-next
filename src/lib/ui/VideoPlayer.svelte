@@ -35,6 +35,7 @@
     thumbnailMime?: string | null;
     playback?: VideoPlaybackView | null;
     size?: number | null;
+    onOpen?: () => void;
     class?: string;
   }
 
@@ -50,6 +51,7 @@
     thumbnailMime = null,
     playback = null,
     size = null,
+    onOpen,
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
@@ -272,6 +274,14 @@
     >
       {filename}
     </video>
+    {#if !video.controls && onOpen}
+      <button
+        type="button"
+        class="media-open"
+        onclick={onOpen}
+        aria-label={i18n.t('timeline.openMedia', { name: mediaLabel })}
+      ></button>
+    {/if}
   {:else}
     {#if thumbnail && posterFailed !== thumbnail}
       <MediaImage
@@ -378,6 +388,15 @@
     padding: 0;
     position: absolute;
     width: 100%;
+  }
+
+  .media-open {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    inset: 0;
+    padding: 0;
+    position: absolute;
   }
 
   .media-play-badge {

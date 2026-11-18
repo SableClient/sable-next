@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 import { flushed } from '#lib/ui/flushed.js';
 
@@ -107,4 +107,39 @@ test.each([
   });
   expect(document.querySelector('video') !== null).toBe(plays);
   expect(screen.queryByText(/can't be played on this device/) !== null).toBe(!plays);
+});
+
+test('a bridged GIF without controls opens the media viewer when clicked', async () => {
+  const onOpen = vi.fn();
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  render(VideoPlayer, {
+    source: 'mxc://example.org/gif-open',
+    mime: 'video/mp4',
+    filename: 'cat.mp4',
+    playback: gif,
+    onOpen,
+  });
+  await vi.waitFor(() => {
+    if (!document.querySelector('video')) throw new Error('no video yet');
+  });
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Open cat.mp4' }));
+
+  expect(onOpen).toHaveBeenCalledOnce();
+});
+
+test('a video with native controls leaves opening to the fullscreen control', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  render(VideoPlayer, {
+    source: 'mxc://example.org/clip-controls',
+    mime: 'video/mp4',
+    filename: 'clip.mp4',
+    playback: { ...gif, hide_controls: false },
+    onOpen: vi.fn(),
+  });
+  await vi.waitFor(() => {
+    if (!document.querySelector('video')) throw new Error('no video yet');
+  });
+
+  expect(screen.queryByRole('button', { name: 'Open clip.mp4' })).toBeNull();
 });
