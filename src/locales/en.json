@@ -1052,6 +1052,7 @@
     "addressPlaceholder": "@someone:server or #room:server",
     "addressInvalid": "Enter a user id like @someone:server or a room address like #room:server.",
     "failed": "The chat could not be created.",
+    "userNotFound": "That user does not exist.",
     "encryptionHint": "Turn off only if the bridge does not support encryption. Once enabled, encryption cannot be turned off.",
     "submit": "Start chat",
     "confirmTitle": "Start a chat with {{name}}?",

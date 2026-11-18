@@ -25,6 +25,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParamFromId: (roomId: string) => encodeURIComponent(roomId),
 }));
 
+import { CoreError } from '#src/transport';
 import CreateChatForm from './CreateChatForm.svelte';
 
 const input = () => screen.getByRole('textbox', { name: 'direct.addressLabel' });
@@ -90,6 +91,18 @@ test('reports a failed creation and stays on the page', async () => {
 
   await submit('@alice:example.org');
   expect(await screen.findByRole('alert')).toHaveTextContent('direct.failed');
+
+  expect(goto).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('reports a user that does not exist', async () => {
+  core.rpc.rooms.createDm.mockRejectedValue(new CoreError({ code: 'not_found' }));
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  render(CreateChatForm);
+
+  await submit('@ghost:example.org');
+  expect(await screen.findByRole('alert')).toHaveTextContent('direct.userNotFound');
 
   expect(goto).not.toHaveBeenCalled();
   warn.mockRestore();

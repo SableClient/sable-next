@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use super::Handler;
 use crate::calendar::CALENDAR_ROOM_TYPE;
+use crate::media::is_not_found;
 use crate::search::MAX_SEARCH_RESULTS;
 use crate::room_settings::StateEventOut;
 use crate::room_settings::join_rule_content;
@@ -541,8 +542,14 @@ impl Handler for CreateDmParams {
         let room = if let Some(room) = existing {
             room
         } else {
-            let mut request = create_room::v3::Request::new();
             let own = client.user_id() == Some(&*user_id);
+            if !own
+                && let Err(error) = client.account().fetch_user_profile_of(&user_id).await
+                && is_not_found(&error)
+            {
+                return Err(core.rpc_error("create_dm_profile", &error));
+            }
+            let mut request = create_room::v3::Request::new();
             // The sender already creates the room, and may not be listed again.
             if !own {
                 request.creation_content = Some(

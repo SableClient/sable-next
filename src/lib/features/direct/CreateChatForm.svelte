@@ -6,6 +6,7 @@
   import { loadE2eePolicy } from '#lib/deployment/e2ee-policy.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isUserId } from '#lib/guards.js';
+  import { isCoreError } from '#src/transport';
   import { parseJoinAddress } from '#lib/rooms/join-address.js';
   import { joinOrKnockPath, joinOrOfferKnock } from '#lib/rooms/join-or-knock.js';
   import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
@@ -24,6 +25,7 @@
   let opening = $state(false);
   let invalid = $state(false);
   let failed = $state(false);
+  let missing = $state(false);
   let room = $derived(parseJoinAddress(address));
 
   async function open(): Promise<string> {
@@ -41,6 +43,7 @@
 
     invalid = !room && !isUserId(address.trim());
     failed = false;
+    missing = false;
     if (invalid) return;
 
     opening = true;
@@ -49,7 +52,8 @@
       await goto(await open());
     } catch (error) {
       console.warn('[sable direct] could not open the chat', error);
-      failed = true;
+      missing = isCoreError(error, 'not_found');
+      failed = !missing;
     } finally {
       opening = false;
     }
@@ -88,6 +92,10 @@
         }}
       />
     </div>
+  {/if}
+
+  {#if missing}
+    <Alert variant="critical" role="alert">{i18n.t('direct.userNotFound')}</Alert>
   {/if}
 
   {#if failed}

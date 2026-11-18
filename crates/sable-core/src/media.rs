@@ -996,7 +996,7 @@ fn media_code(error: &matrix_sdk::Error) -> RpcCode {
     }
 }
 
-fn is_not_found(error: &matrix_sdk::Error) -> bool {
+pub(crate) fn is_not_found(error: &matrix_sdk::Error) -> bool {
     match error {
         matrix_sdk::Error::Http(http) => match http.as_ref() {
             HttpError::Reqwest(error) => error.status() == Some(reqwest::StatusCode::NOT_FOUND),
