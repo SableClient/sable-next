@@ -861,7 +861,7 @@
   oncontextmenu={mouseContextMenu(openDisplayMenu)}
 >
   <div
-    class="rail-scroll scrollbar-hidden"
+    class="rail-scroll"
     role="tree"
     data-focus-region="spaces"
     aria-orientation="vertical"
