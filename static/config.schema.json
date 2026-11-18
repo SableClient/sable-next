@@ -473,6 +473,14 @@
           "type": "boolean",
           "default": true
         },
+        "bannerFit": {
+          "title": "Banner size",
+          "enum": [
+            "fixed",
+            "image"
+          ],
+          "default": "fixed"
+        },
         "showDmTopics": {
           "title": "Show topics in direct messages",
           "type": "boolean",
@@ -1967,6 +1975,14 @@
           "title": "Room banners above the list",
           "type": "boolean",
           "default": true
+        },
+        "bannerFit": {
+          "title": "Banner size",
+          "enum": [
+            "fixed",
+            "image"
+          ],
+          "default": "fixed"
         },
         "showDmTopics": {
           "title": "Show topics in direct messages",
