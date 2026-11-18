@@ -138,6 +138,7 @@
     spaceIds: (id) => personaSpaces(roomList, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
     publicRoom: () => resolvedRoom?.join_rule === 'public',
+    canRedactOwn: () => roomSession.permissions?.can_redact_own ?? true,
     beforeSend: () => timelineList?.resumeLive() ?? resumeLive(),
     afterSend: (id) => donateSentMessage(core, roomList.byId(id)),
   });

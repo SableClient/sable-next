@@ -42,7 +42,8 @@ function setup(
   userId: string,
   store: Partial<PersonaStore> = {},
   beforeSend?: () => Promise<void>,
-  threadRoot: string | null = null
+  threadRoot: string | null = null,
+  canRedactOwn?: () => boolean
 ) {
   const sendMessage = vi.fn((..._args: unknown[]) => Promise.resolve());
   const editMessage = vi.fn((..._args: unknown[]) => Promise.resolve());
@@ -124,6 +125,7 @@ function setup(
       roomId: () => ROOM,
       beforeSend,
       threadRoot,
+      canRedactOwn,
     }),
   };
 }
@@ -249,6 +251,19 @@ test('toggling an existing custom quick reaction omits its source pack', async (
     subscription: 7,
     persona: null,
   });
+});
+
+test('removing your own reaction is skipped without permission to redact it', async () => {
+  const mine = {
+    ...item('$latest', '@ana:example.org'),
+    reactions: [{ key: '😂', senders: ['@kris:example.org'] }],
+  };
+  const fixture = setup([mine], '@kris:example.org', {}, undefined, null, () => false);
+  fixture.conversation.toggleReaction('$latest', '😂');
+  await fixture.conversation.quickReact(ROOM, '😂');
+  expect(fixture.toggleReaction).not.toHaveBeenCalled();
+  fixture.conversation.toggleReaction('$latest', '🎉');
+  expect(fixture.toggleReaction).toHaveBeenCalledOnce();
 });
 
 test('reaction failures reach the composer', async () => {

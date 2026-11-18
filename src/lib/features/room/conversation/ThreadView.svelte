@@ -104,6 +104,7 @@
     encrypted: () => encrypted,
     publicRoom: () => roomList.byId(roomId)?.join_rule === 'public',
     threadRoot: untrack(() => rootEventId),
+    canRedactOwn: () => canRedactOwn,
     beforeSend: () => returnToThread(),
     afterSend: (id) => donateSentMessage(core, roomList.byId(id)),
   });

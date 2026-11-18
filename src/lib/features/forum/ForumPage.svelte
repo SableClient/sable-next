@@ -123,6 +123,7 @@
     spaceIds: (id) => personaSpaces(roomList, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
     publicRoom: () => resolvedRoom?.join_rule === 'public',
+    canRedactOwn: () => permissions?.can_redact_own ?? true,
     afterSend: (id) => {
       composing = false;
       donateSentMessage(core, roomList.byId(id));

@@ -79,6 +79,7 @@ export type ConversationDeps = {
   beforeSend?: () => Promise<void>;
   afterSend?: (roomId: string) => void;
   threadRoot?: string | null;
+  canRedactOwn?: () => boolean;
 };
 
 function failed(action: string): (error: unknown) => void {
@@ -102,6 +103,7 @@ export class Conversation {
   readonly #encrypted: () => boolean | null;
   readonly #publicRoom: () => boolean;
   readonly #threadRoot: string | null;
+  readonly #canRedactOwn: () => boolean;
   readonly #beforeSend: () => Promise<void>;
   readonly #afterSend: (roomId: string) => void;
   /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
@@ -118,6 +120,7 @@ export class Conversation {
     beforeSend = () => Promise.resolve(),
     afterSend = () => {},
     threadRoot = null,
+    canRedactOwn = () => true,
   }: ConversationDeps) {
     this.#core = core;
     this.#personas = personas;
@@ -127,6 +130,7 @@ export class Conversation {
     this.#encrypted = encrypted ?? (() => null);
     this.#publicRoom = publicRoom ?? (() => false);
     this.#threadRoot = threadRoot;
+    this.#canRedactOwn = canRedactOwn;
     this.#beforeSend = beforeSend;
     this.#afterSend = afterSend;
     this.restored = readReply(this.#replyKey(), this.#accountId()) ?? null;
@@ -608,6 +612,7 @@ export class Conversation {
         (reaction) =>
           reaction.key === key && reaction.senders.includes(this.#core.session?.user_id ?? '')
       );
+    if (mine && !this.#canRedactOwn()) return;
     await this.#core.rpc.messages.react({
       room_id: this.#roomId(),
       event_id: eventId,
