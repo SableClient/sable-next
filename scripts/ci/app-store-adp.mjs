@@ -41,22 +41,28 @@ if (!app) throw new Error(`No App Store Connect app has the bundle ID ${bundleId
 
 const versions = await appStoreConnect(`/v1/apps/${app.id}/appStoreVersions`, {
   'filter[platform]': 'IOS',
-  'filter[appVersionState]': 'READY_FOR_DISTRIBUTION',
+  'filter[appVersionState]': [
+    'ACCEPTED',
+    'PENDING_DEVELOPER_RELEASE',
+    'PROCESSING_FOR_DISTRIBUTION',
+    'READY_FOR_DISTRIBUTION',
+  ].join(','),
   include: 'build,alternativeDistributionPackage',
-  limit: '1',
+  limit: '10',
 });
-const live = versions.data[0];
-if (!live) throw new Error(`${bundleId} has no iOS version ready for distribution`);
+const live = versions.data
+  .filter((version) => version.relationships.alternativeDistributionPackage.data)
+  .sort((a, b) => b.attributes.createdDate.localeCompare(a.attributes.createdDate))[0];
+if (!live) {
+  throw new Error(
+    `${bundleId} has no approved iOS version with an alternative distribution package. Check that the app is selected for AltStore PAL in App Store Connect.`
+  );
+}
 
 const buildId = live.relationships.build.data?.id;
 const build = versions.included?.find((item) => item.type === 'builds' && item.id === buildId);
-const adpID = live.relationships.alternativeDistributionPackage.data?.id;
+const adpID = live.relationships.alternativeDistributionPackage.data.id;
 if (!build) throw new Error(`Version ${live.attributes.versionString} has no build`);
-if (!adpID) {
-  throw new Error(
-    `Version ${live.attributes.versionString} has no alternative distribution package. Check that the app is selected for AltStore PAL in App Store Connect.`
-  );
-}
 
 console.log(
   JSON.stringify({

@@ -153,7 +153,7 @@ In the EU, [AltStore PAL](https://altstore.io) installs the same notarized build
 &nbsp;
 <a href="https://git.sable.moe/SableClient/sable-next/releases/download/latest/altstore-pal-source.json"><img alt="Direct URL" src="https://img.shields.io/badge/Direct_URL-6B7280?style=for-the-badge"></a>
 
-The [`altstore-pal.yml`](.forgejo/workflows/altstore-pal.yml) workflow publishes each App Store release once AltStore has processed it.
+The [`altstore-pal.yml`](.forgejo/workflows/altstore-pal.yml) workflow publishes each version once Apple approves it and AltStore has processed it.
 
 To add the source manually, paste this URL into AltStore PAL:
 
