@@ -24,6 +24,8 @@ const ban: BotCommand = {
       optional: false,
       default_value: null,
       flag: null,
+      multiline: false,
+      prefill: null,
     },
     {
       key: 'entity',
@@ -32,6 +34,8 @@ const ban: BotCommand = {
       optional: false,
       default_value: null,
       flag: null,
+      multiline: false,
+      prefill: null,
     },
     {
       key: 'reason',
@@ -40,6 +44,8 @@ const ban: BotCommand = {
       optional: true,
       default_value: null,
       flag: null,
+      multiline: false,
+      prefill: null,
     },
   ],
   tail_parameter: 'reason',

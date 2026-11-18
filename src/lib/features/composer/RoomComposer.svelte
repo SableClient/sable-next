@@ -31,6 +31,7 @@
   import { previewSources } from '#lib/features/room/media/link-preview-cache.js';
   import { previewableLinks } from '#lib/features/room/media/link-preview.js';
   import { i18n } from '#lib/i18n.js';
+  import { serverNameOf } from '#lib/matrix-id.js';
   import { isPackChange } from '#lib/emoji/load-packs.js';
   import { capturesFromCamera, pickFiles } from '#lib/platform/files.js';
   import { isAndroid } from '#lib/platform/os.js';
@@ -125,6 +126,7 @@
     buildInvocation,
     draftsFromText,
     matchBotCommand,
+    prefillDrafts,
     type BotCommand,
     type BotCommandInvocation,
   } from './bot-commands';
@@ -680,6 +682,7 @@
   function openBotCommand(command: BotCommand, args: string, prefix: string): void {
     const drafts = $state(draftsFromText(command, args));
     storeBotCommand({ command, drafts, prefix });
+    void prefillDrafts(command, drafts, serverNameOf(core.session?.user_id ?? ''));
     error = null;
     void sources.loadMembers();
   }

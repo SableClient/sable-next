@@ -127,7 +127,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => return Err("usage: generate-types [--check]".into()),
     };
 
-    let mut types = specta::Types::default()
+    let mut types = Types::default()
         .register::<RpcError>()
         .register::<CoreEvent>()
         .register::<AttachmentInfoView>()

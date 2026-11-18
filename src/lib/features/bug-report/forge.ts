@@ -19,11 +19,13 @@ const TEMPLATES: Record<ReportType, string> = {
 
 const forgeIssuesUrl = `${FORGE_ORIGIN}/${FORGE_REPO}/issues`;
 
-export function issueEnvironment(platform: string, video = ''): string {
+export function issueEnvironment(platform: string, video = '', homeserver = ''): string {
   const userAgent = typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent;
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
-  const environment = `- OS: ${platform}\n- Browser: ${userAgent}\n- Sable: ${version}`;
-  return video ? `${environment}\n- Video: ${video}` : environment;
+  const lines = [`- OS: ${platform}`, `- Browser: ${userAgent}`, `- Sable: ${version}`];
+  if (homeserver) lines.push(`- Homeserver: ${homeserver}`);
+  if (video) lines.push(`- Video: ${video}`);
+  return lines.join('\n');
 }
 
 export function forgeIssueUrl(

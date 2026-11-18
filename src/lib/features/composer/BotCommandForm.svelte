@@ -11,6 +11,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
+  import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import {
@@ -116,6 +117,16 @@
   function clearError(key: string): void {
     if (!(key in errors)) return;
     errors = Object.fromEntries(Object.entries(errors).filter(([found]) => found !== key));
+  }
+
+  function textOf(key: string): string {
+    const value = values[key];
+    return typeof value === 'string' ? value : '';
+  }
+
+  function setText(key: string, value: string): void {
+    values[key] = value;
+    clearError(key);
   }
 
   function entries(key: string): string[] {
@@ -274,6 +285,16 @@
                 }}
               />
             </div>
+          {:else if parameter.multiline}
+            <TextArea
+              {id}
+              rows={3}
+              aria-invalid={error !== null}
+              aria-describedby={describedBy(parameter)}
+              bind:value={
+                () => textOf(parameter.key), (value: string) => setText(parameter.key, value)
+              }
+            />
           {:else}
             <TextInput
               {id}
@@ -284,18 +305,11 @@
               aria-invalid={error !== null}
               aria-describedby={describedBy(parameter)}
               bind:value={
-                () =>
-                  typeof values[parameter.key] === 'string'
-                    ? (values[parameter.key] as string)
-                    : '',
-                (value: string) => {
-                  values[parameter.key] = value;
-                  clearError(parameter.key);
-                }
+                () => textOf(parameter.key), (value: string) => setText(parameter.key, value)
               }
             />
           {/if}
-          {#if !isBooleanParameter(parameter.schema) && !choices}
+          {#if !isBooleanParameter(parameter.schema) && !choices && !parameter.multiline}
             <datalist id="{id}-options">
               {#each optionsFor(parameter) as option (option.value)}
                 <option value={option.value}>{option.label}</option>

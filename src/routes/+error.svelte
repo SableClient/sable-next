@@ -47,7 +47,7 @@
     const url = reportIssueUrl('bug', `Crash: ${error.message}`, {
       description: error.message,
       platforms,
-      info: issueEnvironment(os),
+      environment: issueEnvironment(os),
       context: [details.trim(), '```', error.stack ?? error.message, '```']
         .filter(Boolean)
         .join('\n'),

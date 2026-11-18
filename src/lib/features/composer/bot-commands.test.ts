@@ -1,12 +1,18 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
   buildInvocation,
   draftsFromText,
   matchBotCommand,
   parseBotCommand,
+  prefillDrafts,
   type BotCommand,
 } from './bot-commands';
+
+vi.mock('#lib/platform/diagnostics.js', () => ({
+  describePlatform: () => Promise.resolve('macOS 15'),
+  issuePlatform: () => Promise.resolve('macOS'),
+}));
 
 const BOT = '@bot:example.org';
 
@@ -265,5 +271,64 @@ describe('draftsFromText', () => {
       ],
     });
     expect(draftsFromText(limit, '')).toEqual({ count: '10' });
+  });
+});
+
+describe('prefillDrafts', () => {
+  const issue = command({
+    command: 'issue',
+    parameters: [
+      {
+        key: 'environment',
+        schema: { schema_type: 'primitive', type: 'string' },
+        'moe.sable.prefill': 'environment',
+      },
+      {
+        key: 'platforms',
+        schema: {
+          schema_type: 'array',
+          items: { schema_type: 'union', variants: [{ schema_type: 'literal', value: 'macOS' }] },
+        },
+        optional: true,
+        'moe.sable.prefill': 'platform',
+      },
+    ],
+  });
+
+  test('fills the environment and platform for the user to edit', async () => {
+    const drafts = draftsFromText(issue, '');
+    await prefillDrafts(issue, drafts, 'example.org');
+    expect(drafts.environment).toContain('- OS: macOS 15');
+    expect(drafts.environment).toContain('- Homeserver: example.org');
+    expect(drafts.platforms).toEqual(['macOS']);
+  });
+
+  test('leaves commands without prefill hints alone', async () => {
+    const drafts = draftsFromText(command(), '');
+    const before = structuredClone(drafts);
+    await prefillDrafts(command(), drafts, 'example.org');
+    expect(drafts).toEqual(before);
+  });
+
+  test('skips a platform the bot does not offer', async () => {
+    const linuxOnly = command({
+      command: 'issue',
+      parameters: [
+        {
+          key: 'platforms',
+          schema: { schema_type: 'union', variants: [{ schema_type: 'literal', value: 'Linux' }] },
+          'moe.sable.prefill': 'platform',
+        },
+      ],
+    });
+    const drafts = draftsFromText(linuxOnly, '');
+    await prefillDrafts(linuxOnly, drafts, 'example.org');
+    expect(drafts.platforms ?? '').toBe('');
+  });
+
+  test('keeps what the user already typed', async () => {
+    const drafts = { environment: 'Sable 1.0 on Firefox', platforms: [] };
+    await prefillDrafts(issue, drafts, 'example.org');
+    expect(drafts.environment).toBe('Sable 1.0 on Firefox');
   });
 });

@@ -167,6 +167,12 @@ pub struct BotCommandParameter {
     pub default_value: Option<ArgumentValue>,
     /// `moe.sable.flag`: the option name the bot's own parser expects.
     pub flag: Option<String>,
+    /// `moe.sable.multiline`: the value can span several lines.
+    #[serde(default)]
+    pub multiline: bool,
+    /// `moe.sable.prefill`: what the client fills in first, `environment` or `platform`.
+    #[serde(default)]
+    pub prefill: Option<String>,
 }
 
 /// An `org.matrix.msc4391.command_description` and who it came from.
@@ -227,7 +233,7 @@ pub enum ArgumentError {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct BotCommandInvocation {
     pub command: String,
-    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Unknown>))]
+    #[cfg_attr(feature = "typegen", specta(type = BTreeMap<String, specta_typescript::Unknown>))]
     pub arguments: Map<String, Value>,
 }
 
@@ -396,6 +402,12 @@ struct ParameterIn {
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[serde(default, rename = "moe.sable.flag")]
     flag: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default, rename = "moe.sable.multiline")]
+    multiline: Option<bool>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default, rename = "moe.sable.prefill")]
+    prefill: Option<String>,
 }
 
 /// Every declared parameter has to parse, or the whole list is refused.
@@ -417,6 +429,8 @@ fn parameters<'de, D: Deserializer<'de>>(
                     optional: parameter.optional == Some(true),
                     default_value: parameter.default_value,
                     flag: parameter.flag,
+                    multiline: parameter.multiline == Some(true),
+                    prefill: parameter.prefill,
                 })
                 .ok_or_else(|| serde::de::Error::custom("invalid parameter"))
         })
@@ -1239,6 +1253,7 @@ mod tests {
             "fi.mau.tail_parameter": "n",
             "parameters": [{
                 "key": "n", "optional": "yes", "moe.sable.flag": 4,
+                "moe.sable.multiline": "yes", "moe.sable.prefill": 5,
                 "description": {"m.text": "no"},
                 "schema": {"schema_type": "primitive", "type": "integer"}
             }]
@@ -1251,6 +1266,36 @@ mod tests {
         assert!(!command.parameters[0].optional);
         assert_eq!(command.parameters[0].flag, None);
         assert_eq!(command.parameters[0].description, None);
+        assert!(!command.parameters[0].multiline);
+        assert_eq!(command.parameters[0].prefill, None);
+    }
+
+    #[test]
+    fn a_parameter_from_before_the_sable_hints_still_reads() {
+        let parameter: super::BotCommandParameter = serde_json::from_value(json!({
+            "key": "a", "schema": {"schema_type": "primitive", "type": "string"},
+            "description": null, "optional": false, "default_value": null, "flag": null
+        }))
+        .unwrap();
+        assert!(!parameter.multiline);
+        assert_eq!(parameter.prefill, None);
+    }
+
+    #[test]
+    fn a_parameter_reads_the_sable_multiline_and_prefill_hints() {
+        let content = json!({
+            "command": "issue",
+            "parameters": [{
+                "key": "environment", "moe.sable.multiline": true, "moe.sable.prefill": "environment",
+                "schema": {"schema_type": "primitive", "type": "string"}
+            }]
+        });
+        let command = parse_bot_command("@b:x", None, None, &content).unwrap();
+        assert!(command.parameters[0].multiline);
+        assert_eq!(
+            command.parameters[0].prefill.as_deref(),
+            Some("environment")
+        );
     }
 
     #[test]

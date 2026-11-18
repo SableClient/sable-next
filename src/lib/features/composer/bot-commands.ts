@@ -1,10 +1,15 @@
 import type {
+  ArgumentDraft,
   BotCommand,
   ItemSchema,
   LiteralValue,
   ParameterSchema,
   PrimitiveType,
 } from '#src/generated/protocol';
+
+import { issueEnvironment } from '#lib/features/bug-report/forge.js';
+import type { ArgumentDrafts } from '#lib/model/model.js';
+import { describePlatform, issuePlatform } from '#lib/platform/diagnostics.js';
 
 export type {
   ArgumentDraft,
@@ -25,6 +30,33 @@ export {
   parseBotCommand,
   type ArgumentDrafts,
 } from '#lib/model/model.js';
+
+function isEmptyDraft(draft: ArgumentDraft | undefined): boolean {
+  return draft === undefined || draft === '' || (Array.isArray(draft) && draft.length === 0);
+}
+
+export async function prefillDrafts(
+  command: BotCommand,
+  drafts: ArgumentDrafts,
+  homeserver: string
+): Promise<void> {
+  const wanted = command.parameters.filter(
+    (parameter) => typeof parameter.prefill === 'string' && isEmptyDraft(drafts[parameter.key])
+  );
+  if (wanted.length === 0) return;
+  const [platform, option] = await Promise.all([describePlatform(), issuePlatform()]);
+  for (const parameter of wanted) {
+    if (!isEmptyDraft(drafts[parameter.key])) continue;
+    if (parameter.prefill === 'environment') {
+      drafts[parameter.key] = issueEnvironment(platform, '', homeserver);
+    } else if (
+      parameter.prefill === 'platform' &&
+      literalChoices(itemSchemaOf(parameter.schema))?.some((choice) => choice === option)
+    ) {
+      drafts[parameter.key] = parameter.schema.schema_type === 'array' ? [option] : option;
+    }
+  }
+}
 
 export function botCommandId(command: BotCommand): string {
   return `bot:${command.sender} ${command.command}`;

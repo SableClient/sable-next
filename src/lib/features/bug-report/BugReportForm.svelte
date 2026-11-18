@@ -103,7 +103,7 @@
               .join('\n\nExpected:\n'),
             reproduction,
             platforms: platformOption,
-            info: issueEnvironment(platform, video),
+            environment: issueEnvironment(platform, video),
             context:
               callSnapshot && includeCallDiagnostics
                 ? `${context.trim()}\n\nCall diagnostics:\n\`\`\`json\n${buildCallDiagnostics({ ...callSnapshot, video: undefined })}\n\`\`\``.trim()

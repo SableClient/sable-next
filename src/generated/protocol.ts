@@ -107,6 +107,10 @@ export type BotCommandParameter = {
 	default_value: ArgumentValue | null,
 	/**  `moe.sable.flag`: the option name the bot's own parser expects. */
 	flag: string | null,
+	/**  `moe.sable.multiline`: the value can span several lines. */
+	multiline: boolean,
+	/**  `moe.sable.prefill`: what the client fills in first, `environment` or `platform`. */
+	prefill: string | null,
 };
 
 export type BridgeView = {

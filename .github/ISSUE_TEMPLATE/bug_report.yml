@@ -50,7 +50,7 @@ body:
         - All
 
   - type: textarea
-    id: info
+    id: environment
     attributes:
       label: Environment and versions
       description: 'Provide the build and Sable version you are using, your browser if applicable, and your homeserver.'
