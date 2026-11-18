@@ -59,6 +59,7 @@
 <button
   type="button"
   class={['btn', 'undecryptable', { critical }]}
+  aria-haspopup="dialog"
   onclick={() => {
     detailsOpen = true;
   }}
@@ -144,9 +145,17 @@
     }
 
     &:hover {
+      background-color: var(--surface-container-hover);
       cursor: pointer;
+    }
 
-      /* background-color: var(--surface-var-container-hover); */
+    &:active {
+      background-color: var(--surface-container-active);
+    }
+
+    &:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring);
+      outline-offset: var(--space-050);
     }
   }
 

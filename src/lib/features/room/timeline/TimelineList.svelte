@@ -53,12 +53,13 @@
   import { LoadRetry } from './load-retry';
   import TimelineItem from './TimelineItem.svelte';
   import TimelineMemberGroup from './TimelineMemberGroup.svelte';
+  import TimelineBeforeJoinGroup from './TimelineBeforeJoinGroup.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
   import TimelineAnnouncements from './TimelineAnnouncements.svelte';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import TypingIndicator, { type TypingUser } from './TypingIndicator.svelte';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
-  import { groupMemberEvents } from '../members/member-groups';
+  import { groupTimelineRuns, type TimelineGroupKind } from '../members/member-groups';
   import { TimelineEventIndex } from './timeline-event-index';
   import {
     cumulativeReadBy,
@@ -212,6 +213,7 @@
   interface RowValue {
     item: TimelineItemView;
     group: readonly TimelineItemView[] | null;
+    kind: TimelineGroupKind | null;
     collapsed: boolean;
     groupStart: boolean;
     unreadCount: number;
@@ -288,19 +290,23 @@
   let previousEntries = new Map<string, TimelineEntry<RowValue>>();
   let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
     identity.reconcile(visibleItems);
-    const units = groupMemberEvents(visibleItems);
+    const units = groupTimelineRuns(visibleItems);
     const unitItems = units.map((unit) => unit.item);
-    const next = units.map(({ item, index: source, group }, index) => {
+    const next = units.map(({ item, index: source, group, kind }, index) => {
       const collapsed =
+        kind !== 'before_join' &&
+        units[index - 1]?.kind !== 'before_join' &&
         !(
           threadRootId &&
           (item.event_id === threadRootId || unitItems[index - 1]?.event_id === threadRootId)
-        ) && isCollapsed(unitItems, index, preferences.replyPreviewStyle);
+        ) &&
+        isCollapsed(unitItems, index, preferences.replyPreviewStyle);
       const entry = {
         key: identity.key(visibleItems, source),
         value: {
           item,
           group,
+          kind,
           collapsed,
           groupStart: index > 0 && !collapsed,
           unreadCount:
@@ -1455,6 +1461,8 @@
                 {/if}
                 {#if timelineStart && item.content.kind === 'timeline_start'}
                   {@render timelineStart()}
+                {:else if group && row.value.kind === 'before_join'}
+                  <TimelineBeforeJoinGroup items={group} renderItem={timelineItem} />
                 {:else if group}
                   <TimelineMemberGroup
                     items={group}

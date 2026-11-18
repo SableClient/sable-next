@@ -597,14 +597,31 @@ test('/sharehistory shares the room history with one user', async () => {
   });
 });
 
-test('/sharehistory says why nothing was shared', async () => {
+test('/sharehistory confirms when the keys went out', async () => {
   const rpc = fakeRpc();
-  rpc.encryption.shareHistory.mockResolvedValue('no_cross_signing');
 
   await expect(
     runSlash('/sharehistory @bob:example.org', context(fakeCommands(), rpc))
-  ).rejects.toMatchObject({ key: 'composer.slashShareHistory.no_cross_signing' });
+  ).resolves.toEqual({
+    kind: 'done',
+    notice: { key: 'composer.slashShareHistory.shared', values: { user: '@bob:example.org' } },
+  });
 });
+
+test.each(['no_cross_signing', 'not_invited', 'no_verified_devices', 'nothing_to_share'] as const)(
+  '/sharehistory says why nothing was shared: %s',
+  async (outcome) => {
+    const rpc = fakeRpc();
+    rpc.encryption.shareHistory.mockResolvedValue(outcome);
+
+    await expect(
+      runSlash('/sharehistory @bob:example.org', context(fakeCommands(), rpc))
+    ).rejects.toMatchObject({
+      key: `composer.slashShareHistory.${outcome}`,
+      values: { user: '@bob:example.org' },
+    });
+  }
+);
 
 test('/acl hands the flags to the core', async () => {
   const rpc = fakeRpc();

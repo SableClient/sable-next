@@ -1923,7 +1923,12 @@ export type SessionInfo = {
 	needs_reauth: boolean,
 };
 
-export type ShareHistoryView = "shared" | "unencrypted" | "no_cross_signing" | "history_not_shared";
+export type ShareHistoryView = "shared" | "unencrypted" | "no_cross_signing" | "history_not_shared" | "not_invited" | "no_verified_devices" | "nothing_to_share";
+
+export type SharedByView = {
+	user_id: string,
+	name: string | null,
+};
 
 export type SidebarItemView = { kind: "space"; room_id: string } | { kind: "folder"; id: string; name: string | null; icon: string | null; content: string[] };
 
@@ -2206,6 +2211,8 @@ export type TimelineItemView = {
 	forwarded: ForwardedView | null,
 	forum_title: string | null,
 	shield: MessageShieldView | null,
+	/**  MSC4268: who sent the key bundle this message was decrypted with. */
+	shared_by: SharedByView | null,
 	/**
 	 *  MSC4293: shown as deleted because its sender was banned or kicked with
 	 *  `redact_events`. The content is still held locally.

@@ -559,6 +559,7 @@ test('a moderator sees revealed content under the tombstone until it is hidden',
   const deleted = withRowFields({
     ...item(false),
     content: { kind: 'redacted', reason: null, redacted_by: null },
+    shared_by: null,
     redacted_on_ban: true,
   });
   render(TimelineItemHarness, {
@@ -596,6 +597,7 @@ test('a deleted message that cannot be shown says why next to its toggle', async
   const deleted = withRowFields({
     ...item(false),
     content: { kind: 'redacted', reason: null, redacted_by: null },
+    shared_by: null,
     redacted_on_ban: true,
   });
   render(TimelineItemHarness, {
@@ -719,6 +721,7 @@ test('a message whose embeds were removed renders none, bundled or found', async
       },
     ],
     link_previews_removed: true,
+    shared_by: null,
     redacted_on_ban: null,
   });
   const instance = render(TimelineItemHarness, {
@@ -827,4 +830,20 @@ test('quotes a reply to a membership event as its timeline text', async () => {
   await tick();
 
   expect(document.querySelector('.reply-body')?.textContent).toBe('nex left the room');
+});
+
+test('names who shared the key to a message from before the join', async () => {
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: {
+        item: { ...item(false), shared_by: { user_id: '@alice:example.org', name: 'Alice' } },
+        collapsed: false,
+      },
+    },
+  });
+  await tick();
+
+  await user.click(screen.getByRole('button', { name: 'Shared by Alice' }));
+  expect(await screen.findByText(/Alice shared keys with you to unlock this message/)).toBeTruthy();
 });

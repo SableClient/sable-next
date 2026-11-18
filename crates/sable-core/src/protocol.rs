@@ -1565,9 +1565,19 @@ pub struct TimelineItemView {
     pub forwarded: Option<ForwardedView>,
     pub forum_title: Option<String>,
     pub shield: Option<MessageShieldView>,
+    /// MSC4268: who sent the key bundle this message was decrypted with.
+    pub shared_by: Option<SharedByView>,
     /// MSC4293: shown as deleted because its sender was banned or kicked with
     /// `redact_events`. The content is still held locally.
     pub redacted_on_ban: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SharedByView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub user_id: OwnedUserId,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -2660,6 +2670,9 @@ pub enum ShareHistoryView {
     Unencrypted,
     NoCrossSigning,
     HistoryNotShared,
+    NotInvited,
+    NoVerifiedDevices,
+    NothingToShare,
 }
 
 #[derive(Debug, Clone, Serialize)]

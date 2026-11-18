@@ -10,6 +10,7 @@ import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
 import HandSwipeLeftIcon from 'phosphor-svelte/lib/HandSwipeLeftIcon';
 import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
 import LayoutIcon from 'phosphor-svelte/lib/LayoutIcon';
+import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
 import DatabaseIcon from 'phosphor-svelte/lib/DatabaseIcon';
 import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
@@ -425,6 +426,14 @@ export const timelineCategory: SettingsCategory = {
       section: 'room-events',
       icon: TextAlignLeftIcon,
       name: 'settings.hideTopicChanges',
+      type: 'boolean',
+    },
+    {
+      key: 'hideSentBeforeJoined',
+      section: 'room-events',
+      icon: LockSimpleIcon,
+      name: 'settings.hideSentBeforeJoined',
+      description: 'settings.hideSentBeforeJoinedHint',
       type: 'boolean',
     },
     {

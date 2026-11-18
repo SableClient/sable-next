@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import type { RoomListItemView } from '#src/generated/protocol';
+  import type { HistoryVisibilityView, RoomListItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { isUserId } from '#lib/guards.js';
+  import { showSettingsOver } from '#lib/features/settings/settings-navigation.js';
+  import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
@@ -33,7 +35,21 @@
   const directory = new UserDirectoryLookup(core);
 
   let roomId = $derived(room?.room_id ?? null);
+  let encrypted = $derived(room?.encrypted === true);
   let isDirect = $derived(room?.is_direct ?? false);
+  let history = $state<HistoryVisibilityView | 'unknown' | null>(null);
+  let historyShared = $derived(history === 'shared' || history === 'world_readable');
+  let noCrossSigning = $state(false);
+  let recipient = $state<{ userId: string; noVerified: boolean; stranger: boolean } | null>(null);
+  let candidate = $derived(isUserId(draft.trim()) ? draft.trim() : null);
+  let sharesHistory = $derived(historyShared && !noCrossSigning);
+  let historyNote = $derived.by(() => {
+    if (history === null) return null;
+    if (history === 'unknown') return i18n.t('room.inviteHistoryUnknown');
+    if (history === 'invited') return i18n.t('room.inviteHistoryFromInvite');
+    if (historyShared && noCrossSigning) return i18n.t('room.inviteHistoryNeedsCrossSigning');
+    return i18n.t(historyShared ? 'room.inviteHistoryShared' : 'room.inviteHistoryHidden');
+  });
   let suggestions = $derived(directory.results.filter((entry) => entry.user_id !== draft.trim()));
 
   $effect(() => {
@@ -47,6 +63,70 @@
       converting = false;
       convertPrompt = isDirect;
     });
+  });
+
+  $effect(() => {
+    const target = roomId;
+    history = null;
+    if (!open || !target || !encrypted) return;
+    let current = true;
+    void core.rpc.room_state
+      .historyVisibility({ room_id: target })
+      .then((visibility) => {
+        if (current) history = visibility;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] history visibility unavailable', error);
+        if (current) history = 'unknown';
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  $effect(() => {
+    noCrossSigning = false;
+    if (!historyShared) return;
+    let current = true;
+    void core.rpc.encryption
+      .status()
+      .then((status) => {
+        if (current) noCrossSigning = status.verification === 'unknown';
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] encryption status unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  $effect(() => {
+    const userId = candidate;
+    recipient = null;
+    if (!sharesHistory || !userId) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      void Promise.all([
+        core.rpc.encryption.userSecurity({ user_id: userId }),
+        core.userRelations(userId),
+      ])
+        .then(([security, relations]) => {
+          if (!current) return;
+          recipient = {
+            userId,
+            noVerified: !security.devices.some((device) => device.cross_signed),
+            stranger: relations.mutual_rooms.length === 0,
+          };
+        })
+        .catch((error: unknown) => {
+          console.debug('[sable room] invitee checks unavailable', error);
+        });
+    }, 400);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
   });
 
   function setDraft(next: string): void {
@@ -160,7 +240,39 @@
         <Alert variant="critical" role="alert">{i18n.t('room.inviteSendFailed')}</Alert>
       {:else if invited}
         <Alert variant="success" role="status">
-          {i18n.t('room.inviteSent', { user: invited })}
+          {i18n.t(
+            sharesHistory && !(recipient?.userId === invited && recipient.noVerified)
+              ? 'room.inviteSentWithHistory'
+              : 'room.inviteSent',
+            {
+              user: invited,
+            }
+          )}
+        </Alert>
+      {/if}
+
+      <p class="explain history-note" aria-live="polite" hidden={!historyNote}>{historyNote}</p>
+      {#if historyShared && noCrossSigning}
+        <Button
+          variant="secondary"
+          size="small"
+          class="history-action"
+          onclick={() => {
+            onOpenChange(false);
+            showSettingsOver(SETTINGS_DEVICES_SECTION);
+          }}
+        >
+          {i18n.t('composer.openSecuritySettings')}
+        </Button>
+      {/if}
+      {#if recipient && recipient.userId === candidate && (recipient.stranger || recipient.noVerified)}
+        <Alert variant="warning" role="status">
+          {#if recipient.stranger}
+            <p>{i18n.t('room.inviteStranger', { user: recipient.userId })}</p>
+          {/if}
+          {#if recipient.noVerified}
+            <p>{i18n.t('room.inviteNoVerifiedSessions', { user: recipient.userId })}</p>
+          {/if}
         </Alert>
       {/if}
 
@@ -202,5 +314,13 @@
   .explain {
     color: var(--surface-var-on-container);
     margin: 0;
+  }
+
+  .history-note {
+    font-size: var(--font-size-small);
+  }
+
+  .invite :global(.history-action) {
+    justify-self: start;
   }
 </style>

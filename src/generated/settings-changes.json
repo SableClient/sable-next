@@ -1,4 +1,10 @@
 {
+  "upcoming": {
+    "added": [
+      "hideSentBeforeJoined"
+    ],
+    "changed": []
+  },
   "v26.11.3": {
     "added": [
       "bannerFit"

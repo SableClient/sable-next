@@ -337,6 +337,7 @@ const SETTINGS = {
   hideProfileChanges: toggle(true, { account: true }),
   hideTopicChanges: toggle(false, { account: true }),
   hideMemberInReadOnly: toggle(true, { account: true }),
+  hideSentBeforeJoined: toggle(false, { account: true }),
   showTombstoneEvents: toggle(true, { account: true }),
   openRoomsAtUnread: toggle(true, { account: true }),
   jumpToLatestOnSend: toggle(false, { account: true }),
@@ -572,6 +573,7 @@ export type TimelinePreferences = Pick<
   | 'hideProfileChanges'
   | 'hideTopicChanges'
   | 'hideMemberInReadOnly'
+  | 'hideSentBeforeJoined'
   | 'showTombstoneEvents'
   | 'showHiddenEvents'
   | 'hiddenEventEdits'

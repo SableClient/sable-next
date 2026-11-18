@@ -75,8 +75,17 @@ function isVisibleEvent(
     case 'hidden':
       return preferences.showHiddenEvents && preferences.hiddenEventOther;
     case 'always':
-      return !(preferences.hideTopicChanges && isTopicChange(item));
+      return (
+        !(preferences.hideTopicChanges && isTopicChange(item)) &&
+        !(preferences.hideSentBeforeJoined && isSentBeforeJoined(item))
+      );
   }
+}
+
+export function isSentBeforeJoined(item: TimelineItemView): boolean {
+  return (
+    item.content.kind === 'unable_to_decrypt' && item.content.reason === 'sent_before_we_joined'
+  );
 }
 
 function isTopicChange(item: TimelineItemView): boolean {
@@ -260,6 +269,7 @@ function virtualItem(
     per_message_profile: null,
     bundled_link_previews: [],
     link_previews_removed: null,
+    shared_by: null,
     redacted_on_ban: null,
     mention: 'none',
     forwarded: null,

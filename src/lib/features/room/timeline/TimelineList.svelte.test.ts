@@ -145,6 +145,35 @@ function timelineViewport(): HTMLElement {
   return element;
 }
 
+test('messages sent before the join fold into one row that does not swallow the next header', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [
+    ...['a', 'b', 'c'].map((id): TimelineItemView => ({
+      ...item(id),
+      content: { kind: 'unable_to_decrypt', reason: 'sent_before_we_joined', session_id: null },
+    })),
+    item('after'),
+  ];
+  roomTimeline.backwardPagination = 'end';
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        roomId: '!room:example.org',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+  viewport();
+  await runAnimationFrames();
+
+  expect(screen.getByText('3 messages sent before you joined')).toBeTruthy();
+  expect(document.querySelectorAll('.undecryptable')).toHaveLength(0);
+  expect(document.querySelector('[data-event-id="$after"]')).not.toHaveClass('collapsed');
+});
+
 test('expanding a member group exposes the original event source', async () => {
   const roomTimeline = timeline();
   const source = JSON.stringify({ event_id: '$first' });

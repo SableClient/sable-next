@@ -70,6 +70,7 @@ except those marked deployment only.
 - `hideProfileChanges` (Hide name and avatar changes): `true` or `false`. Default `true`.
 - `hideTopicChanges` (Hide topic changes): `true` or `false`. Default `false`.
 - `hideMemberInReadOnly` (Hide members in read-only rooms): `true` or `false`. Default `true`.
+- `hideSentBeforeJoined` (Hide messages sent before you joined): `true` or `false`. Default `false`.
 - `showTombstoneEvents` (Show removed-message placeholders): `true` or `false`. Default `true`.
 - `openRoomsAtUnread` (Open rooms at the first unread message): `true` or `false`. Default `true`.
 - `jumpToLatestOnSend` (Jump to your message when you send): `true` or `false`. Default `false`.

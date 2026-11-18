@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use matrix_sdk::encryption::recovery::RecoveryError;
 use matrix_sdk::ruma::events::room::history_visibility::HistoryVisibility;
-use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId};
+use matrix_sdk::ruma::events::SyncStateEvent;
+use matrix_sdk::ruma::events::room::member::MembershipState;
+use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId, UserId};
+use matrix_sdk_base::deserialized_responses::MemberEvent;
+use matrix_sdk_base::crypto::olm::InboundGroupSession;
 use serde::{Deserialize, Serialize};
 
 use super::Handler;
@@ -370,8 +374,7 @@ impl Handler for DiscardRoomKeyParams {
     }
 }
 
-/// MSC4268: the invitee only accepts the keys from the sender shortly after
-/// joining, so this is for someone who just did.
+/// MSC4268: the recipient only accepts the keys from whoever invited them.
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ShareHistoryParams {
@@ -405,10 +408,78 @@ impl Handler for ShareHistoryParams {
         ) {
             return Ok(ShareHistoryView::HistoryNotShared);
         }
+        if bundle_refused(&room, own, &self.user_id).await {
+            return Ok(ShareHistoryView::NotInvited);
+        }
+        // Bundles only go to devices the recipient has cross-signed.
+        client
+            .encryption()
+            .request_user_identity(&self.user_id)
+            .await
+            .or_failed(core, "share_history")?;
+        let devices = client
+            .encryption()
+            .get_user_devices(&self.user_id)
+            .await
+            .or_failed(core, "share_history")?;
+        if !devices.devices().any(|device| device.is_cross_signed_by_owner()) {
+            return Ok(ShareHistoryView::NoVerifiedDevices);
+        }
         room.share_history_with(&self.user_id)
             .await
             .or_failed(core, "share_history")?;
+        let base = core.base_client().await?;
+        let machine = base.olm_machine().await;
+        let machine = machine.as_ref().ok_or(RpcCode::NotLoggedIn)?;
+        let sessions = machine
+            .store()
+            .get_inbound_group_sessions_by_room_id(room.room_id())
+            .await
+            .or_failed(core, "share_history")?;
+        if !sessions.iter().any(InboundGroupSession::shared_history) {
+            return Ok(ShareHistoryView::NothingToShare);
+        }
         Ok(ShareHistoryView::Shared)
+    }
+}
+
+/// True when the room state shows `user_id` will drop a bundle from `own`.
+async fn bundle_refused(room: &matrix_sdk::Room, own: &UserId, user_id: &UserId) -> bool {
+    let member = match room.get_member_no_sync(user_id).await {
+        Ok(Some(member)) => Some(member),
+        _ => room.get_member(user_id).await.ok().flatten(),
+    };
+    let Some(member) = member else {
+        return false;
+    };
+    let event = member.event();
+    match event.membership() {
+        MembershipState::Invite => event.sender() != own,
+        MembershipState::Leave | MembershipState::Ban => true,
+        MembershipState::Join => {
+            let MemberEvent::Sync(SyncStateEvent::Original(join)) = &**event else {
+                return false;
+            };
+            match join.unsigned.prev_content.as_ref().map(|previous| &previous.membership) {
+                Some(MembershipState::Leave) => true,
+                Some(MembershipState::Invite) => {
+                    let Some(invite) = join.unsigned.replaces_state.as_ref() else {
+                        return false;
+                    };
+                    let Ok(invite) = room.load_or_fetch_event(invite, None).await else {
+                        return false;
+                    };
+                    invite
+                        .raw()
+                        .get_field::<OwnedUserId>("sender")
+                        .ok()
+                        .flatten()
+                        .is_some_and(|sender| sender != own)
+                }
+                _ => false,
+            }
+        }
+        _ => false,
     }
 }
 
@@ -657,5 +728,124 @@ impl Handler for CancelVerificationParams {
                 .or_failed(core, "cancel_verification")?,
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use matrix_sdk::ruma::events::AnySyncStateEvent;
+    use matrix_sdk::ruma::serde::Raw;
+    use matrix_sdk::ruma::{event_id, room_id, user_id};
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use matrix_sdk_test::{JoinedRoomBuilder, event_factory::EventFactory};
+    use serde_json::{Value, json};
+
+    use super::*;
+
+    fn room() -> JoinedRoomBuilder {
+        JoinedRoomBuilder::new(room_id!("!history:localhost"))
+    }
+
+    fn join(previous: Option<&str>, replaces_state: Option<&str>) -> Raw<AnySyncStateEvent> {
+        let mut unsigned = json!({});
+        if let Some(membership) = previous {
+            unsigned["prev_content"] = json!({ "membership": membership });
+        }
+        if let Some(event_id) = replaces_state {
+            unsigned["replaces_state"] = Value::from(event_id);
+        }
+        Raw::new(&json!({
+            "type": "m.room.member",
+            "state_key": "@bob:localhost",
+            "sender": "@bob:localhost",
+            "event_id": "$join",
+            "origin_server_ts": 1,
+            "content": { "membership": "join" },
+            "unsigned": unsigned,
+        }))
+        .unwrap()
+        .cast_unchecked()
+    }
+
+    /// `None` means we sent the invite.
+    async fn refused(
+        inviter: Option<&UserId>,
+        state: impl FnOnce(&EventFactory, &UserId) -> JoinedRoomBuilder,
+    ) -> bool {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let own = client.user_id().unwrap().to_owned();
+        let factory = EventFactory::new().room(room_id!("!history:localhost"));
+        let room = server.sync_room(&client, state(&factory, &own)).await;
+        server
+            .mock_room_event()
+            .match_event_id()
+            .ok(factory
+                .member(inviter.unwrap_or(&own))
+                .invited(user_id!("@bob:localhost"))
+                .event_id(event_id!("$invite"))
+                .into_event())
+            .mount()
+            .await;
+        bundle_refused(&room, &own, user_id!("@bob:localhost")).await
+    }
+
+    #[tokio::test]
+    async fn an_invite_we_sent_takes_the_bundle() {
+        assert!(
+            !refused(None, |factory, own| room()
+                .add_state_event(factory.member(own).invited(user_id!("@bob:localhost"))))
+            .await
+        );
+    }
+
+    #[tokio::test]
+    async fn an_invite_someone_else_sent_drops_it() {
+        let carol = user_id!("@carol:localhost");
+        assert!(
+            refused(None, |factory, _| room()
+                .add_state_event(factory.member(carol).invited(user_id!("@bob:localhost"))))
+            .await
+        );
+    }
+
+    #[tokio::test]
+    async fn a_join_that_accepted_our_invite_takes_it() {
+        assert!(!refused(None, |_, _| room().add_state_bulk([join(Some("invite"), Some("$invite"))])).await);
+    }
+
+    #[tokio::test]
+    async fn a_join_that_accepted_someone_elses_invite_drops_it() {
+        let carol = user_id!("@carol:localhost");
+        assert!(refused(Some(carol), |_, _| room().add_state_bulk([join(Some("invite"), Some("$invite"))])).await);
+    }
+
+    #[tokio::test]
+    async fn a_join_without_an_invite_drops_it() {
+        assert!(refused(None, |_, _| room().add_state_bulk([join(Some("leave"), None)])).await);
+    }
+
+    #[tokio::test]
+    async fn a_join_with_no_history_is_left_to_their_client() {
+        assert!(!refused(None, |_, _| room().add_state_bulk([join(None, None)])).await);
+    }
+
+    #[tokio::test]
+    async fn someone_we_know_nothing_about_is_left_to_their_client() {
+        assert!(!refused(None, |_, _| room()).await);
+    }
+
+    #[tokio::test]
+    async fn a_profile_change_after_joining_is_left_to_their_client() {
+        assert!(!refused(None, |_, _| room().add_state_bulk([join(Some("join"), Some("$invite"))])).await);
+    }
+
+    #[tokio::test]
+    async fn someone_who_left_drops_it() {
+        assert!(
+            refused(None, |factory, _| room()
+                .add_state_event(factory.member(user_id!("@bob:localhost")).leave()))
+            .await
+        );
     }
 }

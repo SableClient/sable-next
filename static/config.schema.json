@@ -732,6 +732,11 @@
           "type": "boolean",
           "default": true
         },
+        "hideSentBeforeJoined": {
+          "title": "Hide messages sent before you joined",
+          "type": "boolean",
+          "default": false
+        },
         "showTombstoneEvents": {
           "title": "Show removed-message placeholders",
           "type": "boolean",
@@ -2234,6 +2239,11 @@
           "title": "Hide members in read-only rooms",
           "type": "boolean",
           "default": true
+        },
+        "hideSentBeforeJoined": {
+          "title": "Hide messages sent before you joined",
+          "type": "boolean",
+          "default": false
         },
         "showTombstoneEvents": {
           "title": "Show removed-message placeholders",

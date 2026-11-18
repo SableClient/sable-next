@@ -523,6 +523,7 @@ mod tests {
             forwarded: None,
             forum_title: None,
             shield: None,
+            shared_by: None,
             redacted_on_ban: None,
         }
     }

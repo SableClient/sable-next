@@ -69,13 +69,17 @@
     } catch (error) {
       console.warn('[sable room] history visibility change failed', error);
       visibility = previous;
+      toasts.error(i18n.t('errors.actionFailed'));
     } finally {
       saving = false;
     }
   }
 </script>
 
-<SettingsRow title={i18n.t('room.historyTitle')} description={i18n.t('room.historyHint')}>
+<SettingsRow
+  title={i18n.t('room.historyTitle')}
+  description={i18n.t(room?.encrypted ? 'room.historyHintEncrypted' : 'room.historyHint')}
+>
   {#if canEdit}
     <Select
       value={visibility}

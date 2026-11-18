@@ -42,6 +42,7 @@
   import TimelineTransfer from './TimelineTransfer.svelte';
   import UndecryptableNotice from './UndecryptableNotice.svelte';
   import MessageShieldNotice from './MessageCryptoStatus.svelte';
+  import MessageSharedBy from './MessageSharedBy.svelte';
 
   let {
     item,
@@ -140,6 +141,9 @@
     item.in_reply_to ? (events?.get(item.in_reply_to.event_id) ?? null) : null
   );
   let replySender = $derived(item.in_reply_to?.sender ?? replyTarget?.sender ?? null);
+  let shieldShown = $derived(
+    item.shield !== null && (item.shield.critical || !preferences.hideMessageShields)
+  );
   let emote = $derived(item.content.kind === 'message' && item.content.msgtype === 'emote');
   let notice = $derived(item.content.kind === 'message' && item.content.msgtype === 'notice');
   let jumbo = $derived(item.content.kind === 'message' ? (item.content.jumbo ?? null) : null);
@@ -664,8 +668,15 @@
           <span class="receipt-tail" aria-hidden="true"></span>
         {/if}
       </div>
-      {#if item.shield && (item.shield.critical || !preferences.hideMessageShields)}
-        <MessageShieldNotice shield={item.shield} />
+      {#if shieldShown || item.shared_by}
+        <span class="crypto-indicators">
+          {#if item.shield && shieldShown}
+            <MessageShieldNotice shield={item.shield} />
+          {/if}
+          {#if item.shared_by}
+            <MessageSharedBy sharedBy={item.shared_by} />
+          {/if}
+        </span>
       {/if}
       {#if trailingReceiptBadge && layout !== 'bubble'}
         {@render receiptSlot()}
@@ -992,7 +1003,18 @@
     position: absolute;
   }
 
-  .message-content:has(> :global(.message-crypto-status)) > .receipt-slot {
+  .crypto-indicators {
+    align-self: flex-start;
+    display: flex;
+    gap: var(--space-100);
+    margin-inline-start: var(--space-200);
+  }
+
+  .crypto-indicators > :global(button) {
+    margin-inline-start: 0;
+  }
+
+  .message-content:has(> .crypto-indicators) > .receipt-slot {
     inset-inline-end: calc(var(--space-200) + var(--font-size-body));
   }
 
@@ -1182,9 +1204,14 @@
     grid-row: 2;
   }
 
-  .message.layout-compact :global(.message-crypto-status) {
+  .message.layout-compact .crypto-indicators {
     grid-column: 3;
     grid-row: 2;
+  }
+
+  .message.layout-compact :global(.undecryptable) {
+    margin-top: 0;
+    padding-block: 0;
   }
 
   .message.layout-compact :global(.message-actions) {

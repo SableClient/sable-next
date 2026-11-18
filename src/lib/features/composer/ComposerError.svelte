@@ -9,10 +9,11 @@
   interface Props {
     message: string;
     onRetry?: () => void;
+    action?: { label: string; run: () => void };
     onDismiss: () => void;
   }
 
-  let { message, onRetry, onDismiss }: Props = $props();
+  let { message, onRetry, action, onDismiss }: Props = $props();
 </script>
 
 <div class="composer-error" role="alert">
@@ -21,6 +22,11 @@
   {#if onRetry}
     <Button variant="danger" size="small" class="composer-error-retry" onclick={onRetry}>
       {i18n.t('common.retry')}
+    </Button>
+  {/if}
+  {#if action}
+    <Button variant="danger" size="small" class="composer-error-action" onclick={action.run}>
+      {action.label}
     </Button>
   {/if}
   <IconButton
@@ -66,7 +72,7 @@
     overflow-wrap: anywhere;
   }
 
-  .composer-error :global(.composer-error-retry) {
+  .composer-error :global(:is(.composer-error-retry, .composer-error-action)) {
     --button-container: var(--crit-container-hover);
     --button-container-hover: var(--crit-container-active);
 

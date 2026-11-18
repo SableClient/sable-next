@@ -85,6 +85,7 @@ function root(id: string, body: string): TimelineItemView {
     per_message_profile: null,
     bundled_link_previews: [],
     link_previews_removed: null,
+    shared_by: null,
     redacted_on_ban: null,
     mention: 'none',
     forwarded: null,

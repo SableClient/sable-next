@@ -26,8 +26,9 @@ use matrix_sdk_ui::{
 
 use crate::protocol::{
     MembershipChangeView, MentionView, MessageShieldCode, MessageShieldView, PerMessageProfileView,
-    ReactionGroup, SendBlockView, SendStateView, ThreadSummaryView, TimelineItemContentView,
-    TimelineItemView, TimelineRowKind, TimelineVisibility, UploadProgressView,
+    ReactionGroup, SendBlockView, SendStateView, SharedByView, ThreadSummaryView,
+    TimelineItemContentView, TimelineItemView, TimelineRowKind, TimelineVisibility,
+    UploadProgressView,
 };
 
 use super::content::{content, raw_formatted_body};
@@ -358,6 +359,19 @@ pub(crate) const fn forged_state(encrypted: bool, content: &TimelineItemContent)
         )
 }
 
+fn shared_by(event: &EventTimelineItem) -> Option<SharedByView> {
+    let user_id = event.forwarder()?.to_owned();
+    let name = match event.forwarder_profile() {
+        Some(TimelineDetails::Ready(profile)) => profile
+            .display_name
+            .as_deref()
+            .and_then(visible_name)
+            .map(str::to_owned),
+        _ => None,
+    };
+    Some(SharedByView { user_id, name })
+}
+
 const fn shield(state: TimelineEventShieldState) -> Option<MessageShieldView> {
     let (code, critical) = match state {
         TimelineEventShieldState::Red { code } => (code, true),
@@ -411,6 +425,7 @@ impl TimelineItemView {
             forwarded: None,
             forum_title: None,
             shield: None,
+            shared_by: None,
             redacted_on_ban: None,
         }
     }
@@ -642,6 +657,7 @@ pub fn timeline_item(
                         !event.content().is_redacted()
                             || shield.code != MessageShieldCode::SentInClear
                     }),
+                shared_by: shared_by(event),
                 redacted_on_ban: None,
             }
         }

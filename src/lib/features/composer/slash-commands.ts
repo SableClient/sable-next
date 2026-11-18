@@ -61,7 +61,7 @@ export type SlashOutcome =
   | { kind: 'gifSearch'; query: string }
   | { kind: 'bugReport' }
   | { kind: 'knock'; address: string; via: string[] }
-  | { kind: 'done' }
+  | { kind: 'done'; notice?: { key: string; values?: Record<string, string> } }
   | { kind: 'error'; key: string; values?: Record<string, string> };
 
 export type SlashResult = Exclude<SlashOutcome, { kind: 'error' }>;
@@ -376,9 +376,10 @@ async function run(
         room_id: roomId,
         user_id: invocation.user_id,
       });
+      const values = { user: invocation.user_id };
       return outcome === 'shared'
-        ? DONE
-        : { kind: 'error', key: `composer.slashShareHistory.${outcome}` };
+        ? { kind: 'done', notice: { key: 'composer.slashShareHistory.shared', values } }
+        : { kind: 'error', key: `composer.slashShareHistory.${outcome}`, values };
     }
     case 'kick':
       return moderate(name, invocation, 'kick', true, context);

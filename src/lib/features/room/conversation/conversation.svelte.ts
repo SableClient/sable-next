@@ -62,6 +62,7 @@ import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 import { stateEventText } from '#lib/features/room/timeline/state-event-text.js';
 import { isMessageRow } from '#lib/features/room/timeline/timeline-format.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 
 const NO_MENTIONS: OutgoingMentions = { user_ids: [], room: false };
 
@@ -254,6 +255,7 @@ export class Conversation {
       persona: () => this.#personaFor(targetRoomId, '', null).persona,
     });
     if (outcome.kind === 'done') {
+      if (outcome.notice) toasts.info(t(outcome.notice.key, outcome.notice.values));
       this.context = null;
       return;
     }

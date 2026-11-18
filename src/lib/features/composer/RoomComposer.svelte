@@ -41,6 +41,8 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
+  import { showSettingsOver } from '#lib/features/settings/settings-navigation.js';
   import { type ImageMetadata } from '#lib/settings/definitions.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
@@ -130,7 +132,7 @@
     type BotCommand,
     type BotCommandInvocation,
   } from './bot-commands';
-  import { parseSlash } from './slash-commands';
+  import { parseSlash, SlashError } from './slash-commands';
   import { editStep, replyStep } from './step-shortcuts';
   import { suggestionNode } from './suggestion-node';
   import { rememberSuggestion } from './suggestion-usage';
@@ -301,6 +303,7 @@
   let inFlight = $state(0);
   let error = $state<string | null>(null);
   let retry = $state<{ text: string; run: () => void } | null>(null);
+  let securityLink = $state<string | null>(null);
   let pollOpen = $state(false);
   let locationOpen = $state(false);
   let scheduleOpen = $state(false);
@@ -824,9 +827,13 @@
     }
   }
 
-  function failureText(cause: unknown): string {
-    const { key, values } = sendFailure(cause);
-    return i18n.t(key, values);
+  function failureText(cause: unknown, failure = sendFailure(cause)): string {
+    const text = i18n.t(failure.key, failure.values);
+    securityLink =
+      cause instanceof SlashError && cause.key === 'composer.slashShareHistory.no_cross_signing'
+        ? text
+        : null;
+    return text;
   }
 
   /** A send outlives a room switch, so its failure is put back in the room it was meant for. */
@@ -857,7 +864,7 @@
 
   function failRetryably(cause: unknown, run: () => void): void {
     const failure = sendFailure(cause);
-    error = i18n.t(failure.key, failure.values);
+    error = failureText(cause, failure);
     retry = failure.retryable ? { text: error, run } : null;
   }
 
@@ -1504,6 +1511,15 @@
           <ComposerError
             message={error}
             onRetry={retry?.text === error ? retry.run : undefined}
+            action={securityLink === error
+              ? {
+                  label: i18n.t('composer.openSecuritySettings'),
+                  run: () => {
+                    error = null;
+                    showSettingsOver(SETTINGS_DEVICES_SECTION);
+                  },
+                }
+              : undefined}
             onDismiss={() => {
               error = null;
             }}

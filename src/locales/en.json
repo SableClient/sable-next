@@ -485,6 +485,14 @@
     "inviteBody": "Invite someone to {{name}}.",
     "inviteSubmit": "Invite",
     "inviteSent": "Invited {{user}}.",
+    "inviteSentWithHistory": "Invited {{user}}. Once they join, their verified sessions should be able to read messages sent while members could see all history.",
+    "inviteHistoryShared": "Inviting can also give their verified sessions the keys to messages sent while members could see all history.",
+    "inviteHistoryFromInvite": "They’ll be able to read messages sent from the moment you invite them, not earlier ones.",
+    "inviteHistoryHidden": "They won’t be able to read messages sent before they join.",
+    "inviteHistoryNeedsCrossSigning": "Past messages won’t be shared with this invite until you set up cross-signing.",
+    "inviteStranger": "You don’t share any rooms with {{user}}. Check the address: inviting them shares this room’s past messages.",
+    "inviteNoVerifiedSessions": "{{user}} has no verified sessions, so they won’t get past messages.",
+    "inviteHistoryUnknown": "Couldn’t check this room’s history setting, so this invite may also give them the keys to past messages.",
     "inviteConvertBody": "This is a direct message. Inviting someone turns it into a group, and that cannot be undone.",
     "inviteConvertConfirm": "Convert and invite",
     "jumpBody": "Open the room at the first message from a moment.",
@@ -877,6 +885,7 @@
     "cosmeticsMembersPronounsSpace": "Let everyone set pronouns for every room of this space.",
     "historyTitle": "Message history visibility",
     "historyHint": "Only future messages are affected. Existing history keeps its old visibility.",
+    "historyHintEncrypted": "Invites share earlier messages only while members can see all history. Keys already shared stay readable.",
     "exportKeys": "Export this room’s keys",
     "exportKeysHint": "Save the message keys of this room to a passphrase-protected file.",
     "exportKeysDescription": "The file holds the keys this device has for this room. Choose a passphrase to protect it.",
@@ -951,10 +960,10 @@
     "mediaTitle": "Load media",
     "mediaHint": "Only for you. Syncs to your other devices and clients.",
     "historyVisibility": {
-      "shared": "All messages",
-      "invited": "After invite",
-      "joined": "After join",
-      "world_readable": "All messages, including guests"
+      "shared": "Members, all messages",
+      "invited": "Members, since they were invited",
+      "joined": "Members, since they joined",
+      "world_readable": "Anyone, without joining"
     },
     "joinDenied": "You do not have permission to join this room.",
     "joinUnknownRoom": "That room could not be found.",
@@ -1582,7 +1591,7 @@
     "utd": {
       "title": {
         "waiting": "Waiting for this message",
-        "sentBeforeWeJoined": "You don't have access to this message",
+        "sentBeforeWeJoined": "Sent before you joined",
         "verificationViolation": "{{name}} reset digital identity",
         "unsignedDevice": "Sent from an unverified device",
         "unknownDevice": "Waiting for this device",
@@ -1606,16 +1615,30 @@
       "causeHeader": "What can I do?",
       "cause": {
         "waiting": "This message will appear once the message key is delivered. If it does not appear soon, {{name}}'s homeserver may be having issues connecting to your homeserver. Contact your homeserver administrators for assistance.",
+        "sentBeforeWeJoined": "If you joined from an invite in the last day and members could see all history, ask whoever invited you to run /sharehistory. Otherwise these can’t be recovered.",
         "verificationViolation": "Verify {{name}}'s digital identity again, or choose to trust a new identity.",
         "unsignedDevice": "{{name}} must verify their device to prove that this message is trustworthy.",
         "unknownDevice": "This message will appear once the device's information is delivered. If it does not appear soon, {{name}}'s homeserver may be having issues connecting to your homeserver. Contact your homeserver administrators for assistance.",
-        "historicalMessageBackupDisabled": "Enable key storage to share encrypted message history between your devices.",
-        "historicalMessageDeviceUnverified": "Verify this device to download encrypted message history from key storage.",
+        "historicalMessageBackupDisabled": "Turn on key backup to share encrypted message history between your devices.",
+        "historicalMessageDeviceUnverified": "Verify this device to download encrypted message history from your key backup.",
         "withheldUnverified": "Verify this device to receive message keys."
       },
       "openIdentitySettings": "Open identity settings",
-      "enableKeyBackup": "Enable key storage",
+      "enableKeyBackup": "Turn on key backup",
       "confirmThisDevice": "Confirm this device"
+    },
+    "beforeJoinGroup": {
+      "summary_one": "{{count, number}} message sent before you joined",
+      "summary_other": "{{count, number}} messages sent before you joined",
+      "show_one": "Show {{count, number}} message",
+      "show_other": "Show {{count, number}} messages",
+      "hide": "Hide messages",
+      "why": "Why can’t I read these?"
+    },
+    "sharedBy": {
+      "label": "Shared by {{name}}",
+      "title": "Shared message",
+      "body": "{{name}} shared keys with you to unlock this message. The authorship of this message cannot be proven."
     },
     "profileOverride": "Set a nickname",
     "profileOverrideTitle": "How you see this person",
@@ -2055,7 +2078,7 @@
     "recoveryKey": "Recovery key",
     "recoveryKeyPlaceholder": "Enter your recovery key",
     "invalidRecoveryKey": "That recovery key was not accepted.",
-    "keyStorageOutOfSync": "Your key storage is out of sync. Reset your identity to fix it.",
+    "keyStorageOutOfSync": "Your key backup is out of sync. Reset your identity to fix it.",
     "useRecoveryKeyOrPassphrase": "Use a recovery key or passphrase",
     "recoveryKeyOrPassphrase": "Recovery key or passphrase",
     "recoveryKeyOrPassphrasePlaceholder": "Enter your recovery key or passphrase",
@@ -2084,7 +2107,7 @@
     "replaceKeyBackupUseExisting": "Use my recovery key or another device",
     "saveRecoveryKeyDescription": "Store this key somewhere safe. It will not be shown again.",
     "savedRecoveryKey": "I have saved this key",
-    "keyBackupTitle": "Cloud key backup",
+    "keyBackupTitle": "Key backup",
     "dehydratedDevice": "Receive keys while offline",
     "dehydratedDeviceHint": "Keeps an offline device on your server so messages sent while all your sessions are closed can still be decrypted.",
     "dehydratedDeviceNeedsRecoveryKey": "Unlock recovery with your recovery key to set up the offline device.",
@@ -2110,7 +2133,7 @@
     "keyBackupInvalidKeys_other": "{{count, number}} keys could not be read. Try downloading again or use another device.",
     "keyBackupStatusFailed": "Could not load key backup status. Try again.",
     "keyBackupDownloadFailed": "Could not download keys. Try again. Keys already restored are kept.",
-    "roomKeys": "Local key backup",
+    "roomKeys": "Export and import keys",
     "roomKeysExport": "Export message keys",
     "roomKeysExportDescription": "Save your message keys to a passphrase-protected file.",
     "roomKeysExportAction": "Export",
@@ -2198,6 +2221,8 @@
     "hideMembershipEvents": "Hide joins and leaves",
     "hideProfileChanges": "Hide name and avatar changes",
     "hideTopicChanges": "Hide topic changes",
+    "hideSentBeforeJoined": "Hide messages sent before you joined",
+    "hideSentBeforeJoinedHint": "Only the ones you can’t read.",
     "hideMemberInReadOnly": "Hide members in read-only rooms",
     "showTombstoneEvents": "Show removed-message placeholders",
     "openRoomsAtUnread": "Open rooms at the first unread message",
@@ -2219,8 +2244,8 @@
     "unverifiedOthersTitle_one": "One of your devices is not verified",
     "unverifiedOthersTitle_other": "{{count, number}} of your devices are not verified",
     "unverifiedOthersBody": "Other users may see security warnings on your messages.",
-    "recoveryIncompleteTitle": "This device cannot open your key storage",
-    "recoveryIncompleteBody": "Your encrypted message history will not be available. Unlock your key storage to continue.",
+    "recoveryIncompleteTitle": "This device cannot open your key backup",
+    "recoveryIncompleteBody": "Your encrypted message history will not be available. Unlock your key backup to continue.",
     "recoveryIncompleteAction": "Unlock",
     "signingKeysMissingTitle": "Some signing keys are not on this device",
     "signingKeysMissingBody": "This session is verified and its messages decrypt normally. It is missing your {{keys}}, which another session cannot hand over. Until your recovery key brings them here, this session cannot change your recovery setup.",
@@ -3492,10 +3517,15 @@
     "sedNoMatch": "Your last message does not contain that text.",
     "slashDeveloperOnly": "This command is available when developer controls are enabled.",
     "slashWildcardEmpty": "No member on {{server}} matches this room.",
+    "openSecuritySettings": "Open security settings",
     "slashShareHistory": {
+      "shared": "Sent this room’s past messages to {{user}}’s verified sessions. Their client only accepts them within a day of joining from your invite.",
       "unencrypted": "This room is not encrypted, so there is no history to share.",
       "no_cross_signing": "Set up cross-signing before sharing history.",
-      "history_not_shared": "This room’s history visibility does not allow sharing past messages."
+      "history_not_shared": "This room’s history visibility does not allow sharing past messages.",
+      "not_invited": "{{user}} only accepts history from whoever invited them. If that wasn’t you, ask the person who did to share it.",
+      "no_verified_devices": "{{user}} has no verified sessions to receive history. Ask them to verify a session, then run /sharehistory again.",
+      "nothing_to_share": "This session has no past messages it can share."
     },
     "slashFix": {
       "denied": "This device would not share its location.",
@@ -3632,7 +3662,7 @@
         "usage": "/converttoroom"
       },
       "sharehistory": {
-        "description": "Share this room’s encrypted history with someone who just joined",
+        "description": "Share this room’s encrypted history with someone you invited",
         "usage": "/sharehistory <@user:server>"
       },
       "discardsession": {

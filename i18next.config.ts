@@ -22,6 +22,7 @@ export default defineConfig({
       'call.debugTransports.*',
       'composer.schedule*',
       'composer.slash.*',
+      'composer.slashShareHistory.*',
       'emoji.*',
       'presence.*',
       'room.joinRule.*',
