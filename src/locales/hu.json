@@ -334,13 +334,7 @@
     "directoryRateLimited": "A szerver korlátozza a címtárkéréseket. Próbálja újra később.",
     "directoryEmptyTitle": "Nem található szoba",
     "directoryEmptyBody": "Próbáljon másik keresőszót, vagy böngésszen egy másik szervert.",
-    "directoryJoinByAddress": "Csatlakozás címmel",
     "joinTitle": "Csatlakozás címmel",
-    "joinDescription": "Adjon meg egy nyilvános címet a szobához vagy térhez való csatlakozáshoz.",
-    "joinExamplesLabel": "A címek így néznek ki:",
-    "joinAddressLabel": "Cím",
-    "joinAddressPlaceholder": "#szoba:szerver",
-    "joinInvalid": "Ez nem tűnik szobacímnek vagy link.sable.moe hivatkozásnak.",
     "settingsTitle": "Szobabeállítások",
     "settingsOpen": "Szobabeállítások",
     "settingsClose": "Szobabeállítások bezárása",
@@ -585,8 +579,6 @@
     "findCommunityDescription": "Böngésszen a nyilvános szobák és terek között, hogy hasonló érdeklődésű csoportot találjon.",
     "startRoomTitle": "Szoba indítása",
     "startRoomDescription": "Hozzon létre szobát vagy teret a saját baráti körének vagy közösségének.",
-    "joinConversationTitle": "Csatlakozás szobához vagy közvetlen üzenethez",
-    "joinConversationDescription": "Adjon meg egy szobacímet vagy Matrix-felhasználóazonosítót a csevegés megkezdéséhez.",
     "settingsChangesTitle": "Új és módosult beállítások",
     "settingsChangesNew": "Új",
     "settingsChangesDefault": "Az alapérték megváltozott"
@@ -2468,7 +2460,8 @@
     "chooseStatusEmoji": "Státusz emoji kiválasztása",
     "removeStatusEmoji": "Státusz emoji eltávolítása",
     "usernameClickMention": "Felhasználó megemlítése",
-    "usernameClickProfile": "Profil megnyitása"
+    "usernameClickProfile": "Profil megnyitása",
+    "notificationMemberCountHint": "A hidakon át összekapcsolt és a csoportos közvetlen üzenetek automatikusan az Ön közvetlen üzenet - alapértelmezését követik. A csevegés saját értesítési beállítása elsőbbséget élvez."
   },
   "errors": {
     "pageTitle": "Valami elromlott",
@@ -3703,8 +3696,6 @@
     "lobby": "Előtér",
     "add": "Szoba vagy tér hozzáadása",
     "newChat": "Új csevegés",
-    "joinWithAddress": "Csatlakozás címmel",
-    "exploreSpaces": "Terek felfedezése",
     "messageSearch": "Üzenetkeresés",
     "profile": "Profil",
     "editProfile": "Profil szerkesztése",

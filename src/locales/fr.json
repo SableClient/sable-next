@@ -11,8 +11,6 @@
     "lobby": "Salle d'attente",
     "add": "Ajouter un salon ou un espace",
     "newChat": "Nouvelle conversation",
-    "joinWithAddress": "Rejoindre avec une adresse",
-    "exploreSpaces": "Explorer les espaces",
     "messageSearch": "Rechercher des messages",
     "profile": "Profil",
     "editProfile": "Modifier le profil",
@@ -200,13 +198,7 @@
     "directoryTotal_one": "{{count, number}} salon",
     "directoryTotal_many": "",
     "directoryTotal_other": "{{count, number}} salons",
-    "directoryJoinByAddress": "Rejoindre par adresse",
     "joinTitle": "Rejoindre avec une adresse",
-    "joinDescription": "Saisissez une adresse publique pour rejoindre un salon ou un espace.",
-    "joinExamplesLabel": "Les adresses ressemblent à :",
-    "joinAddressLabel": "Adresse",
-    "joinAddressPlaceholder": "#salon:serveur",
-    "joinInvalid": "Cela ne ressemble pas à une adresse de salon ni à un lien link.sable.moe.",
     "settingsTitle": "Paramètres du salon",
     "settingsOpen": "Paramètres du salon",
     "settingsClose": "Fermer les paramètres du salon",
@@ -613,9 +605,7 @@
     "findCommunityTitle": "Trouver une communauté",
     "findCommunityDescription": "Parcourez les salons et espaces publics pour trouver un groupe qui partage vos centres d’intérêt.",
     "startRoomTitle": "Créer un salon",
-    "startRoomDescription": "Créez un salon ou un espace pour votre groupe d’amis ou votre communauté.",
-    "joinConversationTitle": "Rejoindre un salon ou une conversation privée",
-    "joinConversationDescription": "Saisissez l’adresse d’un salon ou un identifiant Matrix pour commencer à discuter."
+    "startRoomDescription": "Créez un salon ou un espace pour votre groupe d’amis ou votre communauté."
   },
   "emoji": {
     "unicode": "Émojis",
