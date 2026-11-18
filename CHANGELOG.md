@@ -1,5 +1,53 @@
 # Sable Changelog
 
+## 26.11.3 (2026-11-18)
+
+### Features
+
+* Self-hosted deployments can set separate light and dark branding themes with `branding.lightThemeUrl` and `branding.darkThemeUrl`.
+* Share the screen in VP8 at 1080p by default.
+
+### Fixes
+
+* Keep the Android keyboard open while scrolling the timeline.
+* Android notifications no longer vanish right after arriving while Sable is in the background, or each time notification settings are re-applied with message previews hidden. Notifications read on another device are now cleared from your read receipt, which also stops Synapse servers from clearing every other room's notification when a push arrives.
+* Voice messages and audio files keep playing on Android and iOS when Sable goes to the background or the screen turns off, with play and pause on the lock screen and in the notification shade.
+* Show banners at a fixed height again, with a setting to match the image shape.
+* Let the call video use the space of hidden controls.
+* Add a copy matrix link button beside the external link in the message menu.
+* Suggest people as you type in the Create Room invite field.
+* On desktop, account pages such as removing a device, changing your password or approving a sign-in now open in your browser, so passkeys work there.
+* Join calls on desktop when the call server is on a local or VPN network address.
+* Use the British English dictionary for spell check on desktop with en-GB, en-IE and other non-US English locales.
+* Emoji search also matches emoji tags, so typing "lol" finds 😂.
+* Pad the sides of the Find or join sheet on phones.
+* Keep the formatting toolbar on one scrolling row, with a fade on the side that has more buttons.
+* Allow forwarding messages to the current chat.
+* Rooms no longer stay unread after they have been read.
+* Hide the link device option on homeservers that cannot sign in another device with a QR code.
+* Open the integration manager without a "Terms not signed" error after accepting its terms.
+* Invites in the inbox no longer show a wrong received date.
+* Keep the Android keyboard open when cancelling a reply, removing an attachment or cancelling an inline edit.
+* Keep the phone screen on during a call on Android and iOS.
+* Download and favourite GIFs that are posted as links from the message menu.
+* Show names in the read receipt and reaction lists in the same colour as in the timeline.
+* Stop the room member settings scrolling sideways on phones.
+* The mobile bottom bar highlights the account tab instead of the alerts button on the profile page.
+* MSC links set to always now also link a reference ending the message. MSC references in received messages are no longer linked unless the sender linked them.
+* Sable no longer adds push rules for every direct chat on its own. Rules it added this way are removed on the next launch, unless you changed them. Bridged direct chats follow the Other rooms default again, and you can set their alerts from the chat menu.
+* Fix OAuth sessions showing as "Sable on Linux on Unknown device".
+* Installed web apps show the system title bar again, so the window can be moved and its buttons no longer cover Sable.
+* Offer QR sign-in right away instead of waiting for the account provider check.
+* Keep read receipts beside a message clear of its encryption warning.
+* Custom emotes now show as images in the reply line instead of their shortcodes.
+* Stop the room list jumping back when scrolled quickly after tapping a room.
+* Fix screen sharing with audio failing to connect in desktop calls.
+* Screen readers no longer announce decorative icons in room icons, comboboxes and icon tooltips, and a profile's bio is announced separately from the profile card.
+* Accept a mention pill again in commands that take a user.
+* Keep the Cancel button beside an upload at its full width.
+* Draw an even waveform for voice messages from other apps such as Element X.
+* Let widgets ask for access to a local network address.
+
 ## 26.11.2 (2026-11-16)
 
 ### Features
