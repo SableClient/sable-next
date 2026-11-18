@@ -10,6 +10,7 @@
   import { isDeclining } from '#lib/rooms/invites.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
@@ -49,17 +50,18 @@
 
   let hasAlerts = $derived(alertProviders.some((provider) => provider.priority !== null));
 
-  const mobileTools = [
-    { href: resolve('/(app)/rooms'), icon: ChatsIcon, label: 'nav.messages' },
+  const messagesHref = $derived(resolve(preferences.showHome ? '/(app)/home' : '/(app)/rooms'));
+  const mobileTools = $derived([
+    { href: messagesHref, icon: ChatsIcon, label: 'nav.messages' },
     {
       href: resolve('/(app)/navigate'),
       icon: ListMagnifyingGlassIcon,
       label: 'shortcuts.paletteTitle',
     },
     { href: resolve('/(app)/inbox'), icon: BellIcon, label: 'nav.inbox' },
-  ] as const;
+  ] as const);
   const mobileSlotCount = $derived(mobileTools.length + 1 + (hasAlerts ? 1 : 0));
-  const ROOM_LIST_PATHS = ['/rooms', '/direct', '/space/'];
+  const roomListPaths = $derived([messagesHref, '/direct', '/space/']);
   const desktopTools = [
     { href: resolve('/(app)/inbox'), icon: BellIcon, label: 'nav.inbox' },
     { href: resolve('/(app)/settings'), icon: GearIcon, label: 'nav.settings' },
@@ -86,8 +88,8 @@
   }
 
   function isToolActive(href: string): boolean {
-    if (href === '/rooms')
-      return ROOM_LIST_PATHS.some((path) => page.url.pathname.startsWith(path));
+    if (href === messagesHref)
+      return roomListPaths.some((path) => page.url.pathname.startsWith(path));
     return page.url.pathname.startsWith(href);
   }
 

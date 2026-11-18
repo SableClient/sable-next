@@ -18,6 +18,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async (importOriginal) => ({
   usePresenceStore: () => ({ get: () => null, peek: () => null }),
 }));
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 import UserQuickToolsHarness from './UserQuickToolsHarness.test.svelte';
@@ -30,6 +31,7 @@ beforeEach(() => {
 
 afterEach(() => {
   paletteState.open = false;
+  preferences.showHome = false;
   resetNavigation();
 });
 
@@ -93,6 +95,17 @@ test('the desktop inbox stays a page link when already selected', async () => {
   const inbox = screen.getByRole('link', { name: 'nav.inbox' });
   expect(inbox).toHaveAttribute('aria-current', 'page');
   expect(await fireEvent.click(inbox)).toBe(true);
+});
+
+test('the mobile conversations tab opens Home when all rooms are shown in the sidebar', () => {
+  preferences.showHome = true;
+  visit('/home');
+  setup();
+
+  expect(screen.getByRole('link', { name: 'nav.messages' })).toHaveAttribute('href', '/home');
+  expect(screen.getByRole('navigation').style.getPropertyValue('--mobile-selected-index')).toBe(
+    '0'
+  );
 });
 
 test('the mobile bar marks the profile tab as selected on the profile page', () => {
