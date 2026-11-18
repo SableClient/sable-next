@@ -230,6 +230,10 @@ for (const context of ['desktop', 'mobile'] as const) {
         .locator(surface === 'forum' ? '.forum-thread-open' : '.thread-summary')
         .last();
       await opener.scrollIntoViewIfNeeded();
+      if (surface === 'forum') {
+        await expect(parent.locator('.forum-thread-list-more')).toHaveCount(0);
+        await opener.scrollIntoViewIfNeeded();
+      }
       await expect(opener).toBeVisible();
       await opener.focus();
       const positionBefore = await opener.evaluate((node) => node.getBoundingClientRect().top);
@@ -331,7 +335,10 @@ for (const context of ['desktop', 'mobile'] as const) {
           ],
         },
       ]);
-      const opener = parent.locator(surface === 'forum' ? '.forum-thread-open' : '.thread-summary');
+      const opener =
+        surface === 'forum'
+          ? parent.getByRole('button', { name: /Discussion about the next release/ })
+          : parent.locator('.thread-summary');
       await expect(opener).toHaveCount(1);
       await opener.click();
       const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });

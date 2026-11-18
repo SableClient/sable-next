@@ -15,6 +15,11 @@ test.beforeEach(async ({ page, app, timeline, installRoomCore }) => {
   await app.openRoom('!room:example.test');
   // The card is anchored to a message, so the timeline has to stop moving first.
   await timeline.expectRevealed();
+  await expect(async () => {
+    await timeline.scrollToAndNotify(0);
+    await expect(timeline.message('General history 2')).toBeAttached({ timeout: 1_000 });
+  }).toPass();
+  await expect(page.locator('.history-loading')).toHaveCount(0);
   await timeline.waitForScrollSettled();
   await page.getByRole('button', { name: 'Open Alice’s profile' }).last().click();
 });

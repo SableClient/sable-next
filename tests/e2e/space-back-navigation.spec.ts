@@ -86,7 +86,7 @@ test('mobile: Back returns to the selected space', async ({ page }) => {
       await page.reload();
       await expect(drawer).toHaveAttribute('aria-pressed', 'false');
     }
-    await page.getByRole('button', { name: 'Back to rooms', exact: true }).click();
+    await page.getByRole('button', { name: /^Back to rooms/ }).click();
     await expect(drawer).toHaveAttribute('aria-pressed', 'true');
     await expect(page).toHaveURL(new RegExp(`${random(name)}$`));
   }

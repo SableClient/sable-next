@@ -56,7 +56,7 @@ test('mobile: the room back arrow slides the list over the room, and a swipe ret
   await expect(drawer).toHaveAttribute('aria-pressed', 'false');
 
   const sampling = trackOffsets(page);
-  await page.getByRole('button', { name: 'Back to rooms', exact: true }).click();
+  await page.getByRole('button', { name: /^Back to rooms/ }).click();
   const offsets = await sampling;
 
   await expect(drawer).toHaveAttribute('aria-pressed', 'true');
@@ -113,7 +113,7 @@ test('mobile: the panels swap inert only once the slide has settled', async ({
         requestAnimationFrame(sample);
       })
   );
-  await page.getByRole('button', { name: 'Back to rooms', exact: true }).click();
+  await page.getByRole('button', { name: /^Back to rooms/ }).click();
   const samples = await sampling;
 
   const width = page.viewportSize()?.width ?? 0;

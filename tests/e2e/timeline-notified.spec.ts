@@ -174,9 +174,12 @@ test('a newer notification tap wins when an older room is listed late', async ({
   await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
+  // The room list is saved when the page stops being presented, not while it is in use.
+  await page.evaluate(() => document.dispatchEvent(new Event('freeze')));
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('sable.room-list.v2.e2e-account')))
     .not.toBeNull();
+  await page.evaluate(() => document.dispatchEvent(new Event('resume')));
   const room = await page.evaluate(() => {
     const saved = localStorage.getItem('sable.room-list.v2.e2e-account');
     if (saved === null) throw new Error('Room list snapshot is missing');

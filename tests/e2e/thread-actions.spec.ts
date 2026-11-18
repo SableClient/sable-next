@@ -37,7 +37,10 @@ for (const surface of ['room', 'forum'] as const) {
         },
       };
       await core.emitTimelineDiff(await core.subscription(), [{ op: 'reset', values: [root] }]);
-      const opener = parent.locator(surface === 'forum' ? '.forum-thread-open' : '.thread-summary');
+      const opener =
+        surface === 'forum'
+          ? parent.getByRole('button', { name: /Original discussion/ })
+          : parent.locator('.thread-summary');
       await expect(opener).toHaveCount(1);
       await opener.click();
       const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });

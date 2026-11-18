@@ -3,7 +3,7 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type {
   MemberView,
@@ -33,6 +33,14 @@ Object.assign(core.rpc.members, {
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+const afterOverlayPops = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+afterEach(() => {
+  afterOverlayPops.mockImplementation(() => Promise.resolve());
+});
+vi.mock('#lib/platform/overlay-back.svelte.js', async (original) => ({
+  ...(await original<typeof import('#lib/platform/overlay-back.svelte.js')>()),
+  afterOverlayPops,
+}));
 
 import { goto } from '#lib/test-support/app-navigation.js';
 
@@ -388,6 +396,41 @@ test('asks before the Message button creates a new chat', async () => {
     user_id: '@alice:example.org',
     encrypted: null,
     encrypt_new: true,
+  });
+});
+
+test('starting a chat waits for the closed dialog to leave history before navigating', async () => {
+  core.rpc.rooms.createDm.mockClear();
+  core.rpc.rooms.createDm.mockResolvedValue('!dm:example.org');
+  vi.mocked(goto).mockClear();
+  let release!: () => void;
+  const popped = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  afterOverlayPops.mockImplementation(() => popped);
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  await user.click(screen.getByRole('button', { name: 'Message' }));
+  await user.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Start chat' })
+  );
+  await vi.waitFor(() => {
+    expect(core.rpc.rooms.createDm).toHaveBeenCalled();
+  });
+  await tick();
+  expect(vi.mocked(goto).mock.calls.some(([url]) => url.includes('/direct/'))).toBe(false);
+
+  release();
+  await vi.waitFor(() => {
+    expect(goto).toHaveBeenCalledWith(expect.stringContaining('/direct/'));
   });
 });
 

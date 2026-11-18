@@ -1,5 +1,6 @@
 <script lang="ts">
   import { serverNameOf } from '#lib/matrix-id.js';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { SUPPORTER_BADGE_FIELD } from '#lib/profile/fields.js';
   import type {
     MemberView,
@@ -347,6 +348,7 @@
         draft = '';
         step = 'open';
       }
+      await afterOverlayPops();
       await goto(resolve('/(app)/direct/[roomId]', { roomId: roomPathParamFromId(dmId) }));
     } catch (error) {
       console.warn('[sable profile] could not open a chat', error);
