@@ -49,8 +49,6 @@ export interface ElectronBridge {
   applySettings(settings: ElectronSettings): void;
   setTelemetryConsent(enabled: boolean): void;
   takeDeepLinks(): Promise<string[]>;
-  openAuthWindow(id: string, url: string): Promise<void>;
-  closeAuthWindow(id: string): Promise<void>;
   openAuthInSystemBrowser(url: string): Promise<void>;
   startAuthLoopback(): Promise<string>;
   closeAuthLoopback(): Promise<void>;

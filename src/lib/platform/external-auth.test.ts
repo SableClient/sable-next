@@ -145,22 +145,17 @@ describe('authentication browsers', () => {
     }
   );
 
-  test('opens and closes Electron popups through the isolated bridge', async () => {
+  test('opens Electron pages in the system browser', async () => {
     native.isTauri.mockReturnValue(false);
-    const bridge = {
-      openAuthWindow: vi.fn().mockResolvedValue(undefined),
-      closeAuthWindow: vi.fn().mockResolvedValue(undefined),
-    };
+    const bridge = { openAuthInSystemBrowser: vi.fn().mockResolvedValue(undefined) };
     native.electronBridge.mockReturnValue(bridge);
     const browser = openExternalAuthWindow('approval');
     if (!browser) throw new Error('Browser was not created');
-    await browser.navigate('https://auth.example.org/device');
-    expect(bridge.openAuthWindow).toHaveBeenCalledWith(
-      'approval',
+    await expect(browser.navigate('https://auth.example.org/device')).resolves.toBe(false);
+    expect(bridge.openAuthInSystemBrowser).toHaveBeenCalledExactlyOnceWith(
       'https://auth.example.org/device'
     );
     await browser.close();
-    expect(bridge.closeAuthWindow).toHaveBeenCalledWith('approval');
     expect(native.invoke).not.toHaveBeenCalled();
   });
 
@@ -175,20 +170,6 @@ describe('authentication browsers', () => {
       callbackUrlScheme: 'moe.sable.next',
       ephemeral: false,
     });
-  });
-
-  test('closes Electron approval while the remote page is still loading', async () => {
-    native.isTauri.mockReturnValue(false);
-    const bridge = {
-      openAuthWindow: vi.fn(() => new Promise<void>(() => {})),
-      closeAuthWindow: vi.fn().mockResolvedValue(undefined),
-    };
-    native.electronBridge.mockReturnValue(bridge);
-    const browser = openExternalAuthWindow('approval');
-    if (!browser) throw new Error('Browser was not created');
-    void browser.navigate('https://auth.example.org/device');
-    await browser.close();
-    expect(bridge.closeAuthWindow).toHaveBeenCalledExactlyOnceWith('approval');
   });
 
   test('does not replace a cancelled iOS session with an external browser', async () => {

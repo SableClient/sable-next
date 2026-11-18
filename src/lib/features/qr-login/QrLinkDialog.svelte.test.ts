@@ -15,17 +15,11 @@ const browser = vi.hoisted(() => ({
   close: vi.fn(),
 }));
 vi.mock('#lib/platform/external-auth.js', () => ({
-  isDesktopAuthClient: vi.fn(() => true),
-  openSystemAuthUrl: vi.fn(() => Promise.resolve()),
   openExternalAuthWindow: vi.fn(() => browser),
 }));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
-import {
-  openExternalAuthWindow,
-  isDesktopAuthClient,
-  openSystemAuthUrl,
-} from '#lib/platform/external-auth.js';
+import { openExternalAuthWindow } from '#lib/platform/external-auth.js';
 
 let listener: ((event: CoreEvent) => void) | null = null;
 const core = Object.assign(baseCore, {
@@ -48,8 +42,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   browser.navigate.mockResolvedValue(false);
   vi.mocked(openExternalAuthWindow).mockReturnValue(browser);
-  vi.mocked(isDesktopAuthClient).mockReturnValue(true);
-  vi.mocked(openSystemAuthUrl).mockResolvedValue(undefined);
 });
 
 async function emit(progress: Extract<CoreEvent, { type: 'qr_login' }>['progress'], grant = true) {
@@ -214,38 +206,4 @@ test('finishes closing the previous browser before reopening approval', async ()
   await vi.waitFor(() => {
     expect(second.navigate).toHaveBeenCalledWith(uri);
   });
-});
-
-test('opens desktop approval externally without restarting QR login', async () => {
-  const user = userEvent.setup();
-  render(QrLinkDialog, { open: true, mode: 'grant' });
-  const uri = 'https://auth.example.org/device?user_code=ABCD';
-  await emit({ stage: 'waiting_for_auth', verification_uri: uri });
-  await user.click(screen.getByRole('button', { name: 'Open the approval page' }));
-  await user.click(screen.getByRole('button', { name: 'Open in browser' }));
-  expect(openSystemAuthUrl).toHaveBeenCalledExactlyOnceWith(uri);
-  expect(browser.close).toHaveBeenCalledOnce();
-  expect(core.cancelQr).not.toHaveBeenCalled();
-  expect(core.startQrGrant).not.toHaveBeenCalled();
-});
-
-test('keeps approval open if the system browser cannot launch', async () => {
-  vi.mocked(openSystemAuthUrl).mockRejectedValueOnce('Browser unavailable');
-  const user = userEvent.setup();
-  render(QrLinkDialog, { open: true, mode: 'grant' });
-  await emit({ stage: 'waiting_for_auth', verification_uri: 'https://auth.example.org/device' });
-  await user.click(screen.getByRole('button', { name: 'Open the approval page' }));
-  await user.click(screen.getByRole('button', { name: 'Open in browser' }));
-  expect(screen.getByRole('alert')).toHaveTextContent(
-    'Could not open the approval page. Try again.'
-  );
-  expect(browser.close).not.toHaveBeenCalled();
-  expect(core.cancelQr).not.toHaveBeenCalled();
-});
-
-test('keeps mobile approval inside the app', async () => {
-  vi.mocked(isDesktopAuthClient).mockReturnValue(false);
-  render(QrLinkDialog, { open: true, mode: 'grant' });
-  await emit({ stage: 'waiting_for_auth', verification_uri: 'https://auth.example.org/device' });
-  expect(screen.queryByRole('button', { name: 'Open in browser' })).not.toBeInTheDocument();
 });

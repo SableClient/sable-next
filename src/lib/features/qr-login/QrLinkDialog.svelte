@@ -6,12 +6,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import {
-    openExternalAuthWindow,
-    isDesktopAuthClient,
-    openSystemAuthUrl,
-    type ExternalAuthWindow,
-  } from '#lib/platform/external-auth.js';
+  import { openExternalAuthWindow, type ExternalAuthWindow } from '#lib/platform/external-auth.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -40,8 +35,6 @@
   const checkCodeId = $props.id();
   let checkCode = $state('');
   let openingApproval = $state(false);
-  let openingSystemBrowser = $state(false);
-  const desktopAuth = isDesktopAuthClient();
   let approvalError = $state(false);
   let approvalBrowser: ExternalAuthWindow | null = null;
 
@@ -166,21 +159,6 @@
     void approvalBrowser?.close();
     approvalBrowser = null;
   }
-
-  async function openSystemApproval(url: string): Promise<void> {
-    if (openingSystemBrowser) return;
-    openingSystemBrowser = true;
-    approvalError = false;
-    try {
-      await openSystemAuthUrl(url);
-      closeApproval();
-    } catch (error) {
-      console.warn('[sable qr] system browser failed', error);
-      approvalError = true;
-    } finally {
-      openingSystemBrowser = false;
-    }
-  }
 </script>
 
 <DialogFrame
@@ -275,20 +253,11 @@
         <Button
           variant="primary"
           class="qr-action"
-          disabled={openingApproval || openingSystemBrowser}
+          disabled={openingApproval}
           onclick={() => void openApproval(uri)}
         >
           {i18n.t('qrLogin.openApproval')}
         </Button>
-        {#if desktopAuth}
-          <Button
-            class="qr-action"
-            loading={openingSystemBrowser}
-            onclick={() => void openSystemApproval(uri)}
-          >
-            {i18n.t('auth.openInBrowser')}
-          </Button>
-        {/if}
       </div>
     {:else if progress.stage === 'starting' || progress.stage === 'syncing_secrets' || progress.stage === 'signed_in'}
       <p class="wait" aria-hidden="true">{announcement}</p>

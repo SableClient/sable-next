@@ -36,8 +36,13 @@ export function openExternalAuthWindow(
   name: string,
   { sheet = false }: { sheet?: boolean } = {}
 ): ExternalAuthWindow | null {
-  const electron = electronBridge();
-  if (isTauri() || electron) {
+  if (electronBridge()) {
+    return {
+      navigate: (url) => openSystemAuthUrl(url).then(() => false),
+      close: () => {},
+    };
+  }
+  if (isTauri()) {
     let closed = false;
     let closing: Promise<void> | undefined;
     let opening: Promise<boolean> = Promise.resolve(false);
@@ -46,11 +51,6 @@ export function openExternalAuthWindow(
       navigate: (url, callbackUri) => {
         opening = (async () => {
           if (closed) return false;
-          if (electron) {
-            closeBrowser = () => electron.closeAuthWindow(name);
-            await electron.openAuthWindow(name, url);
-            return false;
-          }
           closeBrowser = () => invoke('close_in_app_auth_window', { id: name });
           const opened = await invoke<boolean | null>('open_in_app_auth_url', {
             id: name,
@@ -65,8 +65,9 @@ export function openExternalAuthWindow(
       close: () => {
         if (closed) return closing;
         closed = true;
-        // Wait for Tauri presentation. Electron can close during page loading.
-        closing = (electron ? Promise.resolve() : opening.catch(() => {}))
+        // Wait for Tauri presentation.
+        closing = opening
+          .catch(() => {})
           .then(() => closeBrowser?.())
           .catch((error: unknown) => {
             console.warn('[sable auth] browser close failed', error);

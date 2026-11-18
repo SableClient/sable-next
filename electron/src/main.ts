@@ -40,7 +40,6 @@ import type {
 import { deepLinksIn, deepLinkSchemes } from './deep-links';
 import { AuthLoopback } from './auth-loopback';
 import { CallShortcuts, validBindings } from './call-shortcuts';
-import { AuthWindows } from './auth-window';
 import { autostartAvailable, setLaunchAtLogin } from './autostart';
 import { installMethod } from './install-method';
 import { registerContextMenu } from './context-menu';
@@ -337,31 +336,9 @@ function deliverDeepLinks(urls: string[]): void {
   else pendingDeepLinks.push(...urls);
 }
 
-const authWindows = new AuthWindows();
-
 const authLoopback = new AuthLoopback((url) => {
   deliverDeepLinks([url]);
   showMainWindow();
-});
-
-ipcMain.handle('sable-auth-open', async (event, id: string, url: string) => {
-  if (!isAppFrame(event.senderFrame) || event.sender !== mainWindow?.webContents) {
-    throw new Error('Invalid authentication origin');
-  }
-  if (typeof id !== 'string' || typeof url !== 'string') {
-    throw new Error('Invalid authentication request');
-  }
-  await authWindows.open(mainWindow, id, url);
-});
-
-ipcMain.handle('sable-auth-close', (event, id: string) => {
-  if (
-    isAppFrame(event.senderFrame) &&
-    event.sender === mainWindow?.webContents &&
-    typeof id === 'string'
-  ) {
-    authWindows.close(id);
-  }
 });
 
 ipcMain.handle('sable-auth-external', async (event, url: string) => {
