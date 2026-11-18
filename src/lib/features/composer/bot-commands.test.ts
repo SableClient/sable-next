@@ -323,7 +323,7 @@ describe('prefillDrafts', () => {
     });
     const drafts = draftsFromText(linuxOnly, '');
     await prefillDrafts(linuxOnly, drafts, 'example.org');
-    expect(drafts.platforms ?? '').toBe('');
+    expect(drafts.platforms).toBe('');
   });
 
   test('keeps what the user already typed', async () => {
