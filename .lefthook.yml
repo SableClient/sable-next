@@ -53,6 +53,27 @@ pre-commit:
     - name: typos
       run: mise exec -- typos --force-exclude {staged_files}
 
+    - name: settings-changes
+      glob:
+        - 'src/lib/settings/registry/*'
+        - 'src/lib/settings/registry.ts'
+        - 'src/lib/settings/preferences.svelte.ts'
+        - 'package.json'
+      run: node scripts/generate/settings-changes.mjs --check
+
+    - name: config-reference
+      glob:
+        - 'src/lib/settings/**'
+        - 'src/lib/config/**'
+        - 'src/locales/en.json'
+      run: pnpm exec vitest run --project node src/lib/config/config-reference.test.ts
+      fail_text: 'docs/settings.md or a config schema is stale, run pnpm vitest run --project node src/lib/config/config-reference.test.ts -u'
+
+    - name: protocol-types
+      glob: 'crates/**/*.rs'
+      run: mise run check:types
+      fail_text: 'src/generated/protocol.ts is stale, run mise run generate:types'
+
 pre-push:
   parallel: true
   skip:
