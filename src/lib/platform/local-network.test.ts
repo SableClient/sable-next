@@ -89,6 +89,40 @@ test('a refusal or another platform leaves access blocked', async () => {
   expect(other.invoke).not.toHaveBeenCalled();
 });
 
+async function freshOffer() {
+  vi.resetModules();
+  const core = await import('@tauri-apps/api/core');
+  const module = await import('./local-network');
+  return { invoke: vi.mocked(core.invoke), ...module };
+}
+
+test('the Android prompt is offered only while the system would still show it', async () => {
+  const unasked = await freshOffer();
+  unasked.invoke.mockResolvedValue({ localNetwork: 'prompt' });
+  expect(await unasked.androidLocalNetworkUnasked()).toBe(true);
+
+  const settled = await freshOffer();
+  settled.invoke.mockResolvedValue({ localNetwork: 'denied' });
+  expect(await settled.androidLocalNetworkUnasked()).toBe(false);
+
+  android.value = false;
+  const elsewhere = await freshOffer();
+  elsewhere.invoke.mockClear();
+  expect(await elsewhere.androidLocalNetworkUnasked()).toBe(false);
+  expect(elsewhere.invoke).not.toHaveBeenCalled();
+});
+
+test('declining the offer keeps it away until the next launch', async () => {
+  const first = await freshOffer();
+  first.invoke.mockResolvedValue({ localNetwork: 'prompt' });
+  first.declineAndroidLocalNetwork();
+  expect(await first.androidLocalNetworkUnasked()).toBe(false);
+
+  const relaunched = await freshOffer();
+  relaunched.invoke.mockResolvedValue({ localNetwork: 'prompt' });
+  expect(await relaunched.androidLocalNetworkUnasked()).toBe(true);
+});
+
 test.each([
   ['192.168.1.20', true],
   ['10.0.0.5', true],

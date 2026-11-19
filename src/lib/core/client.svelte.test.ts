@@ -42,6 +42,7 @@ const localNetwork = vi.hoisted(() => ({
   gated: false,
   denied: false,
   requestAndroid: vi.fn(() => Promise.resolve(false)),
+  unasked: false,
 }));
 
 vi.mock('#lib/platform/local-network.js', async (importOriginal) => ({
@@ -49,6 +50,7 @@ vi.mock('#lib/platform/local-network.js', async (importOriginal) => ({
   browserGatesCoreNetwork: () => localNetwork.gated,
   localNetworkDenied: () => Promise.resolve(localNetwork.denied),
   requestAndroidLocalNetwork: localNetwork.requestAndroid,
+  androidLocalNetworkUnasked: () => Promise.resolve(localNetwork.unasked),
 }));
 
 const session: SessionInfo = {
@@ -1137,15 +1139,31 @@ test('an offline core the page cannot reach either is just offline', async () =>
   expect(core.localNetworkBlocked).toBeNull();
 });
 
-test('an offline native core asks Android for local network access', async () => {
+test('an offline native core offers Android local network access instead of asking outright', async () => {
   vi.stubGlobal('navigator', { onLine: true });
+  localNetwork.unasked = true;
+  localNetwork.requestAndroid.mockClear();
   const fake = fakeTransport({ 'session.restore': session, 'session.list_accounts': [session] });
   const core = createCoreClient(() => fake.transport);
   await core.start();
 
   fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.waitFor(() => {
+    expect(core.localNetworkOffer).toBe('example.org');
+  });
+  expect(localNetwork.requestAndroid).not.toHaveBeenCalled();
 
+  await core.allowLocalNetwork();
   expect(localNetwork.requestAndroid).toHaveBeenCalledOnce();
+  expect(core.localNetworkOffer).toBeNull();
+
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.waitFor(() => {
+    expect(core.localNetworkOffer).toBe('example.org');
+  });
+  fake.emit({ type: 'sync_status', state: 'live' });
+  expect(core.localNetworkOffer).toBeNull();
+  localNetwork.unasked = false;
 });
 
 test('a cancellation for an unknown verification flow does not open the verification dialog', async () => {

@@ -50,13 +50,34 @@ export async function localNetworkDenied(): Promise<boolean> {
 }
 
 let askedAndroid = false;
+// Until the next launch only, so a mistaken tap is not a dead end.
+let declinedAndroid = false;
+
+async function androidWouldPrompt(): Promise<boolean> {
+  const current = await invoke<Record<string, string>>('plugin:sable-push|check_permissions');
+  return current.localNetwork.startsWith('prompt');
+}
+
+/** Whether to offer the Android prompt: neither it nor the offer has been answered. */
+export async function androidLocalNetworkUnasked(): Promise<boolean> {
+  if (!isAndroid() || askedAndroid || declinedAndroid) return false;
+  try {
+    return await androidWouldPrompt();
+  } catch (error) {
+    console.warn('[sable auth] local network permission unavailable', error);
+    return false;
+  }
+}
+
+export function declineAndroidLocalNetwork(): void {
+  declinedAndroid = true;
+}
 
 // The request opens a system activity even with nothing to ask, which closes the keyboard.
 export async function requestAndroidLocalNetwork(): Promise<boolean> {
   if (!isAndroid() || askedAndroid) return false;
   try {
-    const current = await invoke<Record<string, string>>('plugin:sable-push|check_permissions');
-    if (!current.localNetwork.startsWith('prompt')) return false;
+    if (!(await androidWouldPrompt())) return false;
     askedAndroid = true;
     const states = await invoke<Record<string, string>>('plugin:sable-push|request_permissions', {
       permissions: ['localNetwork'],

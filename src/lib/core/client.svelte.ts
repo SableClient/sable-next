@@ -50,6 +50,8 @@ import {
   browserGatesCoreNetwork,
   probeFromPage,
   requestAndroidLocalNetwork,
+  androidLocalNetworkUnasked,
+  declineAndroidLocalNetwork,
   localNetworkDenied,
   LocalNetworkBlockedError,
 } from '#lib/platform/local-network.js';
@@ -200,6 +202,8 @@ export class CoreClient {
   qrGrantSupported = $state(false);
   unresponsive = $state(false);
   localNetworkBlocked = $state<string | null>(null);
+  /** The homeserver an Android user can let Sable look for on the local network. */
+  localNetworkOffer = $state<string | null>(null);
   accountRevision = $state(0);
 
   private transport: Transport | null = null;
@@ -999,6 +1003,7 @@ export class CoreClient {
     this.searchCoverageUnavailable = false;
     this.cancelLocalNetworkClear();
     this.localNetworkBlocked = null;
+    this.localNetworkOffer = null;
   }
 
   /** Both events fire only on a change, so a session that starts unverified
@@ -1227,6 +1232,7 @@ export class CoreClient {
       for (const userId of retry) this.invalidateProfile(userId);
     }
     if (status.state !== 'offline') {
+      this.localNetworkOffer = null;
       if (this.localNetworkBlocked !== null) {
         this.localNetworkClearTimer ??= setTimeout(() => {
           this.localNetworkClearTimer = null;
@@ -1237,7 +1243,26 @@ export class CoreClient {
     }
     this.cancelLocalNetworkClear();
     if (browserGatesCoreNetwork()) void this.checkLocalNetwork();
-    else if (navigator.onLine) void requestAndroidLocalNetwork();
+    else if (navigator.onLine) void this.offerLocalNetwork();
+  }
+
+  private async offerLocalNetwork(): Promise<void> {
+    const session = this.session;
+    if (!session) return;
+    const revision = this.accountRevision;
+    if (!(await androidLocalNetworkUnasked())) return;
+    if (revision !== this.accountRevision || this.sync?.state !== 'offline') return;
+    this.localNetworkOffer = homeserverUrl(session.homeserver).hostname;
+  }
+
+  async allowLocalNetwork(): Promise<void> {
+    this.localNetworkOffer = null;
+    await requestAndroidLocalNetwork();
+  }
+
+  declineLocalNetwork(): void {
+    this.localNetworkOffer = null;
+    declineAndroidLocalNetwork();
   }
 
   private async checkLocalNetwork(): Promise<void> {

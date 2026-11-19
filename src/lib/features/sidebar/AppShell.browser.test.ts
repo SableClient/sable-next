@@ -31,6 +31,7 @@ beforeEach(() => {
     crashed: null,
     deviceList: [],
     localNetworkBlocked: null,
+    localNetworkOffer: null,
     verification: null,
   });
   visit('/inbox');
