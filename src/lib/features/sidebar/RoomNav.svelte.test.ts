@@ -227,6 +227,22 @@ test.each([
   });
 });
 
+test('a room that is not a direct chat can be made one from its menu, and back', async () => {
+  roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
+  core.rpc.account.setDirect.mockReset().mockResolvedValue(null);
+  await mountNav();
+
+  await openMenu('Plain');
+  expect(screen.queryByRole('menuitem', { name: /room\.menuConvertToGroup/ })).toBeNull();
+  await user.click(await screen.findByRole('menuitem', { name: /room\.menuConvertToDirect/ }));
+
+  expect(core.rpc.account.setDirect).toHaveBeenCalledExactlyOnceWith({
+    room_id: '!plain:example.org',
+    direct: true,
+    user_id: null,
+  });
+});
+
 test('the space header menu invites to the space when the user may', async () => {
   visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   roomsFixture.rooms = [

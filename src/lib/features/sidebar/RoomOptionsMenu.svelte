@@ -229,11 +229,8 @@
       });
   }
 
-  /** One-directional, like v1: a DM becomes a group. */
-  function convertToGroup(): void {
-    void core.rpc.account
-      .setDirect({ room_id: room.room_id, direct: false, user_id: null })
-      .catch(report);
+  function setDirect(direct: boolean): void {
+    void core.rpc.account.setDirect({ room_id: room.room_id, direct, user_id: null }).catch(report);
   }
 
   function addToSpaces(spaceIds: string[]): void {
@@ -345,9 +342,22 @@
     </ActionMenuItem>
 
     {#if room.is_direct}
-      <ActionMenuItem onSelect={convertToGroup}>
+      <ActionMenuItem
+        onSelect={() => {
+          setDirect(false);
+        }}
+      >
         <ChatCircleIcon />
         {i18n.t('room.menuConvertToGroup')}
+      </ActionMenuItem>
+    {:else if room.room_kind !== 'space'}
+      <ActionMenuItem
+        onSelect={() => {
+          setDirect(true);
+        }}
+      >
+        <ChatCircleIcon />
+        {i18n.t('room.menuConvertToDirect')}
       </ActionMenuItem>
     {/if}
 

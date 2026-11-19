@@ -402,6 +402,7 @@
       "unknown": "a rule this client does not recognise"
     },
     "menuConvertToGroup": "Convert to group chat",
+    "menuConvertToDirect": "Convert to direct message",
     "lobbyJoinAll_one": "Join {{count, number}} room",
     "lobbyJoinAll_other": "Join all {{count, number}} rooms",
     "lobbyJoinProgress": "Joined {{done, number}} of {{total, number}}…",
