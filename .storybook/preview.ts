@@ -2,6 +2,8 @@ import type { Decorator, Preview } from '@storybook/sveltekit';
 
 import '../src/styles.css';
 
+import CoreClientProvider from './CoreClientProvider.svelte';
+
 const applyTheme: Decorator = (story, context) => {
   const theme = context.globals.theme as string;
   document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -9,8 +11,13 @@ const applyTheme: Decorator = (story, context) => {
   return story();
 };
 
+const provideCoreClient: Decorator = (story) => ({
+  Component: CoreClientProvider,
+  props: { children: story },
+});
+
 const preview: Preview = {
-  decorators: [applyTheme],
+  decorators: [applyTheme, provideCoreClient],
   globalTypes: {
     theme: {
       description: 'Colour scheme',
