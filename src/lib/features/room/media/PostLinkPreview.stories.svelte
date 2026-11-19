@@ -1,15 +1,16 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
-  import { expect } from 'storybook/test';
 
-  import type { UrlPreviewView, PostView } from '#src/generated/protocol';
+  import type { UrlPreviewView, PostView, PostMediaView } from '#src/generated/protocol';
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import PostLinkPreview from './PostLinkPreview.svelte';
 
+  const url = 'https://social.example/alice/post/f00b4r';
+
   const post: PostView = {
-    url: 'https://social.example/alice/post/f00b4r',
+    url,
     author: {
       name: 'Alice',
       handle: 'alice',
@@ -17,6 +18,7 @@
       url: 'https://social.example/alice',
     },
     text: 'This is a test post. Hello.',
+    translated_from: null,
     created_at: 0,
     stats: {
       replies: 3,
@@ -30,7 +32,7 @@
   };
 
   const preview: UrlPreviewView = {
-    url: post.url,
+    url,
     title: 'Shipping the search crawl fix',
     description: 'How the indexer keeps results steady while older history is still loading.',
     site_name: 'Example Social',
@@ -45,7 +47,17 @@
     post: post,
   };
 
-  const previewWith = (obj) => {
+  const media = (kind: PostMediaView['kind'], source: string): PostMediaView => ({
+    kind,
+    source,
+    poster: null,
+    mime: null,
+    width: null,
+    height: null,
+    alt: null,
+  });
+
+  const previewWith = (obj: Partial<PostView>) => {
     return {
       ...preview,
       post: {
@@ -76,12 +88,7 @@
   name="With one image"
   args={{
     preview: previewWith({
-      media: [
-        {
-          kind: 'image',
-          source: 'https://social.example/image.png',
-        },
-      ],
+      media: [media('image', 'https://social.example/image.png')],
     }),
   }}
 />
@@ -91,14 +98,8 @@
   args={{
     preview: previewWith({
       media: [
-        {
-          kind: 'image',
-          source: 'https://social.example/image.png',
-        },
-        {
-          kind: 'image',
-          source: 'https://social.example/image.png',
-        },
+        media('image', 'https://social.example/image.png'),
+        media('image', 'https://social.example/image.png'),
       ],
     }),
   }}
@@ -109,22 +110,10 @@
   args={{
     preview: previewWith({
       media: [
-        {
-          kind: 'image',
-          source: 'https://social.example/image.png',
-        },
-        {
-          kind: 'image',
-          source: 'https://social.example/image.png',
-        },
-        {
-          kind: 'image',
-          source: 'https://social.example/image.png',
-        },
-        {
-          kind: 'image',
-          source: 'https://social.example/image.png',
-        },
+        media('image', 'https://social.example/image.png'),
+        media('image', 'https://social.example/image.png'),
+        media('image', 'https://social.example/image.png'),
+        media('image', 'https://social.example/image.png'),
       ],
     }),
   }}
@@ -134,12 +123,7 @@
   name="With video"
   args={{
     preview: previewWith({
-      media: [
-        {
-          kind: 'video',
-          source: 'https://social.example/video.mp4',
-        },
-      ],
+      media: [media('video', 'https://social.example/video.mp4')],
     }),
   }}
 />
