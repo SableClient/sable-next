@@ -48,7 +48,7 @@ const trayEvents: (EventEmitter & {
   setImage: ReturnType<typeof vi.fn>;
 })[] = [];
 
-import { DesktopTray, hideToTray } from './tray';
+import { closeAction, DesktopTray, hideToTray } from './tray';
 
 function setup(platform: NodeJS.Platform = 'win32') {
   let visible = true;
@@ -102,6 +102,19 @@ test('Windows double-click hides and restores, while single click does not toggl
   expect(window.restore).toHaveBeenCalledOnce();
   expect(window.isVisible()).toBe(true);
 });
+
+test.each([
+  ['darwin', false, false, 'hide-app'],
+  ['darwin', true, false, 'close'],
+  ['linux', false, true, 'hide-to-tray'],
+  ['linux', false, false, 'close'],
+  ['win32', true, true, 'close'],
+] as const)(
+  'closing the window on %s (quitting %s, closes to tray %s) is %s',
+  (platform, quitting, closesToTray, action) => {
+    expect(closeAction(platform, quitting, closesToTray)).toBe(action);
+  }
+);
 
 test('the menu restores a hidden window and Quit exits the app', () => {
   const { tray, window } = setup();

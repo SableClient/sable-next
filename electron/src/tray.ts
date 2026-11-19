@@ -17,6 +17,19 @@ function withUnreadDot(base: NativeImage): NativeImage {
   return nativeImage.createFromBitmap(bitmap, { width, height });
 }
 
+export type CloseAction = 'close' | 'hide-app' | 'hide-to-tray';
+
+/** macOS has no tray, and a destroyed window stops updating the dock badge, so closing hides the app there. */
+export function closeAction(
+  platform: NodeJS.Platform,
+  quitting: boolean,
+  closesToTray: boolean
+): CloseAction {
+  if (quitting) return 'close';
+  if (platform === 'darwin') return 'hide-app';
+  return closesToTray ? 'hide-to-tray' : 'close';
+}
+
 export function hideToTray(window: BrowserWindow): void {
   window.webContents.send('sable-window-hidden-to-tray');
   window.hide();

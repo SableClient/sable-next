@@ -64,7 +64,7 @@ import { initSentry, setTelemetryConsent } from './sentry';
 import { readSettings, sanitize } from './settings';
 import { captureCorePanic, ignoreBrokenPipes } from './stdio';
 import { importTauriConfig } from './tauri-import';
-import { DesktopTray, hideToTray } from './tray';
+import { closeAction, DesktopTray, hideToTray } from './tray';
 import { registerUpdater, setUpdateChannel, supportsAutoUpdate } from './updater';
 import {
   MIN_HEIGHT,
@@ -636,10 +636,15 @@ function createWindow(): BrowserWindow {
   window.on('close', (event) => {
     rememberWindowState(window);
     persistWindowState();
-    if (!quitting && desktopWindowSettings.closeToTray && desktopTray.available) {
-      event.preventDefault();
-      hideToTray(window);
-    }
+    const action = closeAction(
+      process.platform,
+      quitting,
+      desktopWindowSettings.closeToTray && desktopTray.available
+    );
+    if (action === 'close') return;
+    event.preventDefault();
+    if (action === 'hide-app') app.hide();
+    else hideToTray(window);
   });
   const reportMaximized = () => {
     window.webContents.send('sable-window-maximized', window.isMaximized());
