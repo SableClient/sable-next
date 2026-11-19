@@ -49,6 +49,18 @@ function pack(usage: ImagePackView['usage']): ImagePackView {
   };
 }
 
+function crowdedPack(count: number): ImagePackView {
+  const base = pack(['emoticon', 'sticker']);
+  return {
+    ...base,
+    images: Array.from({ length: count }, (_, index) => ({
+      ...base.images[0],
+      shortcode: `emote${index}`,
+      url: `mxc://a/emote${index}`,
+    })),
+  };
+}
+
 const button = (name: string) => screen.getByRole('button', { name });
 
 function imageInput(): HTMLInputElement {
@@ -72,7 +84,17 @@ async function appliedDraft(applied: PackDraft[]): Promise<PackDraft> {
   return applied[0];
 }
 
+// happy-dom has no layout, so rows would measure zero tall and all fit in the viewport.
+function giveRowsHeight(): void {
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.matches('.setting-row') ? 56 : 0;
+  });
+}
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -458,4 +480,40 @@ test('navigating with nothing edited, or within the same url, is left alone', as
 
   await userEvent.type(screen.getByRole('textbox', { name: 'Attribution' }), 'x');
   expect(navigate('http://localhost/rooms/a')).not.toHaveBeenCalled();
+});
+
+test('a pack with hundreds of images mounts only the rows near the top', () => {
+  giveRowsHeight();
+  render(ImagePackEditor, { props: { pack: crowdedPack(400), canEdit: true } });
+
+  const rows = screen.getAllByText(/^:emote\d+:$/);
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.length).toBeLessThan(60);
+  expect(screen.getByText(':emote0:')).toBeTruthy();
+  expect(screen.queryByText(':emote399:')).toBeNull();
+});
+
+test('the row being renamed stays mounted after it scrolls out of view', async () => {
+  giveRowsHeight();
+  const scroller = document.createElement('div');
+  scroller.style.overflowY = 'auto';
+  document.body.append(scroller);
+  render(ImagePackEditor, {
+    target: scroller,
+    props: { pack: crowdedPack(400), canEdit: true },
+  });
+
+  // Without layout the list never moves up the page as the host scrolls, so say where it is.
+  const list = screen.getByText(':emote0:').closest('ul');
+  if (!list) throw new Error('the image list was not found');
+  list.getBoundingClientRect = () => new DOMRect(0, -scroller.scrollTop, 0, 0);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Rename :emote0:' }));
+  scroller.scrollTop = 6000;
+  scroller.dispatchEvent(new Event('scroll'));
+
+  await vi.waitFor(() => {
+    expect(screen.queryByText(':emote1:')).toBeNull();
+  });
+  expect(screen.getByRole('group', { name: 'Rename :emote0:' })).toBeTruthy();
 });

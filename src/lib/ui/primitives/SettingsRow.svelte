@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { ClassValue } from 'svelte/elements';
+  import type { ClassValue, HTMLLiAttributes } from 'svelte/elements';
   import SettingsAnchorLink from './SettingsAnchorLink.svelte';
   import { settingsAnchors } from './settings-anchors.js';
   import StatusBadge from './StatusBadge.svelte';
@@ -8,7 +8,7 @@
   import SettingsNotSyncedBadge from './SettingsNotSyncedBadge.svelte';
   import type { Preferences } from '#lib/settings/definitions.js';
 
-  interface Props {
+  interface Props extends Omit<HTMLLiAttributes, 'class' | 'children' | 'title' | 'id'> {
     title?: string;
     description?: string | Snippet;
     disabled?: boolean;
@@ -40,12 +40,14 @@
     before,
     copy,
     children,
+    ...rest
   }: Props = $props();
   const anchors = settingsAnchors();
   let lit = $derived(highlighted || (id !== undefined && anchors?.highlighted() === id));
 </script>
 
 <li
+  {...rest}
   {id}
   data-settings-focus={dataSettingsFocus}
   class={['setting-row', { disabled, highlighted: lit }, className]}
