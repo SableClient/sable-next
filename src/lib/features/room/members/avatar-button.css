@@ -9,6 +9,6 @@
   padding: 0;
 }
 
-:global(.compact-user) .sender-avatar-button {
+.compact-user .sender-avatar-button {
   align-items: center;
 }
