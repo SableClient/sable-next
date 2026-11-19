@@ -60,7 +60,7 @@
 
   async function allow(): Promise<void> {
     await list(true);
-    // Android stops showing its prompt after two refusals and never says so.
+    // A refusal still reads as unasked on Android, so the offer would come straight back.
     if (access === 'unasked') decline();
   }
 

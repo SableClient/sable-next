@@ -31,7 +31,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-test('photo access is offered with its reason and asked for only on Allow', async () => {
+test('photo access is offered with its reason and asked for only on Continue', async () => {
   const user = userEvent.setup();
   platform.recentMedia.mockImplementation((_limit, request) =>
     Promise.resolve(request ? { access: 'granted', items: [photo] } : unasked)
@@ -65,7 +65,7 @@ test('turning the offer down hides it for good', async () => {
   expect(platform.recentMedia).not.toHaveBeenCalledWith(24, true);
 });
 
-test('a prompt the system no longer shows stops the offer', async () => {
+test('refusing the system prompt stops the offer', async () => {
   const user = userEvent.setup();
   platform.recentMedia.mockResolvedValue(unasked);
   render(RecentMediaStrip, { onFile: vi.fn() });
