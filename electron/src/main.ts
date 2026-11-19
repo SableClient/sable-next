@@ -64,7 +64,9 @@ import { initSentry, setTelemetryConsent } from './sentry';
 import { readSettings, sanitize } from './settings';
 import { captureCorePanic, ignoreBrokenPipes } from './stdio';
 import { importTauriConfig } from './tauri-import';
+import { relaunchOptions } from './relaunch';
 import { closeAction, DesktopTray, hideToTray } from './tray';
+import { waitForTrayHost } from './tray-host';
 import { registerUpdater, setUpdateChannel, supportsAutoUpdate } from './updater';
 import {
   MIN_HEIGHT,
@@ -235,7 +237,7 @@ async function serveApp(request: Request): Promise<Response> {
   const found = entry !== undefined && (await stat(file).catch(() => undefined))?.isFile();
   const target = found ? file : join(distDir, '404.html');
   if (target.endsWith('.html') && bundleReplaced()) {
-    app.relaunch();
+    app.relaunch(relaunchOptions(process.argv, process.env.APPIMAGE));
     app.quit();
     return new Response(null, { status: 503 });
   }
@@ -299,6 +301,11 @@ function trayIconPath(): string {
 }
 
 const desktopTray = new DesktopTray(trayIconPath(), () => mainWindow);
+let trayHostReady = false;
+
+function updateTray(): boolean {
+  return trayHostReady && desktopTray.update(desktopWindowSettings.showSystemTrayIcon);
+}
 
 function sanitizeDesktopWindowSettings(value: unknown): DesktopWindowSettings {
   const stored = (typeof value === 'object' && value !== null ? value : {}) as Record<
@@ -419,7 +426,7 @@ function startCore(): UtilityProcess {
       app.exit(1);
       return;
     }
-    app.relaunch({ args: [...process.argv.slice(1), '--password-store=basic'] });
+    app.relaunch(relaunchOptions(process.argv, process.env.APPIMAGE, ['--password-store=basic']));
     app.exit(0);
   });
 
@@ -540,7 +547,7 @@ ipcMain.handle('sable-apply-window-settings', (event, value: unknown) => {
   if (!isAppFrame(event.senderFrame)) return null;
   desktopWindowSettings = sanitizeDesktopWindowSettings(value);
   setCustomTitleBar(isCustomTitleBarRequested(value));
-  return { trayAvailable: desktopTray.update(desktopWindowSettings.showSystemTrayIcon) };
+  return { trayAvailable: updateTray() };
 });
 
 function windowOf(event: IpcMainEvent | IpcMainInvokeEvent): BrowserWindow | null {
@@ -968,7 +975,10 @@ if (!app.requestSingleInstanceLock()) {
       callShortcuts.releaseAll();
     });
     registerDeepLinks();
-    desktopTray.update(desktopWindowSettings.showSystemTrayIcon);
+    void waitForTrayHost().then(() => {
+      trayHostReady = true;
+      if (!quitting) updateTray();
+    });
     core = startCore();
     protocol.handle(SCHEME, serveApp);
     enforcePermissions(
