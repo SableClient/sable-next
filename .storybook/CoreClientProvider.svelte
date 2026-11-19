@@ -33,9 +33,10 @@
   const mockRpc = { rpc: createRpc(() => new Promise(() => {})) };
   const mockCore = {
     ...mockRpc,
-    onProfileChanged: noop,
+    onProfileChanged: () => noop,
     subscribeEvents: noop,
     cachedUserProfile: noop,
+    media: { fetchMedia: () => new Promise(() => {}) },
   } as unknown as CoreClient;
 
   provideCoreClient(mockCore);

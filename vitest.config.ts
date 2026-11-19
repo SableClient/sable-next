@@ -34,6 +34,7 @@ const storybookProject = (theme: 'light' | 'dark') => ({
       ],
       test: {
         name: `storybook-${theme}`,
+        maxWorkers: 4,
         browser: {
           enabled: true,
           headless: true,
