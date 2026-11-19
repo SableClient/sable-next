@@ -72,12 +72,11 @@ tofu -chdir=infra/web plan -var-file="../terraform.tfvars"
 tofu -chdir=infra/web apply -var-file="../terraform.tfvars"
 ```
 
-The workflow is `.forgejo/workflows/cloudflare-web.yml`. It builds the web
-assets once per push or pull request, reuses that artifact for frontend checks,
-Playwright, desktop packaging, and Cloudflare operations, plans infrastructure
-changes, applies the development state on pushes to `main`, applies the
-production state on `v*` tags or a manual dispatch with `git_tag`, and uploads
-same-repository PR preview versions using Cloudflare Worker preview aliases.
+The workflow is `.forgejo/workflows/cloudflare-web.yml`. Quality checks call it
+on `main` and the app build on `v*` tags. It applies the development state on
+`main`, the production state on `v*` tags or a manual dispatch with `git_tag`,
+and plans pull requests that touch `infra/`. Quality checks upload PR previews
+with Cloudflare Worker preview aliases.
 
 The Worker is configured with `single-page-application` not-found handling so
 client-side routes continue to resolve to the static SvelteKit shell.

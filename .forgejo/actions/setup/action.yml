@@ -13,7 +13,7 @@ inputs:
   rust-cache-key:
     description: rust-cache's shared-key.
     required: false
-    default: 'wasm'
+    default: 'wasm-release'
   rust-cache-targets:
     description: Cache compiled Cargo dependencies.
     required: false
@@ -56,6 +56,13 @@ runs:
       working-directory: ${{ github.workspace }}
       run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
 
+    # Leaves out the app crate, whose version every release bumps.
+    - name: Hash the WASM dependencies
+      id: wasm-lock
+      if: ${{ inputs.build == 'true' }}
+      shell: bash
+      run: echo "hash=$(awk 'BEGIN { RS = "" } !/^\[\[package\]\]\nname = "app"\n/' Cargo.lock | sha256sum | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
     # The bindings are a pure function of the Rust sources and the pinned
     # toolchain, so every job that builds shares one entry and only the first
     # miss compiles.
@@ -65,7 +72,7 @@ runs:
       uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: src/generated/wasm
-        key: wasm-${{ runner.os }}-${{ hashFiles('crates/**', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', '.mise/config.toml', 'scripts/build/build-wasm.mjs') }}
+        key: wasm-${{ runner.os }}-${{ steps.wasm-lock.outputs.hash }}-${{ hashFiles('crates/**', 'Cargo.toml', 'rust-toolchain.toml', '.cargo/config.toml', '.mise/config.toml', 'scripts/build/build-wasm.mjs') }}
 
     - name: Set up Rust
       if: ${{ inputs.rust == 'true' || (inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true') }}
@@ -87,7 +94,7 @@ runs:
       with:
         shared-key: ${{ inputs.rust-cache-key }}
         cache-on-failure: true
-        cache-targets: ${{ inputs.rust-cache-targets }}
+        cache-targets: ${{ inputs.rust-cache-targets == 'true' || inputs.build == 'true' }}
         save-if: ${{ github.ref == 'refs/heads/main' || inputs.rust-cache-save == 'true' }}
 
     - name: Install JavaScript dependencies
@@ -99,6 +106,7 @@ runs:
       if: ${{ inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
+        command -v clang && command -v llvm-ar && exit 0
         SUDO=$([ "$(id -u)" -eq 0 ] || echo sudo)
         $SUDO apt-get update
         $SUDO apt-get install --no-install-recommends -y clang llvm
@@ -110,6 +118,11 @@ runs:
       env:
         CARGO_BUILD_JOBS: '1'
       run: pnpm wasm:build
+
+    - name: Show sccache stats
+      if: ${{ always() && inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true' && env.RUSTC_WRAPPER != '' }}
+      shell: bash
+      run: sccache --show-stats || true
 
     - name: Verify Sentry source map configuration
       if: ${{ inputs.build == 'true' }}

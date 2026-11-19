@@ -160,6 +160,12 @@ jobs:
             src/generated/wasm
           if-no-files-found: error
           retention-days: 7
+  deploy:
+    name: Deploy to Cloudflare
+    needs: build-web
+    if: ${{ github.event_name == 'push' }}
+    uses: ./.forgejo/workflows/cloudflare-web.yml
+    secrets: inherit
   docker:
     name: Build ${{ matrix.image }} image (${{ matrix.arch }})
     needs: [setup-release, build-web]
@@ -192,15 +198,17 @@ jobs:
       DOCKERFILE: ${{ matrix.file }}
       PACKAGES_USER: ${{ secrets.PACKAGES_USER }}
       PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.setup-release.outputs.ref }}
           persist-credentials: false
-      # The web image reuses the bundle built for the desktop packages.
+      # The web image reuses the bundle built for the desktop packages, the
+      # server image its WASM bindings.
       - name: Download web assets
-        if: ${{ matrix.image == 'web' }}
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: web-assets
@@ -213,7 +221,12 @@ jobs:
         run: |
           revision="$(git rev-parse HEAD)"
           image="$REGISTRY/${GITHUB_REPOSITORY,,}"
-          [ "$IMAGE_KIND" = web ] || image="$image-server"
+          if [ "$IMAGE_KIND" = web ]; then
+            prebuilt=(--build-context dist=dist)
+          else
+            image="$image-server"
+            prebuilt=(--build-context wasm=src/generated/wasm)
+          fi
           # The BuildKit container outlives the job so its local cache is reused across runs.
           builder="ci-builder-$ARCH"
           docker context inspect "ci-$ARCH" >/dev/null 2>&1 || docker context create "ci-$ARCH"
@@ -225,6 +238,11 @@ jobs:
               --builder "$builder" \
               --file "$DOCKERFILE" \
               --platform "linux/$ARCH" \
+              "${prebuilt[@]}" \
+              --build-arg SCCACHE_BUCKET --build-arg SCCACHE_ENDPOINT --build-arg SCCACHE_REGION \
+              --build-arg SCCACHE_S3_KEY_PREFIX --build-arg SCCACHE_S3_USE_SSL \
+              --secret id=aws_access_key_id,env=AWS_ACCESS_KEY_ID \
+              --secret id=aws_secret_access_key,env=AWS_SECRET_ACCESS_KEY \
               --provenance=false \
               --label "org.opencontainers.image.source=$FORGEJO_URL/$GITHUB_REPOSITORY" \
               --label "org.opencontainers.image.revision=$revision" \

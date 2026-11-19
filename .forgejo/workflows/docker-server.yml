@@ -1,18 +1,8 @@
 name: Server Docker image
 
 on:
-  push:
-    branches: [main]
+  pull_request:
     paths:
-      - 'crates/**'
-      - 'vendor/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'rust-toolchain.toml'
-      - '.cargo/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'patches/**'
       - 'packaging/server/**'
       - '.forgejo/workflows/docker-server.yml'
 
@@ -20,11 +10,26 @@ concurrency:
   group: docker-server-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
+  CARGO_INCREMENTAL: 0
+  SCCACHE_BUCKET: sccache
+  SCCACHE_S3_KEY_PREFIX: sable-next
+  SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
+  SCCACHE_REGION: us-east-1
+  SCCACHE_S3_USE_SSL: 'true'
+
+# Pushes publish the image from tauri-build. This only proves a Dockerfile
+# change builds.
 jobs:
   build-server:
     name: Build server image (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +44,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up app and build
+        uses: ./.forgejo/actions/setup
+        with:
+          build: 'true'
+
       - name: Set up Docker Buildx
         id: buildx
         uses: https://github.com/docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -51,6 +61,16 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
           file: packaging/server/Dockerfile
+          build-contexts: wasm=src/generated/wasm
+          build-args: |
+            SCCACHE_BUCKET
+            SCCACHE_ENDPOINT
+            SCCACHE_REGION
+            SCCACHE_S3_KEY_PREFIX
+            SCCACHE_S3_USE_SSL
+          secret-envs: |
+            aws_access_key_id=AWS_ACCESS_KEY_ID
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY
           platforms: linux/${{ matrix.arch }}
           push: false
           outputs: type=cacheonly

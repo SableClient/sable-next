@@ -142,6 +142,7 @@ jobs:
 
       - name: Install the WASM C toolchain
         run: |
+          command -v clang && command -v llvm-ar && exit 0
           sudo_cmd=()
           [ "$(id -u)" -eq 0 ] || sudo_cmd=(sudo)
           "${sudo_cmd[@]}" apt-get update

@@ -1,16 +1,9 @@
 name: Cloudflare Infra
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - '.changeset/**'
-      - 'fastlane/**'
-      - 'src-tauri/**'
-      - 'electron/**'
+  # quality-checks calls this on main and tauri-build on tags, once the WASM
+  # bindings are cached.
+  workflow_call:
   pull_request:
     paths:
       - 'infra/**'

@@ -21,7 +21,8 @@ on:
 
 concurrency:
   group: quality-checks-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer main push must not cancel a Cloudflare apply midway.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
@@ -66,6 +67,13 @@ jobs:
             src/generated/wasm
           if-no-files-found: error
           retention-days: 7
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: build
+    if: ${{ github.event_name == 'push' }}
+    uses: ./.forgejo/workflows/cloudflare-web.yml
+    secrets: inherit
 
   format:
     name: Format and Stylelint

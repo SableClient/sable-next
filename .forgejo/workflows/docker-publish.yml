@@ -43,5 +43,6 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
           file: packaging/docker/Dockerfile
+          build-contexts: dist=dist
           push: false
           outputs: type=cacheonly
