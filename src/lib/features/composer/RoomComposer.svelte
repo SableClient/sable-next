@@ -317,8 +317,7 @@
   let multiline = $state(false);
   let pointerHidden = $state(false);
   const shortLayout = $derived(
-    !expanded &&
-      (compactHeight || (composerShort && (!multiline || preferences.alwaysInlineEditor)))
+    compactHeight || (!expanded && composerShort && (!multiline || preferences.alwaysInlineEditor))
   );
   let layoutFrame: number | undefined;
   let empty = $state(true);
