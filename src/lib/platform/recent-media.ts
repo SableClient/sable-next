@@ -10,14 +10,22 @@ export interface RecentMedia {
   duration: number;
 }
 
-/** Asks for photo library access on first use, and resolves to nothing when it is refused. */
-export async function recentMedia(limit = 24): Promise<RecentMedia[]> {
-  if (!isNativeMobile()) return [];
+/** `unasked` on Android also covers a refusal, which the system does not tell apart. */
+export type MediaAccess = 'granted' | 'limited' | 'unasked' | 'denied';
+
+export interface RecentMediaList {
+  access: MediaAccess;
+  items: RecentMedia[];
+}
+
+/** Lists what is already readable; `request` shows the system prompt first. */
+export async function recentMedia(limit = 24, request = false): Promise<RecentMediaList> {
+  if (!isNativeMobile()) return { access: 'denied', items: [] };
   try {
-    return await invoke<RecentMedia[]>('recent_media', { limit });
+    return await invoke<RecentMediaList>('recent_media', { limit, request });
   } catch (error) {
     console.debug('[sable files] recent media unavailable', error);
-    return [];
+    return { access: 'denied', items: [] };
   }
 }
 

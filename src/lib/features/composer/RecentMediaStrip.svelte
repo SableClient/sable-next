@@ -1,14 +1,21 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
 
   import { i18n } from '#lib/i18n.js';
+  import { readText, writeText } from '#lib/platform/local-json.js';
+  import { isAndroid } from '#lib/platform/os.js';
   import { formatClockDuration } from '#lib/ui/clock-duration.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import {
     recentMedia,
     recentMediaFile,
     recentMediaThumbnail,
+    type MediaAccess,
     type RecentMedia,
   } from '#lib/platform/recent-media.js';
+
+  const DECLINED_KEY = 'sable-recent-media-declined';
 
   interface Props {
     onFile: (file: File) => void;
@@ -17,29 +24,45 @@
   let { onFile }: Props = $props();
   let items = $state.raw<RecentMedia[]>([]);
   let loading = $state<string | null>(null);
+  let access = $state<MediaAccess | null>(null);
+  let declined = $state(readText(DECLINED_KEY) !== null);
   const thumbnails = new SvelteMap<string, string>();
+  const urls: string[] = [];
+  let live = true;
 
-  $effect(() => {
-    let live = true;
-    const urls: string[] = [];
-    void (async () => {
-      const listed = await recentMedia();
+  async function list(request: boolean): Promise<void> {
+    const listed = await recentMedia(24, request);
+    if (!live) return;
+    access = listed.access;
+    items = listed.items;
+    for (const media of listed.items) {
+      const blob = await recentMediaThumbnail(media, 360);
       if (!live) return;
-      items = listed;
-      for (const media of listed) {
-        const blob = await recentMediaThumbnail(media, 360);
-        if (!live) return;
-        if (!blob) continue;
-        const url = URL.createObjectURL(blob);
-        urls.push(url);
-        thumbnails.set(media.id, url);
-      }
-    })();
+      if (!blob) continue;
+      const url = URL.createObjectURL(blob);
+      urls.push(url);
+      thumbnails.set(media.id, url);
+    }
+  }
+
+  onMount(() => {
+    void list(false);
     return () => {
       live = false;
       for (const url of urls) URL.revokeObjectURL(url);
     };
   });
+
+  function decline(): void {
+    declined = true;
+    writeText(DECLINED_KEY, '1');
+  }
+
+  async function allow(): Promise<void> {
+    await list(true);
+    // Android stops showing its prompt after two refusals and never says so.
+    if (access === 'unasked') decline();
+  }
 
   async function choose(media: RecentMedia): Promise<void> {
     if (loading) return;
@@ -54,7 +77,20 @@
   }
 </script>
 
-{#if items.length > 0}
+{#if access === 'unasked' && !declined}
+  <div class="offer">
+    <p>{i18n.t('composer.recentMediaOffer')}</p>
+    <p class="hint">{i18n.t('composer.recentMediaOfferHint')}</p>
+    <div class="offer-actions">
+      <Button size="small" variant="ghost" onclick={decline}>
+        {i18n.t('composer.recentMediaDecline')}
+      </Button>
+      <Button size="small" onclick={() => void allow()}>
+        {i18n.t('composer.recentMediaAllow')}
+      </Button>
+    </div>
+  </div>
+{:else if items.length > 0}
   <ul
     class="recent-media scrollbar-hidden"
     aria-label={i18n.t('composer.recentMedia')}
@@ -78,9 +114,48 @@
       </li>
     {/each}
   </ul>
+  {#if access === 'limited'}
+    <p class="hint limited">
+      {i18n.t('composer.recentMediaLimited')}
+      {#if isAndroid()}
+        <Button size="small" variant="ghost" onclick={() => void list(true)}>
+          {i18n.t('composer.recentMediaChange')}
+        </Button>
+      {/if}
+    </p>
+  {/if}
 {/if}
 
 <style>
+  .offer {
+    display: grid;
+    gap: var(--space-100);
+    padding: 0 var(--space-300);
+  }
+
+  .offer p,
+  .limited {
+    margin: 0;
+  }
+
+  .hint {
+    font-size: var(--font-size-small);
+  }
+
+  .limited {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+    justify-content: space-between;
+    padding: 0 var(--space-300);
+  }
+
+  .offer-actions {
+    display: flex;
+    gap: var(--space-200);
+    justify-content: flex-end;
+  }
+
   .recent-media {
     display: flex;
     gap: var(--space-200);

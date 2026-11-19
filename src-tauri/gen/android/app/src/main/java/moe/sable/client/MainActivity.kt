@@ -304,6 +304,20 @@ class MainActivity : TauriActivity() {
     ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
   }
 
+  // A refusal reads as unasked: Android only reports what is granted.
+  private fun mediaAccess(): String {
+    val granted = { permission: String ->
+      ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+    return when {
+      !readsMedia() -> "unasked"
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+        !granted(Manifest.permission.READ_MEDIA_IMAGES) &&
+        !granted(Manifest.permission.READ_MEDIA_VIDEO) -> "limited"
+      else -> "granted"
+    }
+  }
+
   private fun recentMedia(limit: Int): JSONArray {
     val items = JSONArray()
     val timed = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
@@ -465,9 +479,10 @@ class MainActivity : TauriActivity() {
     @Keep
     @JvmStatic
     @Suppress("unused")
-    fun recentMediaNative(limit: Int): String {
+    fun recentMediaNative(limit: Int, request: Boolean): String {
       val activity = checkNotNull(instance) { "Activity is unavailable" }
-      if (!activity.readsMedia()) {
+      // With only some photos allowed, asking again reopens the system's selection.
+      if (request && activity.mediaAccess() != "granted") {
         val asked = CompletableFuture<Unit>()
         activity.runOnUiThread {
           runCatching {
@@ -477,9 +492,9 @@ class MainActivity : TauriActivity() {
           }.onFailure { asked.completeExceptionally(it) }
         }
         asked.get(2, TimeUnit.MINUTES)
-        check(activity.readsMedia()) { "Media access was denied" }
       }
-      return activity.recentMedia(limit).toString()
+      val items = if (activity.readsMedia()) activity.recentMedia(limit) else JSONArray()
+      return JSONObject().put("access", activity.mediaAccess()).put("items", items).toString()
     }
 
     @Keep

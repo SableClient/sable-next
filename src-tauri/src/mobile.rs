@@ -193,7 +193,7 @@ pub(crate) extern "system" fn Java_moe_sable_client_MainActivity_nativeInitSyste
 
 /// `light` asks for the icon treatment a light background needs: dark icons.
 #[tauri::command]
-pub(crate) async fn recent_media(limit: i32) -> Result<serde_json::Value, String> {
+pub(crate) async fn recent_media(limit: i32, request: bool) -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
         let class = MAIN_ACTIVITY
@@ -204,8 +204,8 @@ pub(crate) async fn recent_media(limit: i32) -> Result<serde_json::Value, String
                 let result = env.call_static_method(
                     class,
                     jni_str!("recentMediaNative"),
-                    jni_sig!("(I)Ljava/lang/String;"),
-                    &[JValue::Int(limit)],
+                    jni_sig!("(IZ)Ljava/lang/String;"),
+                    &[JValue::Int(limit), JValue::Bool(request)],
                 );
                 let listed = caught(env, result)?.l()?;
                 env.cast_local::<JString<'_>>(listed)?.try_to_string(env)

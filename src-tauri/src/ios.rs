@@ -375,7 +375,9 @@ fn media_resource(asset: &PHAsset) -> Option<(Retained<PHAssetResource>, String)
 }
 
 fn recent_media_blocking(limit: usize) -> Result<Vec<RecentMedia>, String> {
-    authorize_blocking(PHAccessLevel::ReadWrite)?;
+    if !matches!(media_access(), "granted" | "limited") {
+        return Ok(Vec::new());
+    }
     autoreleasepool(|_| {
         let newest = NSSortDescriptor::sortDescriptorWithKey_ascending(
             Some(&NSString::from_str("creationDate")),
@@ -521,11 +523,36 @@ fn media_file_blocking(id: &str) -> Result<Vec<u8>, String> {
     result
 }
 
+fn media_access() -> &'static str {
+    // SAFETY: a class method that only reads the current authorization and is callable from any thread
+    match unsafe { PHPhotoLibrary::authorizationStatusForAccessLevel(PHAccessLevel::ReadWrite) } {
+        PHAuthorizationStatus::Authorized => "granted",
+        PHAuthorizationStatus::Limited => "limited",
+        PHAuthorizationStatus::NotDetermined => "unasked",
+        _ => "denied",
+    }
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct RecentMediaList {
+    access: &'static str,
+    items: Vec<RecentMedia>,
+}
+
 #[tauri::command]
-pub(crate) async fn recent_media(limit: usize) -> Result<Vec<RecentMedia>, String> {
-    tauri::async_runtime::spawn_blocking(move || recent_media_blocking(limit))
-        .await
-        .map_err(|error| error.to_string())?
+pub(crate) async fn recent_media(limit: usize, request: bool) -> Result<RecentMediaList, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if request {
+            // A refusal is reported through `access`, not as a failure.
+            let _ = authorize_blocking(PHAccessLevel::ReadWrite);
+        }
+        Ok(RecentMediaList {
+            access: media_access(),
+            items: recent_media_blocking(limit)?,
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
