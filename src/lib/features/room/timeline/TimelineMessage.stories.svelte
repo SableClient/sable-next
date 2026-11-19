@@ -9,6 +9,9 @@
     TimelineItemContentView,
     TimelineItemView,
   } from '#src/generated/protocol';
+  import AudioTrack from '#lib/ui/AudioTrack.svelte';
+  import AudioPlayer from '#lib/ui/AudioPlayer.svelte';
+  import MediaContent from '#lib/ui/MediaContent.svelte';
 
   const noop = () => {};
   const id = 'foobar';
@@ -162,4 +165,110 @@
       shared_by: id,
     })}
   />
+</Story>
+
+<Story name="Media/Image">
+  <TimelineMessage
+    {...withItem({
+      content: {
+        kind: 'image',
+        filename: 'image.png',
+        source: 'string',
+        spoiler: null,
+        blurhash: 'LxHrbxN4PRPU;rNhwIj?KrX9z;rW',
+      },
+    })}
+  />
+</Story>
+
+<Story name="Media/Audio">
+  <TimelineMessage
+    {...withItem({
+      content: {
+        kind: 'audio',
+        filename: 'find it.flac',
+        source: 'https://example.com/find it.flac',
+        voice: false,
+        metadata: {
+          title: 'find it',
+          artist: 'vimae',
+          album: 'nightlight',
+          cover_art_blurhash: 'UHES|,}b0{0x1GJ6=f-C1FJ6$*-V$kspWBR%',
+        },
+      },
+    })}
+  />
+</Story>
+
+<Story name="Media/Audio Variants">
+  <div style="display: flex; flex-flow: column nowrap; gap: 1rem">
+    <MediaContent
+      source="https://copse.f0rest.net/junk/find%20it.flac"
+      mime="audio/flac"
+      filename="find it.flac"
+      kind="audio"
+      audioMetadata={{
+        title: 'find it',
+        artist: 'vimae',
+        album: 'nightlight',
+        cover_art_blurhash: 'UHES|,}b0{0x1GJ6=f-C1FJ6$*-V$kspWBR%',
+      }}
+    />
+
+    <MediaContent
+      source="https://copse.f0rest.net/junk/find%20it.flac"
+      mime="audio/flac"
+      filename="find it.flac"
+      kind="audio"
+      audioMetadata={{
+        title: 'find it',
+        artist: 'vimae',
+        album: 'nightlight',
+        cover_art_blurhash: null,
+      }}
+    />
+
+    <MediaContent
+      source="https://copse.f0rest.net/junk/outgoing_call.wav"
+      mime="audio/webm"
+      filename="outgoing_call.webm"
+      kind="audio"
+      durationMs={2000}
+    />
+
+    <MediaContent
+      source="https://copse.f0rest.net/junk/outgoing_call.wav"
+      mime="audio/webm"
+      filename="outgoing_call.webm"
+      kind="audio"
+      waveform={[1, 2, 4, 2, 5, 2, 4, 6, 8, 7, 4, 2, 2, 1, 1, 2, 2, 3, 3]}
+    />
+  </div>
+</Story>
+
+<Story name="Media/Video">
+  <TimelineMessage
+    {...withItem({
+      content: {
+        kind: 'video',
+        filename: 'big buck bunny.mp4',
+        source: 'https://example.com/big+buck+bunny.mp4',
+        caption: 'look at this funny video',
+        external_url: 'https://example.com/big+buck+bunny.mp4',
+        mime: 'video/webm',
+        spoiler: null,
+        blurhash: 'LMFZN000?vDzR0Mu-rD%p8oI%KV}',
+      },
+    })}
+  />
+</Story>
+<Story name="Media/Video Variants">
+  <div style="display: flex; flex-flow: column nowrap; gap: 1rem">
+    <MediaContent
+      source="https://copse.f0rest.net/junk/Big_Buck_Bunny_4K.webm"
+      mime="video/webm"
+      filename="Big_Buck_Bunny_4K.webm"
+      kind="video"
+    />
+  </div>
 </Story>

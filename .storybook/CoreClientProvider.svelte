@@ -29,6 +29,38 @@
 
   let { children }: { children: Snippet } = $props();
 
+  const getRemoteMedia = async (url: string) => {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const bytes = await blob.bytes();
+    return bytes;
+  };
+
+  const mockFetchMedia = async (
+    source: string,
+    width: number,
+    height: number,
+    background: boolean = false
+  ) => {
+    if (!!width && width > 0 && !!height && height > 0) {
+      return getRemoteMedia(`https://placehold.co/${width}x${height}.png`);
+    }
+    if (source.includes('wav') && source.includes('metadata')) {
+      return getRemoteMedia('https://copse.f0rest.net/junk/outgoing_call_metadata.webm');
+    }
+    if (source.includes('wav')) {
+      return getRemoteMedia('https://copse.f0rest.net/junk/outgoing_call.webm');
+    }
+    if (source.includes('flac')) {
+      return getRemoteMedia('https://copse.f0rest.net/junk/find%20it.flac');
+    }
+    if (source.includes('mp4')) {
+      return getRemoteMedia('https://copse.f0rest.net/junk/Big_Buck_Bunny_4K.webm');
+    }
+
+    return getRemoteMedia(`https://placehold.co/1600x900.png`);
+  };
+
   const noop = () => {};
   const mockRpc = { rpc: createRpc(() => new Promise(() => {})) };
   const mockCore = {
@@ -36,7 +68,9 @@
     onProfileChanged: () => noop,
     subscribeEvents: noop,
     cachedUserProfile: noop,
-    media: { fetchMedia: () => new Promise(() => {}) },
+    media: {
+      fetchMedia: mockFetchMedia,
+    },
   } as unknown as CoreClient;
 
   provideCoreClient(mockCore);
