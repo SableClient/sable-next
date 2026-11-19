@@ -261,6 +261,7 @@ test('a call tears down after a successful join reports disconnected', async () 
 
   await session.join('!room:example.org', { microphone: true, camera: false });
   expect(session.lifecycle).toBe('active');
+  sounds.played.length = 0;
 
   emitTransportState({ ...idleTransportState(), connection: 'disconnected' });
 
@@ -272,6 +273,7 @@ test('a call tears down after a successful join reports disconnected', async () 
     expect(leaveCall).toHaveBeenCalledOnce();
     expect(transport.disconnect).toHaveBeenCalledOnce();
   });
+  expect(sounds.played).toEqual(['call_leave']);
 
   const retry = new CallSession(client, { createTransport: () => transport });
   await retry.join('!other:example.org', { microphone: true, camera: false });
@@ -313,10 +315,12 @@ test('a connect promise does not make the session active while transport is stil
   expect(session.transport.connection).toBe('connecting');
   expect(session.lifecycle).toBe('connecting');
 
+  sounds.played.length = 0;
   resolveConnect();
   await joining;
   expect(session.lifecycle).toBe('failed');
   expect(session.failure).toBe('setup-failed');
+  expect(sounds.played).toEqual([]);
 });
 
 test('reconnecting and recovering leaves an active call intact', async () => {

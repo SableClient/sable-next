@@ -725,6 +725,8 @@ export class CallSession {
   }
 
   #fail(failure: CallFailure): void {
+    // A call that was up and dropped sounds like leaving it; one that never connected is silent.
+    if (this.connectedAt !== null) this.#cue('call_leave');
     this.failure = failure;
     this.lifecycle = 'failed';
     this.connectedAt = null;
