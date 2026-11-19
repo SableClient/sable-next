@@ -13,6 +13,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { currentLanguage } from '#lib/language.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
   import VideoPlayer from '#lib/ui/VideoPlayer.svelte';
@@ -39,6 +40,14 @@
     inappropriate: 'timeline.postInappropriate',
     spoiler: 'timeline.postSpoiler',
   } as const satisfies Record<PostSensitivityView, string>;
+
+  function languageName(code: string): string {
+    try {
+      return new Intl.DisplayNames([currentLanguage()], { type: 'language' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  }
 </script>
 
 {#snippet author(post: PostView, size: number)}
@@ -104,6 +113,11 @@
     </Button>
   {:else}
     {#if note.text}<p class="post-text">{note.text}</p>{/if}
+    {#if note.translated_from}
+      <p class="post-translated">
+        {i18n.t('timeline.postTranslatedFrom', { language: languageName(note.translated_from) })}
+      </p>
+    {/if}
     {@render media(note.media, key)}
   {/if}
 {/snippet}
@@ -222,6 +236,12 @@
     margin: 0;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
+  }
+
+  .post-translated {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: 0;
   }
 
   .post-media.grid {

@@ -114,6 +114,7 @@ fn into_post_view(post: Post) -> PostView {
             url: post.author.url.filter(|url| is_preview_url(url)),
         },
         text: text(post.text),
+        translated_from: text(post.translated_from),
         created_at: post.created_at,
         media: post
             .media
@@ -188,6 +189,7 @@ fn bundle_post(post: &PostView, images: &HashMap<String, PreviewImage>) -> Post 
             url: post.author.url.clone(),
         },
         text: post.text.clone(),
+        translated_from: post.translated_from.clone(),
         created_at: post.created_at,
         media: post
             .media
@@ -632,6 +634,21 @@ mod tests {
         assert!(
             read.and_then(|preview| preview.video)
                 .is_some_and(|video| video.gif)
+        );
+    }
+
+    #[test]
+    fn a_translated_post_names_the_language_it_came_from() {
+        let data = serde_json::json!({
+            "og:type": "note",
+            "note:content": "Hello",
+            "note:content:translated_from": "ja",
+        });
+        let post = super::url_preview("https://x.com/ran/status/1".to_owned(), &data)
+            .and_then(|preview| preview.post);
+        assert_eq!(
+            post.and_then(|post| post.translated_from).as_deref(),
+            Some("ja")
         );
     }
 

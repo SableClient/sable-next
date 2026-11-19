@@ -1594,6 +1594,7 @@
     "postGraphic": "Graphic content",
     "postInappropriate": "Sensitive content",
     "postSpoiler": "Spoiler",
+    "postTranslatedFrom": "Translated from {{language}}",
     "showPost": "Show post",
     "forwardSelected_one": "{{count, number}} room selected",
     "forwardSelected_other": "{{count, number}} rooms selected",

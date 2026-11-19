@@ -1719,6 +1719,9 @@ pub struct PostView {
     pub url: Option<String>,
     pub author: PostAuthorView,
     pub text: Option<String>,
+    /// The language code `text` was machine translated from.
+    #[serde(default)]
+    pub translated_from: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub created_at: Option<u64>,
     pub media: Vec<PostMediaView>,

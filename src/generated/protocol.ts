@@ -1026,6 +1026,8 @@ export type PostView = {
 	url: string | null,
 	author: PostAuthorView,
 	text: string | null,
+	/**  The language code `text` was machine translated from. */
+	translated_from: string | null,
 	created_at: number | null,
 	media: PostMediaView[],
 	stats: PostStatsView | null,

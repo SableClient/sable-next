@@ -22,6 +22,7 @@ function post(overrides: Partial<PostView> = {}): PostView {
     url: null,
     author: { name: 'Alice', handle: 'alice.test', avatar: null, url: null },
     text: 'hello',
+    translated_from: null,
     created_at: null,
     media: [],
     stats: null,
@@ -54,6 +55,21 @@ function renderPost(value: PostView, mediaHidden = false) {
   const shown = preview(value);
   return render(PostLinkPreview, { url: shown.url, preview: shown, mediaHidden, tunnel: false });
 }
+
+test('says which language a translated post came from', () => {
+  renderPost(post({ text: 'Hello', translated_from: 'ja' }));
+
+  expect(screen.getByText('Translated from Japanese')).toBeInTheDocument();
+});
+
+test('names an unknown language by its code and leaves an untranslated post unmarked', () => {
+  const { unmount } = renderPost(post({ translated_from: 'not a language' }));
+  expect(screen.getByText('Translated from not a language')).toBeInTheDocument();
+  unmount();
+
+  renderPost(post());
+  expect(screen.queryByText(/Translated from/)).not.toBeInTheDocument();
+});
 
 test('shows the author, text, quote and the counts it knows', () => {
   renderPost(

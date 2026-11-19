@@ -32,6 +32,7 @@ describe('findLinkPresentation', () => {
       url: null,
       author: { name: null, handle: 'alice.test', avatar: null, url: null },
       text: 'hello',
+      translated_from: null,
       created_at: null,
       media: [],
       stats: null,
