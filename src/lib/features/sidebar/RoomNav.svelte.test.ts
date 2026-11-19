@@ -227,6 +227,26 @@ test.each([
   });
 });
 
+test('the space header menu invites to the space when the user may', async () => {
+  visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!root:example.org', name: 'Root', room_kind: 'space' }),
+  ];
+  listSections(sectionView('!root:example.org', {}));
+  core.rpc.members.permissions.mockResolvedValue({ can_invite: true } as RoomPermissionsView);
+  await mountNav();
+
+  await user.click(screen.getByRole('button', { name: 'nav.listOptions' }));
+  const invite = await screen.findByRole('menuitem', { name: /room\.menuInvite/ });
+  expect(core.rpc.members.permissions).toHaveBeenCalledWith({ room_id: '!root:example.org' });
+  await vi.waitFor(() => {
+    expect(invite).not.toHaveAttribute('data-disabled');
+  });
+  await user.click(invite);
+
+  expect(await screen.findByRole('dialog', { name: 'room.inviteTitle' })).toBeInTheDocument();
+});
+
 test('a subspace context menu opens its lobby', async () => {
   visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   roomsFixture.rooms = [

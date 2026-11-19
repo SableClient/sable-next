@@ -2,7 +2,10 @@
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+  import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
+  import { onMount } from 'svelte';
   import type { RoomListItemView } from '#src/generated/protocol';
+  import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { groupsFavourites, setGroupsFavourites } from '#lib/rooms/favourite-grouping.svelte.js';
   import { ROOM_SORTS, ROOM_SORT_LABELS } from '#lib/rooms/room-sort.js';
@@ -17,6 +20,7 @@
     sortKey: 'directSort' | 'roomSort';
     markReadDisabled: boolean;
     onMarkRead: () => void;
+    onInvite: (room: RoomListItemView) => void;
     onSettings: (room: RoomListItemView) => void;
     onLeave: (room: RoomListItemView) => void;
   }
@@ -27,11 +31,27 @@
     sortKey,
     markReadDisabled,
     onMarkRead,
+    onInvite,
     onSettings,
     onLeave,
   }: Props = $props();
 
   let groupFavourites = $derived(groupsFavourites(favouriteView));
+
+  const core = useCoreClient();
+  let canInvite = $state(false);
+  // These items mount with the menu, so the permission is read each time it opens.
+  onMount(() => {
+    if (!activeSpace) return;
+    core.rpc.members.permissions({ room_id: activeSpace.room_id }).then(
+      (permissions) => {
+        canInvite = permissions.can_invite;
+      },
+      (error: unknown) => {
+        console.debug('[sable room] space permissions unavailable', error);
+      }
+    );
+  });
 </script>
 
 <ActionMenuItem disabled={markReadDisabled} onSelect={onMarkRead}>
@@ -59,6 +79,15 @@
     />
   {/each}
 {:else}
+  <ActionMenuItem
+    disabled={!canInvite}
+    onSelect={() => {
+      onInvite(activeSpace);
+    }}
+  >
+    <UserPlusIcon />
+    {i18n.t('room.menuInvite')}
+  </ActionMenuItem>
   <ActionMenuItem
     onSelect={() => {
       onSettings(activeSpace);

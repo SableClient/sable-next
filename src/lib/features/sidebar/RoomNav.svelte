@@ -40,6 +40,7 @@
     spaceHidesBridgeBadges,
   } from '#lib/rooms/space-bridge-badges.svelte.js';
   import { roomIconOverride, showsRoomAvatar } from '#lib/rooms/room-appearance.svelte.js';
+  import RoomInviteDialog from '#lib/features/room/RoomInviteDialog.svelte';
   import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
   import { goToPage } from '#lib/features/room/room-navigation.js';
   import SpaceEvents from '#lib/features/calendar/SpaceEvents.svelte';
@@ -187,6 +188,7 @@
   const peerProfiles = new PeerProfiles(core);
   let settingsRoomId = $state<string | null>(null);
   let leaveRoomId = $state<string | null>(null);
+  let inviteRoomId = $state<string | null>(null);
 
   let directSection = $derived(pathname.startsWith('/direct'));
   let unspacedSection = $derived(pathname.startsWith('/rooms'));
@@ -236,6 +238,7 @@
   // Held by id so the dialogs follow the live summary.
   let settingsRoom = $derived(roomList.byId(settingsRoomId) ?? null);
   let leaveRoom = $derived(roomList.byId(leaveRoomId) ?? null);
+  let inviteRoom = $derived(roomList.byId(inviteRoomId) ?? null);
 
   type RoomNavItem = SpaceTreeSpace | RoomNavRow;
 
@@ -458,6 +461,9 @@
       {sortKey}
       markReadDisabled={!sectionUnread}
       onMarkRead={markSectionRead}
+      onInvite={(room) => {
+        inviteRoomId = room.room_id;
+      }}
       onSettings={openSettings}
       onLeave={openLeave}
     />
@@ -893,6 +899,14 @@
   room={settingsRoom}
   onOpenChange={(open) => {
     if (!open) settingsRoomId = null;
+  }}
+/>
+
+<RoomInviteDialog
+  open={inviteRoom !== null}
+  room={inviteRoom}
+  onOpenChange={(open) => {
+    if (!open) inviteRoomId = null;
   }}
 />
 
