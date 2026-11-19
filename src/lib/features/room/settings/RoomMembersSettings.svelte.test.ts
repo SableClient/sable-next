@@ -320,6 +320,33 @@ test('offers no role above your own and asks before lowering your own', async ()
   core.session = null;
 });
 
+test('asks before giving someone a role equal to your own', async () => {
+  core.session = { user_id: '@me:example.org' };
+  core.rpc.members.list.mockResolvedValue([alice]);
+  core.rpc.members.setUserPowerLevel.mockReset().mockResolvedValue(null);
+  const user = await renderMembers({
+    ...permissions,
+    own_power_level: 50,
+    can_change_power_levels: true,
+  });
+
+  await user.click(screen.getByRole('combobox', { name: 'Change role' }));
+  await user.click(await screen.findByRole('option', { name: /Moderator/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Give Alice your own role?' });
+  expect(within(dialog).getByText(/@alice:example\.org/)).toBeInTheDocument();
+  expect(core.rpc.members.setUserPowerLevel).not.toHaveBeenCalled();
+
+  await user.click(within(dialog).getByRole('button', { name: 'Give role' }));
+  await vi.waitFor(() => {
+    expect(core.rpc.members.setUserPowerLevel).toHaveBeenCalledWith({
+      room_id: '!room:example.org',
+      user_id: alice.user_id,
+      power_level: 50,
+    });
+  });
+  core.session = null;
+});
+
 test('refreshes the list and says the server refused when a kick is denied', async () => {
   core.rpc.members.list.mockResolvedValueOnce([alice]).mockResolvedValue([]);
   core.rpc.members.kick.mockRejectedValue(new CoreError({ code: 'denied' }));

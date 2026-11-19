@@ -18,6 +18,15 @@ export function tagForLevel(tags: PowerLevelTagMap, level: number): PowerLevelTa
   return Object.hasOwn(tags, level) ? tags[level] : null;
 }
 
+/** You cannot reverse either one yourself: lowering your own level, or raising someone to it. */
+export function needsPowerConfirmation(
+  isSelf: boolean,
+  level: number,
+  ownPowerLevel: number
+): boolean {
+  return isSelf || level >= ownPowerLevel;
+}
+
 export function isValidPowerLevel(value: number): boolean {
   return Number.isInteger(value) && value >= MIN_POWER_LEVEL && value <= MAX_POWER_LEVEL;
 }

@@ -1085,6 +1085,50 @@ test('asks before lowering your own role', async () => {
   });
 });
 
+test('asks before giving someone a role equal to your own', async () => {
+  core.rpc.members.setUserPowerLevel.mockReset().mockResolvedValue(null);
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 50,
+      permissions: {
+        own_power_level: 50,
+        can_change_power_levels: true,
+      } as RoomPermissionsView,
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        real_name: 'Alice',
+        real_avatar_url: null,
+        avatar_url: null,
+        power_level: 0,
+        membership: 'join',
+        member_ts: null,
+        kicked: false,
+        service: false,
+      },
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  await chooseAction('Change role');
+  await user.click(await screen.findByRole('menuitem', { name: /Moderator/ }));
+  const dialog = await screen.findByRole('dialog', { name: 'Give Alice your own role?' });
+  expect(within(dialog).getByText(/@alice:example\.org/)).toBeInTheDocument();
+  expect(core.rpc.members.setUserPowerLevel).not.toHaveBeenCalled();
+
+  await user.click(within(dialog).getByRole('button', { name: 'Give role' }));
+  await vi.waitFor(() => {
+    expect(core.rpc.members.setUserPowerLevel).toHaveBeenCalledWith({
+      room_id: '!room:example.org',
+      user_id: '@alice:example.org',
+      power_level: 50,
+    });
+  });
+});
+
 test('lists mutual rooms in a menu of their own, with direct messages last', async () => {
   core.userRelations.mockResolvedValueOnce({
     mutual_rooms: [

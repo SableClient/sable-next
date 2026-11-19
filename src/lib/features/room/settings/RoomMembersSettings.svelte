@@ -50,6 +50,7 @@
   import {
     FOUNDER_POWER_LEVEL,
     isValidPowerLevel,
+    needsPowerConfirmation,
     type PowerLevelTagMap,
   } from './power-level-tags';
 
@@ -94,7 +95,9 @@
   let ownPowerLevel = $derived(permissions?.own_power_level ?? 0);
   let canSetPower = $derived(permissions?.can_change_power_levels ?? false);
   let selfId = $derived(core.session?.user_id ?? null);
-  let selfDemotion = $state<{ member: MemberView; level: number } | null>(null);
+  let powerConfirm = $state<{ member: MemberView; level: number } | null>(null);
+  // Outlives powerConfirm so the dialog keeps its wording while it closes.
+  let promoted = $state<MemberView | null>(null);
   let powerResets = $state(0);
   let isDirect = $derived(room?.is_direct ?? false);
   let canInviteInline = $derived(
@@ -274,8 +277,9 @@
   function setPower(member: MemberView, level: number, confirmed = false): void {
     const target = roomId;
     if (!target || level === member.power_level) return;
-    if (member.user_id === selfId && !confirmed) {
-      selfDemotion = { member, level };
+    if (needsPowerConfirmation(member.user_id === selfId, level, ownPowerLevel) && !confirmed) {
+      promoted = member.user_id === selfId ? null : member;
+      powerConfirm = { member, level };
       return;
     }
     void act(
@@ -614,22 +618,31 @@
 />
 
 <ConfirmDialog
-  open={selfDemotion !== null}
-  title={i18n.t('timeline.profileDemoteSelfTitle')}
-  description={i18n.t('timeline.profileDemoteSelfBody')}
-  confirmLabel={i18n.t('timeline.profileDemoteSelfConfirm')}
+  open={powerConfirm !== null}
+  title={promoted
+    ? i18n.t('timeline.profilePromoteEqualTitle', { name: memberName(promoted) })
+    : i18n.t('timeline.profileDemoteSelfTitle')}
+  description={promoted
+    ? i18n.t('timeline.profilePromoteEqualBody', {
+        name: memberName(promoted),
+        user: promoted.user_id,
+      })
+    : i18n.t('timeline.profileDemoteSelfBody')}
+  confirmLabel={promoted
+    ? i18n.t('timeline.profilePromoteEqualConfirm')
+    : i18n.t('timeline.profileDemoteSelfConfirm')}
   onOpenChange={(next: boolean) => {
-    if (next || selfDemotion === null) return;
-    selfDemotion = null;
+    if (next || powerConfirm === null) return;
+    powerConfirm = null;
     powerResets += 1;
   }}
   onCancel={() => {
-    selfDemotion = null;
+    powerConfirm = null;
     powerResets += 1;
   }}
   onConfirm={() => {
-    const pending = selfDemotion;
-    selfDemotion = null;
+    const pending = powerConfirm;
+    powerConfirm = null;
     if (pending) setPower(pending.member, pending.level, true);
   }}
 />
