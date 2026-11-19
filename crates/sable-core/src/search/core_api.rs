@@ -193,6 +193,7 @@ impl Core {
                     skip,
                     take: room,
                     context,
+                    order,
                 },
             );
             let consumed = skip + room;

@@ -648,6 +648,7 @@ impl RoomIndex {
         query: &str,
         filter: &IndexFilter,
         terms: &FoldedTerms,
+        expand: bool,
     ) -> Vec<Ranked<'index>> {
         if query.is_empty() {
             return self
@@ -659,7 +660,7 @@ impl RoomIndex {
         }
 
         self.index
-            .query(query)
+            .query(query, expand)
             .into_iter()
             .filter_map(|(key, score)| {
                 let document = self.documents.get(&key)?;
@@ -1045,7 +1046,9 @@ impl MessageIndex {
                 (filter.rooms.is_empty() || filter.rooms.iter().any(|wanted| wanted == *room_id))
                     && !filter.not_rooms.iter().any(|denied| denied == *room_id)
             })
-            .flat_map(|(room_id, index)| index.ranked(room_id, query, filter, &terms))
+            .flat_map(|(room_id, index)| {
+                index.ranked(room_id, query, filter, &terms, expands(order))
+            })
             .collect();
 
         self.materialize(page_ranked(ranked, order, limit, offset))
@@ -1176,6 +1179,7 @@ impl MessageIndex {
             skip,
             take,
             context,
+            order,
         } = window;
         let Some(index) = self.rooms.get(room_id) else {
             return (Vec::new(), 0);
@@ -1184,7 +1188,7 @@ impl MessageIndex {
         if documents.is_empty() {
             return (Vec::new(), 0);
         }
-        let matched = rank_cold_documents(&documents, query, filter, terms);
+        let matched = rank_cold_documents(&documents, query, filter, terms, expands(order));
         let total = matched.len();
         let hits = matched
             .into_iter()
@@ -1591,6 +1595,7 @@ fn rank_cold_documents(
     query: &str,
     filter: &IndexFilter,
     terms: &FoldedTerms,
+    expand: bool,
 ) -> Vec<(usize, f64)> {
     let mut matched: Vec<(usize, f64)> = if query.is_empty() {
         documents
@@ -1605,7 +1610,7 @@ fn rank_cold_documents(
             scratch.add_document(position, &document.body);
         }
         scratch
-            .query(query)
+            .query(query, expand)
             .into_iter()
             .filter(|(position, _)| {
                 documents
@@ -1720,6 +1725,7 @@ pub(super) struct ColdWindow {
     pub(super) skip: usize,
     pub(super) take: usize,
     pub(super) context: usize,
+    pub(super) order: SearchOrder,
 }
 
 impl ColdWindow {
@@ -1729,6 +1735,7 @@ impl ColdWindow {
             skip: 0,
             take: usize::MAX,
             context,
+            order: SearchOrder::Rank,
         }
     }
 }
@@ -1784,6 +1791,12 @@ pub(super) fn newest_chunks_within(
         wanted.entry(room).or_default().push(chunk);
     }
     wanted
+}
+
+/// Date orders have no score to sink a loose match, so only relevance takes
+/// prefixes and typos.
+const fn expands(order: SearchOrder) -> bool {
+    matches!(order, SearchOrder::Rank)
 }
 
 fn by_rank(left: &Ranked<'_>, right: &Ranked<'_>) -> std::cmp::Ordering {
@@ -1970,6 +1983,71 @@ mod tests {
             .collect();
 
         assert_eq!(hits, vec!["$screenshot", "$alice", "$kris"]);
+    }
+
+    #[test]
+    fn test_date_orders_match_whole_words_only() {
+        let (mut index, room) = filtered_index();
+        let room_index = index.rooms.get_mut(&room).expect("the room");
+        for (seed, body) in [
+            ("mute", "please mute it"),
+            ("muted", "so I muted it"),
+            ("mutex", "a tokio mutex"),
+        ] {
+            room_index.upsert(document(
+                seed,
+                body,
+                "@kris:localhost",
+                4_000,
+                None,
+                Vec::new(),
+            ));
+        }
+        let search = |order| {
+            let mut hits: Vec<String> = index
+                .search("mute", &super::IndexFilter::default(), order, 20, 0)
+                .into_iter()
+                .map(|hit| hit.event_id.to_string())
+                .collect();
+            hits.sort();
+            hits
+        };
+
+        assert_eq!(
+            search(super::SearchOrder::Rank),
+            ["$mute", "$muted", "$mutex"]
+        );
+        assert_eq!(search(super::SearchOrder::Recent), ["$mute", "$muted"]);
+        assert_eq!(search(super::SearchOrder::Oldest), ["$mute", "$muted"]);
+    }
+
+    #[test]
+    fn test_a_cold_chunk_matches_whole_words_only_unless_expanded() {
+        let documents = [
+            document(
+                "mute",
+                "please mute it",
+                "@kris:localhost",
+                1,
+                None,
+                Vec::new(),
+            ),
+            document(
+                "mutex",
+                "a tokio mutex",
+                "@kris:localhost",
+                2,
+                None,
+                Vec::new(),
+            ),
+        ];
+        let filter = super::IndexFilter::default();
+        let terms = super::FoldedTerms::of(&filter, std::collections::HashSet::new());
+        let matched =
+            |expand| super::rank_cold_documents(&documents, "mute", &filter, &terms, expand).len();
+
+        assert_eq!(matched(true), 2);
+        assert_eq!(matched(false), 1);
     }
 
     #[test]

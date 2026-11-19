@@ -84,6 +84,7 @@ fn benchmark_cold_search_with_pending_edits() {
                         skip: 0,
                         take: 20,
                         context: 0,
+                        order: crate::api::search::SearchOrder::Rank,
                     },
                 ))
             });

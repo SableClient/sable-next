@@ -80,7 +80,7 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         clippy::cast_precision_loss,
         reason = "counts stay far below 2^52 and only feed a ranking score"
     )]
-    pub(super) fn query(&self, query: &str) -> Vec<(K, f64)> {
+    pub(super) fn query(&self, query: &str, expand: bool) -> Vec<(K, f64)> {
         if self.lengths.is_empty() {
             return Vec::new();
         }
@@ -94,7 +94,7 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         let mut live = Vec::new();
         for term in &terms {
             let mut best: HashMap<K, f64> = HashMap::new();
-            for (list, edits) in self.expand(term) {
+            for (list, edits) in self.expand(term, expand) {
                 live.clear();
                 live.extend(
                     list.iter()
@@ -125,14 +125,25 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         scores.into_iter().collect()
     }
 
-    fn expand(&self, term: &str) -> Vec<(&[(K, u32)], usize)> {
+    /// Without `expand` a term finds only the words that stem onto it. Chinese
+    /// and Japanese keep their prefixes: one character has to reach the pair
+    /// it was indexed in.
+    fn expand(&self, term: &str, expand: bool) -> Vec<(&[(K, u32)], usize)> {
+        if !expand && !tokenize::contains_chinese(term) {
+            return self
+                .postings
+                .get(term)
+                .map(|list| (list.as_slice(), 0))
+                .into_iter()
+                .collect();
+        }
         let Some(first) = term.chars().next() else {
             return Vec::new();
         };
         let mut buffer = [0; 4];
         let first: &str = first.encode_utf8(&mut buffer);
         let term_chars = term.chars().count();
-        let typos = allowed_typos(term);
+        let typos = if expand { allowed_typos(term) } else { 0 };
 
         let mut prefixed = Vec::new();
         let mut misspelled = Vec::new();
@@ -183,7 +194,7 @@ mod tests {
     }
 
     fn ranked(index: &InvertedIndex<u32>, query: &str) -> Vec<u32> {
-        let mut hits = index.query(query);
+        let mut hits = index.query(query, true);
         hits.sort_by(|left, right| right.1.total_cmp(&left.1).then(left.0.cmp(&right.0)));
         hits.into_iter().map(|(key, _)| key).collect()
     }
@@ -249,6 +260,40 @@ mod tests {
     fn test_a_prefix_matches_longer_words() {
         let index = index(&["deployment pipeline"]);
         assert_eq!(ranked(&index, "dep"), [0]);
+    }
+
+    #[test]
+    fn test_an_unexpanded_query_matches_only_the_word_and_its_inflections() {
+        let index = index(&["please mute it", "so I muted it", "a tokio mutex"]);
+        let mut exact: Vec<u32> = index
+            .query("mute", false)
+            .into_iter()
+            .map(|hit| hit.0)
+            .collect();
+        exact.sort_unstable();
+        assert_eq!(exact, [0, 1]);
+        assert_eq!(ranked(&index, "mute").len(), 3);
+    }
+
+    #[test]
+    fn test_an_unexpanded_query_still_finds_text_written_without_spaces() {
+        crate::search::tokenize::load_bundled_chinese();
+        let index = index(&["黒い猫", "検索を使う", "今天我们一起讨论中文搜索功能"]);
+        let found = |query: &str| {
+            let mut hits: Vec<u32> = index
+                .query(query, false)
+                .into_iter()
+                .map(|hit| hit.0)
+                .collect();
+            hits.sort_unstable();
+            hits
+        };
+        assert_eq!(found("黒"), [0]);
+        assert_eq!(found("猫"), [0]);
+        assert_eq!(found("検索"), [1]);
+        assert_eq!(found("搜索"), [2]);
+        assert_eq!(found("中"), [2]);
+        assert_eq!(found("搜"), [2]);
     }
 
     #[test]
