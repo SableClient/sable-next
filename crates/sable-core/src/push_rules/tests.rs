@@ -10,7 +10,8 @@ use super::{
     RuleWrite, default_modes, event_notifications, keywords, level_actions, master_muted,
     mention_notifications, new_rule, plan_add_keyword, plan_cleanup, plan_default_mode,
     plan_direct_default, plan_event, plan_keyword_mode, plan_master, plan_mention,
-    plan_remove_keyword, plan_room_mode, pushes_every_encrypted_event, room_mode, rule_notifies,
+    plan_remove_keyword, plan_room_mode, plan_suppressions, pushes_every_encrypted_event,
+    room_mode, rule_notifies,
 };
 use crate::protocol::{
     EventNotificationView, MentionNotificationModeView, MentionRuleView, NotificationModeView,
@@ -68,19 +69,15 @@ fn a_room_mode_does_not_depend_on_what_the_cache_believed() {
     let room = room_id!("!r:example.org");
 
     assert_eq!(
-        describe(&plan_room_mode(
-            room,
-            false,
-            Some(NotificationModeView::All)
-        )),
+        describe(&plan_room_mode(room, Some(NotificationModeView::All))),
         vec![
-            r#"put !r:example.org ["notify"]"#,
+            r#"put !r:example.org ["notify",{"set_tweak":"sound","value":"default"}]"#,
             "enabled room !r:example.org true",
             "delete override !r:example.org",
         ]
     );
     assert_eq!(
-        describe(&plan_room_mode(room, false, None)),
+        describe(&plan_room_mode(room, None)),
         vec![
             "delete override !r:example.org",
             "delete room !r:example.org"
@@ -92,10 +89,7 @@ fn a_room_mode_does_not_depend_on_what_the_cache_believed() {
 fn a_room_rule_matching_the_default_is_still_an_explicit_choice() {
     let room = room_id!("!bridged:example.org");
     let rules = Ruleset::server_default(me());
-    let chosen = applied(
-        rules,
-        plan_room_mode(room, true, Some(NotificationModeView::All)),
-    );
+    let chosen = applied(rules, plan_room_mode(room, Some(NotificationModeView::All)));
     let settings = super::room_settings(&chosen, room, false);
     assert_eq!(settings.room, Some(NotificationModeView::All));
 }
@@ -117,7 +111,7 @@ fn a_grown_direct_chat_follows_the_direct_default_only_when_it_differs() {
 
     let chosen = applied(
         quiet_groups,
-        plan_room_mode(room, false, Some(NotificationModeView::Mentions)),
+        plan_room_mode(room, Some(NotificationModeView::Mentions)),
     );
     assert!(plan_direct_default(&chosen, room).is_empty());
 }
@@ -135,27 +129,9 @@ fn a_room_mode_round_trips_through_the_ruleset() {
         Some(NotificationModeView::Mentions),
         Some(NotificationModeView::All),
     ] {
-        rules = applied(rules.clone(), plan_room_mode(room, false, mode));
+        rules = applied(rules.clone(), plan_room_mode(room, mode));
         assert_eq!(room_mode(&rules, room), mode);
     }
-}
-
-#[test]
-fn all_messages_in_a_room_rings_only_where_the_spec_default_does() {
-    let room = room_id!("!r:example.org");
-
-    assert_eq!(
-        describe(&plan_room_mode(
-            room,
-            false,
-            Some(NotificationModeView::All)
-        ))[0],
-        r#"put !r:example.org ["notify"]"#
-    );
-    assert_eq!(
-        describe(&plan_room_mode(room, true, Some(NotificationModeView::All)))[0],
-        r#"put !r:example.org ["notify",{"set_tweak":"sound","value":"default"}]"#
-    );
 }
 
 #[test]
@@ -174,7 +150,7 @@ fn a_mute_from_another_client_under_its_own_id_is_preserved() {
     );
     assert_eq!(room_mode(&rules, room), Some(NotificationModeView::Mute));
 
-    let rules = applied(rules.clone(), plan_room_mode(room, false, None));
+    let rules = applied(rules.clone(), plan_room_mode(room, None));
 
     assert_eq!(room_mode(&rules, room), Some(NotificationModeView::Mute));
     assert!(rules.override_.get("other-client-mute").is_some());
@@ -186,7 +162,7 @@ fn a_disabled_room_rule_is_not_the_room_mode() {
     let mut rules = Ruleset::server_default(me());
     rules = applied(
         rules.clone(),
-        plan_room_mode(room, false, Some(NotificationModeView::All)),
+        plan_room_mode(room, Some(NotificationModeView::All)),
     );
     rules
         .set_enabled(RuleKind::Room, room.as_str(), false)
@@ -694,7 +670,7 @@ async fn server_rtc_rules_respect_targets_mentions_only_and_mutes() {
         Some(NotificationModeView::Mentions),
         Some(NotificationModeView::Mute),
     ] {
-        let rules = applied(rules.clone(), plan_room_mode(room, false, mode));
+        let rules = applied(rules.clone(), plan_room_mode(room, mode));
         for event_type in ["m.rtc.invite", "org.matrix.msc4075.rtc.notification"] {
             for mentions in [json!({"user_ids":[me()]}), json!({"room":true})] {
                 let actions = invite_actions(&rules, event_type, mentions, 100).await;
@@ -1018,13 +994,17 @@ fn cleanup_removes_generated_rules_without_installing_or_reenabling_any() {
     let defaults = rtc_rules();
     let old = legacy_rules();
     let writes = plan_cleanup(&old, me());
-    assert_eq!(writes.len(), 35);
+    assert_eq!(writes.len(), 19);
     assert!(
         writes
             .iter()
             .all(|write| matches!(write, RuleWrite::Delete { .. }))
     );
-    let cleaned = applied(old, writes);
+    let mut cleaned = applied(old, writes);
+    assert!(plan_suppressions(&cleaned).is_empty());
+    cleaned
+        .override_
+        .retain(|rule| !rule.rule_id.starts_with("moe.sable.suppress"));
     assert_eq!(
         serde_json::to_value(&cleaned).unwrap(),
         serde_json::to_value(defaults).unwrap()
@@ -1122,4 +1102,42 @@ fn a_new_rule_is_read_for_its_kind() {
     )
     .unwrap_err();
     new_rule(&RuleKind::Content, json!({ "rule_id": "x", "actions": [] })).unwrap_err();
+}
+
+#[tokio::test]
+async fn a_room_set_to_all_messages_rings_for_messages_and_not_for_bridge_or_room_events() {
+    use matrix_sdk::ruma::push::PushConditionRoomCtx;
+    use matrix_sdk::ruma::serde::Raw;
+
+    let room = room_id!("!bridged:example.org");
+    let rules = Ruleset::server_default(me());
+    let mut writes = plan_room_mode(room, Some(NotificationModeView::All));
+    writes.extend(plan_suppressions(&rules));
+    let rules = applied(rules, writes);
+    assert!(plan_suppressions(&rules).is_empty());
+    assert!(plan_cleanup(&rules, me()).is_empty());
+
+    let context = PushConditionRoomCtx::new(
+        room.to_owned(),
+        3_u8.into(),
+        me().to_owned(),
+        "me".to_owned(),
+    );
+    for (event_type, rings) in [
+        ("m.room.message", true),
+        ("com.beeper.message_send_status", false),
+        ("m.room.redaction", false),
+        ("m.room.topic", false),
+        ("m.call.member", false),
+    ] {
+        let event = Raw::new(&json!({
+            "type": event_type, "event_id": "$event", "sender": "@bot:example.org",
+            "room_id": room, "origin_server_ts": 1000,
+            "content": {"msgtype": "m.text", "body": "hi"}
+        }))
+        .unwrap();
+        let actions = rules.get_actions(&event, &context).await;
+        assert_eq!(super::sound(actions), rings, "{event_type}");
+        assert_eq!(super::notifies(actions), rings, "{event_type}");
+    }
 }

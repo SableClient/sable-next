@@ -18,7 +18,7 @@ mod keywords;
 mod related;
 mod store;
 
-pub use alignment::plan_cleanup;
+pub use alignment::{plan_cleanup, plan_suppressions};
 pub use authored::authored_event;
 pub use categories::{
     event_notifications, master_muted, mention_notifications, plan_event, plan_master,
@@ -232,11 +232,7 @@ pub fn new_rule(
 }
 
 #[must_use]
-pub fn plan_room_mode(
-    room_id: &RoomId,
-    direct: bool,
-    mode: Option<NotificationModeView>,
-) -> Vec<RuleWrite> {
+pub fn plan_room_mode(room_id: &RoomId, mode: Option<NotificationModeView>) -> Vec<RuleWrite> {
     let kept = match mode {
         Some(NotificationModeView::Mute) => Some(RuleKind::Override),
         Some(_) => Some(RuleKind::Room),
@@ -259,7 +255,7 @@ pub fn plan_room_mode(
         Some(NotificationModeView::All) => {
             writes.push(RuleWrite::Put(NewPushRule::Room(NewSimplePushRule::new(
                 room_id.to_owned(),
-                spec_actions(direct),
+                level_actions(MentionNotificationModeView::Loud, false),
             ))));
         }
         Some(NotificationModeView::Mentions) => {
@@ -295,7 +291,11 @@ pub fn plan_direct_default(rules: &Ruleset, room_id: &RoomId) -> Vec<RuleWrite> 
     if room_mode(rules, room_id).is_some() || direct == default_mode(rules, false) {
         return Vec::new();
     }
-    plan_room_mode(room_id, true, Some(direct))
+    let mut writes = plan_room_mode(room_id, Some(direct));
+    if direct == NotificationModeView::All {
+        writes.extend(plan_suppressions(rules));
+    }
+    writes
 }
 
 /// # Errors

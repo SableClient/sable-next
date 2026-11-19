@@ -659,11 +659,7 @@ async fn a_second_room_mode_change_before_the_sync_echo_still_lands() {
     let rules = PushRules::load(&client).await;
 
     rules
-        .apply(plan_room_mode(
-            room_id,
-            false,
-            Some(NotificationModeView::Mute),
-        ))
+        .apply(plan_room_mode(room_id, Some(NotificationModeView::Mute)))
         .await
         .unwrap();
     assert_eq!(
@@ -671,10 +667,7 @@ async fn a_second_room_mode_change_before_the_sync_echo_still_lands() {
         Some(NotificationModeView::Mute)
     );
 
-    rules
-        .apply(plan_room_mode(room_id, false, None))
-        .await
-        .unwrap();
+    rules.apply(plan_room_mode(room_id, None)).await.unwrap();
 
     assert_eq!(room_mode(&rules.snapshot().await, room_id), None);
     let deleted_override = server
@@ -707,7 +700,7 @@ async fn a_missing_rule_on_delete_is_not_a_failure() {
     let rules = PushRules::load(&client).await;
 
     rules
-        .apply(plan_room_mode(room_id!("!gone:example.org"), false, None))
+        .apply(plan_room_mode(room_id!("!gone:example.org"), None))
         .await
         .unwrap();
 }
