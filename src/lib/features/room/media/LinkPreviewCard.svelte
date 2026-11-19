@@ -176,13 +176,7 @@
           onclick={openPreviewImage}
         />
       {/if}
-      <a
-        class="link-preview-text"
-        href={url}
-        target="_blank"
-        rel="external noopener noreferrer"
-        aria-label={title}
-      >
+      <a class="link-preview-text" href={url} target="_blank" rel="external noopener noreferrer">
         {#if view.site_name}<span class="link-preview-site" dir="auto">{view.site_name}</span>{/if}
         {#if view.author_name}<span class="link-preview-author">{view.author_name}</span>{/if}
         <span class="link-preview-title" dir="auto">{title}</span>
