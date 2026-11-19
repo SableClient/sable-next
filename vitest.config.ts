@@ -34,7 +34,6 @@ const storybookProject = (theme: 'light' | 'dark') => ({
       ],
       test: {
         name: `storybook-${theme}`,
-        setupFiles: ['./.storybook/vitest.setup.ts'],
         browser: {
           enabled: true,
           headless: true,
