@@ -80,6 +80,8 @@
   import { splitVia } from '#lib/rooms/join-address.js';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { RoomSession } from './room-session.svelte.js';
+  import { RoomPins, provideRoomPins } from './room-pins.svelte.js';
+  import { useEventItems } from './messages/event-items.svelte.js';
   import { RoomReadActions } from './room-read-actions.svelte.js';
   import { RoomUnreadMentions } from './room-unread-mentions.svelte.js';
   import { MemberProfile } from './members/member-profile.svelte.js';
@@ -174,6 +176,14 @@
     if (pinRevision === null) return;
     const target = resolvedRoomId;
     if (target) void pinnedEvents.load(target);
+  });
+
+  const roomPins = new RoomPins(core.rpc.timeline, useEventItems());
+  provideRoomPins(roomPins);
+  $effect(() => {
+    void pinRevision;
+    const target = resolvedRoomId;
+    if (target) void roomPins.refresh(target);
   });
 
   const bookmarks = useBookmarks();
@@ -431,7 +441,6 @@
   const appLayout = new AppLayout();
   let phone = $derived(!appLayout.current);
   let pinsOpen = $state(false);
-  let pinsUnread = $state(0);
   let desktop = $derived(sidePanels.current);
   let threadInPanel = $derived(desktop && preferences.threadPresentation === 'panel');
   let voiceView = $derived(isVoiceRoom && (!voiceChat.open || desktop));
@@ -949,10 +958,8 @@
     {#snippet pins()}
       <RoomPinMenu
         bind:open={pinsOpen}
-        onUnread={(count) => (pinsUnread = count)}
         triggerHidden={phone}
         roomId={resolvedRoomId}
-        revision={pinRevision}
         members={memberLoader.members}
         canPin={roomSession.permissions?.can_pin ?? false}
         onJump={jumpToEvent}
@@ -976,7 +983,7 @@
           ? () => panels.toggleNotifications()
           : undefined}
         onPins={phone ? () => (pinsOpen = true) : undefined}
-        {pinsUnread}
+        pinsUnread={roomPins.unread}
         onWidgets={phone && (roomSession.widgets.length > 0 || canManageWidgets)
           ? toggleWidgets
           : undefined}

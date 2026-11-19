@@ -172,23 +172,22 @@ test('shows the total pin count on the button, even once the pins are read', asy
 
 test('reports the unread pin count and clears it once the pins are seen', async () => {
   const user = userEvent.setup({ delay: null });
-  const onUnread = vi.fn();
   render(RoomPinMenuHarness, {
     menu: {
       roomId: '!room:example.org',
       members: [],
       canPin: false,
       onJump: vi.fn(),
-      onUnread,
     },
   });
 
+  const unread = screen.getByTestId('pins-unread');
   await vi.waitFor(() => {
-    expect(onUnread).toHaveBeenLastCalledWith(2);
+    expect(unread).toHaveTextContent('2');
   });
   await user.click(screen.getByRole('button', { name: 'Pinned messages' }));
   await vi.waitFor(() => {
-    expect(onUnread).toHaveBeenLastCalledWith(0);
+    expect(unread).toHaveTextContent('0');
   });
 });
 
@@ -200,8 +199,8 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve };
 }
 
-function menuFor(roomId: string, onUnread = vi.fn()) {
-  return { roomId, members: [], canPin: false, onJump: vi.fn(), onUnread };
+function menuFor(roomId: string) {
+  return { roomId, members: [], canPin: false, onJump: vi.fn() };
 }
 
 function countRefreshes(roomId: string): number {
@@ -272,10 +271,9 @@ test('switching rooms while open drops the previous room pins', async () => {
 
 test('ignores a late pins-seen reply from the previous room', async () => {
   const user = userEvent.setup({ delay: null });
-  const onUnread = vi.fn();
   const seen = deferred<{ pinned_ids: string[]; unread: number; fresh_ids: string[] }>();
   timeline.markPinsSeen.mockImplementationOnce(() => seen.promise);
-  const menu = menuFor('!late-from:example.org', onUnread);
+  const menu = menuFor('!late-from:example.org');
   const { rerender } = render(RoomPinMenuHarness, { menu });
 
   await user.click(screen.getByRole('button', { name: 'Pinned messages' }));
@@ -296,7 +294,7 @@ test('ignores a late pins-seen reply from the previous room', async () => {
       pinned_ids: nextIds,
     });
     expect(button).toHaveTextContent('3');
-    expect(onUnread).toHaveBeenLastCalledWith(0);
+    expect(screen.getByTestId('pins-unread')).toHaveTextContent('0');
   });
 
   seen.resolve({ pinned_ids: ['$image'], unread: 4, fresh_ids: [] });
@@ -304,5 +302,5 @@ test('ignores a late pins-seen reply from the previous room', async () => {
   await Promise.resolve();
 
   expect(button).toHaveTextContent('3');
-  expect(onUnread).toHaveBeenLastCalledWith(0);
+  expect(screen.getByTestId('pins-unread')).toHaveTextContent('0');
 });
