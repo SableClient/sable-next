@@ -114,9 +114,9 @@ impl WatchedRoom {
         loop {
             match self.sticky.try_recv() {
                 Ok(update) => {
-                    for (key, _) in update.removed {
-                        if !values.iter().any(|value| matches_key(value, &key)) {
-                            self.remove_sticky_key(&key, now);
+                    for removal in update.removed {
+                        if !values.iter().any(|value| matches_key(value, &removal.key)) {
+                            self.remove_sticky_key(&removal.key, now);
                         }
                     }
                 }

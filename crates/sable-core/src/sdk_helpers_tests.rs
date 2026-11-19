@@ -2150,6 +2150,11 @@ async fn an_unencrypted_dm_request_reuses_an_unencrypted_dm() {
 async fn a_new_dm_makes_the_invitee_a_creator() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/profile/@bob:example.org"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
     Mock::given(method("POST"))
         .and(path("/_matrix/client/v3/createRoom"))
         .and(wiremock::matchers::body_partial_json(json!({

@@ -458,7 +458,7 @@ pub(crate) fn affects_voice_roster(update: &matrix_sdk_base::sticky::StickyEvent
         .iter()
         .chain(&update.updated)
         .map(|event| &event.key)
-        .chain(update.removed.iter().map(|(key, _)| key))
+        .chain(update.removed.iter().map(|removal| &removal.key))
         .any(|key| membership::is_rtc_member_type(&key.event_type.to_string()))
 }
 
