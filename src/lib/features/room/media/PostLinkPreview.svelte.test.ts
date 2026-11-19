@@ -13,6 +13,8 @@ vi.mock('#lib/config/runtime-config.js', () => ({
 
 import { core } from '#lib/core/__mocks__/context.js';
 
+import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
+
 import PostLinkPreview from './PostLinkPreview.svelte';
 
 function post(overrides: Partial<PostView> = {}): PostView {
@@ -162,4 +164,35 @@ test('plays a bundled video by scraping the link again', async () => {
     expect.objectContaining({ url: scraped.url, client: true })
   );
   expect(core.fetchMedia).toHaveBeenCalledWith('https://pds/clip', 0, 0);
+});
+
+test('opens a post image in the media viewer', async () => {
+  const open = vi.spyOn(mediaViewerState, 'openStandalone').mockImplementation(() => undefined);
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  renderPost(
+    post({
+      media: [
+        {
+          kind: 'image',
+          source: 'mxc://s/cat',
+          poster: null,
+          mime: 'image/png',
+          width: 640,
+          height: 480,
+          alt: 'a cat',
+        },
+      ],
+    })
+  );
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Open a cat' }));
+
+  expect(open).toHaveBeenCalledExactlyOnceWith(
+    'mxc://s/cat',
+    'https://bsky.app/profile/alice.test/post/3abc',
+    'image/png',
+    640,
+    480
+  );
+  open.mockRestore();
 });

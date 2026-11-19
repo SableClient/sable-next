@@ -14,6 +14,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import { mediaViewerState } from '#lib/ui/media/media-viewer-state.svelte.js';
   import VideoPlayer from '#lib/ui/VideoPlayer.svelte';
   import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -61,8 +62,9 @@
     <div class={['post-media', { grid: items.length > 1 }]}>
       {#each items as item, index (index)}
         {#if item.kind === 'image' && item.source}
+          {@const source = item.source}
           <MediaImage
-            source={item.source}
+            {source}
             alt={item.alt ?? ''}
             width={items.length > 1 ? 200 : 400}
             height={items.length > 1 ? 200 : 300}
@@ -70,6 +72,9 @@
             intrinsicHeight={item.height}
             mime={item.mime}
             href={url}
+            onclick={() => {
+              mediaViewerState.openStandalone(source, url, item.mime, item.width, item.height);
+            }}
           />
         {:else if item.kind !== 'image'}
           {@const video = items.slice(0, index).filter((media) => media.kind !== 'image').length}
