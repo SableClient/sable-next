@@ -161,7 +161,7 @@
           <Slider
             min={0}
             max={1}
-            step={0.05}
+            step={0.01}
             label={i18n.t('settings.callOutputVolume')}
             value={outputVolume()}
             oninput={setOutputVolume}

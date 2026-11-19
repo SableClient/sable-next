@@ -360,7 +360,7 @@
       <Slider
         min={0}
         max={MAX_PARTICIPANT_VOLUME}
-        step={0.05}
+        step={0.01}
         label={volumeLabel}
         value={volume}
         oninput={applyVolume}

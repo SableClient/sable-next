@@ -211,10 +211,10 @@ test('a shared screen with sound has its own volume, apart from the voice', asyn
   slider.focus();
   await user.keyboard('{ArrowLeft}');
 
-  expect(screen.getByText('95%')).toBeInTheDocument();
+  expect(screen.getByText('99%')).toBeInTheDocument();
   expect(onVolumeChange).not.toHaveBeenCalled();
   expect(JSON.parse(localStorage.getItem('sable-call-volumes') ?? '{}')).toMatchObject({
-    'screen:@bob:example.org': 0.95,
+    'screen:@bob:example.org': 0.99,
   });
 });
 
