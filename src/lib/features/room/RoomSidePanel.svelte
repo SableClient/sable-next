@@ -19,7 +19,6 @@
     modal?: boolean;
     body?: 'padded' | 'flush';
     toolbar?: Snippet;
-    icon: Snippet;
     children: Snippet;
     onClose: () => void;
   }
@@ -33,7 +32,6 @@
     modal = false,
     body: bodyStyle = 'padded',
     toolbar,
-    icon,
     children,
     onClose,
   }: Props = $props();
@@ -72,9 +70,6 @@
       />
     {/if}
     <PanelHeader {title}>
-      {#snippet prefix()}
-        {@render icon()}
-      {/snippet}
       {#snippet suffix()}
         <PanelHeaderButton label={closeLabel} onclick={onClose}>
           <XIcon />

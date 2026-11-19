@@ -2,7 +2,6 @@
   import { clamp } from '#lib/clamp.js';
   import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
-  import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import ShieldSlashIcon from 'phosphor-svelte/lib/ShieldSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -78,6 +77,12 @@
   );
 </script>
 
+{#snippet widgetBack()}
+  <PanelHeaderButton label={i18n.t('widgets.back')} onclick={() => (activeId = null)}>
+    <ArrowLeftIcon class="mirror-rtl" />
+  </PanelHeaderButton>
+{/snippet}
+
 <aside
   in:panelIn|global={{ modal, stage }}
   out:panelOut|global={{ modal, stage }}
@@ -99,16 +104,11 @@
       onCommit={() => writeText(WIDTH_STORAGE_KEY, String(width))}
     />
   {/if}
-  <PanelHeader class="widgets-header" title={activeWidget?.name || i18n.t('widgets.title')}>
-    {#snippet prefix()}
-      {#if activeWidget}
-        <PanelHeaderButton label={i18n.t('widgets.back')} onclick={() => (activeId = null)}>
-          <ArrowLeftIcon class="mirror-rtl" />
-        </PanelHeaderButton>
-      {:else}
-        <GridFourIcon aria-hidden="true" />
-      {/if}
-    {/snippet}
+  <PanelHeader
+    class="widgets-header"
+    title={activeWidget?.name || i18n.t('widgets.title')}
+    prefix={activeWidget ? widgetBack : undefined}
+  >
     {#snippet suffix()}
       {#if activeKey}
         {@const key = activeKey}

@@ -5,10 +5,10 @@
   import { innerWidth } from 'svelte/reactivity/window';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import { i18n } from '#lib/i18n.js';
+  import { currentLocale, i18n } from '#lib/i18n.js';
   import { panelIn, panelOut, usePanelStage } from '#lib/ui/motion.js';
   import { readText, writeText } from '#lib/platform/local-json.js';
-  import type { MembershipFilter } from '#lib/rooms/member-listing.js';
+  import { MEMBERSHIP_FILTER_LABELS, type MembershipFilter } from '#lib/rooms/member-listing.js';
   import PanelBody from '#lib/ui/primitives/PanelBody.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
@@ -16,7 +16,10 @@
   import MemberList from './MemberList.svelte';
   import MemberListControls from './MemberListControls.svelte';
 
-  interface Props extends Omit<ComponentProps<typeof MemberList>, 'count' | 'search' | 'filter'> {
+  interface Props extends Omit<
+    ComponentProps<typeof MemberList>,
+    'count' | 'resultCount' | 'search' | 'filter'
+  > {
     searchable?: boolean;
     modal?: boolean;
     compact?: boolean;
@@ -33,6 +36,7 @@
   const stage = usePanelStage();
 
   let count = $state(0);
+  let resultCount = $state<number | null>(null);
   let search = $state('');
   let filter = $state<MembershipFilter>('join');
   let width = $state<number | null>(null);
@@ -50,6 +54,20 @@
 
   const storedWidth = Number.parseInt(readText(WIDTH_STORAGE_KEY) ?? '', 10);
   if (Number.isFinite(storedWidth)) resize(storedWidth);
+
+  let countLabel = $derived(
+    count === 0 && list.loading ? '' : i18n.t('timeline.memberCount', { count })
+  );
+  let countNumber = $derived(new Intl.NumberFormat(currentLocale()).format(count));
+  let resultLabel = $derived.by(() => {
+    if (resultCount === null) return '';
+    if (search.trim() !== '') return i18n.t('timeline.memberResults', { count: resultCount });
+    if (filter !== 'join') {
+      const total = new Intl.NumberFormat(currentLocale()).format(resultCount);
+      return `${i18n.t(MEMBERSHIP_FILTER_LABELS[filter])} · ${total}`;
+    }
+    return '';
+  });
 </script>
 
 <aside
@@ -76,20 +94,35 @@
       }}
     />
   {/if}
-  <PanelHeader {modal} {title} subtitle={i18n.t('timeline.memberCount', { count })}>
-    {#snippet suffix()}
-      {#if modal}
+  {#if modal}
+    <PanelHeader {modal} {title}>
+      {#snippet suffix()}
+        {#if countLabel}
+          <span class="header-count">
+            <span aria-hidden="true">{countNumber}</span>
+            <span class="screen-reader-only">{countLabel}</span>
+          </span>
+        {/if}
         <Dialog.Close
           class="btn btn-ghost icon-button icon-button-small"
           aria-label={i18n.t('timeline.closeMembers')}><XIcon /></Dialog.Close
         >
-      {/if}
-    {/snippet}
-  </PanelHeader>
+      {/snippet}
+    </PanelHeader>
+  {:else}
+    <h2 class="screen-reader-only">{title}</h2>
+  {/if}
 
   <PanelBody toolbar={searchable ? controls : undefined}>
-    <MemberList {...list} {search} {filter} bind:count />
+    <MemberList {...list} {search} {filter} bind:count bind:resultCount />
   </PanelBody>
+
+  {#if !modal}
+    <footer class="members-status">
+      <span class="member-total">{countLabel}</span>
+      {#if resultLabel}<span class="member-results">{resultLabel}</span>{/if}
+    </footer>
+  {/if}
 </aside>
 
 {#snippet controls()}
@@ -112,6 +145,44 @@
     position: absolute;
     width: 100%;
     z-index: 2;
+  }
+
+  .header-count {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    display: inline-flex;
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .members-status {
+    align-items: center;
+    border-block-start: var(--border-width) solid var(--bg-container-line);
+    color: var(--surface-var-on-container);
+    display: flex;
+    flex: 0 0 auto;
+    font-size: var(--font-size-small);
+    gap: var(--space-200);
+    justify-content: space-between;
+    min-height: 2rem;
+    padding: var(--space-100) var(--space-300);
+  }
+
+  .member-results {
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .member-total {
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .members-drawer :global(.resize-handle) {

@@ -21,11 +21,10 @@
 
 <style>
   .panel-toolbar {
-    border-bottom: var(--border-width) solid var(--bg-container-line);
     display: grid;
     flex: none;
     gap: var(--space-200);
-    padding: var(--space-300);
+    padding: var(--space-300) var(--space-300) var(--space-200);
   }
 
   .panel-body {

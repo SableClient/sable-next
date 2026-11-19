@@ -119,6 +119,28 @@ test('shows a room preview while members and roles reload', async () => {
   expect(screen.getByText('1 member')).toBeInTheDocument();
 });
 
+test('desktop footer reports search results and filters separately from the room total', async () => {
+  const loadMembership = vi.fn(() =>
+    Promise.resolve([{ ...member('Bob'), membership: 'leave' as const }])
+  );
+  renderDrawer({ members: [member('Amy'), member('Bob')], loadMembership });
+  await tick();
+
+  const search = screen.getByRole('textbox', { name: 'Search members' });
+  await user.type(search, 'Amy');
+  expect(screen.getByText('2 members')).toBeInTheDocument();
+  expect(await screen.findByText('1 result')).toBeInTheDocument();
+
+  await user.clear(search);
+  expect(screen.queryByText('1 result')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Filter members: Joined' }));
+  await user.click(screen.getByRole('menuitemradio', { name: /Left/ }));
+
+  expect(await screen.findByText('Left · 1')).toBeInTheDocument();
+  expect(screen.getByText('2 members')).toBeInTheDocument();
+});
+
 test('waits for full data when searching or filtering a preview', async () => {
   const props = {
     loadMembership: vi.fn(() =>

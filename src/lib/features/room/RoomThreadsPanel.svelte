@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import type { MemberView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
 
@@ -27,8 +26,5 @@
   {modal}
   {onClose}
 >
-  {#snippet icon()}
-    <ChatsIcon aria-hidden="true" />
-  {/snippet}
   <ThreadList {roomId} {members} {onOpenThread} />
 </RoomSidePanel>

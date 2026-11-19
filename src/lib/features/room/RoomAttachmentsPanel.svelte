@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import type { MemberView, RoomAttachmentKind } from '#src/generated/protocol';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { i18n } from '#lib/i18n.js';
@@ -32,9 +31,6 @@
   {modal}
   {onClose}
 >
-  {#snippet icon()}
-    <ImagesIcon aria-hidden="true" />
-  {/snippet}
   {#snippet toolbar()}
     <RoomAttachmentTabs bind:kind />
   {/snippet}

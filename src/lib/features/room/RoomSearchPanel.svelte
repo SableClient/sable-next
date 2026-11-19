@@ -1,6 +1,4 @@
 <script lang="ts">
-  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
-
   import { i18n } from '#lib/i18n.js';
 
   import SearchView from '../search/SearchView.svelte';
@@ -23,8 +21,5 @@
   {modal}
   {onClose}
 >
-  {#snippet icon()}
-    <MagnifyingGlassIcon aria-hidden="true" />
-  {/snippet}
   <SearchView panel initialQuery={query} />
 </RoomSidePanel>

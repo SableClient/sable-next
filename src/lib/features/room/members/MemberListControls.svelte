@@ -26,18 +26,24 @@
   let sort = $derived(preferences.memberSort);
 </script>
 
-<div class="filters">
+<div class="controls">
+  <TextInput
+    bind:value={search}
+    class="member-search-input"
+    placeholder={i18n.t('timeline.searchMembers')}
+    aria-label={i18n.t('timeline.searchMembers')}
+  />
   {#if membership}
     <ActionMenu label={i18n.t('timeline.memberFilter')} align="start">
       {#snippet trigger({ props })}
         <button
           {...props}
           type="button"
-          class="chip selection-open"
+          class="control-button selection-open"
           aria-label={`${i18n.t('timeline.memberFilter')}: ${i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}`}
+          data-active={filter !== 'join'}
         >
           <FunnelIcon aria-hidden="true" />
-          <span>{i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}</span>
         </button>
       {/snippet}
       {#each MEMBERSHIP_FILTERS as option (option)}
@@ -58,10 +64,10 @@
       <button
         {...props}
         type="button"
-        class="chip selection-open"
+        class="control-button selection-open"
         aria-label={`${i18n.t('timeline.memberSort')}: ${i18n.t(MEMBER_SORT_LABELS[sort])}`}
+        data-active={sort !== 'name-asc'}
       >
-        <span>{i18n.t(MEMBER_SORT_LABELS[sort])}</span>
         <ArrowsDownUpIcon aria-hidden="true" />
       </button>
     {/snippet}
@@ -78,22 +84,15 @@
     {/each}
   </ActionMenu>
 </div>
-<TextInput
-  bind:value={search}
-  class="member-search-input"
-  placeholder={i18n.t('timeline.searchMembers')}
-  aria-label={i18n.t('timeline.searchMembers')}
-/>
 
 <style>
-  .filters {
+  .controls {
     align-items: center;
     display: flex;
     gap: var(--space-200);
-    justify-content: space-between;
   }
 
-  .filters :global(.chip) {
+  .control-button {
     align-items: center;
     background: transparent;
     border: 0;
@@ -101,30 +100,37 @@
     color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
-    font: inherit;
-    font-size: var(--font-size-small);
-    gap: var(--space-100);
-    min-height: 1.75rem;
-    padding: 0 var(--space-150);
+    flex: 0 0 auto;
+    height: 2rem;
+    justify-content: center;
+    padding: 0;
+    width: 2rem;
   }
 
-  .filters :global(.chip:hover) {
+  .control-button:hover {
     background: var(--bg-container-hover);
     color: var(--bg-on-container);
   }
 
-  .filters :global(.chip:focus-visible) {
+  .control-button:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
-  .filters :global(.chip svg) {
+  .control-button[data-active='true'] {
+    color: var(--primary-main);
+  }
+
+  .control-button :global(svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }
 
-  .filters :global(.chip:first-child svg) {
-    color: var(--primary-main);
+  @media (pointer: coarse) {
+    .control-button {
+      height: var(--control-height-touch);
+      width: var(--control-height-touch);
+    }
   }
 
   :global(.member-search-input) {
@@ -134,8 +140,10 @@
 
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
+    flex: 1 1 auto;
     min-height: 2.25rem;
+    min-width: 0;
     padding: 0 var(--space-300);
-    width: 100%;
+    width: auto;
   }
 </style>

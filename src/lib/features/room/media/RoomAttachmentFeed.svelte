@@ -94,9 +94,6 @@
   }
 </script>
 
-{#if !showEmpty}
-  <p class="attachments-scope">{i18n.t('timeline.attachmentsIndexed')}</p>
-{/if}
 <p class="screen-reader-only" aria-live="polite">
   {pager.items.length > 0
     ? i18n.t('timeline.attachmentsLoaded', { count: pager.items.length })
@@ -159,13 +156,6 @@
 </div>
 
 <style>
-  .attachments-scope {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-    padding: var(--space-200) var(--space-400) var(--space-300);
-  }
-
   .attachments-body {
     padding-block-end: var(--space-300);
   }
@@ -180,7 +170,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
     margin: 0;
-    padding: var(--space-300) var(--space-400) var(--space-200);
+    padding: var(--space-200) var(--space-400);
     position: sticky;
     top: 0;
     z-index: 1;

@@ -14,7 +14,6 @@ function panel(onClose: () => void) {
       closeLabel: 'Close search',
       resizeLabel: 'Resize search',
       widthKey: 'test-width',
-      icon: createRawSnippet(() => ({ render: () => '<span></span>' })),
       children: createRawSnippet(() => ({ render: () => '<input aria-label="Query" />' })),
       onClose,
     },

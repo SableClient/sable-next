@@ -1,5 +1,4 @@
 <script lang="ts">
-  import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
   import type { MemberView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -37,9 +36,6 @@
   {modal}
   {onClose}
 >
-  {#snippet icon()}
-    <TrayIcon aria-hidden="true" />
-  {/snippet}
   {#snippet toolbar()}
     <div class="filters" role="group" aria-label={i18n.t('inbox.filterLabel')}>
       {#each filters as option (option.value)}

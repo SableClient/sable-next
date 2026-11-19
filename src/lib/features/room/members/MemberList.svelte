@@ -37,6 +37,7 @@
     loadMembership?: ((membership: MemberView['membership']) => Promise<MemberView[]>) | null;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
     count?: number;
+    resultCount?: number | null;
   }
 
   let {
@@ -50,6 +51,7 @@
     loadMembership = null,
     onMemberProfile,
     count = $bindable(0),
+    resultCount = $bindable(null),
   }: Props = $props();
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
@@ -146,6 +148,7 @@
 
   $effect(() => {
     count = preview?.count ?? joined.length;
+    resultCount = busy ? null : searched.length;
   });
 </script>
 
@@ -205,7 +208,7 @@
   }
 
   .member-groups {
-    padding: var(--space-100) var(--space-200) var(--space-200);
+    padding: 0 var(--space-200) var(--space-200);
   }
 
   .group-label {
