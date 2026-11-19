@@ -44,7 +44,13 @@ import { autostartAvailable, setLaunchAtLogin } from './autostart';
 import { installMethod } from './install-method';
 import { registerContextMenu } from './context-menu';
 import { claimSchemes } from './linux-schemes';
-import { historyDirection, openAppLink, openExternal, originOf } from './navigation';
+import {
+  historyDirection,
+  openAppLink,
+  openExternal,
+  originOf,
+  windowShortcut,
+} from './navigation';
 import { enforcePermissions } from './permissions';
 import { flushWritesBeforeQuit, writeJson } from './persistence';
 import { spellCheckerLanguages } from './spellcheck';
@@ -663,6 +669,13 @@ function createWindow(): BrowserWindow {
       const history = window.webContents.navigationHistory;
       if (direction === 'back' && history.canGoBack()) history.goBack();
       if (direction === 'forward' && history.canGoForward()) history.goForward();
+      return;
+    }
+    const shortcut = windowShortcut(input, process.platform);
+    if (shortcut) {
+      event.preventDefault();
+      if (shortcut === 'quit') app.quit();
+      else window.close();
       return;
     }
     const f12 = input.key === 'F12' && !input.control && !input.shift && !input.alt && !input.meta;

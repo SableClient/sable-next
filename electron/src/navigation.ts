@@ -33,3 +33,16 @@ export function historyDirection(
   if (input.key === (mac ? ']' : 'ArrowRight')) return 'forward';
   return null;
 }
+
+/** macOS gets both from its application menu, which the other platforms do not have. */
+export function windowShortcut(
+  input: Pick<Electron.Input, 'key' | 'alt' | 'control' | 'meta' | 'shift'>,
+  platform: NodeJS.Platform
+): 'quit' | 'close' | null {
+  if (platform === 'darwin') return null;
+  if (!input.control || input.alt || input.meta || input.shift) return null;
+  const key = input.key.toLowerCase();
+  if (key === 'q') return 'quit';
+  if (key === 'w') return 'close';
+  return null;
+}

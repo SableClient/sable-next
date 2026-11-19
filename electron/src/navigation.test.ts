@@ -3,7 +3,13 @@ import { beforeEach, expect, test, vi } from 'vitest';
 const { openExternal } = vi.hoisted(() => ({ openExternal: vi.fn(() => Promise.resolve()) }));
 vi.mock('electron', () => ({ shell: { openExternal } }));
 
-import { historyDirection, openAppLink, openExternal as openLink, originOf } from './navigation';
+import {
+  historyDirection,
+  openAppLink,
+  openExternal as openLink,
+  originOf,
+  windowShortcut,
+} from './navigation';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -74,4 +80,19 @@ test.each([
   ['darwin', { ...keys, key: 'ArrowLeft', alt: true }, null],
 ] as const)('maps %s %o to %s', (platform, input, direction) => {
   expect(historyDirection(input, platform)).toBe(direction);
+});
+
+test.each([
+  ['linux', { ...keys, key: 'q', control: true }, 'quit'],
+  ['win32', { ...keys, key: 'Q', control: true }, 'quit'],
+  ['linux', { ...keys, key: 'w', control: true }, 'close'],
+  ['win32', { ...keys, key: 'W', control: true }, 'close'],
+  ['linux', { ...keys, key: 'q', control: true, shift: true }, null],
+  ['linux', { ...keys, key: 'w', control: true, alt: true }, null],
+  ['linux', { ...keys, key: 'w', control: true, meta: true }, null],
+  ['linux', { ...keys, key: 'q' }, null],
+  ['darwin', { ...keys, key: 'q', meta: true }, null],
+  ['darwin', { ...keys, key: 'w', control: true }, null],
+] as const)('maps %s %o to the window shortcut %s', (platform, input, shortcut) => {
+  expect(windowShortcut(input, platform)).toBe(shortcut);
 });
