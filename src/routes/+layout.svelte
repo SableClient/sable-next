@@ -22,7 +22,10 @@
   import AccountLocked from '#lib/features/sidebar/AccountLocked.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { appName, faviconUrl } from '#lib/deployment/brand.js';
-  import { setDeploymentThemeKind } from '#lib/deployment/theme.js';
+  import {
+    setDeploymentThemeEnabled,
+    setDeploymentThemeKind,
+  } from '#lib/deployment/theme.svelte.js';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { blockEdgeNavigation } from '#lib/platform/edge-navigation.js';
   import { lockNativeZoom } from '#lib/platform/viewport-zoom.js';
@@ -218,6 +221,10 @@
     document.documentElement.dataset.blurMedia = preferences.blurMedia ? 'on' : 'off';
     document.documentElement.dataset.blurAvatars = preferences.blurAvatars ? 'on' : 'off';
     document.documentElement.dataset.blurEmotes = preferences.blurEmotes ? 'on' : 'off';
+  });
+
+  $effect(() => {
+    setDeploymentThemeEnabled(preferences.deploymentTheme);
   });
 
   $effect(() => {

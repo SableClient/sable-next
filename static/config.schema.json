@@ -367,6 +367,11 @@
           ],
           "default": "system"
         },
+        "deploymentTheme": {
+          "title": "Use this server’s theme",
+          "type": "boolean",
+          "default": true
+        },
         "quickCss": {
           "type": "string",
           "default": ""
@@ -1874,6 +1879,11 @@
             "light"
           ],
           "default": "system"
+        },
+        "deploymentTheme": {
+          "title": "Use this server’s theme",
+          "type": "boolean",
+          "default": true
         },
         "quickCss": {
           "type": "string",

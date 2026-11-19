@@ -18,7 +18,7 @@ import {
 } from '#lib/settings/preferences.svelte.js';
 import { configuration } from './configuration.svelte.js';
 import { appName } from './brand.js';
-import { loadDeploymentTheme } from './theme.js';
+import { loadDeploymentTheme } from './theme.svelte.js';
 export { removeAccountConfiguration } from '#lib/config/account-discovery.js';
 
 let revision = 0;

@@ -21,6 +21,7 @@ import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TreeStructureIcon from 'phosphor-svelte/lib/TreeStructureIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
+import { hasDeploymentTheme } from '#lib/deployment/theme.svelte.js';
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { SUBSPACE_DEPTHS } from '../definitions';
@@ -70,6 +71,15 @@ export const appearanceCategory: SettingsCategory = {
         { value: 'dark', label: 'common.dark' },
         { value: 'light', label: 'common.light' },
       ],
+    },
+    {
+      key: 'deploymentTheme',
+      supported: hasDeploymentTheme,
+      section: 'themes',
+      icon: PaintBrushIcon,
+      name: 'settings.deploymentTheme',
+      description: 'settings.deploymentThemeHint',
+      type: 'boolean',
     },
     {
       key: 'showRoomIcon',

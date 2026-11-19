@@ -4,11 +4,27 @@ import { parseThemeFile } from '#lib/settings/theme-file.js';
 
 let generation = 0;
 let kind: ResolvedTheme = 'light';
+let enabled = true;
+let configured = $state(false);
 let themes: Record<ResolvedTheme, string> = { light: '', dark: '' };
+
+function apply(): void {
+  applyDeploymentTheme(enabled ? themes[kind] : '');
+}
 
 export function setDeploymentThemeKind(next: ResolvedTheme): void {
   kind = next;
-  applyDeploymentTheme(themes[kind]);
+  apply();
+}
+
+export function setDeploymentThemeEnabled(next: boolean): void {
+  enabled = next;
+  apply();
+}
+
+/** Whether the deployment names a theme at all, so the setting to turn it off has a use. */
+export function hasDeploymentTheme(): boolean {
+  return configured;
 }
 
 export async function loadDeploymentTheme(
@@ -19,12 +35,13 @@ export async function loadDeploymentTheme(
   applyDeploymentTheme('');
   const lightUrl = branding.lightThemeUrl ?? branding.themeUrl;
   const darkUrl = branding.darkThemeUrl ?? branding.themeUrl;
+  configured = lightUrl !== null || darkUrl !== null;
   const light = fetchThemeCss(lightUrl);
   const dark = darkUrl === lightUrl ? light : fetchThemeCss(darkUrl);
   const loaded = { light: await light, dark: await dark };
   if (current !== generation) return;
   themes = loaded;
-  applyDeploymentTheme(themes[kind]);
+  apply();
 }
 
 async function fetchThemeCss(url: string | null): Promise<string> {

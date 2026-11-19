@@ -2459,6 +2459,8 @@
     "savedField": "{{name}} saved",
     "language": "Language",
     "theme": "Light or dark",
+    "deploymentTheme": "Use this server’s theme",
+    "deploymentThemeHint": "The colours chosen by whoever hosts this Sable. Turn off for the Sable default; your own themes apply either way.",
     "messageSpacing": "Message spacing",
     "spacingNone": "None",
     "spacingCompact": "Compact",

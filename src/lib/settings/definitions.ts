@@ -271,6 +271,7 @@ const SETTINGS = {
     { account: true }
   ),
   theme: choice<ThemeMode>(['system', 'dark', 'light'], 'system', { account: true }),
+  deploymentTheme: toggle(true, { account: true }),
   quickCss: text(''),
   fontFamily: text('', { account: true, device: true }),
   fontFamilyMono: text('', { account: true, device: true }),

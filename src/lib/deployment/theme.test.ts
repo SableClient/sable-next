@@ -4,7 +4,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { applyCustomTheme, applyCustomTweaks, applyQuickCss } from '#lib/settings/theme.js';
 
-import { loadDeploymentTheme, setDeploymentThemeKind } from './theme.js';
+import {
+  hasDeploymentTheme,
+  loadDeploymentTheme,
+  setDeploymentThemeEnabled,
+  setDeploymentThemeKind,
+} from './theme.svelte.js';
 
 const THEME = '/* @sable-theme\nname: Corp\nkind: dark\n*/\n:root { --primary-main: #123456; }';
 
@@ -25,6 +30,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setDeploymentThemeKind('light');
+  setDeploymentThemeEnabled(true);
   document.head.replaceChildren();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -157,4 +163,30 @@ it('follows the light or dark mode, falling back to themeUrl', async () => {
   setDeploymentThemeKind('dark');
   expect(css()).toContain('/dark.sable.css');
   expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it('is left out while the user has turned it off, and comes back when turned on', async () => {
+  respond(THEME);
+  setDeploymentThemeEnabled(false);
+  await loadDeploymentTheme(theme('/brand.sable.css'));
+  expect(document.getElementById('sable-deployment-theme')).toBeNull();
+
+  setDeploymentThemeEnabled(true);
+  expect(document.getElementById('sable-deployment-theme')?.textContent).toContain('#123456');
+
+  setDeploymentThemeEnabled(false);
+  expect(document.getElementById('sable-deployment-theme')).toBeNull();
+});
+
+it('says whether the deployment names a theme', async () => {
+  respond(THEME);
+  await loadDeploymentTheme(theme(null));
+  expect(hasDeploymentTheme()).toBe(false);
+
+  await loadDeploymentTheme({
+    themeUrl: null,
+    lightThemeUrl: null,
+    darkThemeUrl: '/dark.sable.css',
+  });
+  expect(hasDeploymentTheme()).toBe(true);
 });
