@@ -850,12 +850,12 @@ jobs:
       - name: Submit to the App Store
         if: ${{ needs.setup-release.outputs.nightly != 'true' }}
         env:
-          IPA_PATH: ${{ steps.ipa.outputs.path }}
+          SHORT_VERSION: ${{ steps.ipa.outputs.version }}
           BUILD: ${{ steps.ipa.outputs.build }}
           APPLE_API_KEY_BASE64: ${{ secrets.APP_STORE_API_KEY_BASE64 }}
         run: |
           notes="$PWD/$(node -e 'import("./scripts/release/release-prep.mjs").then((m) => console.log(m.fastlaneChangelogs(process.argv[1]).at(-1)))' "$VERSION")"
-          fastlane ios app_store ipa:"$IPA_PATH" build:"$BUILD" notes:"$notes"
+          fastlane ios app_store version:"$SHORT_VERSION" build:"$BUILD" notes:"$notes"
 
   github-bundles:
     name: Wait for GitHub bundles

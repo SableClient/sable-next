@@ -26,7 +26,7 @@ platform :ios do
       is_key_content_base64: true
     )
     upload_to_app_store(
-      ipa: options.fetch(:ipa),
+      app_version: options.fetch(:version),
       build_number: options.fetch(:build),
       skip_binary_upload: true,
       skip_screenshots: true,
