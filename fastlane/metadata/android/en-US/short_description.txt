@@ -1,1 +1,1 @@
-A Matrix client with quality-of-life features
+Customisable encrypted Matrix chat with personas, themes, forums, calls and GIFs

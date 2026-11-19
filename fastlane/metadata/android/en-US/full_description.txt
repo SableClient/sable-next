@@ -1,12 +1,18 @@
-Sable is a Matrix client built to enhance the user experience with quality-of-life features, cosmetics, utilities, and sheer usability. It is a fork of Cinny.
+Sable is a Matrix client built to enhance the user experience with quality-of-life features, cosmetics, utilities, and sheer usability. Chat with friends and communities on any Matrix server, on your phone, your computer or in the browser.
 
 Features:
+- End-to-end encrypted messaging, with encrypted push notification previews decrypted on-device
+- Push without Google Play Services, through UnifiedPush
+- Voice and video calls over MatrixRTC
+- Spaces, threads and forum rooms, with threads in a side panel
+- Personas: a different name, avatar and pronouns per message, with PluralKit-style commands
+- Customisable app icons, themes, and a configurable GIF provider
+- Make your own theme in the theme creator
+- Polls and location sharing
+- Settings sync across your devices
+- Message reporting, forwarding and read-receipt controls
+- Presence controls and opt-in crash reporting
 
-* End-to-end encrypted messaging, with encrypted push notification previews decrypted on-device
-* Push without Google Play Services, through UnifiedPush
-* Voice and video calls over MatrixRTC
-* Spaces, threads, and forum rooms
-* Customisable app icons, themes, and a configurable GIF provider
-* Message reporting, forwarding, and read-receipt controls
+Matrix is an open, decentralised and federated chat network. Join a public server, use your community's, or host your own.
 
-Sable is free software licensed under the AGPL-3.0. Crash reporting is opt-in and disabled until you consent.
+Sable is free software licensed under the AGPL-3.0.
