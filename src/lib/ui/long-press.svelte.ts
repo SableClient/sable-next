@@ -1,7 +1,8 @@
 import { hapticFeedback } from '#lib/platform/haptics.js';
 import { armTrailingClickSwallow, touchActive } from '#lib/ui/trailing-click.js';
 
-export const LONG_PRESS_MS = 600;
+// iOS's own long press; Android's default is 400 ms plus the 150 ms its WebView adds.
+export const LONG_PRESS_MS = 500;
 export const SCHEDULE_PRESS_MS = 800;
 const LONG_PRESS_SLOP_PX = 10;
 

@@ -132,6 +132,8 @@ class MainActivity : TauriActivity() {
 
   override fun onWebViewCreate(webView: WebView) {
     mainWebView = webView
+    // The page plays its own long-press feedback; the WebView's would be a second buzz.
+    webView.isHapticFeedbackEnabled = false
     webView.addJavascriptInterface(SystemTheme(), "__sableAndroidSystemTheme")
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {
