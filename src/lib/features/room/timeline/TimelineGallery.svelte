@@ -17,6 +17,8 @@
   import FormattedBody from '../messages/FormattedBody.svelte';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
 
+  import { partitionGallery, type GalleryEntry } from './gallery-layout.js';
+
   interface Props {
     items: readonly GalleryItemView[];
     eventId?: string;
@@ -29,6 +31,7 @@
 
   let { items, eventId, body, html, senderTimezone = null, onMatrixLink, onOpen }: Props = $props();
   const revealed = new SvelteSet<string>();
+  let layout = $derived(partitionGallery(items));
 
   function imageKey(item: GalleryItemView, index: number): string {
     return spoilerVisibilityKey(
@@ -51,10 +54,10 @@
     <FormattedBody {html} {senderTimezone} {onMatrixLink} />
   </div>
 {/if}
-<div class="gallery">
-  {#each items as item, index (index)}
-    {@const spoiler = item.kind === 'image' || item.kind === 'video' ? item.spoiler : null}
-    <div class={['cell', { wide: item.kind !== 'image' && item.kind !== 'video' }]}>
+{#snippet cell({ item, index }: GalleryEntry<GalleryItemView>)}
+  {@const spoiler = item.kind === 'image' || item.kind === 'video' ? item.spoiler : null}
+  <div class="cell">
+    <div class="frame">
       {#if item.kind === 'video' && spoiler !== null && !revealed.has(item.source)}
         <Button class="spoiler-reveal" onclick={() => revealed.add(item.source)}>
           {spoiler ? `${spoiler} — ` : ''}{i18n.t('timeline.spoilerMedia')}
@@ -99,12 +102,25 @@
           onOpen={() => onOpen?.(index)}
         />
       {/if}
-      {#if item.caption}
-        <p class="item-caption">{item.caption}</p>
-      {:else if item.kind === 'image' && !imageHidden(item, index) && preferences.alwaysShowAltText}
-        <p class="item-caption">{item.filename}</p>
-      {/if}
     </div>
+    {#if item.caption}
+      <p class="item-caption">{item.caption}</p>
+    {:else if item.kind === 'image' && !imageHidden(item, index) && preferences.alwaysShowAltText}
+      <p class="item-caption">{item.filename}</p>
+    {/if}
+  </div>
+{/snippet}
+
+<div class="gallery">
+  {#each layout.groups as group (group.entries[0]?.index)}
+    <div class={['grid', group.layout]}>
+      {#each group.entries as entry (entry.index)}
+        {@render cell(entry)}
+      {/each}
+    </div>
+  {/each}
+  {#each layout.attachments as entry (entry.index)}
+    {@render cell(entry)}
   {/each}
 </div>
 {#if body && preferences.captionPosition !== 'above' && preferences.captionPosition !== 'hidden'}
@@ -115,22 +131,47 @@
   .gallery {
     display: grid;
     gap: var(--space-100);
-    grid-template-columns: repeat(
-      auto-fit,
-      minmax(min(100%, calc((var(--timeline-media-max) - var(--space-100)) / 2)), 1fr)
-    );
     max-width: 100%;
     width: min(var(--timeline-media-fill), var(--timeline-media-max));
+  }
+
+  .grid {
+    display: grid;
+    gap: var(--space-100);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid.one {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .grid.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .cell {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
     min-width: 0;
   }
 
-  .cell.wide {
-    grid-column: 1 / -1;
+  .grid:not(.one) .frame {
+    aspect-ratio: 1;
+  }
+
+  .grid:not(.one) .frame :global(:is(.tile, .spoiler-reveal)) {
+    height: 100%;
+    width: 100%;
+  }
+
+  .grid.featured .cell:first-child {
+    grid-row: span 2;
+  }
+
+  .grid.featured .cell:first-child .frame {
+    aspect-ratio: auto;
+    contain: size;
   }
 
   .item-caption {
