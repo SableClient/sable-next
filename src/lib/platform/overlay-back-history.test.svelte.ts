@@ -19,10 +19,10 @@ export function goto(_url: string, options: { state: App.PageState }): Promise<v
   return landed;
 }
 
-export function navigate(url: string): void {
+export function navigate(url: string, state: App.PageState = {}): void {
   window.history.pushState({}, '', url);
-  stack.push({});
-  pageStub.state = {};
+  stack.push(state);
+  pageStub.state = state;
 }
 
 export function go(delta?: number): void {

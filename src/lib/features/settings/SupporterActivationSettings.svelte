@@ -7,6 +7,7 @@
   import '#lib/ui/primitives/settings-row.css';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { settingsState } from './settings-navigation.js';
 
   let badge = $derived(supporter.badge);
 
@@ -27,7 +28,7 @@
             goto(resolve(`settings/account?focus=account-supporter`), {
               shallow: true,
               replace: true,
-              state: { settings: { section: 'account', focus: 'account-supporter' } },
+              state: settingsState('account', 'account-supporter'),
             })}
         >
           {i18n.t('settings.supporterThanksButton')}

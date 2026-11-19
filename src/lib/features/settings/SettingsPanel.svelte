@@ -7,6 +7,7 @@
   import SettingsSectionContent from './SettingsSectionContent.svelte';
   import SettingsNavigator from './SettingsNavigator.svelte';
   import { SettingsHistory } from './settings-history.js';
+  import { settingsState } from './settings-navigation.js';
 
   interface Props {
     section: string | null;
@@ -51,7 +52,7 @@
       void goto(resolve(`settings/${nextSection}${query}`), {
         shallow: true,
         replace: true,
-        state: { settings: { section: nextSection, focus } },
+        state: settingsState(nextSection, focus),
       });
       return;
     }

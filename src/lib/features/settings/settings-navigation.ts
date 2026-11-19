@@ -1,11 +1,17 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { page } from '$app/state';
 
 import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
 import { isPlainClick } from '#lib/ui/plain-click.js';
 
 export function defaultSettingsSection(): string {
   return SETTINGS_ACCOUNT_SECTION;
+}
+
+/** Keeps the overlay depth, so an overlay open on the page behind keeps its history entry. */
+export function settingsState(section: string, focus?: string): App.PageState {
+  return { overlay: page.state.overlay, settings: { section, focus } };
 }
 
 /** Opens settings over the calling page, which stays mounted behind it. */
@@ -17,7 +23,7 @@ export function openSettingsOver(event: MouseEvent, section: string): void {
 }
 
 export function showSettingsOver(section: string): void {
-  void goto(resolve(`settings/${section}`), { shallow: true, state: { settings: { section } } });
+  void goto(resolve(`settings/${section}`), { shallow: true, state: settingsState(section) });
 }
 
 /** Section-to-section moves replace, so closing returns to the opening page. */
@@ -29,7 +35,7 @@ export function selectSettingsSection(event: MouseEvent, section: string): void 
   void goto(resolve(`settings/${section}`), {
     shallow: true,
     replace: true,
-    state: { settings: { section } },
+    state: settingsState(section),
   });
 }
 
@@ -47,7 +53,7 @@ export function followSettingsLink(
   if (shallow) {
     void goto(resolve(`settings/${section}${query}`), {
       shallow: true,
-      state: { settings: { section, focus } },
+      state: settingsState(section, focus),
     });
     return;
   }

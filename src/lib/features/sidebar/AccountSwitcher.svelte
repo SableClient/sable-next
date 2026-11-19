@@ -6,7 +6,10 @@
   import type { SessionInfo } from '#src/generated/protocol';
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
-  import { defaultSettingsSection } from '#lib/features/settings/settings-navigation.js';
+  import {
+    defaultSettingsSection,
+    settingsState,
+  } from '#lib/features/settings/settings-navigation.js';
   import { pushOverride } from '#lib/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
@@ -94,7 +97,7 @@
       return;
     }
 
-    void goto(resolve(`settings/${section}`), { shallow: true, state: { settings: { section } } });
+    void goto(resolve(`settings/${section}`), { shallow: true, state: settingsState(section) });
   }
 
   function linkDevice(): void {
@@ -134,7 +137,7 @@
   function openStatusEdit(): void {
     void goto(resolve('settings/account?editStatus'), {
       shallow: true,
-      state: { settings: { section: 'account' } },
+      state: settingsState('account'),
     });
   }
 </script>

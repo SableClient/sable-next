@@ -79,6 +79,21 @@ test('navigating to another page while an overlay is open does not close it', as
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 
+test('a route opened over the page with the overlay depth leaves the overlay its entry', async () => {
+  const onClose = vi.fn();
+  render(Harness, { props: { open: true, onClose } });
+  await settle();
+
+  fakeHistory.navigate('/settings/account', { overlay: 1, settings: { section: 'account' } });
+  await settle();
+  expect(fakeHistory.entries()).toBe(3);
+
+  fakeHistory.go(-1);
+  await settle();
+  expect(onClose).not.toHaveBeenCalled();
+  expect(fakeHistory.pageStub.state.overlay).toBe(1);
+});
+
 test('back unwinds one level at a time when a second level is held', async () => {
   const onClose = vi.fn();
   const onCloseNested = vi.fn();
