@@ -10,7 +10,7 @@ publish.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-global-hotkey = "0.9.0"
+global-hotkey = "0.10.0"
 handy-keys = "0.3.4"
 sable-core = { path = "../sable-core", version = "0.1.0" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "tokio_rt"] }
