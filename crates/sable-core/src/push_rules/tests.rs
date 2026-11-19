@@ -213,6 +213,34 @@ fn a_default_switched_back_to_all_restores_the_spec_actions() {
 }
 
 #[test]
+fn the_direct_default_follows_the_msc4563_rule_where_the_server_has_it() {
+    let rules = Ruleset::server_default(me());
+    let quiet = applied(
+        rules.clone(),
+        plan_default_mode(&rules, true, NotificationModeView::Mentions).unwrap(),
+    );
+
+    assert!(default_modes(&rules).direct_rule);
+    assert_eq!(default_modes(&quiet).direct, NotificationModeView::Mentions);
+    for rule_id in [
+        ".eu.cyrneko.msc4563.direct",
+        ".eu.cyrneko.msc4563.encrypted_direct",
+        ".m.rule.room_one_to_one",
+        ".m.rule.encrypted_room_one_to_one",
+    ] {
+        assert!(
+            !rule_notifies(quiet.get(RuleKind::Underride, rule_id).unwrap()),
+            "{rule_id} should be quiet"
+        );
+    }
+
+    let mut legacy = rules;
+    legacy.underride.shift_remove(".eu.cyrneko.msc4563.direct");
+    assert!(!default_modes(&legacy).direct_rule);
+    assert_eq!(default_modes(&legacy).direct, NotificationModeView::All);
+}
+
+#[test]
 fn a_default_is_refused_where_the_server_has_no_rule() {
     let mut rules = Ruleset::server_default(me());
     rules.underride.clear();

@@ -499,10 +499,11 @@ impl RoomListWorker {
     ) -> Option<Vec<crate::protocol::VectorDiff<RoomListItemView>>> {
         self.rules = self.push_rules.snapshot().await;
         let client = &self.client;
-        let diffs = self.rows.renotify(&self.rules, |room_id| {
+        let rules = &self.rules;
+        let diffs = self.rows.renotify(rules, |room_id| {
             client
                 .get_room(room_id)
-                .is_some_and(|room| notifications::uses_direct_push_rules(&room))
+                .is_some_and(|room| notifications::uses_direct_push_rules(rules, &room))
         });
         (!diffs.is_empty()).then_some(diffs)
     }

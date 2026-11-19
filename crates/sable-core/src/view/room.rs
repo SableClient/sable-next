@@ -83,7 +83,7 @@ pub fn room_list_item<S: BuildHasher>(
     let notification = crate::push_rules::room_settings(
         rules,
         item.room_id(),
-        crate::notifications::uses_direct_push_rules(item),
+        crate::notifications::uses_direct_push_rules(rules, item),
     );
     let mut view = RoomListItemView {
         room_id: item.room_id().to_owned(),

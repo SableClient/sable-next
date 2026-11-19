@@ -66,7 +66,7 @@ impl Handler for SettingsParams {
         Ok(push_rules::room_settings(
             &rules,
             &self.room_id,
-            notifications::uses_direct_push_rules(&room),
+            notifications::uses_direct_push_rules(&rules, &room),
         ))
     }
 }

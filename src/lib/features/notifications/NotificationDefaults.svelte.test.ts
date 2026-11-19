@@ -10,7 +10,9 @@ import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = baseCore;
 Object.assign(core.rpc.notifications, {
-  defaultModes: vi.fn(() => Promise.resolve({ direct: 'all', group: 'mentions' })),
+  defaultModes: vi.fn(() =>
+    Promise.resolve({ direct: 'all', group: 'mentions', direct_rule: false })
+  ),
   masterMute: vi.fn(() => Promise.resolve(false)),
   eventNotifications: vi.fn<() => Promise<Record<string, boolean | null>>>(),
   setEventNotification: vi.fn<(params: { event: string; enabled: boolean }) => Promise<void>>(),
@@ -47,6 +49,21 @@ test('shows each event kind at its account state', async () => {
   expect(screen.getByLabelText('Calls that notify the room')).toHaveTextContent('Off');
   expect(screen.getByLabelText('Legacy calls')).toHaveTextContent('Notify');
   expect(core.rpc.notifications.setEventNotification).not.toHaveBeenCalled();
+});
+
+test('names the direct default after direct messages on an MSC4563 server', async () => {
+  core.rpc.notifications.eventNotifications.mockResolvedValue(loaded);
+  render(NotificationDefaults);
+  expect(await screen.findByText('Rooms with two members')).toBeInTheDocument();
+
+  core.rpc.notifications.defaultModes.mockResolvedValueOnce({
+    direct: 'all',
+    group: 'mentions',
+    direct_rule: true,
+  });
+  render(NotificationDefaults);
+
+  expect(await screen.findByLabelText('Default alert level: Direct messages')).toBeInTheDocument();
 });
 
 test('hides an event kind the server has no rule for', async () => {

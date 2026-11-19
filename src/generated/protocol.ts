@@ -266,6 +266,8 @@ export type CreateJoinRuleView = "public" | "invite" | "knock" | "restricted" | 
 export type DefaultNotificationModesView = {
 	direct: NotificationModeView,
 	group: NotificationModeView,
+	/**  The server has the MSC4563 rule. */
+	direct_rule: boolean,
 };
 
 export type DehydratedDeviceView = "unsupported" | "disabled" | "active" | "needs_recovery_key";

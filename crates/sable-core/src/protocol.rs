@@ -2712,6 +2712,8 @@ pub enum DiagnosticPushView {
 pub struct DefaultNotificationModesView {
     pub direct: NotificationModeView,
     pub group: NotificationModeView,
+    /// The server has the MSC4563 rule.
+    pub direct_rule: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

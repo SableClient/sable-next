@@ -39,7 +39,7 @@
   ];
 
   const pushRows: {
-    key: keyof DefaultNotificationModesView;
+    key: 'direct' | 'group';
     label: string;
     direct: boolean;
   }[] = [
@@ -103,11 +103,7 @@
     };
   });
 
-  function savePush(
-    key: keyof DefaultNotificationModesView,
-    isDirect: boolean,
-    mode: NotificationModeView
-  ): void {
+  function savePush(key: 'direct' | 'group', isDirect: boolean, mode: NotificationModeView): void {
     if (current) current = { ...current, [key]: mode };
 
     void core.rpc.notifications.setDefaultMode({ direct: isDirect, mode }).then(
@@ -176,7 +172,9 @@
     <SettingsAnchorLink anchor="notification-push" />
   </div>
   <p class="hint settings-description">{i18n.t('settings.notificationPushHint')}</p>
-  <p class="hint settings-description">{i18n.t('settings.notificationMemberCountHint')}</p>
+  {#if !current?.direct_rule}
+    <p class="hint settings-description">{i18n.t('settings.notificationMemberCountHint')}</p>
+  {/if}
   <p class="hint settings-description">{i18n.t('settings.notificationRulesCleanupHint')}</p>
 
   {#if failed}
@@ -199,7 +197,8 @@
         />
       </SettingsRow>
     {/if}
-    {#each pushRows as { key, label, direct } (key)}
+    {#each pushRows as { key, label: fallback, direct } (key)}
+      {@const label = direct && current?.direct_rule ? 'common.directMessages' : fallback}
       <SettingsRow id={`notification-push-${key}`} title={i18n.t(label)}>
         {#if current}
           <Select

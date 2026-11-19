@@ -1160,6 +1160,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'notifications.default_modes': () => ({
         direct: 'all',
         group: defaultGroupMode,
+        direct_rule: false,
       }),
       'notifications.mention_notifications': () => mentionNotificationModes,
       'notifications.event_notifications': () => eventNotifications,

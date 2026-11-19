@@ -26,6 +26,18 @@ use crate::{
     session::Session,
     store::MemorySessionStore,
 };
+/// The default rules of a server without MSC4563.
+fn legacy_rules(user_id: &ruma::UserId) -> Ruleset {
+    let mut rules = Ruleset::server_default(user_id);
+    for rule_id in [
+        ".eu.cyrneko.msc4563.direct",
+        ".eu.cyrneko.msc4563.encrypted_direct",
+    ] {
+        rules.underride.shift_remove(rule_id);
+    }
+    rules
+}
+
 async fn watching(
     server: &MatrixMockServer,
     client: &Client,
@@ -631,7 +643,7 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
         .await
         .snapshot()
         .await;
-    let direct = notifications::uses_direct_push_rules(&room);
+    let direct = notifications::uses_direct_push_rules(&rules, &room);
     let result = crate::push_rules::room_settings(&rules, room_id, direct);
 
     assert!(result.room.is_none());
@@ -909,7 +921,85 @@ async fn a_bridged_dm_uses_the_group_defaults_like_the_server() {
         .await;
     let room = client.get_room(room_id).unwrap();
 
-    assert!(!notifications::uses_direct_push_rules(&room));
+    assert!(!notifications::uses_direct_push_rules(
+        &legacy_rules(&own),
+        &room
+    ));
+    assert!(
+        notifications::uses_direct_push_rules(&Ruleset::server_default(&own), &room),
+        "an MSC4563 server has a rule for every room in m.direct"
+    );
+}
+
+#[tokio::test]
+async fn a_group_dm_alerts_through_the_msc4563_rule() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!groupdm:example.org");
+    let own = client.user_id().unwrap().to_owned();
+    let friend = user_id!("@friend:example.org");
+    let other = user_id!("@other:example.org");
+    let factory = EventFactory::new().room(room_id).sender(friend);
+    let members = [own.as_ref(), friend, other];
+    let quiet_groups = |mut rules: Ruleset| {
+        rules
+            .set_actions(RuleKind::Underride, ".m.rule.message", vec![])
+            .unwrap();
+        rules
+    };
+    let sync_rules = async |rules: Ruleset| {
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_global_account_data(factory.push_rules(rules));
+            })
+            .await;
+    };
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_bulk(members.iter().map(|member| factory.member(*member).into()))
+                    .set_joined_members_count(3),
+            );
+            builder.add_global_account_data(factory.direct().add_user(friend.to_owned(), room_id));
+        })
+        .await;
+    let room = client.get_room(room_id).unwrap();
+    let (synced, mut alerts) = tokio::sync::mpsc::unbounded_channel();
+    client
+        .register_notification_handler(move |notification, _, _| {
+            let synced = synced.clone();
+            async move {
+                synced.send(notification.actions).unwrap();
+            }
+        })
+        .await;
+
+    sync_rules(quiet_groups(Ruleset::server_default(&own))).await;
+    let raw: ruma::serde::Raw<ruma::events::AnySyncTimelineEvent> = factory
+        .text_msg("hey")
+        .event_id(ruma::event_id!("$hey"))
+        .into_raw_sync();
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(raw.clone()),
+        )
+        .await;
+    let actions = alerts.try_recv().expect("the sync alerts for the message");
+    assert!(notifications::notifies(&actions));
+    assert!(actions.iter().any(|action| action.sound().is_some()));
+    let push = room.push_context().await.unwrap().unwrap();
+    assert!(notifications::notifies(&push.for_event(&raw).await));
+
+    sync_rules(quiet_groups(legacy_rules(&own))).await;
+    let push = room.push_context().await.unwrap().unwrap();
+    assert!(
+        !notifications::notifies(&push.for_event(&raw).await),
+        "without the rule a group DM follows the other rooms"
+    );
 }
 
 #[tokio::test]
@@ -987,8 +1077,12 @@ async fn a_two_member_room_not_marked_direct_uses_the_direct_defaults() {
         })
         .await;
     let room = client.get_room(room_id).unwrap();
+    let own = client.user_id().unwrap();
 
-    assert!(notifications::uses_direct_push_rules(&room));
+    assert!(notifications::uses_direct_push_rules(
+        &legacy_rules(own),
+        &room
+    ));
 }
 
 #[tokio::test]
@@ -1007,7 +1101,10 @@ async fn a_pending_invite_does_not_make_a_room_one_to_one() {
     let room = client.get_room(room_id).unwrap();
 
     assert_eq!(room.active_members_count(), 2);
-    assert!(!notifications::uses_direct_push_rules(&room));
+    assert!(!notifications::uses_direct_push_rules(
+        &legacy_rules(client.user_id().unwrap()),
+        &room
+    ));
 }
 
 #[tokio::test]

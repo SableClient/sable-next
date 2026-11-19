@@ -3,7 +3,7 @@ use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::TimelineEventType;
-use matrix_sdk::ruma::push::Action;
+use matrix_sdk::ruma::push::{Action, Ruleset};
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedUserId, RoomId};
 use matrix_sdk_ui::notification_client::{
@@ -167,8 +167,12 @@ fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
 pub use crate::push_rules::notifies;
 
 #[must_use]
-pub fn uses_direct_push_rules(room: &matrix_sdk::Room) -> bool {
-    room.joined_members_count() == 2
+pub fn uses_direct_push_rules(rules: &Ruleset, room: &matrix_sdk::Room) -> bool {
+    crate::push_rules::direct_defaults(
+        rules,
+        room.direct_targets_length() != 0,
+        room.joined_members_count() == 2,
+    )
 }
 
 pub async fn every_encrypted_event_pushed(client: &Client) -> bool {

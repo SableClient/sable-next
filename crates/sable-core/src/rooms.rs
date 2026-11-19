@@ -265,10 +265,14 @@ impl Core {
                 .mark_as_dm(room_id, &others)
                 .await
                 .or_failed(self, "set_direct")?;
-            if !crate::notifications::uses_direct_push_rules(&room) {
-                let rules = self.push_rules().await?;
-                let writes =
-                    crate::push_rules::plan_direct_default(&rules.snapshot().await, room_id);
+            let rules = self.push_rules().await?;
+            let snapshot = rules.snapshot().await;
+            if !crate::push_rules::direct_defaults(
+                &snapshot,
+                true,
+                room.joined_members_count() == 2,
+            ) {
+                let writes = crate::push_rules::plan_direct_default(&snapshot, room_id);
                 rules
                     .apply(writes)
                     .await
