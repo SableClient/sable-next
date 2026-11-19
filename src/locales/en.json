@@ -3312,7 +3312,7 @@
     "syncFailed": "Sync failed: {{message}}",
     "offline": "You are offline. Reconnecting…",
     "localNetworkOffer": "{{appName}} cannot reach {{host}}. If that server is on your home network, Android needs your permission before {{appName}} can connect to it.",
-    "localNetworkAllow": "Allow",
+    "localNetworkAllow": "Continue",
     "localNetworkDecline": "Not now",
     "localNetworkBlocked": "Your browser is blocking {{appName}} from reaching {{host}} on your local network. Allow local network access for this site in the browser’s site settings.\nIn Firefox, add {{host}} to network.lna.skip-domains in about:config.",
     "actionFailed": "Could not complete that action. Try again.",

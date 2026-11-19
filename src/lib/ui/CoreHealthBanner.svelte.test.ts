@@ -40,7 +40,7 @@ test('local network access is offered with its reason once the app stays offline
   await vi.advanceTimersByTimeAsync(3000);
   expect(screen.getByRole('alert')).toHaveTextContent('matrix.home.example');
 
-  await user.click(screen.getByRole('button', { name: 'Allow' }));
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
   expect(offer.allowLocalNetwork).toHaveBeenCalledOnce();
 });
 
@@ -59,5 +59,5 @@ test('without an offer the banner only says the app is offline', async () => {
   await vi.advanceTimersByTimeAsync(3000);
 
   expect(screen.getByRole('alert')).toHaveTextContent('You are offline');
-  expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
 });
