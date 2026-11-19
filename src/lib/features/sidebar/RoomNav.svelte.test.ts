@@ -14,6 +14,7 @@ import type {
   RoomUnreadView,
 } from '#src/generated/protocol';
 
+import { adoptQuietRooms, setUnreadDot } from '#lib/rooms/quiet-rooms.svelte.js';
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { bannerChanged } from '#lib/features/room/room-banner.svelte.js';
@@ -585,6 +586,25 @@ test('a row shows the badge the core gives it and none otherwise', async () => {
   expect(row('Quiet').querySelector('.unread-badge-dot')).toBeInTheDocument();
   expect(row('Quiet').querySelector('.unread-badge-count')).not.toBeInTheDocument();
   expect(within(row('Pinged')).getByText('2')).toHaveClass('unread-badge-count');
+});
+
+test('a row marks an unread dot hidden by its own override only', async () => {
+  onTestFinished(() => {
+    adoptQuietRooms([]);
+  });
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!hidden:example.org', name: 'Hidden' }),
+    makeRoom({ room_id: '!shown:example.org', name: 'Shown' }),
+    makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
+  ];
+  setUnreadDot('!hidden:example.org', 'hide');
+  setUnreadDot('!shown:example.org', 'show');
+
+  await mountNav();
+
+  expect(within(row('Hidden')).getByRole('img', { name: 'room.unreadDotHidden' })).toBeVisible();
+  expect(within(row('Shown')).queryByRole('img', { name: 'room.unreadDotHidden' })).toBeNull();
+  expect(within(row('Plain')).queryByRole('img', { name: 'room.unreadDotHidden' })).toBeNull();
 });
 
 test('message search from a space is scoped to that space', async () => {

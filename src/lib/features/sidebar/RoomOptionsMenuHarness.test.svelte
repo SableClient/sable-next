@@ -14,12 +14,14 @@
     core: CoreClient;
     room: RoomListItemView;
     rooms: RoomListItemView[];
+    quietRoomIds?: string[];
     registerRefresh: (refresh: () => void) => void;
   }
 
-  let { core, room, rooms, registerRefresh }: Props = $props();
+  let { core, room, rooms, quietRoomIds = [], registerRefresh }: Props = $props();
   const roomList = untrack(() => new RoomList(core));
   roomList.rooms = untrack(() => rooms);
+  roomList.quietRoomIds = new Set(untrack(() => quietRoomIds));
   Object.assign(roomList, {
     roomSpaces: (roomId: string) => roomSpacesLookup(roomList.rooms)(roomId),
   });

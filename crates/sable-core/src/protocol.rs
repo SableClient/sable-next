@@ -1053,6 +1053,9 @@ pub struct RoomListOptionsView {
     /// A quiet space quiets everything under it.
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub quiet_rooms: Vec<OwnedRoomId>,
+    /// Shows the unread dot even where the default or a quiet space would hide it.
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub shown_rooms: Vec<OwnedRoomId>,
 }
 
 impl Default for RoomListOptionsView {
@@ -1065,6 +1068,7 @@ impl Default for RoomListOptionsView {
             badge_default_direct: BadgeModeView::All,
             badge_default_group: BadgeModeView::Mentions,
             quiet_rooms: Vec::new(),
+            shown_rooms: Vec::new(),
         }
     }
 }

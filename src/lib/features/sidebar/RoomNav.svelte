@@ -35,6 +35,7 @@
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { isBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
+  import { unreadDot } from '#lib/rooms/quiet-rooms.svelte.js';
   import {
     spaceBridgeBadgeChanges,
     spaceHidesBridgeBadges,
@@ -631,7 +632,14 @@
               profiles={peerProfiles}
             />
           {/if}
-          <RoomRowStatus {counts} dm={room?.is_direct ?? false} {typing} {collapsed} {notifyMode} />
+          <RoomRowStatus
+            {counts}
+            dm={room?.is_direct ?? false}
+            {typing}
+            {collapsed}
+            {notifyMode}
+            dotHidden={room !== undefined && unreadDot(room.room_id) === 'hide'}
+          />
         </a>
         <!-- eslint-enable svelte/no-navigation-without-resolve -->
       {/snippet}

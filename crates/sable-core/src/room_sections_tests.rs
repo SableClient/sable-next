@@ -501,6 +501,68 @@ fn quiet_mode_keeps_only_mentions() {
 }
 
 #[test]
+fn show_beats_a_quiet_default() {
+    let options = RoomListOptionsView {
+        shown_rooms: ids(&["shown"]),
+        ..group_badges(BadgeModeView::Quiet)
+    };
+    let sections = RoomSections::build(
+        &[unread(row("shown"), 6, 0), unread(row("plain"), 6, 0)],
+        &options,
+    );
+
+    assert_eq!(badge(&sections, "shown"), Some(counts(6, 0, 0, false)));
+    assert_eq!(badge(&sections, "plain"), None);
+}
+
+#[test]
+fn show_beats_a_quiet_space_but_does_not_spread_to_its_rooms() {
+    let options = RoomListOptionsView {
+        quiet_rooms: ids(&["hushed"]),
+        shown_rooms: ids(&["shown", "hushed"]),
+        ..RoomListOptionsView::default()
+    };
+    let sections = RoomSections::build(
+        &[
+            space("hushed", &["shown", "other"]),
+            unread(row("shown"), 4, 0),
+            unread(row("other"), 4, 0),
+        ],
+        &options,
+    );
+
+    assert_eq!(badge(&sections, "shown"), Some(counts(4, 0, 0, false)));
+    assert_eq!(badge(&sections, "other"), None);
+}
+
+#[test]
+fn show_leaves_a_mode_that_already_shows_the_dot_alone() {
+    let options = RoomListOptionsView {
+        shown_rooms: ids(&["loud"]),
+        ..group_badges(BadgeModeView::All)
+    };
+    let sections = RoomSections::build(&[unread(row("loud"), 6, 0)], &options);
+
+    assert_eq!(badge(&sections, "loud"), Some(counts(6, 6, 0, false)));
+}
+
+#[test]
+fn hide_still_quiets_a_room_that_is_not_shown() {
+    let options = RoomListOptionsView {
+        quiet_rooms: ids(&["hidden"]),
+        shown_rooms: ids(&["shown"]),
+        ..group_badges(BadgeModeView::All)
+    };
+    let sections = RoomSections::build(
+        &[unread(row("hidden"), 6, 0), unread(row("shown"), 6, 0)],
+        &options,
+    );
+
+    assert_eq!(badge(&sections, "hidden"), None);
+    assert_eq!(badge(&sections, "shown"), Some(counts(6, 6, 0, false)));
+}
+
+#[test]
 fn all_mode_promotes_unread_into_notifying() {
     let sections = RoomSections::build(
         &[counted(row("hushed"), counts(6, 0, 0, false))],

@@ -2,11 +2,12 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomListItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
+import { adoptQuietRooms, adoptShownRooms, unreadDot } from '#lib/rooms/quiet-rooms.svelte.js';
 import { roomView } from '#lib/test-support/room-views.js';
 
 import RoomOptionsMenuHarness from './RoomOptionsMenuHarness.test.svelte';
@@ -82,4 +83,66 @@ test('offers notification settings for a space', async () => {
   await user.click(screen.getByRole('button', { name: 'Room options' }));
 
   expect(await screen.findByRole('menuitem', { name: 'Notifications' })).toBeInTheDocument();
+});
+
+afterEach(() => {
+  adoptQuietRooms([]);
+  adoptShownRooms([]);
+});
+
+async function openUnreadDot(
+  quietRoomIds: string[] = []
+): Promise<ReturnType<typeof userEvent.setup>> {
+  const user = userEvent.setup();
+  const current = room('!room');
+  const core = createCoreStub({
+    rpc: {
+      notifications: { settings: vi.fn().mockResolvedValue({ room: null, default: 'mentions' }) },
+      members: { permissions: vi.fn().mockResolvedValue({ can_manage_children: false }) },
+    },
+  }) as unknown as CoreClient;
+
+  render(RoomOptionsMenuHarness, {
+    core,
+    room: current,
+    rooms: [current],
+    quietRoomIds,
+    registerRefresh: () => {},
+  });
+
+  await user.click(screen.getByRole('button', { name: 'Room options' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Unread dot' }));
+  return user;
+}
+
+test('checks the current unread dot choice', async () => {
+  adoptQuietRooms(['!room']);
+  await openUnreadDot();
+
+  expect(await screen.findByRole('menuitemradio', { name: 'Hide' })).toBeChecked();
+  expect(screen.getByRole('menuitemradio', { name: 'Default' })).not.toBeChecked();
+  expect(screen.getByRole('menuitemradio', { name: 'Show' })).not.toBeChecked();
+});
+
+test.each([
+  ['Show', 'show'],
+  ['Hide', 'hide'],
+  ['Default', 'default'],
+])('the %s unread dot choice sets the room override', async (name, expected) => {
+  adoptShownRooms(expected === 'default' ? ['!room'] : []);
+  const user = await openUnreadDot();
+
+  await user.click(await screen.findByRole('menuitemradio', { name }));
+
+  expect(unreadDot('!room')).toBe(expected);
+});
+
+test('lets a room inside a quiet space be shown but not hidden again', async () => {
+  const user = await openUnreadDot(['!room']);
+
+  const hide = await screen.findByRole('menuitemradio', { name: 'Unread dot hidden by space' });
+  expect(hide).toHaveAttribute('aria-disabled', 'true');
+  await user.click(screen.getByRole('menuitemradio', { name: 'Show' }));
+
+  expect(unreadDot('!room')).toBe('show');
 });

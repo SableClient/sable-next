@@ -20,7 +20,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { ungroupedFavourites } from './favourite-grouping.svelte.js';
-import { quietRooms } from './quiet-rooms.svelte.js';
+import { quietRooms, shownRooms } from './quiet-rooms.svelte.js';
 import {
   readRoomListSnapshot,
   type RoomListSnapshot,
@@ -39,6 +39,7 @@ export function roomListOptions(): RoomListOptionsView {
     badge_default_direct: preferences.badgeDefaultDirect,
     badge_default_group: preferences.badgeDefaultGroup,
     quiet_rooms: quietRooms(),
+    shown_rooms: shownRooms(),
   };
 }
 

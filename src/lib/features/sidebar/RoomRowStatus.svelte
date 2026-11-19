@@ -3,6 +3,7 @@
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import BellRingingIcon from 'phosphor-svelte/lib/BellRingingIcon';
   import BellSlashIcon from 'phosphor-svelte/lib/BellSlashIcon';
+  import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import type { NotificationModeView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import type { UnreadCount } from '#lib/rooms/unread.js';
@@ -17,9 +18,10 @@
     typing: boolean;
     collapsed: boolean;
     notifyMode: NotificationModeView | null;
+    dotHidden: boolean;
   }
 
-  let { counts, dm, typing, collapsed, notifyMode }: Props = $props();
+  let { counts, dm, typing, collapsed, notifyMode, dotHidden }: Props = $props();
 
   let badgeLabel = $derived(unreadLabel(counts) ?? i18n.t('nav.markedUnread'));
 
@@ -42,6 +44,11 @@
       {@const chip = notificationChip(notifyMode)}
       <span class="room-mode" role="img" aria-label={i18n.t(chip.label)}>
         <chip.icon />
+      </span>
+    {/if}
+    {#if dotHidden}
+      <span class="room-mode" role="img" aria-label={i18n.t('room.unreadDotHidden')}>
+        <EyeSlashIcon />
       </span>
     {/if}
   </span>

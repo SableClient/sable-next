@@ -168,7 +168,12 @@ const fn add_unread(total: &mut RoomUnreadView, counts: RoomUnreadView) {
 }
 
 /// A muted room's counts are already empty.
-fn badge_counts(row: &Row, quiet: bool, options: &RoomListOptionsView) -> RoomUnreadView {
+fn badge_counts(
+    row: &Row,
+    quiet: bool,
+    shown: bool,
+    options: &RoomListOptionsView,
+) -> RoomUnreadView {
     let counts = row.counts;
     let mode = match row.notification.room {
         Some(NotificationModeView::Mute) => return counts,
@@ -177,7 +182,12 @@ fn badge_counts(row: &Row, quiet: bool, options: &RoomListOptionsView) -> RoomUn
         None if row.is_direct => options.badge_default_direct,
         None => options.badge_default_group,
     };
-    match if quiet { BadgeModeView::Quiet } else { mode } {
+    let mode = if quiet { BadgeModeView::Quiet } else { mode };
+    match if shown && mode == BadgeModeView::Quiet {
+        BadgeModeView::Mentions
+    } else {
+        mode
+    } {
         BadgeModeView::Quiet => RoomUnreadView {
             unread: counts.highlight,
             notifying: 0,
@@ -267,7 +277,12 @@ impl<'a> Lists<'a> {
     }
 
     fn badge(&self, row: &Row) -> RoomUnreadView {
-        badge_counts(row, self.quiet.contains(row.room_id.as_str()), self.options)
+        badge_counts(
+            row,
+            self.quiet.contains(row.room_id.as_str()),
+            self.options.shown_rooms.contains(&row.room_id),
+            self.options,
+        )
     }
 
     fn grouped(&self, key: &str) -> bool {

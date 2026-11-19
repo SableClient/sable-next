@@ -9,7 +9,6 @@
   import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
-  import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import FingerprintIcon from 'phosphor-svelte/lib/FingerprintIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
@@ -32,7 +31,7 @@
   import { joinRoom } from '#lib/core/api/rooms.js';
   import { i18n } from '#lib/i18n.js';
   import { copyRoomLink } from '#lib/rooms/permalink.js';
-  import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
+  import { setUnreadDot, unreadDot, type UnreadDot } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -114,8 +113,13 @@
   let unread = $derived(
     readable.some((entry) => entry.unread > 0 || entry.highlight > 0 || entry.marked_unread)
   );
-  let quiet = $derived(isQuiet(room.room_id));
-  let quietBySpace = $derived(!quiet && roomList.quietRoomIds.has(room.room_id));
+  const unreadDotChoices: { dot: UnreadDot; label: string }[] = [
+    { dot: 'default', label: 'room.unreadDotDefault' },
+    { dot: 'show', label: 'room.unreadDotShow' },
+    { dot: 'hide', label: 'room.unreadDotHide' },
+  ];
+  let dot = $derived(unreadDot(room.room_id));
+  let quietBySpace = $derived(dot === 'default' && roomList.quietRoomIds.has(room.room_id));
 
   const manageable = new SvelteSet<string>();
   let manageableRun = 0;
@@ -323,23 +327,26 @@
       <StarIcon weight={favourite ? 'fill' : 'regular'} />
       {i18n.t('room.menuFavourite')}
     </ActionMenuItem>
-    <ActionMenuItem
-      disabled={quietBySpace}
-      onSelect={() => {
-        setQuiet(room.room_id, !quiet);
-      }}
-    >
-      {#if quiet || quietBySpace}
-        <EyeIcon />
-      {:else}
+    <ActionMenuSub label={i18n.t('room.menuUnreadDot')} class="room-options-menu">
+      {#snippet trigger()}
         <EyeSlashIcon />
-      {/if}
-      {quietBySpace
-        ? i18n.t('room.menuUnreadHiddenBySpace')
-        : quiet
-          ? i18n.t('room.menuShowUnread')
-          : i18n.t('room.menuHideUnread')}
-    </ActionMenuItem>
+        {i18n.t('room.menuUnreadDot')}
+      {/snippet}
+      {#each unreadDotChoices as choice (choice.dot)}
+        {@const selected = dot === choice.dot}
+        {@const hiddenBySpace = quietBySpace && choice.dot === 'hide'}
+        <ActionMenuItem
+          checked={selected}
+          disabled={hiddenBySpace}
+          onSelect={() => {
+            setUnreadDot(room.room_id, choice.dot);
+          }}
+        >
+          <span class="menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+          <span>{i18n.t(hiddenBySpace ? 'room.menuUnreadHiddenBySpace' : choice.label)}</span>
+        </ActionMenuItem>
+      {/each}
+    </ActionMenuSub>
 
     {#if room.is_direct}
       <ActionMenuItem

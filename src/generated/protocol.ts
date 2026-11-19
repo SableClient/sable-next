@@ -1425,6 +1425,8 @@ export type RoomListOptionsView = {
 	badge_default_group: BadgeModeView,
 	/**  A quiet space quiets everything under it. */
 	quiet_rooms: string[],
+	/**  Shows the unread dot even where the default or a quiet space would hide it. */
+	shown_rooms: string[],
 };
 
 export type RoomOpenView = {
