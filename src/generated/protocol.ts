@@ -557,6 +557,9 @@ export type InboxItemView = {
 
 export type InviteAvatarsView = "on" | "off";
 
+/**  What became of the room's past messages when an invite went out. */
+export type InviteHistoryView = "shared" | "not_shared" | "failed";
+
 export type InviteTriageView = {
 	room_id: string,
 	inviter: string | null,
@@ -3487,7 +3490,7 @@ export type Rpc = {
     invite: (params: {
 	room_id: string,
 	user_id: string,
-}) => Promise<null>;
+}) => Promise<InviteHistoryView>;
     create: (params: {
 	name?: string | null,
 	topic: string | null,

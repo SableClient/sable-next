@@ -357,6 +357,64 @@ async fn history_bundles_require_owner_signed_recipient_devices() {
 }
 
 #[tokio::test]
+async fn an_invite_goes_out_when_its_history_cannot_be_shared() {
+    use matrix_sdk::ruma::{events::room::history_visibility::HistoryVisibility, room_id};
+    use matrix_sdk_base::crypto::EncryptionSettings;
+    use matrix_sdk_test::{JoinedRoomBuilder, event_factory::EventFactory};
+
+    use crate::{api::rooms::InviteParams, protocol::InviteHistoryView};
+
+    let server = MatrixMockServer::new().await;
+    let (old, _new, _queue) = two_devices(&server, true).await;
+    let user_id = old.client.user_id().unwrap().to_owned();
+    let room_id = room_id!("!invite:example.org");
+    server
+        .mock_room_state_encryption()
+        .encrypted()
+        .mount()
+        .await;
+    server
+        .sync_room(
+            &old.client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(EventFactory::new().sender(&user_id).room_encryption()),
+        )
+        .await;
+    let machine = old.client.olm_machine_for_testing().await;
+    machine
+        .as_ref()
+        .unwrap()
+        .share_room_key(
+            room_id,
+            std::iter::empty(),
+            EncryptionSettings {
+                history_visibility: HistoryVisibility::Shared,
+                ..EncryptionSettings::default()
+            },
+        )
+        .await
+        .unwrap();
+    // The media repository has no mock, so the bundle cannot be uploaded.
+    server
+        .mock_invite_user_by_id()
+        .ok()
+        .mock_once()
+        .mount()
+        .await;
+
+    let history = old
+        .core
+        .run(InviteParams {
+            room_id: room_id.to_owned(),
+            user_id,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(history, InviteHistoryView::Failed);
+}
+
+#[tokio::test]
 async fn crossed_self_verification_requests_are_cancelled_without_retrying() {
     let server = MatrixMockServer::new().await;
     let (mut old, mut new, queue) = two_devices(&server, false).await;

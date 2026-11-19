@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import type {
+  InviteHistoryView,
   MemberView,
   RoomPermissionsView,
   RoomListItemView,
@@ -28,7 +29,7 @@ Object.assign(core.rpc.members, {
   permissions: vi.fn<(params: { room_id: string }) => Promise<RoomPermissionsView>>(),
   denyKnock: vi.fn<(params: { room_id: string; user_id: string }) => Promise<null>>(),
 });
-Object.assign(core.rpc.rooms, { invite: vi.fn<() => Promise<null>>() });
+Object.assign(core.rpc.rooms, { invite: vi.fn<() => Promise<InviteHistoryView>>() });
 const roomList = new RoomList(core as unknown as CoreClient);
 const room = {
   room_id: '!room:example.org',
@@ -69,7 +70,7 @@ beforeEach(() => {
   });
   core.rpc.members.permissions.mockReset().mockResolvedValue(permissions);
   core.rpc.members.list.mockReset().mockResolvedValue([alice]);
-  core.rpc.rooms.invite.mockReset().mockResolvedValue(null);
+  core.rpc.rooms.invite.mockReset().mockResolvedValue('not_shared');
   core.rpc.members.denyKnock.mockReset().mockResolvedValue(null);
   roomList.rooms = [room];
 });

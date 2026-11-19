@@ -389,58 +389,69 @@ impl Handler for ShareHistoryParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<ShareHistoryView, RpcError> {
         let room = core.room(&self.room_id).await?;
-        if !room.encryption_state().is_encrypted() {
-            return Ok(ShareHistoryView::Unencrypted);
-        }
-        let client = core.client().await?;
-        let own = client.user_id().ok_or(RpcCode::NotLoggedIn)?;
-        let identity = client
-            .encryption()
-            .get_user_identity(own)
-            .await
-            .or_failed(core, "share_history")?;
-        if identity.is_none() {
-            return Ok(ShareHistoryView::NoCrossSigning);
-        }
-        if matches!(
-            room.history_visibility_or_default(),
-            HistoryVisibility::Joined | HistoryVisibility::Invited
-        ) {
-            return Ok(ShareHistoryView::HistoryNotShared);
-        }
-        if bundle_refused(&room, own, &self.user_id).await {
-            return Ok(ShareHistoryView::NotInvited);
-        }
-        // Bundles only go to devices the recipient has cross-signed.
-        client
-            .encryption()
-            .request_user_identity(&self.user_id)
-            .await
-            .or_failed(core, "share_history")?;
-        let devices = client
-            .encryption()
-            .get_user_devices(&self.user_id)
-            .await
-            .or_failed(core, "share_history")?;
-        if !devices.devices().any(|device| device.is_cross_signed_by_owner()) {
-            return Ok(ShareHistoryView::NoVerifiedDevices);
-        }
-        room.share_history_with(&self.user_id)
-            .await
-            .or_failed(core, "share_history")?;
-        let base = core.base_client().await?;
-        let machine = base.olm_machine().await;
-        let machine = machine.as_ref().ok_or(RpcCode::NotLoggedIn)?;
-        let sessions = machine
-            .store()
-            .get_inbound_group_sessions_by_room_id(room.room_id())
-            .await
-            .or_failed(core, "share_history")?;
-        if !sessions.iter().any(InboundGroupSession::shared_history) {
-            return Ok(ShareHistoryView::NothingToShare);
-        }
-        Ok(ShareHistoryView::Shared)
+        share_history(core, &room, &self.user_id, false).await
     }
+}
+
+/// `inviting` skips the inviter check: the invite that makes us the inviter
+/// is about to be sent.
+pub(crate) async fn share_history(
+    core: &Arc<Core>,
+    room: &matrix_sdk::Room,
+    user_id: &UserId,
+    inviting: bool,
+) -> Result<ShareHistoryView, RpcError> {
+    if !room.encryption_state().is_encrypted() {
+        return Ok(ShareHistoryView::Unencrypted);
+    }
+    let client = core.client().await?;
+    let own = client.user_id().ok_or(RpcCode::NotLoggedIn)?;
+    let identity = client
+        .encryption()
+        .get_user_identity(own)
+        .await
+        .or_failed(core, "share_history")?;
+    if identity.is_none() {
+        return Ok(ShareHistoryView::NoCrossSigning);
+    }
+    if matches!(
+        room.history_visibility_or_default(),
+        HistoryVisibility::Joined | HistoryVisibility::Invited
+    ) {
+        return Ok(ShareHistoryView::HistoryNotShared);
+    }
+    if !inviting && bundle_refused(room, own, user_id).await {
+        return Ok(ShareHistoryView::NotInvited);
+    }
+    // Bundles only go to devices the recipient has cross-signed.
+    client
+        .encryption()
+        .request_user_identity(user_id)
+        .await
+        .or_failed(core, "share_history")?;
+    let devices = client
+        .encryption()
+        .get_user_devices(user_id)
+        .await
+        .or_failed(core, "share_history")?;
+    if !devices.devices().any(|device| device.is_cross_signed_by_owner()) {
+        return Ok(ShareHistoryView::NoVerifiedDevices);
+    }
+    room.share_history_with(user_id)
+        .await
+        .or_failed(core, "share_history")?;
+    let base = core.base_client().await?;
+    let machine = base.olm_machine().await;
+    let machine = machine.as_ref().ok_or(RpcCode::NotLoggedIn)?;
+    let sessions = machine
+        .store()
+        .get_inbound_group_sessions_by_room_id(room.room_id())
+        .await
+        .or_failed(core, "share_history")?;
+    if !sessions.iter().any(InboundGroupSession::shared_history) {
+        return Ok(ShareHistoryView::NothingToShare);
+    }
+    Ok(ShareHistoryView::Shared)
 }
 
 /// True when the room state shows `user_id` will drop a bundle from `own`.

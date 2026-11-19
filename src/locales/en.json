@@ -490,6 +490,7 @@
     "inviteSubmit": "Invite",
     "inviteSent": "Invited {{user}}.",
     "inviteSentWithHistory": "Invited {{user}}. Once they join, their verified sessions should be able to read messages sent while members could see all history.",
+    "inviteSentHistoryFailed": "Invited {{user}}, but this room’s past messages couldn’t be shared. Run /sharehistory {{user}} to try again.",
     "inviteHistoryShared": "Inviting can also give their verified sessions the keys to messages sent while members could see all history.",
     "inviteHistoryFromInvite": "They’ll be able to read messages sent from the moment you invite them, not earlier ones.",
     "inviteHistoryHidden": "They won’t be able to read messages sent before they join.",

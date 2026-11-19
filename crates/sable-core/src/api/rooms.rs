@@ -4,6 +4,10 @@ use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
 use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
 use matrix_sdk::ruma::api::client::discovery::get_capabilities;
 use matrix_sdk::ruma::api::client::discovery::get_capabilities::v3::RoomVersionStability;
+use matrix_sdk::ruma::api::client::membership::invite_user::{
+    self,
+    v3::{InvitationRecipient, InviteUserId},
+};
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::aliases;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
@@ -25,7 +29,7 @@ use crate::search::MAX_SEARCH_RESULTS;
 use crate::room_settings::StateEventOut;
 use crate::room_settings::join_rule_content;
 use crate::room_settings::voice_power_level_override;
-use crate::protocol::{RpcError, CreateJoinRuleView, PresenceHintView, PresencePromptView, PublicRoomView, RoomAttachmentKind, RoomAttachmentView, RoomCosmeticsView, RoomOpenView, RoomPreviewView, RoomListItemView, RoomTag, RoomVersionView, RoomVersionsView};
+use crate::protocol::{RpcError, CreateJoinRuleView, InviteHistoryView, ShareHistoryView, PresenceHintView, PresencePromptView, PublicRoomView, RoomAttachmentKind, RoomAttachmentView, RoomCosmeticsView, RoomOpenView, RoomPreviewView, RoomListItemView, RoomTag, RoomVersionView, RoomVersionsView};
 use crate::view::FORUM_ROOM_TYPE;
 use crate::{Core, ResultExt, power_levels, view};
 
@@ -340,16 +344,28 @@ pub struct InviteParams {
 }
 
 impl Handler for InviteParams {
-    type Ok = ();
+    type Ok = InviteHistoryView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.room(&self.room_id)
-            .await?
-            .invite_user_by_id(&self.user_id)
+    async fn run(self, core: &Arc<Core>) -> Result<InviteHistoryView, RpcError> {
+        let room = core.room(&self.room_id).await?;
+        // MSC4268 sends the keys ahead of the invite. `invite_user_by_id`
+        // gives up on the invite when that fails, so both steps happen here.
+        let history =
+            match super::encryption::share_history(core, &room, &self.user_id, true).await {
+                Ok(ShareHistoryView::Shared) => InviteHistoryView::Shared,
+                Ok(_) => InviteHistoryView::NotShared,
+                // `share_history` has reported the error.
+                Err(_) => InviteHistoryView::Failed,
+            };
+        let recipient = InvitationRecipient::UserId(InviteUserId::new(self.user_id));
+        room.client()
+            .send(invite_user::v3::Request::new(self.room_id, recipient))
             .await
             .or_failed(core, "invite_user")?;
+        // The next send reloads the members, so the invitee gets its key.
+        room.mark_members_missing();
 
-        Ok(())
+        Ok(history)
     }
 }
 

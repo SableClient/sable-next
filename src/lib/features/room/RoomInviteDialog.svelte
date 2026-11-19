@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import type { HistoryVisibilityView, RoomListItemView } from '#src/generated/protocol';
+  import type {
+    HistoryVisibilityView,
+    InviteHistoryView,
+    RoomListItemView,
+  } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -28,7 +32,7 @@
   let draft = $state('');
   let invalid = $state(false);
   let inviting = $state(false);
-  let invited = $state<string | null>(null);
+  let invited = $state<{ userId: string; history: InviteHistoryView } | null>(null);
   let failed = $state(false);
   let convertPrompt = $state(false);
   let converting = $state(false);
@@ -150,8 +154,8 @@
     inviting = true;
     failed = false;
     try {
-      await core.rpc.rooms.invite({ room_id: target, user_id: candidate });
-      invited = candidate;
+      const history = await core.rpc.rooms.invite({ room_id: target, user_id: candidate });
+      invited = { userId: candidate, history };
       setDraft('');
     } catch (error) {
       console.warn('[sable room] invite failed', error);
@@ -239,15 +243,15 @@
       {:else if failed}
         <Alert variant="critical" role="alert">{i18n.t('room.inviteSendFailed')}</Alert>
       {:else if invited}
-        <Alert variant="success" role="status">
-          {i18n.t(
-            sharesHistory && !(recipient?.userId === invited && recipient.noVerified)
-              ? 'room.inviteSentWithHistory'
-              : 'room.inviteSent',
-            {
-              user: invited,
-            }
-          )}
+        <Alert variant={invited.history === 'failed' ? 'warning' : 'success'} role="status">
+          {#if invited.history === 'failed'}
+            {i18n.t('room.inviteSentHistoryFailed', { user: invited.userId })}
+          {:else}
+            {i18n.t(
+              invited.history === 'shared' ? 'room.inviteSentWithHistory' : 'room.inviteSent',
+              { user: invited.userId }
+            )}
+          {/if}
         </Alert>
       {/if}
 

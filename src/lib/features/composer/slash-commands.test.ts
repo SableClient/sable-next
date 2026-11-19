@@ -12,6 +12,7 @@ import type {
   PersonaView,
   RoomPreviewView,
   RpcParams,
+  InviteHistoryView,
   ShareHistoryView,
   Rpc,
 } from '#src/generated/protocol';
@@ -30,7 +31,7 @@ import { memberView } from '#lib/test-support/room-views.js';
 function fakeCommands() {
   return {
     banUser: vi.fn(() => Promise.resolve()),
-    inviteUser: vi.fn(() => Promise.resolve()),
+    inviteUser: vi.fn(() => Promise.resolve<InviteHistoryView>('not_shared')),
     joinRoom: vi.fn(() => Promise.resolve('!joined:example.org')),
     kickUser: vi.fn(() => Promise.resolve()),
     knockRoom: vi.fn(() => Promise.resolve('!knocked:example.org')),
@@ -594,6 +595,16 @@ test('/sharehistory shares the room history with one user', async () => {
 
   await expect(runSlash('/sharehistory', context(fakeCommands(), rpc))).rejects.toMatchObject({
     key: 'composer.slash.sharehistory.usage',
+  });
+});
+
+test('/invite says when the invite went out without its history', async () => {
+  const commands = fakeCommands();
+  commands.inviteUser.mockResolvedValue('failed');
+
+  await expect(runSlash('/invite @bob:example.org', context(commands))).resolves.toEqual({
+    kind: 'done',
+    notice: { key: 'room.inviteSentHistoryFailed', values: { user: '@bob:example.org' } },
   });
 });
 

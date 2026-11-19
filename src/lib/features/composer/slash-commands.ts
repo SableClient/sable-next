@@ -368,9 +368,15 @@ async function run(
     case 'leave':
       await rpc.rooms.leave({ room_id: roomId });
       return DONE;
-    case 'invite':
-      await rpc.rooms.invite({ room_id: roomId, user_id: invocation.user_id });
-      return DONE;
+    case 'invite': {
+      const history = await rpc.rooms.invite({ room_id: roomId, user_id: invocation.user_id });
+      return history === 'failed'
+        ? {
+            kind: 'done',
+            notice: { key: 'room.inviteSentHistoryFailed', values: { user: invocation.user_id } },
+          }
+        : DONE;
+    }
     case 'share_history': {
       const outcome = await rpc.encryption.shareHistory({
         room_id: roomId,
