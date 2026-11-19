@@ -410,7 +410,7 @@ test('uses a site-specific presentation for a recognised URL', () => {
     }),
   });
 
-  expect(screen.getByRole('link', { name: 'A video' }).parentElement).toHaveClass(
+  expect(screen.getByRole('link', { name: /A video/ }).parentElement).toHaveClass(
     'youtube-preview'
   );
 });

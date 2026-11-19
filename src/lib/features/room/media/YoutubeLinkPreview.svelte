@@ -39,13 +39,7 @@
       {/if}
     </span>
   {/if}
-  <a
-    class="youtube-preview-text"
-    href={url}
-    target="_blank"
-    rel="external noopener noreferrer"
-    aria-label={title}
-  >
+  <a class="youtube-preview-text" href={url} target="_blank" rel="external noopener noreferrer">
     <span class="youtube-preview-site">{preview.site_name ?? 'YouTube'}</span>
     <span class="youtube-preview-title" dir="auto">{title}</span>
     {#if preview.description}<span class="youtube-preview-description" dir="auto"
