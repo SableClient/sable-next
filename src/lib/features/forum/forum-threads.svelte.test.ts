@@ -96,3 +96,52 @@ test('an older redacted thread stays hidden through discovery refresh and reopen
   await forum.start('!forum:example.org');
   expect(forum.threads.map((thread) => thread.eventId)).toEqual(['$other']);
 });
+
+test('a failed page is retried so a search can still reach older threads', async () => {
+  vi.useFakeTimers();
+  const { forum, core } = fixture([timelineItem('newest')], []);
+  core.rpc.timeline.paginate
+    .mockRejectedValueOnce(new Error('connection reset'))
+    .mockResolvedValue({ direction: 'backward', reached_end: false });
+  await forum.start('!forum:example.org');
+
+  const page = forum.paginateBackward();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(forum.error).toBe(true);
+  await vi.advanceTimersByTimeAsync(1000);
+
+  await expect(page).resolves.toBe(false);
+  expect(forum.error).toBe(false);
+  expect(forum.canLoadMore).toBe(true);
+  expect(core.rpc.timeline.paginate).toHaveBeenCalledTimes(2);
+});
+
+test('a page that keeps failing gives up and shows the failure', async () => {
+  vi.useFakeTimers();
+  const { forum, core } = fixture([timelineItem('newest')], []);
+  core.rpc.timeline.paginate.mockRejectedValue(new Error('connection reset'));
+  await forum.start('!forum:example.org');
+
+  const page = forum.paginateBackward();
+  const settled = expect(page).rejects.toThrow('Unable to load forum threads');
+  await vi.advanceTimersByTimeAsync(7000);
+
+  await settled;
+  expect(forum.error).toBe(true);
+  expect(core.rpc.timeline.paginate).toHaveBeenCalledTimes(4);
+});
+
+test('leaving the forum stops retrying a failed page', async () => {
+  vi.useFakeTimers();
+  const { forum, core } = fixture([timelineItem('newest')], []);
+  core.rpc.timeline.paginate.mockRejectedValue(new Error('connection reset'));
+  await forum.start('!forum:example.org');
+
+  const page = forum.paginateBackward().catch(() => {});
+  await vi.advanceTimersByTimeAsync(0);
+  await forum.stop();
+  await vi.advanceTimersByTimeAsync(7000);
+  await page;
+
+  expect(core.rpc.timeline.paginate).toHaveBeenCalledTimes(1);
+});
