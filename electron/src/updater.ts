@@ -103,6 +103,6 @@ export function registerUpdater(
   });
 
   ipcMain.handle('sable-update-install', (event) => {
-    if (enabled && isAppFrame(event.senderFrame)) autoUpdater.quitAndInstall();
+    if (enabled && isAppFrame(event.senderFrame)) autoUpdater.quitAndInstall(true, true);
   });
 }
