@@ -85,6 +85,22 @@ test('a rightward drag is left to the nav drawer', async () => {
   expect(onReply).not.toHaveBeenCalled();
 });
 
+test('a drag that started rightward stays with the nav drawer when it turns back left', async () => {
+  const { swipe, onReply } = await harness();
+
+  fire('touchstart', 0);
+  fire('touchmove', 20);
+  const back = fire('touchmove', -PAST_REPLY);
+
+  expect(swipe.offset).toBe(0);
+  expect(swipe.action).toBe('none');
+  expect(back.defaultPrevented).toBe(false);
+
+  fire('touchend', 0);
+  expect(onReply).not.toHaveBeenCalled();
+  expect(hapticFeedback).not.toHaveBeenCalled();
+});
+
 test('a vertical drag never swipes, even if it later turns sideways', async () => {
   const { swipe, onReply } = await harness();
 

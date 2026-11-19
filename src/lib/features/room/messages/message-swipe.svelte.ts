@@ -43,7 +43,12 @@ export class MessageSwipe {
       }
       if (update.mode !== 'horizontal') return;
 
-      if (update.distanceX >= 0) {
+      // Rightward belongs to the nav drawer, and keeps the touch even if it turns back.
+      if (update.distanceX > 0) {
+        this.#release(false);
+        return;
+      }
+      if (update.distanceX === 0) {
         this.offset = 0;
         this.#arm('none');
         return;
