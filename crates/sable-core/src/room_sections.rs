@@ -182,12 +182,12 @@ fn badge_counts(
         None if row.is_direct => options.badge_default_direct,
         None => options.badge_default_group,
     };
-    let mode = if quiet { BadgeModeView::Quiet } else { mode };
-    match if shown && mode == BadgeModeView::Quiet {
-        BadgeModeView::Mentions
-    } else {
-        mode
-    } {
+    let mode = match (quiet || mode == BadgeModeView::Quiet, shown) {
+        (true, true) => BadgeModeView::Mentions,
+        (true, false) => BadgeModeView::Quiet,
+        (false, _) => mode,
+    };
+    match mode {
         BadgeModeView::Quiet => RoomUnreadView {
             unread: counts.highlight,
             notifying: 0,
