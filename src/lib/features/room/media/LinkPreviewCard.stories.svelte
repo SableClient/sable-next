@@ -25,7 +25,7 @@
   };
 
   const { Story } = defineMeta({
-    title: 'Room/Link preview card',
+    title: 'Room/Preview/Link preview card',
     component: LinkPreviewCard,
     tags: ['autodocs'],
     args: { url: bundled.url, encrypted: false, bundled },
@@ -47,3 +47,47 @@
 <Story name="Accented" args={{ bundled: { ...bundled, theme_color: '#7c5cff' } }} />
 
 <Story name="Title only" args={{ bundled: { ...bundled, site_name: null, description: null } }} />
+
+<Story
+  name="Horizontal 16:9 Image"
+  args={{
+    bundled: {
+      ...bundled,
+      card: 'summary_large_image',
+      image: 'hi',
+      image_width: 160,
+      image_height: 90,
+    },
+  }}
+/>
+<Story
+  name="Horizontal 32:9 Image"
+  args={{
+    bundled: {
+      ...bundled,
+      card: 'summary_large_image',
+      image: 'hi',
+      image_width: 320,
+      image_height: 90,
+    },
+  }}
+/>
+<Story
+  name="Vertical 9:16 Image"
+  args={{
+    bundled: {
+      ...bundled,
+      card: 'summary_large_image',
+      image: 'hi',
+      image_width: 90,
+      image_height: 160,
+    },
+  }}
+/>
+
+<Story
+  name="Summary Small Image"
+  args={{
+    bundled: { ...bundled, card: 'summary', image: 'hi', image_width: 90, image_height: 160 },
+  }}
+/>
