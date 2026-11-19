@@ -1,5 +1,6 @@
 use crate::Core;
 use crate::protocol::{OpenIdTokenView, RpcCode, RpcError, UrlPreviewView};
+use matrix_sdk::ruma::OwnedUserId;
 use sable_link_preview::{
     Fetch as _, MAX_DIRECT_VIDEO_BYTES, PostMediaKind, PreviewData, Response as _, ScrapeOptions,
     TunnelFetch,
@@ -21,6 +22,13 @@ const MAX_SCRAPED_MEDIA: usize = 512;
 
 const REFRESH_MARGIN: Duration = Duration::from_secs(60);
 
+/// How long a service that refused a ticket is left alone. Asking can take as long as the
+/// request timeout, and every link in the room would wait for it in turn.
+const RETRY_AFTER_REFUSAL: Duration = Duration::from_mins(5);
+
+/// Shorter for a request that never got an answer, which a moment offline also causes.
+const RETRY_AFTER_FAILURE: Duration = Duration::from_secs(30);
+
 struct Session {
     service: String,
     expires: Instant,
@@ -29,8 +37,11 @@ struct Session {
 
 #[derive(Default)]
 struct State {
+    /// Whose token and ticket these are, so another account never rides on them.
+    owner: Option<OwnedUserId>,
     openid: Option<(OpenIdTokenView, Instant)>,
     session: Option<Session>,
+    retry_after: Option<(String, Instant)>,
 }
 
 struct ScrapedMedia {
@@ -122,7 +133,14 @@ impl Core {
         let Some(relay) = relay_url(service) else {
             return Ok(None);
         };
+        let owner = self.client().await?.user_id().map(ToOwned::to_owned);
         let mut state = self.tunnel.state.lock().await;
+        if state.owner != owner {
+            *state = State {
+                owner,
+                ..State::default()
+            };
+        }
         if let Some(session) = &state.session
             && session.service == service
             && session.expires > Instant::now() + REFRESH_MARGIN
@@ -130,6 +148,12 @@ impl Core {
             return Ok(Some(session.fetch.clone()));
         }
         state.session = None;
+        if let Some((refused, until)) = &state.retry_after
+            && refused == service
+            && *until > Instant::now()
+        {
+            return Ok(None);
+        }
 
         let token = match &state.openid {
             Some((token, expires)) if *expires > Instant::now() + REFRESH_MARGIN => token.clone(),
@@ -142,15 +166,27 @@ impl Core {
                 token
             }
         };
-        let granted = match request_ticket(service, &token).await? {
-            Ticket::Granted(granted) => granted,
-            Ticket::Refused { token_rejected } => {
-                if token_rejected {
+        let granted = match request_ticket(service, &token).await {
+            Ok(Ticket::Granted(granted)) => granted,
+            withheld => {
+                if matches!(
+                    withheld,
+                    Ok(Ticket::Refused {
+                        token_rejected: true
+                    })
+                ) {
                     state.openid = None;
                 }
-                return Ok(None);
+                let wait = if withheld.is_ok() {
+                    RETRY_AFTER_REFUSAL
+                } else {
+                    RETRY_AFTER_FAILURE
+                };
+                state.retry_after = Some((service.to_owned(), Instant::now() + wait));
+                return withheld.map(|_| None);
             }
         };
+        state.retry_after = None;
         let fetch = TunnelFetch::new(relay, granted.ticket, USER_AGENT.to_owned());
         state.session = Some(Session {
             service: service.to_owned(),
@@ -333,16 +369,70 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_rejected_openid_token_is_requested_again() {
+    async fn a_refused_ticket_is_not_asked_for_again_straight_away() {
+        for status in [401, 404, 429] {
+            let (_server, core) = core_with_openid(1).await;
+            let service = ticket_service(status, 600_000, 1).await;
+            for _ in 0..3 {
+                let preview = core
+                    .tunnel_preview(&service.uri(), "https://example.org/")
+                    .await
+                    .unwrap();
+                assert!(preview.is_none());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_service_is_not_asked_again_straight_away() {
+        let (_server, core) = core_with_openid(1).await;
+        let service = "http://127.0.0.1:1";
+        core.tunnel_preview(service, "https://example.org/")
+            .await
+            .unwrap_err();
+        let preview = core
+            .tunnel_preview(service, "https://example.org/")
+            .await
+            .unwrap();
+        assert!(preview.is_none());
+        let (_, until) = core.tunnel.state.lock().await.retry_after.clone().unwrap();
+        assert!(until <= std::time::Instant::now() + super::RETRY_AFTER_FAILURE);
+    }
+
+    #[tokio::test]
+    async fn a_rejected_openid_token_is_requested_again_once_the_wait_is_over() {
         let (_server, core) = core_with_openid(2).await;
         let service = ticket_service(401, 600_000, 2).await;
-        for _ in 0..2 {
-            let preview = core
-                .tunnel_preview(&service.uri(), "https://example.org/")
-                .await
-                .unwrap();
-            assert!(preview.is_none());
+        core.tunnel_preview(&service.uri(), "https://example.org/")
+            .await
+            .unwrap();
+        core.tunnel.state.lock().await.retry_after =
+            Some((service.uri(), std::time::Instant::now()));
+        core.tunnel_preview(&service.uri(), "https://example.org/")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn another_account_does_not_reuse_the_ticket() {
+        let (_server, core) = core_with_openid(1).await;
+        let service = ticket_service(200, 600_000, 1).await;
+        {
+            let mut state = core.tunnel.state.lock().await;
+            state.owner = Some(matrix_sdk::ruma::owned_user_id!("@other:example.org"));
+            state.session = Some(super::Session {
+                service: service.uri(),
+                expires: std::time::Instant::now() + std::time::Duration::from_secs(300),
+                fetch: sable_link_preview::TunnelFetch::new(
+                    relay_url(&service.uri()).unwrap(),
+                    "theirs".to_owned(),
+                    super::USER_AGENT.to_owned(),
+                ),
+            });
         }
+        core.tunnel_preview(&service.uri(), "https://example.org/")
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
