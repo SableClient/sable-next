@@ -11,6 +11,7 @@ const windows = vi.hoisted(() => ({
 
 vi.mock('#lib/platform/window-decorations.js', () => ({
   customTitleBarDefault: () => false,
+  hardwareVideoEncodeDefault: () => false,
   closeWindow: windows.close,
   minimizeWindow: windows.minimize,
   toggleMaximizeWindow: windows.toggle,

@@ -26,7 +26,7 @@ vi.mock('#lib/settings/preferences.svelte.js', () => ({
   applyDeploymentLocks: vi.fn(),
   applyAccountPreferences: mocks.preferences,
 }));
-vi.mock('./theme.js', () => ({ loadDeploymentTheme: vi.fn() }));
+vi.mock('./theme.svelte.js', () => ({ loadDeploymentTheme: vi.fn() }));
 import {
   activateAccountConfiguration,
   deployment,
