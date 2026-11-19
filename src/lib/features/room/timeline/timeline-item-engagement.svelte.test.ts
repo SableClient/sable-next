@@ -31,6 +31,12 @@ test('pointer enter engages and pointer leave disengages', () => {
   expect(engagement.engaged).toBe(false);
 });
 
+test('a touch entering the row does not engage it', () => {
+  const { engagement } = setup();
+  engagement.engage(new PointerEvent('pointerenter', { pointerType: 'touch' }));
+  expect(engagement.engaged).toBe(false);
+});
+
 test('focus moving within the row keeps it engaged', () => {
   const { inside, engagement } = setup();
   engagement.engaged = true;

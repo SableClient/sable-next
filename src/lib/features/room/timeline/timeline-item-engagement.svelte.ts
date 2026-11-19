@@ -23,6 +23,8 @@ export class TimelineItemEngagement {
   }
 
   engage = (event: FocusEvent | PointerEvent): void => {
+    // A finger has no hover, so the actions it would reveal vanish again on release.
+    if (event instanceof PointerEvent && event.pointerType === 'touch') return;
     if (
       event instanceof FocusEvent &&
       event.target instanceof Element &&
