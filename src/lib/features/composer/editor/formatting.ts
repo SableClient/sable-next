@@ -457,7 +457,22 @@ const tableCommand = insertNode(nodes.table, () => {
   return nodes.table.create(null, [header, ...(body as ProseMirrorNode[])]);
 });
 
-const detailsCommand = insertNode(nodes.details, () => nodes.details.createAndFill());
+const detailsCommand: Command = (state, dispatch) => {
+  if (!canInsert(state, nodes.details)) return false;
+  const details = nodes.details.createAndFill();
+  if (!details) return false;
+  if (dispatch) {
+    const tr = state.tr.replaceSelectionWith(details);
+    tr.doc.descendants((node, position) => {
+      if (node !== details) return true;
+      // Past the opening of the section and of its summary, which is written first.
+      tr.setSelection(TextSelection.create(tr.doc, position + 2));
+      return false;
+    });
+    dispatch(tr.scrollIntoView());
+  }
+  return true;
+};
 
 const bulletListCommand = toggleList(nodes.bullet_list);
 const orderedListCommand = toggleList(nodes.ordered_list);

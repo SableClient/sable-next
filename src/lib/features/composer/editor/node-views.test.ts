@@ -224,3 +224,21 @@ test('an emote keeps animating when stickers and emoji autoplay', async () => {
 
   expect(image.getAttribute('src')).toBe('blob:parrot');
 });
+
+test('a collapsible section stays open while it is written', () => {
+  const view = views().details(
+    composerSchema.nodes.details.createAndFill() as never,
+    null as never,
+    () => 0,
+    [],
+    null as never
+  );
+  const dom = view.dom as HTMLDetailsElement;
+  expect(dom.open).toBe(true);
+  expect(view.contentDOM).toBe(dom);
+
+  dom.open = false;
+  dom.dispatchEvent(new Event('toggle'));
+
+  expect(dom.open).toBe(true);
+});

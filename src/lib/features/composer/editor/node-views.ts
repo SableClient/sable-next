@@ -178,6 +178,15 @@ export function composerNodeViews(
       }),
     emoticon: (node) => new EmoticonNodeView(node, media),
     image: (node) => new ImageNodeView(node, media),
+    details: () => {
+      const dom = document.createElement('details');
+      // Closed, the body being written is hidden and the caret can sit in it unseen.
+      dom.open = true;
+      dom.addEventListener('toggle', () => {
+        dom.open = true;
+      });
+      return { dom, contentDOM: dom, ignoreMutation: (mutation) => mutation.type === 'attributes' };
+    },
     mfm_time: (node) => {
       const dom = document.createElement('time');
       dom.className = 'composer-time';

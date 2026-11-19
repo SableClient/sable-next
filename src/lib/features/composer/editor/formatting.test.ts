@@ -632,6 +632,17 @@ describe('toolbar block insertion', () => {
     expect(details?.firstChild?.type.name).toBe('summary');
     expect(details?.child(1).type.name).toBe('paragraph');
   });
+
+  test('a new collapsible section puts the caret in its summary', () => {
+    open();
+    type('before');
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    formatCommands.details(editor.state, editor.dispatch);
+
+    expect(editor.state.selection.empty).toBe(true);
+    expect(editor.state.selection.$from.parent.type.name).toBe('summary');
+  });
 });
 
 describe('markdown wrap on a select-all', () => {
