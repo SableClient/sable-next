@@ -228,7 +228,7 @@ test.each([
   });
 });
 
-test('a room that is not a direct chat can be made one from its menu, and back', async () => {
+test('a room that is not a direct chat can be made one from its menu', async () => {
   roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
   core.rpc.account.setDirect.mockReset().mockResolvedValue(null);
   await mountNav();
