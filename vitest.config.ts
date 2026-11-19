@@ -18,6 +18,7 @@ const storybookProject = (theme: 'light' | 'dark') => ({
   ...mergeConfig(
     viteConfig,
     defineProject({
+      optimizeDeps: { include: ['katex'] },
       plugins: [
         storybookTest({ configDir: '.storybook', initialGlobals: { theme } }),
         {
