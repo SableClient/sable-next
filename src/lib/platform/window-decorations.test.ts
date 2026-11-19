@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import {
   customTitleBarDefault,
+  hardwareVideoEncodeDefault,
   supportsTray,
   titleBarKind,
   watchMaximized,
@@ -38,6 +39,13 @@ test('Electron defaults to the custom title bar only on Windows', () => {
   expect(customTitleBarDefault()).toBe(true);
   installElectron('linux');
   expect(customTitleBarDefault()).toBe(false);
+});
+
+test('hardware video encoding defaults to off only on Linux', () => {
+  installElectron('linux');
+  expect(hardwareVideoEncodeDefault()).toBe(false);
+  installElectron('darwin');
+  expect(hardwareVideoEncodeDefault()).toBe(true);
 });
 
 test('an Electron window reports its maximised state and stops listening', async () => {

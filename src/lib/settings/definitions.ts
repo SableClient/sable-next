@@ -10,7 +10,10 @@ import type { RoomSort } from '#lib/rooms/room-sort.js';
 import { SYSTEM_TIME_ZONE, timeZoneValues } from '#lib/ui/time-zones.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { isNightlyBuild } from '#lib/platform/build-channel.js';
-import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
+import {
+  customTitleBarDefault,
+  hardwareVideoEncodeDefault,
+} from '#lib/platform/window-decorations.js';
 import { isNativeMobile } from '#lib/platform/os.js';
 import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
 
@@ -533,7 +536,7 @@ const SETTINGS = {
   showSystemTrayIcon: toggle(true, { device: true }),
   useCustomTitleBar: toggle(customTitleBarDefault(), { device: true }),
   hardwareAcceleration: toggle(true, { device: true }),
-  hardwareVideoEncode: toggle(true, { device: true }),
+  hardwareVideoEncode: toggle(hardwareVideoEncodeDefault(), { device: true }),
   hardwareVideoDecode: toggle(true, { device: true }),
   smoothScrolling: toggle(true, { device: true }),
   webRtcIpPolicy: choice(WEBRTC_IP_POLICIES, 'default', { device: true }),

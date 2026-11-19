@@ -37,6 +37,10 @@ export function customTitleBarDefault(): boolean {
   return desktopOs() === 'windows';
 }
 
+export function hardwareVideoEncodeDefault(): boolean {
+  return desktopOs() !== 'linux';
+}
+
 export function titleBarKind(useCustomTitleBar: boolean): TitleBarKind | null {
   if (!useCustomTitleBar || !supportsCustomTitleBar()) return null;
 
