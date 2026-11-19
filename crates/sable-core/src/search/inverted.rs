@@ -86,7 +86,7 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         }
         let documents = self.lengths.len() as f64;
         let average_length = self.total_length as f64 / documents;
-        let mut terms = tokenize::tokenize(query);
+        let mut terms = tokenize::tokenize_query(query);
         terms.sort_unstable();
         terms.dedup();
 
@@ -186,6 +186,13 @@ mod tests {
         let mut hits = index.query(query);
         hits.sort_by(|left, right| right.1.total_cmp(&left.1).then(left.0.cmp(&right.0)));
         hits.into_iter().map(|(key, _)| key).collect()
+    }
+
+    #[test]
+    fn test_a_japanese_word_does_not_match_words_sharing_one_character() {
+        crate::search::tokenize::load_bundled_chinese();
+        let index = index(&["検索を使う", "検討します", "索引です"]);
+        assert_eq!(ranked(&index, "検索"), [0]);
     }
 
     #[test]

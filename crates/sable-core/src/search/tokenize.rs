@@ -15,8 +15,18 @@ static TAMIL: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Ta
 
 const MAX_TERM_CHARS: usize = 256;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Side {
+    Document,
+    Query,
+}
+
 pub(crate) fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
-    tokenize_with(text, CHINESE.get())
+    tokenize_with(text, CHINESE.get(), Side::Document)
+}
+
+pub(crate) fn tokenize_query(text: &str) -> Vec<Cow<'static, str>> {
+    tokenize_with(text, CHINESE.get(), Side::Query)
 }
 
 pub(super) fn chinese_ready() -> bool {
@@ -33,7 +43,7 @@ pub(super) fn contains_chinese(text: &str) -> bool {
         .any(|character| Script::from(character) == Script::Cj)
 }
 
-fn tokenize_with(text: &str, dictionary: Option<&Jieba>) -> Vec<Cow<'static, str>> {
+fn tokenize_with(text: &str, dictionary: Option<&Jieba>, side: Side) -> Vec<Cow<'static, str>> {
     let mut terms = Vec::new();
     for token in text
         .tokenize()
@@ -47,20 +57,55 @@ fn tokenize_with(text: &str, dictionary: Option<&Jieba>) -> Vec<Cow<'static, str
             let original = text
                 .get(token.byte_start..token.byte_end)
                 .unwrap_or_default();
+            let mut singles = Vec::new();
             for word in dictionary.cut_for_search(original, false) {
+                let single = word.word.chars().count() == 1;
+                let mut found = false;
                 for token in word
                     .word
                     .tokenize()
                     .filter(|token| token.kind == TokenKind::Word)
                 {
-                    push_term(&mut terms, &token);
+                    let term = limit_term(stem(&token));
+                    if term.is_empty() {
+                        continue;
+                    }
+                    if single {
+                        found = true;
+                        singles.push(term);
+                    } else {
+                        terms.push(Cow::Owned(term));
+                    }
+                }
+                if !found {
+                    push_pairs(&mut terms, &mut singles, side);
                 }
             }
+            push_pairs(&mut terms, &mut singles, side);
         } else {
             push_term(&mut terms, &token);
         }
     }
     terms
+}
+
+/// The Chinese dictionary cuts text it has no words for, Japanese above all,
+/// into single characters, and a query of single characters matches any word
+/// that starts with one of them. A run of them is indexed as overlapping
+/// pairs instead. A document also keeps the last character, which starts no
+/// pair, so a one character query still finds it.
+fn push_pairs(terms: &mut Vec<Cow<'static, str>>, singles: &mut Vec<String>, side: Side) {
+    if singles.len() == 1 {
+        terms.extend(singles.drain(..).map(Cow::Owned));
+        return;
+    }
+    for pair in singles.windows(2) {
+        terms.push(Cow::Owned(pair.concat()));
+    }
+    if side == Side::Document {
+        terms.extend(singles.pop().map(Cow::Owned));
+    }
+    singles.clear();
 }
 
 fn push_term(terms: &mut Vec<Cow<'static, str>>, token: &Token<'_>) {
@@ -98,11 +143,35 @@ fn stemmer_for(script: Script) -> Option<&'static Stemmer> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_TERM_CHARS, tokenize};
+    use super::{MAX_TERM_CHARS, tokenize, tokenize_query};
 
     fn terms(text: &str) -> Vec<String> {
         super::load_bundled_chinese();
         tokenize(text).into_iter().map(Into::into).collect()
+    }
+
+    fn finds(query: &str, document: &str) -> bool {
+        let document = terms(document);
+        tokenize_query(query).iter().all(|wanted| {
+            document
+                .iter()
+                .any(|term| term.starts_with(wanted.as_ref()))
+        })
+    }
+
+    #[test]
+    fn test_a_japanese_word_matches_only_text_that_contains_it() {
+        assert!(finds("検索", "検索を使う"));
+        assert!(finds("検索", "日本語検索が失敗"));
+        assert!(!finds("検索", "検討します"));
+        assert!(!finds("検索", "索引です"));
+        assert!(!finds("ありがとう", "日本語検索が失敗"));
+    }
+
+    #[test]
+    fn test_one_japanese_character_finds_it_anywhere_in_a_run() {
+        assert!(finds("猫", "黒い猫"));
+        assert!(finds("黒", "黒い猫"));
     }
 
     #[test]
@@ -151,8 +220,15 @@ mod tests {
 
     #[test]
     fn test_missing_chinese_dictionary_keeps_latin_terms() {
-        assert_eq!(super::tokenize_with("deploy 中文搜索", None), ["deploy"]);
-        assert_eq!(super::tokenize_with("中文搜索", None), Vec::<&str>::new());
+        let document = super::Side::Document;
+        assert_eq!(
+            super::tokenize_with("deploy 中文搜索", None, document),
+            ["deploy"]
+        );
+        assert_eq!(
+            super::tokenize_with("中文搜索", None, document),
+            Vec::<&str>::new()
+        );
     }
 
     #[test]

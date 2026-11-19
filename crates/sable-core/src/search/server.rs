@@ -18,7 +18,7 @@ use matrix_sdk::ruma::{
 };
 
 use super::IndexFilter;
-use super::tokenize::tokenize;
+use super::tokenize::{tokenize, tokenize_query};
 use super::{ContextLine, Hit, edited_or_own_event_id, indexable_body, replacement_of};
 use crate::Core;
 use crate::messages::latest_valid_replacement;
@@ -293,7 +293,7 @@ fn latest_body(message: &OriginalSyncRoomMessageEvent) -> Option<String> {
 
 fn matches_query(query: &str, body: &str) -> bool {
     let terms = tokenize(body);
-    tokenize(query)
+    tokenize_query(query)
         .iter()
         .all(|wanted| terms.iter().any(|term| term.starts_with(wanted.as_ref())))
 }
