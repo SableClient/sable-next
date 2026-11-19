@@ -355,12 +355,12 @@ for (const width of [320, 412, 520, 768]) {
     expect(strip.left).toBeGreaterThanOrEqual(composer.left);
     expect(strip.right).toBeLessThanOrEqual(composer.right);
     if (rail.scrollWidth > rail.clientWidth) {
-      await expect.element(rail).toHaveClass('fade-end');
+      await expect.poll(() => rail.dataset.scrollMoreX).toContain('end');
     }
     const highlight = screen.getByRole('button', { name: 'Highlight colour', exact: true });
     highlight.element().focus();
     await expect.element(highlight).toBeInViewport();
-    await expect.element(rail).not.toHaveClass('fade-end');
+    await expect.poll(() => rail.dataset.scrollMoreX ?? '').not.toContain('end');
   });
 }
 
