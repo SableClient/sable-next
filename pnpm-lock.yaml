@@ -162,6 +162,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-qBVO6QwPSKvo1VkoyX1conlS+5mR2NTvHHOng13C5ew=
+
 patchedDependencies:
   '@sapphi-red/web-noise-suppressor@0.4.1': 04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828
   '@sveltejs/kit@3.1.1': 6589fb8ecd1177fe34954a01735f3a86ea8c7c2e478a3937cfef8697fffd94b7
@@ -412,6 +414,9 @@ importers:
       '@storybook/addon-svelte-csf':
         specifier: 5.1.6
         version: 5.1.6(@storybook/svelte@10.6.6(storybook@10.6.6(@types/react@19.3.0)(react@19.3.1))(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1)))(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))(storybook@10.6.6(@types/react@19.3.0)(react@19.3.1))(svelte@5.57.3(patch_hash=49db0772c949d096c7a511ad138eb787aad19e7529ef94e8a358db7423ce743e)(@typescript-eslint/types@8.72.1))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      '@storybook/addon-themes':
+        specifier: 10.6.6
+        version: 10.6.6(react@19.3.1)(storybook@10.6.6(@types/react@19.3.0)(react@19.3.1))
       '@storybook/addon-vitest':
         specifier: 10.6.6
         version: 10.6.6(@vitest/browser-playwright@5.1.0)(@vitest/browser@5.1.0)(react@19.3.1)(storybook@10.6.6(@types/react@19.3.0)(react@19.3.1))(vitest@5.1.0)
@@ -2786,6 +2791,15 @@ packages:
       storybook: ^0.0.0-0 || ^8.2.0 || ^9.0.0 || ^9.1.0-0 || ^10.0.0-0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0 || ^10.5.0-0 || ^10.6.0-0 || ^11.0.0-0
       svelte: ^5.0.0
       vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
+
+  '@storybook/addon-themes@10.6.6':
+    resolution: {integrity: sha512-R47S85vAHy52esRjPwn4YMqziVhwflMX+8B/DcxShUh1OexlC4DcZ3XRBbzmANz1DTOZAXzOAarjBA9ctmwlPw==}
+    peerDependencies:
+      react: '*'
+      storybook: ^10.6.6
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@storybook/addon-vitest@10.6.6':
     resolution: {integrity: sha512-wyCJ6922tD/xxcADk0lnKqZ5OiekD59oIyt7iUZM7X/nUOqfoY3AU4kwvvIM+6sd68YUT8QyTmGZAzyiLVduFA==}
@@ -8162,6 +8176,13 @@ snapshots:
       zimmerframe: 1.1.5
     transitivePeerDependencies:
       - babel-plugin-macros
+
+  '@storybook/addon-themes@10.6.6(react@19.3.1)(storybook@10.6.6(@types/react@19.3.0)(react@19.3.1))':
+    dependencies:
+      storybook: 10.6.6(@types/react@19.3.0)(react@19.3.1)
+      ts-dedent: 2.3.0
+    optionalDependencies:
+      react: 19.3.1
 
   '@storybook/addon-vitest@10.6.6(@vitest/browser-playwright@5.1.0)(@vitest/browser@5.1.0)(react@19.3.1)(storybook@10.6.6(@types/react@19.3.0)(react@19.3.1))(vitest@5.1.0)':
     dependencies:

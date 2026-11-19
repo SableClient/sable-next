@@ -1,15 +1,9 @@
-import type { Decorator, Preview } from '@storybook/sveltekit';
+import { withThemeByClassName } from '@storybook/addon-themes';
+import type { Decorator, Preview, SvelteRenderer } from '@storybook/sveltekit';
 
 import '../src/styles.css';
 
 import CoreClientProvider from './CoreClientProvider.svelte';
-
-const applyTheme: Decorator = (story, context) => {
-  const theme = context.globals.theme as string;
-  document.documentElement.classList.toggle('dark', theme === 'dark');
-  document.documentElement.classList.toggle('light', theme === 'light');
-  return story();
-};
 
 const provideCoreClient: Decorator = (story) => ({
   Component: CoreClientProvider,
@@ -17,22 +11,13 @@ const provideCoreClient: Decorator = (story) => ({
 });
 
 const preview: Preview = {
-  decorators: [applyTheme, provideCoreClient],
-  globalTypes: {
-    theme: {
-      description: 'Colour scheme',
-      toolbar: {
-        title: 'Theme',
-        icon: 'contrast',
-        items: [
-          { value: 'light', title: 'Light', icon: 'sun' },
-          { value: 'dark', title: 'Dark', icon: 'moon' },
-        ],
-        dynamicTitle: true,
-      },
-    },
-  },
-  initialGlobals: { theme: 'light' },
+  decorators: [
+    withThemeByClassName<SvelteRenderer>({
+      themes: { light: 'light', dark: 'dark' },
+      defaultTheme: 'light',
+    }),
+    provideCoreClient,
+  ],
   parameters: {
     backgrounds: { disable: true },
     controls: { expanded: true, sort: 'requiredFirst' },

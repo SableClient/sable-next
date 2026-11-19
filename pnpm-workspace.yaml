@@ -24,6 +24,14 @@ minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - '@sableclient/*'
   - electron@45.0.0
+packageExtensions:
+  # Its entry imports React without declaring it: https://github.com/storybookjs/storybook/issues/37184
+  '@storybook/addon-themes':
+    peerDependencies:
+      react: '*'
+    peerDependenciesMeta:
+      react:
+        optional: true
 patchedDependencies:
   # Start the worklet's message port so destroy() stops RNNoise processing.
   '@sapphi-red/web-noise-suppressor@0.4.1': patches/@sapphi-red__web-noise-suppressor@0.4.1.patch
