@@ -1,0 +1,30 @@
+[01:00:59.825] [INFO] storybook v10.6.6
+[01:01:00.055] [DEBUG] Getting package.json info for /Users/jo/sable-next/package.json...
+[01:01:00.587] [DEBUG] Could not determine @babel/preset-env version in use. In case of runtime errors with @babel/preset-env, you may need to set the babelRemoveBugfixes feature flag in your `main.ts` file.
+[01:01:00.817] [WARN] 🚨 Unable to index ./src/lib/features/room/media/LinkPreviewCard.stories.svelte:
+  SB_SVELTE_CSF_PARSER_EXTRACT_SVELTE_0009 (IndexerParseError): Storybook stories indexer parser threw an unrecognized error.
+If you see this error, please report it on the issue tracker on GitHub.
+
+More info: https://github.com/storybookjs/addon-svelte-csf/blob/v5.1.6/ERRORS.md#SB_SVELTE_CSF_PARSER_EXTRACT_SVELTE_0009
+
+    at Object.createIndex (file:///Users/jo/sable-next/node_modules/.pnpm/@storybook+addon-svelte-csf@5.1.6_@storybook+svelte@10.6.6_storybook@10.6.6_@types+reac_56c4d125b7e788b08197a53b86405c8c/node_modules/@storybook/addon-svelte-csf/dist/indexer/index.js:44:19)
+    at async _StoryIndexGenerator.extractStories (file:///Users/jo/sable-next/node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:16874:23)
+    at async file:///Users/jo/sable-next/node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:16795:39
+    at async Promise.all (index 0)
+    at async Promise.all (index 1)
+    at async _StoryIndexGenerator.updateExtracted (file:///Users/jo/sable-next/node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:16783:5)
+    at async _StoryIndexGenerator.ensureExtracted (file:///Users/jo/sable-next/node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:16818:5)
+    at async _StoryIndexGenerator.initialize (file:///Users/jo/sable-next/node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:16779:5)
+    at async file:///Users/jo/sable-next/node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/presets/common-preset.js:2347:10
+    at async Object.experimental_serverChannel (file:///Users/jo/sable-next/node_modules/.pnpm/@storybook+addon-vitest@10.6.6_@vitest+browser-playwright@5.1.0_@vitest+browser@5.1.0_r_c39a11b07a807076d681938395947083/node_modules/@storybook/addon-vitest/dist/preset.js:1554:116)
+[01:01:00.820] [ERROR] Error: Unable to index ./src/lib/features/room/media/LinkPreviewCard.stories.svelte
+    at _StoryIndexGenerator.getIndexAndStats (file://./node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:17055:15)
+    at async _StoryIndexGenerator.getIndex (file://./node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:17044:13)
+    at async createTestRunnerStore (file://./node_modules/.pnpm/@storybook+addon-vitest@10.6.6_@vitest+browser-playwright@5.1.0_@vitest+browser@5.1.0_r_c39a11b07a807076d681938395947083/node_modules/@storybook/addon-vitest/dist/preset.js:459:14)
+    at async Object.experimental_serverChannel (file://./node_modules/.pnpm/@storybook+addon-vitest@10.6.6_@vitest+browser-playwright@5.1.0_@vitest+browser@5.1.0_r_c39a11b07a807076d681938395947083/node_modules/@storybook/addon-vitest/dist/preset.js:1554:176)
+    at async buildDevStandalone (file://./node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/core-server/index.js:9540:72)
+    at async withTelemetry (file://./node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/_node-chunks/chunk-44BW7MFU.js:142:12)
+    at async dev (file://./node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/bin/core.js:4877:3)
+    at async _Command.<anonymous> (file://./node_modules/.pnpm/storybook@10.6.6_@types+react@19.3.0_react@19.3.1/node_modules/storybook/dist/bin/core.js:4985:3)
+[01:01:00.821] [WARN] Broken build, fix the error above.
+You may need to refresh the browser.

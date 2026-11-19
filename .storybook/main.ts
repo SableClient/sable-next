@@ -26,6 +26,7 @@ const config: StorybookConfig = {
             replacement: fileURLToPath(new URL('overlay-back-stub.ts', import.meta.url)),
           },
         ],
+        "#lib/core/context.ts": import.meta.resolve('../src/lib/core/__mocks__/context.ts')
       },
     }),
 };

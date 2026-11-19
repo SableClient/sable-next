@@ -1,6 +1,9 @@
 import type { Decorator, Preview } from '@storybook/sveltekit';
+import { sb } from 'storybook/test';
 
 import '../src/styles.css';
+
+sb.mock("#lib/core/context.js");
 
 const applyTheme: Decorator = (story, context) => {
   const theme = context.globals.theme as string;
