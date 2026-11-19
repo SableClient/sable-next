@@ -1,5 +1,34 @@
 # Sable Changelog
 
+## 26.11.4 (2026-11-19)
+
+### Features
+
+* Bot command forms show multi-line fields where the bot asks for them, and fill in your OS, browser, Sable version and homeserver when a bot asks for that information. You can edit or clear what was filled in.
+
+### Fixes
+
+* An account you add no longer starts with the status message and presence of your other accounts.
+* Sticker messages in the bubble timeline layout now get a bubble that fits the sticker on narrow screens instead of spanning the full width.
+* An expanded composer keeps its collapse button while empty and collapses when a message is sent.
+* `/converttodm` gives a chat with more than two members, such as a bridged direct message, your direct message alert level, unless the chat already has its own.
+* Messages with an unknown message type, such as Element's confetti and hearts effects, now show their text instead of being dropped from the timeline.
+* Starting a chat with a user that does not exist shows an error instead of creating an empty room.
+* Show the local network notice in Firefox when a homeserver on your local network keeps dropping the connection, with the about:config setting that fixes it.
+* GIFs and videos without controls or audio can be opened in the media viewer to view them fullscreen.
+* The mobile conversations button opens Home when all rooms are shown in the sidebar.
+* Tapping a notification opens its room instead of failing to switch accounts when a signed-out copy of the same account is saved.
+* Pasting a matrix: link over selected text in the composer now makes the selection the link label, like other links.
+* The pinned messages menu no longer gets stuck loading when a pin changes while it is open, and switching rooms with it open shows only the new room's pins.
+* Starting a chat from someone's profile card opens the chat in Firefox instead of staying on the current room.
+* Profiles that failed to load while offline load again once the connection returns.
+* Clicking your own reaction in a room where you cannot remove it no longer makes it flicker away and come back.
+* Long room names and addresses in the forward, add-existing and protect-rooms dialogs stay inside the dialog instead of overflowing to the right.
+* Stop search results from dimming and showing "Searching…" every second while older history is indexed.
+* Style adjustments to the room side panels and members panel.
+* The space sidebar now shows a scrollbar when its spaces do not fit the window height.
+* Windows installer progresses automatically.
+
 ## 26.11.3 (2026-11-18)
 
 ### Features

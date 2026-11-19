@@ -1,0 +1,3 @@
+- Bot command forms show multi-line fields where the bot asks for them, and fill in your OS, browser, Sable version and homeserver when a bot asks for that information. You can edit or clear what was filled in.
+- An account you add no longer starts with the status message and presence of your other accounts.
+- Sticker messages in the bubble timeline layout now get a bubble that fits the sticker on narrow screens instead of spanning the full width.
