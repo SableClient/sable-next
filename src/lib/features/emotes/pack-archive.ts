@@ -77,7 +77,7 @@ export function archivePack(
 }
 
 export function manifestJson(packs: ArchivePack[]): string {
-  return JSON.stringify({ version: ARCHIVE_VERSION, packs }, null, 2);
+  return JSON.stringify({ version: ARCHIVE_VERSION, packs });
 }
 
 function readString(value: unknown): string | undefined {

@@ -49,6 +49,12 @@ test('an unknown mime still gets a name rather than dropping the image', () => {
   expect(entryName(0, 'wave', null)).toBe('images/0-wave.bin');
 });
 
+test('the manifest is written compact', () => {
+  const written = manifestJson([archivePack(draft(), (url) => files.get(url))]);
+
+  expect(written).toBe(JSON.stringify(JSON.parse(written)));
+});
+
 test('a pack round-trips through the manifest', () => {
   const written = archivePack(draft(), (url) => files.get(url));
   const [read] = parseManifest(manifestJson([written]));
