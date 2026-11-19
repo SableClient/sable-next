@@ -39,7 +39,6 @@
   let faces = $derived(seen.slice(0, MAX_FACES));
   let overflow = $derived(Math.max(0, readers.length - MAX_FACES));
   let listFormat = $derived(new Intl.ListFormat(currentLocale(), { type: 'conjunction' }));
-  let names = $derived(listFormat.format(seen.map((reader) => reader.name)));
   let overflowNames = $derived(
     listFormat.format(seen.slice(MAX_FACES).map((reader) => reader.name))
   );
@@ -94,7 +93,7 @@
       class="read-receipt-stack chip selection-open"
       style:--stack-slots={MAX_FACES + 1}
       type="button"
-      aria-label={i18n.t('timeline.seenByNames', { names })}
+      aria-label={i18n.t('timeline.seenByNames', { count: `+${overflow}` })}
       aria-haspopup="dialog"
       aria-expanded={expanded}
       onclick={(event) => onOpen(event.currentTarget)}
@@ -123,7 +122,7 @@
               {...props}
               class={['t-avatar', 'overflow', 'selection-open']}
               type="button"
-              aria-label={i18n.t('timeline.seenByNames', { names: overflowNames })}
+              aria-label={i18n.t('timeline.seenByNames', { count: `+${overflow}` })}
               aria-haspopup="dialog"
               aria-expanded={expanded}
               onmouseenter={() => setShifts(faces.length)}

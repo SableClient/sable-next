@@ -1,9 +1,13 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
-
   import TimelineMessage from './TimelineMessage.svelte';
   import type { TimelineItemProps } from './timeline-row.svelte';
-  import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
+  import type {
+    ReplyView,
+    TimelineItemContentView,
+    TimelineItemView,
+  } from '#src/generated/protocol';
+  import TimelineNotice from './TimelineNotice.svelte';
 
   const noop = () => {};
   const id = 'foobar';
@@ -25,10 +29,10 @@
     event_id: id,
     transaction_id: id,
     send_state: { status: 'sent' },
-    sender: 'alice',
+    sender: '@alice:matrix.org',
     sender_name: 'Alice',
     sender_avatar: null,
-    timestamp: Date.now() - 60,
+    timestamp: Date.now(),
     content: plainContent,
     in_reply_to: null,
     thread_root: null,
@@ -107,54 +111,452 @@
   };
 
   const { Story } = defineMeta({
-    title: 'Room/Timeline Message',
+    title: 'Message/Message',
     tags: ['autodocs'],
+    parameters: {
+      a11y: {
+        config: {
+          rules: [
+            {
+              // isolated component
+              id: 'aria-valid-attr-value',
+              enabled: false,
+            },
+          ],
+        },
+      },
+    },
   });
 </script>
 
+{#snippet message(obj: object)}
+  <TimelineMessage {...withItem(obj)} />
+{/snippet}
+
 <Story name="Default">
-  <TimelineMessage {...args} />
+  {@render message({})}
+  <TimelineMessage
+    {...{
+      ...args,
+      overrideCosmetics: {
+        colorOnLight: null,
+        colorOnDark: null,
+        pronouns: [
+          {
+            summary: 'she/her',
+            language: 'en',
+          },
+        ],
+      },
+    }}
+  />
+</Story>
+
+<Story name="With Many Pronouns">
+  <TimelineMessage
+    {...{
+      ...args,
+      overrideCosmetics: {
+        colorOnLight: null,
+        colorOnDark: null,
+        pronouns: [
+          {
+            summary: 'foo',
+            language: 'en',
+          },
+          {
+            summary: 'bar',
+            language: 'en',
+          },
+          {
+            summary: 'baz',
+            language: 'en',
+          },
+          {
+            summary: 'etc',
+            language: 'en',
+          },
+          {
+            summary: 'helllooooooooooo',
+            language: 'en',
+          },
+          {
+            summary: 'lorem ipsum dolor sit amet',
+            language: 'en',
+          },
+        ],
+      },
+    }}
+  />
 </Story>
 
 <Story name="With PMP">
-  <TimelineMessage
-    {...withItem({
-      per_message_profile: {
-        id: id,
-        display_name: 'Tasque Manager', // i needed a picture from external servers lol
-        avatar_url: 'https://f0rest.net/art/abstract/task.png',
-        pronouns: [],
+  {@render message({
+    per_message_profile: {
+      id: id,
+      display_name: 'Foo', // i needed a picture from external servers lol
+      avatar_url: null,
+      pronouns: [],
+    },
+  })}
+  {@render message({
+    per_message_profile: {
+      id: id,
+      display_name: 'Foo', // i needed a picture from external servers lol
+      avatar_url: null,
+      pronouns: [
+        {
+          summary: 'they/them',
+          language: 'en',
+        },
+      ],
+    },
+  })}
+
+  {@render message({
+    per_message_profile: {
+      id: id,
+      display_name: 'Foo', // i needed a picture from external servers lol
+      avatar_url: null,
+      pronouns: [
+        {
+          summary: 'foo',
+          language: 'en',
+        },
+        {
+          summary: 'bar',
+          language: 'en',
+        },
+        {
+          summary: 'baz',
+          language: 'en',
+        },
+        {
+          summary: 'etc',
+          language: 'en',
+        },
+        {
+          summary: 'helllooooooooooo',
+          language: 'en',
+        },
+        {
+          summary: 'lorem ipsum dolor sit amet',
+          language: 'en',
+        },
+      ],
+    },
+  })}
+</Story>
+
+<Story name="Mention">
+  {@render message({
+    mention: 'loud',
+  })}
+  {@render message({
+    mention: 'silent',
+  })}
+</Story>
+
+<Story name="Forwarded">
+  {@render message({
+    forwarded: {
+      timestamp: Date.now(),
+      room_id: null,
+      event_id: null,
+      sender: null,
+      content_valid: null,
+    },
+  })}
+  {@render message({
+    forwarded: {
+      timestamp: Date.now(),
+      room_id: 'foo',
+      event_id: 'bar',
+      sender: '@bob:matrix.org',
+      content_valid: null,
+    },
+  })}
+
+  <div style="font-style: italic; padding-top: var(--space-100);">(Invalid forward)</div>
+  {@render message({
+    forwarded: {
+      room_id: 'foo',
+      event_id: 'bar',
+      sender: '@mallory:matrix.org',
+      content_valid: false,
+    },
+  })}
+</Story>
+
+<Story name="Read reciepts">
+  {@render message({
+    read_by: ['foo'],
+  })}
+  {@render message({
+    read_by: ['foo', 'bar', 'baz'],
+  })}
+  {@render message({
+    read_by: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+  })}
+</Story>
+
+<Story name="Reply">
+  {@render message({
+    in_reply_to: {
+      event_id: '1',
+      sender: '@alice:matrix.org',
+      sender_mentioned: true,
+      sender_name: 'Alice',
+      body: 'Hello world!',
+      fallback: null,
+      emotes: [],
+    } satisfies ReplyView,
+  })}
+  {@render message({
+    in_reply_to: {
+      event_id: '1',
+      sender: '@alice:matrix.org',
+      sender_mentioned: false,
+      sender_name: 'Alice',
+      body: 'Hello world!',
+      fallback: null,
+      emotes: [],
+    } satisfies ReplyView,
+  })}
+  {@render message({
+    in_reply_to: {
+      event_id: '1',
+      sender: '@alice:matrix.org',
+      sender_mentioned: true,
+      sender_name: 'Alice',
+      body: null,
+      fallback: {
+        kind: 'redacted',
       },
-    })}
+      emotes: [],
+    } satisfies ReplyView,
+  })}
+  {@render message({
+    in_reply_to: {
+      event_id: '1',
+      sender: '@alice:matrix.org',
+      sender_mentioned: true,
+      sender_name: 'Alice',
+      body: null,
+      fallback: {
+        kind: 'reaction',
+        key: ':P',
+      },
+      emotes: [],
+    } satisfies ReplyView,
+  })}
+  {@render message({
+    in_reply_to: {
+      event_id: '1',
+      sender: '@alice:matrix.org',
+      sender_mentioned: true,
+      sender_name: 'Alice',
+      body: null,
+      fallback: {
+        kind: 'redaction',
+      },
+      emotes: [],
+    } satisfies ReplyView,
+  })}
+  {@render message({
+    in_reply_to: {
+      event_id: '1',
+      sender: '@alice:matrix.org',
+      sender_mentioned: true,
+      sender_name: 'Alice',
+      body: null,
+      fallback: {
+        kind: 'verification_request',
+      },
+      emotes: [],
+    } satisfies ReplyView,
+  })}
+  {@render message({
+    in_reply_to: {
+      event_id: '1',
+      sender: '@alice:matrix.org',
+      sender_mentioned: true,
+      sender_name: 'Alice',
+      body: null,
+      fallback: {
+        kind: 'event',
+        event_type: 'm.foo',
+      },
+      emotes: [],
+    } satisfies ReplyView,
+  })}
+</Story>
+
+<Story name="Placeholder">
+  <TimelineMessage
+    {...{
+      ...args,
+      placeholder: true,
+    }}
   />
 </Story>
 
-<Story name="Encryption/Authenticity not guaranteed">
-  <TimelineMessage
-    {...withItem({
-      shield: {
-        code: 'authenticity_not_guaranteed',
-        critical: false,
+<Story
+  name="Selected"
+  parameters={{
+    a11y: {
+      config: {
+        rules: [
+          {
+            // not much we can do about name colors here
+            id: 'color-contrast',
+            enabled: false,
+          },
+        ],
       },
-    })}
+    },
+  }}
+>
+  <TimelineMessage
+    {...{
+      ...args,
+      selected: false,
+    }}
+  />
+  <TimelineMessage
+    {...{
+      ...args,
+      selected: true,
+    }}
+  />
+  <TimelineMessage
+    {...{
+      ...args,
+      selected: false,
+    }}
   />
 </Story>
 
-<Story name="Encryption/Cleartext">
-  <TimelineMessage
-    {...withItem({
-      shield: {
-        code: 'sent_in_clear',
-        critical: true,
+<Story name="Read marker">
+  <TimelineMessage {...args} />
+  <TimelineNotice
+    {...{
+      item: {
+        ...item,
+        content: {
+          kind: 'read_marker',
+        },
       },
-    })}
+      unreadCount: 3,
+    }}
+  />
+  <TimelineMessage {...args} />
+</Story>
+
+<Story name="Timeline start">
+  <TimelineNotice
+    {...{
+      item: {
+        ...item,
+        content: {
+          kind: 'timeline_start',
+        },
+      },
+      unreadCount: 0,
+    }}
+  />
+  <TimelineMessage {...args} />
+  <TimelineMessage {...args} />
+</Story>
+
+<Story name="Date marker">
+  <TimelineMessage {...args} />
+  <TimelineNotice
+    {...{
+      item: {
+        ...item,
+        content: {
+          kind: 'date_divider',
+          timestamp: Date.now() - 86400000,
+        },
+      },
+      unreadCount: 0,
+    }}
+  />
+  <TimelineMessage {...args} />
+  <TimelineNotice
+    {...{
+      item: {
+        ...item,
+        content: {
+          kind: 'date_divider',
+          timestamp: Date.now(),
+        },
+      },
+      unreadCount: 0,
+    }}
+  />
+  <TimelineMessage {...args} />
+</Story>
+
+<Story name="Highlighted">
+  <span>You'll need to view this one when it loads to view the animation.</span>
+  <TimelineMessage
+    {...{
+      ...args,
+      highlighted: false,
+    }}
+  />
+  <TimelineMessage
+    {...{
+      ...args,
+      highlighted: true,
+    }}
+  />
+  <TimelineMessage
+    {...{
+      ...args,
+      highlighted: false,
+    }}
   />
 </Story>
 
-<Story name="Encryption/Shared keys">
-  <TimelineMessage
-    {...withItem({
-      shared_by: id,
-    })}
-  />
+<Story name="Sending">
+  {@render message({
+    send_state: { status: 'sending', progress: null },
+  })}
+  {@render message({
+    send_state: {
+      status: 'sending',
+      progress: {
+        index: 2,
+        current: 100,
+        total: 1000,
+      },
+    },
+  })}
+  {@render message({
+    send_state: { status: 'failed', error: 'Example error', recoverable: false, blocked: null },
+  })}
+  {@render message({
+    send_state: {
+      status: 'failed',
+      error: 'Example error',
+      recoverable: false,
+      blocked: {
+        kind: 'verify_this_device',
+      },
+    },
+  })}
+  {@render message({
+    send_state: {
+      status: 'failed',
+      error: 'Example error',
+      recoverable: false,
+      blocked: {
+        kind: 'identity_changed',
+        user_ids: ['Bob', 'Mallory'],
+      },
+    },
+  })}
 </Story>

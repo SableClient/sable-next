@@ -24,7 +24,7 @@
   };
 
   const { Story } = defineMeta({
-    title: 'Room/Preview/Youtube link preview card',
+    title: 'Message/Preview/Youtube link preview card',
     component: YoutubeLinkPreview,
     tags: ['autodocs'],
     args: { url: preview.url, preview, mediaHidden: false },

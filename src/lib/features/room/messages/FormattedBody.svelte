@@ -362,7 +362,8 @@
         const zoned = time ? parseZonedDatetime(time.dateTime) : null;
         if (!time || !zoned) continue;
         time.textContent = formatMessageTimestamp(zoned.instant);
-        if (chip instanceof HTMLButtonElement) chip.ariaLabel = timeDetail(chip);
+        if (chip instanceof HTMLButtonElement)
+          chip.ariaLabel = formatMessageTimestamp(zoned.instant);
       }
 
       for (const image of node.querySelectorAll<HTMLImageElement>('img[data-mx-emoticon]')) {

@@ -25,7 +25,7 @@
   };
 
   const { Story } = defineMeta({
-    title: 'Room/Preview/Link preview card',
+    title: 'Message/Preview/Link preview card',
     component: LinkPreviewCard,
     tags: ['autodocs'],
     args: { url: bundled.url, encrypted: false, bundled },

@@ -26,6 +26,10 @@ const config: StorybookConfig = {
             find: /^(#lib\/platform|\.)\/overlay-back\.svelte\.js$/,
             replacement: fileURLToPath(new URL('overlay-back-stub.ts', import.meta.url)),
           },
+          {
+            find: /^#lib\/model\/model.js$/,
+            replacement: fileURLToPath(new URL('model-2-stub.ts', import.meta.url)),
+          },
         ],
       },
     }),

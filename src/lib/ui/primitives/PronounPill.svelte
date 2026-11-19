@@ -143,7 +143,7 @@
   }
 
   .pronoun-pill {
-    background: var(--pronoun-pill-ground, var(--surface-var-container));
+    background: var(--pronoun-pill-ground, var(--surface-container));
     border-radius: var(--radii-0);
     display: block;
     flex: none;

@@ -787,7 +787,7 @@ test('the sender zone reaches a time chip without rebuilding the body', async ()
 
   expect(document.querySelector('.time-chip')).toBe(chip);
   expect(spoiler.ariaPressed).toBe('false');
-  expect(chip.ariaLabel).toContain('Asia/Tokyo');
+  expect(chip.ariaLabel).toContain('January 1, 1970 01:00 AM');
   expect(document.querySelector('.tooltip')?.textContent).toContain('Asia/Tokyo');
 });
 

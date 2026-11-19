@@ -1449,7 +1449,7 @@
     "closeMemberList": "Close list",
     "seenBy": "Seen by",
     "inVoiceNames": "In voice: {{names}}",
-    "seenByNames": "Seen by {{names}}. Open the list.",
+    "seenByNames": "Seen by {{count}} more users. Open the list.",
     "userProfile": "Profile",
     "senderProfile": "Open {{name}}’s profile",
     "mentionSender": "Mention {{name}}",

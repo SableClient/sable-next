@@ -7,7 +7,7 @@
   import '#lib/ui/primitives/menu.css';
 
   const { Story } = defineMeta({
-    title: 'Room/Message menu',
+    title: 'Message/Message menu',
     tags: ['autodocs'],
   });
 

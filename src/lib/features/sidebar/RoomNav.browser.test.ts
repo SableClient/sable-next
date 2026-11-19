@@ -175,9 +175,7 @@ test('the list options menu renders its checkable items (#1341)', async () => {
 test('the room sort menu offers unread first and persists the choice', async () => {
   roomsFixture.rooms = [room({ room_id: '!a:example.org', name: 'General' })];
   const screen = await mountNav();
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Sort rooms: Recent activity' })
-  );
+  await userEvent.click(screen.getByRole('button', { name: 'Sort rooms: Recent activity' }));
   await expect.element(screen.getByRole('menuitemradio', { name: 'Unread first' })).toBeVisible();
   await userEvent.click(screen.getByRole('menuitemradio', { name: 'Unread first' }));
   await expect

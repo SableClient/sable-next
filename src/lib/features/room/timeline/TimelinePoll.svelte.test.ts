@@ -135,7 +135,7 @@ test('tapping a vote count with voters opens the voters dialog', async () => {
   }));
   const view = setup({ poll: poll({ answers }) });
 
-  await view.user.click(screen.getByRole('button', { name: 'See who voted for "ramen"' }));
+  await view.user.click(screen.getByRole('button', { name: '3 votes. See who voted for "ramen"' }));
 
   const dialog = await screen.findByRole('dialog');
   expect(within(dialog).getByRole('tablist')).toBeInTheDocument();
@@ -149,7 +149,7 @@ test('a voters tab switches the list to that answer', async () => {
   }));
   const view = setup({ poll: poll({ answers }) });
 
-  await view.user.click(screen.getByRole('button', { name: 'See who voted for "ramen"' }));
+  await view.user.click(screen.getByRole('button', { name: '3 votes. See who voted for "ramen"' }));
 
   const dialog = await screen.findByRole('dialog');
   const tabs = within(dialog).getAllByRole('tab');

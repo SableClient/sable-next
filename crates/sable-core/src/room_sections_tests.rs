@@ -208,7 +208,13 @@ fn unread_first_keeps_recent_order_within_unread_and_read() {
 
     assert_eq!(
         section(&sections, HOME).rooms,
-        ids(&["unread-late", "unread-early", "marked", "read-early", "read-late"])
+        ids(&[
+            "unread-late",
+            "unread-early",
+            "marked",
+            "read-early",
+            "read-late"
+        ])
     );
 }
 
