@@ -487,6 +487,22 @@ fn the_app_badge_counts_mentions_in_rooms_that_only_notify_for_mentions() {
     );
 
     assert_eq!(sections.app_badge, 5);
+    let push_badge = sections.push_badge();
+    assert_eq!(
+        push_badge[id("mentioned").as_str()],
+        PushBadgeRoom {
+            count: 2,
+            every: false
+        }
+    );
+    assert_eq!(
+        push_badge[id("dm").as_str()],
+        PushBadgeRoom {
+            count: 3,
+            every: true
+        }
+    );
+    assert!(!push_badge.contains_key(id("left").as_str()));
 }
 
 #[test]

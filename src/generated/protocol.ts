@@ -1201,6 +1201,7 @@ export type PushEventView = {
 	room_avatar_url: string | null,
 	encrypted: boolean,
 	noisy: boolean,
+	mention: boolean,
 };
 
 export type PushFetchView = { kind: "event"; event: PushEventView } | { kind: "discard" } | { kind: "unavailable" };

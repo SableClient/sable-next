@@ -10,6 +10,7 @@ use matrix_sdk::ruma::OwnedRoomId;
 use sable_model::space_graph::{SpaceGraph, SpaceNode};
 
 use crate::api::rooms::RoomKind;
+use crate::notifications::badge::PushBadgeRoom;
 use crate::protocol::{
     BadgeModeView, NotificationModeView, RoomBadgeView, RoomListItemView, RoomListOptionsView,
     RoomSectionView, RoomSectionsUpdate, RoomSortView, RoomSpacesView, RoomStateView, RoomTag,
@@ -28,6 +29,11 @@ pub(crate) struct RoomSections {
     badges: Vec<RoomBadgeView>,
     quiet_rooms: Vec<OwnedRoomId>,
     app_badge: u32,
+    #[cfg_attr(
+        not(any(target_os = "ios", test)),
+        expect(dead_code, reason = "only the iOS notification extension reads it")
+    )]
+    push_badge: BTreeMap<String, PushBadgeRoom>,
     room_spaces: Arc<Vec<RoomSpacesView>>,
     space_inputs: Option<u64>,
 }
@@ -66,13 +72,21 @@ impl RoomSections {
                 })
             })
             .collect();
-        let app_badge = rows
+        let push_badge: BTreeMap<_, _> = rows
             .iter()
             .filter(|row| joined(row) && !is_space(row))
             .map(|row| {
                 let counts = lists.badge(row);
-                counts.notifying.max(counts.highlight)
+                let room = PushBadgeRoom {
+                    count: counts.notifying.max(counts.highlight),
+                    every: lists.badge_mode(row) == Some(BadgeModeView::All),
+                };
+                (row.room_id.to_string(), room)
             })
+            .collect();
+        let app_badge = push_badge
+            .values()
+            .map(|room| room.count)
             .fold(0, u32::saturating_add);
 
         let space_inputs = Some(space_inputs(rows));
@@ -87,9 +101,18 @@ impl RoomSections {
             badges,
             quiet_rooms,
             app_badge,
+            push_badge,
             room_spaces,
             space_inputs,
         }
+    }
+
+    #[cfg_attr(
+        not(any(target_os = "ios", test)),
+        expect(dead_code, reason = "only the iOS notification extension reads it")
+    )]
+    pub(crate) const fn push_badge(&self) -> &BTreeMap<String, PushBadgeRoom> {
+        &self.push_badge
     }
 
     pub(crate) fn update(&mut self, next: Self) -> Option<RoomSectionsUpdate> {
@@ -167,6 +190,27 @@ const fn add_unread(total: &mut RoomUnreadView, counts: RoomUnreadView) {
     total.marked |= counts.marked;
 }
 
+/// `None` for a muted room.
+fn badge_mode(
+    row: &Row,
+    quiet: bool,
+    shown: bool,
+    options: &RoomListOptionsView,
+) -> Option<BadgeModeView> {
+    let mode = match row.notification.room {
+        Some(NotificationModeView::Mute) => return None,
+        Some(NotificationModeView::All) => BadgeModeView::All,
+        Some(NotificationModeView::Mentions) => BadgeModeView::Mentions,
+        None if row.is_direct => options.badge_default_direct,
+        None => options.badge_default_group,
+    };
+    Some(match (quiet || mode == BadgeModeView::Quiet, shown) {
+        (true, true) => BadgeModeView::Mentions,
+        (true, false) => BadgeModeView::Quiet,
+        (false, _) => mode,
+    })
+}
+
 /// A muted room's counts are already empty.
 fn badge_counts(
     row: &Row,
@@ -175,17 +219,8 @@ fn badge_counts(
     options: &RoomListOptionsView,
 ) -> RoomUnreadView {
     let counts = row.counts;
-    let mode = match row.notification.room {
-        Some(NotificationModeView::Mute) => return counts,
-        Some(NotificationModeView::All) => BadgeModeView::All,
-        Some(NotificationModeView::Mentions) => BadgeModeView::Mentions,
-        None if row.is_direct => options.badge_default_direct,
-        None => options.badge_default_group,
-    };
-    let mode = match (quiet || mode == BadgeModeView::Quiet, shown) {
-        (true, true) => BadgeModeView::Mentions,
-        (true, false) => BadgeModeView::Quiet,
-        (false, _) => mode,
+    let Some(mode) = badge_mode(row, quiet, shown, options) else {
+        return counts;
     };
     match mode {
         BadgeModeView::Quiet => RoomUnreadView {
@@ -278,6 +313,15 @@ impl<'a> Lists<'a> {
 
     fn badge(&self, row: &Row) -> RoomUnreadView {
         badge_counts(
+            row,
+            self.quiet.contains(row.room_id.as_str()),
+            self.options.shown_rooms.contains(&row.room_id),
+            self.options,
+        )
+    }
+
+    fn badge_mode(&self, row: &Row) -> Option<BadgeModeView> {
+        badge_mode(
             row,
             self.quiet.contains(row.room_id.as_str()),
             self.options.shown_rooms.contains(&row.room_id),

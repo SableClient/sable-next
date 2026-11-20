@@ -149,6 +149,7 @@ test.each([false, true])('fetches rich text as plain text (encrypted: %s)', asyn
           room_avatar_url: null,
           encrypted: true,
           noisy: false,
+          mention: false,
         },
       }
     )
@@ -191,6 +192,7 @@ test('an encrypted event takes what the open tab decrypted, and remembers it was
           room_avatar_url: null,
           encrypted: true,
           noisy: false,
+          mention: false,
         },
       }
     )
@@ -477,6 +479,7 @@ test('an app tab supplies already validated RTC presentation', async () => {
         room_avatar_url: null,
         encrypted: false,
         noisy: true,
+        mention: false,
       },
     }
   );

@@ -104,9 +104,10 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
                    let user = rendered["user_id"] as? String {
                     self?.clearReadRooms(rooms, user: user)
                 }
+                let badge = rendered["badge"] as? Int
                 if rendered["discard"] as? Bool == true {
                     Self.log.info("discarded by push rules")
-                    self?.suppress()
+                    self?.suppress(badge: badge)
                     return
                 }
                 if let ring = rendered["ring"] as? [String: Any], let room = rendered["room_id"] as? String,
@@ -115,7 +116,7 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
                     return
                 }
                 if let read = rendered["read"] as? [String: Any], let user = rendered["user_id"] as? String {
-                    self?.clearRead(read, user: user)
+                    self?.clearRead(read, user: user, badge: badge ?? 0)
                     return
                 }
                 guard let body = rendered["body"] as? String,
@@ -236,9 +237,9 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
         return INImage(imageData: data)
     }
 
-    private func clearRead(_ read: [String: Any], user: String) {
+    private func clearRead(_ read: [String: Any], user: String, badge: Int) {
         guard read["clear"] as? Bool == true else {
-            suppress(badge: 0)
+            suppress(badge: badge)
             return
         }
         let room = read["room_id"] as? String
@@ -251,7 +252,7 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             if !identifiers.isEmpty {
                 UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiers)
             }
-            self?.suppress(badge: 0)
+            self?.suppress(badge: badge)
         }
     }
 

@@ -1,3 +1,4 @@
+pub mod badge;
 #[cfg(not(target_family = "wasm"))]
 mod cold;
 mod device_activity;

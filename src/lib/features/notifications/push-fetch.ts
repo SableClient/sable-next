@@ -53,6 +53,7 @@ export function readPushFetch(value: unknown): PushFetchView | null {
       room_avatar_url: text(event.room_avatar_url) ?? null,
       encrypted: event.encrypted === true,
       noisy: event.noisy === true,
+      mention: event.mention === true,
     },
   };
 }

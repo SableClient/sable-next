@@ -6,6 +6,7 @@ use std::ops::ControlFlow;
 use std::path::Path;
 use std::time::Duration;
 
+use sable_core::notifications::badge::PushBadge;
 use sable_core::notifications::{
     ColdPush, PushImage, PushMedia, PushSession, push_preview, push_sender_name,
 };
@@ -198,6 +199,8 @@ struct DiscardOut {
     discard: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     read_rooms: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    badge: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -210,12 +213,16 @@ struct ReadOut {
 struct ReadPushOut {
     read: ReadOut,
     user_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    badge: Option<u32>,
 }
 
 #[derive(Serialize)]
 struct ReadRoomsOut {
     read_rooms: Vec<String>,
     user_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    badge: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -236,6 +243,7 @@ impl Rendered {
                 room_id: room_id.map(str::to_owned),
             },
             user_id,
+            badge: None,
         })
     }
 
@@ -243,6 +251,7 @@ impl Rendered {
         Self::Discard(DiscardOut {
             discard: true,
             read_rooms,
+            badge: None,
         })
     }
 }
@@ -357,6 +366,22 @@ struct PushTarget {
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[serde(default)]
     counts: Option<Counts>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default)]
+    mention: Option<bool>,
+    /// Sygnal's `event_id_only` format moves `counts.unread` here.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default)]
+    unread_count: Option<u64>,
+}
+
+impl PushTarget {
+    fn unread(&self) -> Option<u64> {
+        self.counts
+            .as_ref()
+            .and_then(|counts| counts.unread)
+            .or(self.unread_count)
+    }
 }
 
 #[serde_as]
@@ -466,6 +491,7 @@ fn decrypted_event(push: ColdPush) -> Result<Option<Value>, DiscardOut> {
             Err(DiscardOut {
                 discard: true,
                 read_rooms: Vec::new(),
+                badge: None,
             })
         }
         ColdPush::Clear(clear) => Ok(serde_json::from_str(&clear).ok()),
@@ -767,13 +793,13 @@ impl Alert<'_> {
             text: message.text,
             sender,
             sender_id,
+            unread: self.target.unread(),
             event_id: self.target.event_id.filter(|event| !event.is_empty()),
             room_id: self.room_id.to_owned(),
             user_id: user,
             sounds: current.sounds,
             noisy,
-            highlight: highlighted(self.notification),
-            unread: self.target.counts.as_ref().and_then(|counts| counts.unread),
+            highlight: highlighted(self.notification) || self.target.mention == Some(true),
             invite: message.invite,
             active_elsewhere,
             group: !room_name.is_empty(),
@@ -793,9 +819,57 @@ async fn render(root: &Path, payload: &Value, stage: &Cell<&'static str>) -> Out
     if !settings.enabled {
         return (None, None);
     }
-    let (Flow::Break(outcome) | Flow::Continue(outcome)) =
+    let (Flow::Break(mut outcome) | Flow::Continue(mut outcome)) =
         render_enabled(root, payload, &settings, optional_deadline, stage).await;
+    if let Some(rendered) = &mut outcome.0
+        && let Flow::Continue((_, user)) = parse_target(payload, notification(payload))
+    {
+        settle_badge(root, &user, rendered);
+    }
     outcome
+}
+
+/// Clears the rooms a push says were read and counts an alert it shows, then reports the
+/// badge the app would show, when the app has left one for this account.
+fn settle_badge(root: &Path, user: &str, rendered: &mut Rendered) {
+    let Some(mut badge) = PushBadge::load(root, user) else {
+        return;
+    };
+    let read_rooms = match rendered {
+        Rendered::Read(_) => &[][..],
+        Rendered::ReadRooms(out) => &out.read_rooms[..],
+        Rendered::Discard(out) => &out.read_rooms[..],
+        Rendered::Ring(out) => &out.read_rooms[..],
+        Rendered::Content(out) => &out.read_rooms[..],
+    };
+    let read_rooms: Vec<&str> = read_rooms.iter().map(String::as_str).collect();
+    let mut changed = badge.clear(Some(&read_rooms));
+    match rendered {
+        Rendered::Read(out) => {
+            let read_room = out.read.room_id.as_deref();
+            changed |= badge.clear(read_room.as_ref().map(std::slice::from_ref));
+        }
+        Rendered::Content(out) if !out.invite => {
+            if let Some(event_id) = &out.event_id {
+                // A room the app has not listed yet goes by its size.
+                let direct = out.members.is_some_and(|members| members <= 2);
+                changed |= badge.count(&out.room_id, event_id, out.highlight, direct);
+            }
+        }
+        _ => {}
+    }
+    // A failed write leaves the badge where the app last put it.
+    if changed {
+        let _ = badge.write(root);
+    }
+    let total = Some(badge.total());
+    match rendered {
+        Rendered::Read(out) => out.badge = total,
+        Rendered::ReadRooms(out) => out.badge = total,
+        Rendered::Discard(out) => out.badge = total,
+        Rendered::Content(out) => out.unread = total.map(u64::from),
+        Rendered::Ring(_) => {}
+    }
 }
 
 async fn render_enabled(
@@ -812,7 +886,7 @@ async fn render_enabled(
     let Some((account_id, device_id)) = signed_in(root, &user).await else {
         return stop(Issue::NoAccount);
     };
-    let zero_unread = target.counts.as_ref().and_then(|counts| counts.unread) == Some(0);
+    let zero_unread = target.unread() == Some(0);
     if zero_unread && target.event_id.as_deref().is_none_or(str::is_empty) {
         return finish(Rendered::read(settings.clear_on_read, room_id, user));
     }
@@ -840,6 +914,7 @@ async fn render_enabled(
             finish(Rendered::ReadRooms(ReadRoomsOut {
                 read_rooms,
                 user_id: account.user,
+                badge: None,
             }))
         };
     };
@@ -1322,6 +1397,7 @@ mod tests {
             room_avatar_url: None,
             encrypted: true,
             noisy: false,
+            mention: false,
         };
 
         let completed = complete(&push, &event).unwrap();
@@ -1530,6 +1606,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_badge_counts_on_from_what_the_app_left() {
+        let root = shape_root("badge").await;
+        let entry = |count, every| sable_core::notifications::badge::PushBadgeRoom { count, every };
+        PushBadge {
+            user_id: "@alice:example.org".to_owned(),
+            rooms: [
+                ("!room:example.org".to_owned(), entry(1, true)),
+                ("!quiet:example.org".to_owned(), entry(2, false)),
+            ]
+            .into(),
+            direct_every: true,
+            group_every: false,
+            counted: std::collections::VecDeque::new(),
+        }
+        .write(&root)
+        .unwrap();
+        let message = shape_push(json!({
+            "room_id":"!room:example.org","type":"m.room.message","event_id":"$e",
+            "sender":"@bob:example.org","content":{"body":"hi"},"counts":{"unread":40}
+        }));
+
+        assert_eq!(rendered(&root, &message).await.unwrap()["unread"], 4);
+        assert_eq!(rendered(&root, &message).await.unwrap()["unread"], 4);
+        let quiet = shape_push(json!({
+            "room_id":"!quiet:example.org","type":"m.room.message","event_id":"$q",
+            "sender":"@bob:example.org","content":{"body":"hi"}
+        }));
+        assert_eq!(rendered(&root, &quiet).await.unwrap()["unread"], 4);
+        let read = rendered(
+            &root,
+            &shape_push(json!({"room_id":"!room:example.org","counts":{"unread":0}})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(read["badge"], 2);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
     async fn read_pushes_follow_the_android_alerts() {
         let root = shape_root("reads").await;
         let policy = |clear_on_read: bool| json!({"enabled":true,"content":true,"encrypted_content":false,"sounds":true,"clear_on_read":clear_on_read});
@@ -1568,6 +1683,23 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(account_read["read"], json!({"clear":true,"room_id":null}));
+        let sygnal_read = rendered(
+            &root,
+            &json!({"user_id":"@alice:example.org","room_id":"!room:example.org","unread_count":0}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(sygnal_read["read"]["clear"], true);
+        let sygnal_message = rendered(
+            &root,
+            &shape_push(json!({
+                "room_id":"!room:example.org","type":"m.room.message","event_id":"$e",
+                "unread_count":3,"content":{"body":"hi"}
+            })),
+        )
+        .await
+        .unwrap();
+        assert_eq!(sygnal_message["unread"], 3);
         std::fs::write(
             root.join("push-policy.json"),
             r#"{"enabled":true,"content":true,"encrypted_content":false,"sounds":true}"#,
@@ -1739,14 +1871,16 @@ mod tests {
         assert_eq!(
             wire(&DiscardOut {
                 discard: true,
-                read_rooms: rooms.clone()
+                read_rooms: rooms.clone(),
+                badge: None,
             }),
             json!({"discard": true, "read_rooms": ["!a:example.org"]}).to_string()
         );
         assert_eq!(
             wire(&ReadRoomsOut {
                 read_rooms: rooms.clone(),
-                user_id: "@alice:example.org".to_owned()
+                user_id: "@alice:example.org".to_owned(),
+                badge: None,
             }),
             json!({"read_rooms": ["!a:example.org"], "user_id": "@alice:example.org"}).to_string()
         );

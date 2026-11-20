@@ -148,7 +148,8 @@ fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
         RawNotificationEvent::Invite(raw) => raw.json().get(),
     };
     let mut event: serde_json::Value = serde_json::from_str(raw).ok()?;
-    let noisy = item.is_noisy == Some(true) || item.has_mention == Some(true);
+    let mention = item.has_mention == Some(true);
+    let noisy = item.is_noisy == Some(true) || mention;
     Some(PushEventView {
         event_type: event.get("type")?.as_str()?.to_owned(),
         content: event
@@ -161,6 +162,7 @@ fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
         room_avatar_url: item.room_avatar_url,
         encrypted: item.is_room_encrypted == Some(true),
         noisy,
+        mention,
     })
 }
 

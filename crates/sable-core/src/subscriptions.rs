@@ -311,11 +311,15 @@ impl RoomListWorker {
     }
 
     fn emit(&mut self, diffs: Vec<crate::protocol::VectorDiff<RoomListItemView>>) {
-        let next = RoomSections::rebuild(
-            self.rows.rows(),
-            &self.options.borrow_and_update(),
-            &self.sections,
-        );
+        let options = self.options.borrow_and_update();
+        let next = RoomSections::rebuild(self.rows.rows(), &options, &self.sections);
+        #[cfg(target_os = "ios")]
+        let defaults = (options.badge_default_direct, options.badge_default_group);
+        drop(options);
+        #[cfg(target_os = "ios")]
+        if next.push_badge() != self.sections.push_badge() {
+            self.save_push_badge(next.push_badge(), defaults);
+        }
         let sections = self.sections.update(next);
         if diffs.is_empty() && sections.is_none() {
             return;
@@ -324,6 +328,34 @@ impl RoomListWorker {
             subscription: self.subscription,
             diffs,
             sections,
+        });
+    }
+
+    #[cfg(target_os = "ios")]
+    fn save_push_badge(
+        &self,
+        rooms: &std::collections::BTreeMap<String, notifications::badge::PushBadgeRoom>,
+        (direct, group): (
+            crate::protocol::BadgeModeView,
+            crate::protocol::BadgeModeView,
+        ),
+    ) {
+        use crate::protocol::BadgeModeView;
+        let Some(user_id) = self.client.user_id() else {
+            return;
+        };
+        let badge = notifications::badge::PushBadge {
+            user_id: user_id.to_string(),
+            rooms: rooms.clone(),
+            direct_every: direct == BadgeModeView::All,
+            group_every: group == BadgeModeView::All,
+            counted: std::collections::VecDeque::new(),
+        };
+        let root = std::path::PathBuf::from(&self.core.store_id);
+        tokio::task::spawn_blocking(move || {
+            if let Err(error) = badge.save(&root) {
+                tracing::warn!("push badge not saved: {error}");
+            }
         });
     }
 

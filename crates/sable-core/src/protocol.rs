@@ -2828,6 +2828,7 @@ pub struct PushEventView {
     pub room_avatar_url: Option<String>,
     pub encrypted: bool,
     pub noisy: bool,
+    pub mention: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
