@@ -113,12 +113,16 @@
   .member-group {
     align-items: center;
     color: var(--surface-var-on-container);
+    color: color-mix(
+      in srgb,
+      var(--surface-var-on-container) calc(var(--opacity-p300) * 100%),
+      transparent
+    );
     display: flex;
     font-size: var(--font-size-body);
     gap: var(--timeline-row-gap);
     line-height: var(--line-height-body);
     margin: 0;
-    opacity: var(--opacity-p300);
   }
 
   .state-icon {

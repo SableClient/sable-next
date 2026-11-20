@@ -194,7 +194,7 @@
     {@render stateTime()}
   </p>
   {#if item.content.content !== null}
-    <div class="state-detail">
+    <div class="state-detail state-diff">
       <StateContentDiff before={item.content.prev_content} after={item.content.content} />
     </div>
   {/if}
@@ -293,9 +293,13 @@
   }
 
   .state-icon,
-  .state :global(.state-event-text),
-  .state-text {
+  .state-text,
+  .state :global(.state-emote) {
     opacity: var(--opacity-p300);
+  }
+
+  .state :global(.state-event-text) {
+    color: color-mix(in srgb, currentcolor calc(var(--opacity-p300) * 100%), transparent);
   }
 
   .state-icon {
@@ -331,8 +335,11 @@
     gap: var(--space-050);
     margin-inline-start: calc(var(--avatar-size-small) + var(--timeline-row-gap));
     min-width: 0;
-    opacity: var(--opacity-p300);
     padding-block: var(--space-050);
+  }
+
+  .state-diff {
+    opacity: var(--opacity-p300);
   }
 
   .state-detail.target-above,
