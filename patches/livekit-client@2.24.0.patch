@@ -1,0 +1,48 @@
+diff --git a/dist/livekit-client.esm.mjs b/dist/livekit-client.esm.mjs
+index 9e59479..7109a56 100644
+--- a/dist/livekit-client.esm.mjs
++++ b/dist/livekit-client.esm.mjs
+@@ -25043,7 +25043,7 @@ class LocalTrack extends Track {
+       if (settings.noiseSuppression) {
+         features.add(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+       }
+-      if (settings.channelCount && settings.channelCount > 1) {
++      if (this.options?.forceStereo ?? (settings.channelCount ?? 0) > 1) {
+         features.add(AudioTrackFeature.TF_STEREO);
+       }
+       if (!((_a = this.options) === null || _a === void 0 ? void 0 : _a.dtx)) {
+@@ -26241,7 +26241,7 @@ class Participant extends eventsExports.EventEmitter {
+       if (settings.noiseSuppression) {
+         audioFeatures.push(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+       }
+-      if (settings.channelCount && settings.channelCount > 1) {
++      if (isStereo) {
+         audioFeatures.push(AudioTrackFeature.TF_STEREO);
+       }
+       if (disableDtx) {
+diff --git a/src/room/participant/LocalParticipant.ts b/src/room/participant/LocalParticipant.ts
+index 9016817..c2f194d 100644
+--- a/src/room/participant/LocalParticipant.ts
++++ b/src/room/participant/LocalParticipant.ts
+@@ -911,7 +911,7 @@ export class LocalParticipant extends Participant {
+     if (settings.noiseSuppression) {
+       audioFeatures.push(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+     }
+-    if (settings.channelCount && settings.channelCount > 1) {
++    if (isStereo) {
+       audioFeatures.push(AudioTrackFeature.TF_STEREO);
+     }
+     if (disableDtx) {
+diff --git a/src/room/track/LocalTrackPublication.ts b/src/room/track/LocalTrackPublication.ts
+index 3b9e3a8..29fbb95 100644
+--- a/src/room/track/LocalTrackPublication.ts
++++ b/src/room/track/LocalTrackPublication.ts
+@@ -102,7 +102,7 @@ export default class LocalTrackPublication extends TrackPublication {
+       if (settings.noiseSuppression) {
+         features.add(AudioTrackFeature.TF_NOISE_SUPPRESSION);
+       }
+-      if (settings.channelCount && settings.channelCount > 1) {
++      if (this.options?.forceStereo ?? (settings.channelCount ?? 0) > 1) {
+         features.add(AudioTrackFeature.TF_STEREO);
+       }
+       if (!this.options?.dtx) {
