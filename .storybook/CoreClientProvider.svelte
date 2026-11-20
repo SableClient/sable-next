@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
 
   import type { CoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
@@ -51,4 +52,7 @@
   provideRoomList(new RoomList(mockCore));
 </script>
 
-{@render children()}
+<!-- The root layout does the same for the app. -->
+<IconContext values={{ 'aria-hidden': true }}>
+  {@render children()}
+</IconContext>
