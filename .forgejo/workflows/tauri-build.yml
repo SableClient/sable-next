@@ -25,10 +25,10 @@ env:
   FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
   # Each nightly is ~1.5 GB of bundles on a node with ~100 GB of disk.
   NIGHTLY_KEEP: 20
-  SCCACHE_BUCKET: sccache
+  SCCACHE_BUCKET: ow-oops-sccache
   SCCACHE_S3_KEY_PREFIX: sable-next
-  SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
-  SCCACHE_REGION: us-east-1
+  SCCACHE_ENDPOINT: https://s3.gra.io.cloud.ovh.net
+  SCCACHE_REGION: gra
   SCCACHE_S3_USE_SSL: 'true'
   SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
 jobs:

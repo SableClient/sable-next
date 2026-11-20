@@ -13,10 +13,10 @@ concurrency:
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
   CARGO_INCREMENTAL: 0
-  SCCACHE_BUCKET: sccache
+  SCCACHE_BUCKET: ow-oops-sccache
   SCCACHE_S3_KEY_PREFIX: sable-next
-  SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
-  SCCACHE_REGION: us-east-1
+  SCCACHE_ENDPOINT: https://s3.gra.io.cloud.ovh.net
+  SCCACHE_REGION: gra
   SCCACHE_S3_USE_SSL: 'true'
 
 # Pushes publish the image from tauri-build. This only proves a Dockerfile

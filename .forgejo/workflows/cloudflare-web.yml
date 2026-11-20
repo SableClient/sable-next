@@ -33,10 +33,10 @@ env:
   TF_HTTP_UNLOCK_METHOD: 'DELETE'
   TF_HTTP_RETRY_WAIT_MIN: '5'
   CARGO_INCREMENTAL: 0
-  SCCACHE_BUCKET: sccache
+  SCCACHE_BUCKET: ow-oops-sccache
   SCCACHE_S3_KEY_PREFIX: sable-next
-  SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
-  SCCACHE_REGION: us-east-1
+  SCCACHE_ENDPOINT: https://s3.gra.io.cloud.ovh.net
+  SCCACHE_REGION: gra
   SCCACHE_S3_USE_SSL: 'true'
 
 jobs:
