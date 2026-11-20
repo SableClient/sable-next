@@ -72,7 +72,7 @@ runs:
       uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: src/generated/wasm
-        key: wasm-${{ runner.os }}-${{ steps.wasm-lock.outputs.hash }}-${{ hashFiles('crates/**', 'Cargo.toml', 'rust-toolchain.toml', '.cargo/config.toml', '.mise/config.toml', 'scripts/build/build-wasm.mjs') }}
+        key: wasm-${{ runner.os }}-${{ steps.wasm-lock.outputs.hash }}-${{ hashFiles('crates/**', 'vendor/bytecount/**', 'Cargo.toml', 'rust-toolchain.toml', '.cargo/config.toml', '.mise/config.toml', 'scripts/build/build-wasm.mjs', 'scripts/lib/cargo.mjs', 'scripts/lib/download.mjs', 'src/worker/wasm-debug.ts') }}
 
     - name: Set up Rust
       if: ${{ inputs.rust == 'true' || (inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true') }}
