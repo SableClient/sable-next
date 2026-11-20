@@ -89,6 +89,12 @@
       allowedVersions: '<7',
     },
     {
+      description: '2.0.1 fails the composer round-trip tests on escaped pipes in table cells',
+      matchManagers: ['npm'],
+      matchPackageNames: ['mdast-util-gfm-table'],
+      allowedVersions: '<2.0.1',
+    },
+    {
       description: 'Match ruma-html until the Ruma pin is updated',
       matchManagers: ['cargo'],
       matchPackageNames: ['html5ever'],
