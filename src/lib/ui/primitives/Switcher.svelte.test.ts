@@ -32,7 +32,7 @@ test('changes one native radio selection and submits the selected form value', a
 test('disabled choices preserve the selected value', () => {
   const onValueChange = vi.fn();
   render(Switcher, { items, value: 'dark', label: 'Theme', disabled: true, onValueChange });
-  const light = screen.getByRole('radio', { name: 'Light' }) as HTMLInputElement;
+  const light = screen.getByRole<HTMLInputElement>('radio', { name: 'Light' });
   expect(light).toBeDisabled();
   light.click();
   expect(screen.getByRole('radio', { name: 'Dark' })).toBeChecked();

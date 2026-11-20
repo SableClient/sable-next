@@ -189,7 +189,7 @@ fn a_screen_share_flag_is_top_level_and_leaves_the_membership_untouched() {
         let sharing = content_at(&room_id, &own, None, 9_000);
         assert_eq!(sharing["org.sable.screen_sharing"], true);
 
-        let mut stripped = sharing.clone();
+        let mut stripped = sharing;
         stripped
             .as_object_mut()
             .unwrap()
