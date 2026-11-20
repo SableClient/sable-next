@@ -105,7 +105,10 @@ function keyboardInset(viewport: VisualViewport): number {
 export function softwareKeyboardShown(): boolean | null {
   if (document.documentElement.dataset.tauriOs === 'android') return null;
   const viewport = window.visualViewport;
-  return viewport ? keyboardInset(viewport) > 0 : null;
+  // A viewport panned up to the caret still has the keyboard under it.
+  return viewport
+    ? Math.round(window.innerHeight - viewport.height * (viewport.scale || 1)) > 0
+    : null;
 }
 
 export function resetDocumentScroll(): void {

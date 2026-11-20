@@ -239,13 +239,17 @@ test('pinch zoom and panning do not become keyboard insets', async () => {
 });
 
 test.each([
-  [500, true],
-  [800, false],
-])('a visual viewport %i tall under an 800 window shows a keyboard=%s', (height, shown) => {
-  vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height, offsetTop: 0 }));
-  vi.stubGlobal('innerHeight', 800);
-  expect(softwareKeyboardShown()).toBe(shown);
-});
+  [500, 0, true],
+  [500, 300, true],
+  [800, 0, false],
+])(
+  'a visual viewport %i tall and panned %i under an 800 window shows a keyboard=%s',
+  (height, offsetTop, shown) => {
+    vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height, offsetTop }));
+    vi.stubGlobal('innerHeight', 800);
+    expect(softwareKeyboardShown()).toBe(shown);
+  }
+);
 
 test('the Android app cannot tell whether its keyboard is shown', () => {
   document.documentElement.dataset.tauriOs = 'android';
