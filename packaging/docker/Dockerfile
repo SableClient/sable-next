@@ -6,7 +6,7 @@
 # Builds everything from source. CI packages its release bundle instead with
 # `--build-context dist=dist`.
 
-FROM node:24-bookworm AS node
+FROM node:26-bookworm AS node
 
 FROM rust:1.100.0-bookworm AS rust
 ARG TARGETARCH
