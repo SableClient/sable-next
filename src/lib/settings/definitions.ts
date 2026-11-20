@@ -297,6 +297,7 @@ const SETTINGS = {
   showRoomIcon: choice<ShowRoomIcon>(['always', 'sometimes', 'collapsed', 'never'], 'always', {
     account: true,
   }),
+  showEncryptionStatusIcon: toggle(true, { account: true }),
   voiceParticipantPlacement: choice(['both', 'below', 'inline'], 'both', { account: true }),
   showRoomBanners: toggle(true, { account: true }),
   bannerFit: choice(['fixed', 'image'], 'fixed', { account: true }),

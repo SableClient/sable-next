@@ -151,7 +151,7 @@
   {/snippet}
 
   {#snippet suffix()}
-    {#if encryptionLabel !== null}
+    {#if preferences.showEncryptionStatusIcon && encryptionLabel !== null}
       <Tooltip label={encryptionLabel}>
         {#snippet trigger({ props })}
           <span

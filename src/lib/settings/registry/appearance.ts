@@ -9,6 +9,7 @@ import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
 import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
 import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
 import MagnifyingGlassPlusIcon from 'phosphor-svelte/lib/MagnifyingGlassPlusIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
@@ -36,6 +37,7 @@ export const appearanceCategory: SettingsCategory = {
     { id: 'font', name: 'settings.groups.font' },
     { id: 'app-language', name: 'settings.groups.language' },
     { id: 'sidebar', name: 'settings.groups.sidebar' },
+    { id: 'room-header', name: 'settings.groups.roomHeader' },
     { id: 'unread-badges', name: 'settings.groups.unreadBadges' },
     { id: 'accessibility', name: 'settings.accessibilityTitle' },
   ],
@@ -197,6 +199,13 @@ export const appearanceCategory: SettingsCategory = {
       icon: ClockIcon,
       name: 'settings.restoreLastRoom',
       description: 'settings.restoreLastRoomHint',
+      type: 'boolean',
+    },
+    {
+      key: 'showEncryptionStatusIcon',
+      section: 'room-header',
+      icon: LockSimpleIcon,
+      name: 'settings.showEncryptionStatusIcon',
       type: 'boolean',
     },
     {
