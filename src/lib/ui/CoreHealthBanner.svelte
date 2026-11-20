@@ -48,7 +48,7 @@
       };
     }
     if (offlineSettled) {
-      return { kind: 'warn' as const, text: i18n.t('errors.offline') };
+      return { kind: 'retry' as const, text: i18n.t('errors.offline') };
     }
     return null;
   });
@@ -77,6 +77,10 @@
       >
       <Button size="small" onclick={() => void core.allowLocalNetwork()}
         >{i18n.t('errors.localNetworkAllow')}</Button
+      >
+    {:else if notice.kind === 'retry'}
+      <Button size="small" variant="ghost" onclick={() => void core.retrySync()}
+        >{i18n.t('common.retry')}</Button
       >
     {/if}
   </div>

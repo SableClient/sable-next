@@ -222,6 +222,11 @@ impl Core {
             self.set_sync_presence(self.cached_sync_presence().await)
                 .await;
             transition.start_sync(&sync_service).await;
+            if !self.sync_paused() && !self.activity.network_available() {
+                self.emit(crate::protocol::CoreEvent::SyncStatus(
+                    self.shown_sync_status(sync_service.state().get()),
+                ));
+            }
             drop(transition);
             // Fetches replied-to events, which must not hold up local reads or the next pause.
             Box::pin(self.until_stores_close(self.retry_cached_decryption())).await;
@@ -247,7 +252,24 @@ impl Core {
         if available && !was_available && !self.sync_paused() {
             self.apply_activity(self.activity.app_active(), None).await;
         }
+        if !available
+            && was_available
+            && !self.sync_paused()
+            && let Ok(sync_service) = self.sync_service().await
+        {
+            self.emit(crate::protocol::CoreEvent::SyncStatus(
+                self.shown_sync_status(sync_service.state().get()),
+            ));
+        }
         self.refresh_search_peers().await;
+    }
+
+    /// For when the OS reports the network gone and is wrong, which would block every restart.
+    pub(crate) async fn retry_sync(&self, sync_service: &SyncService) {
+        self.activity
+            .network_available
+            .store(true, Ordering::SeqCst);
+        self.resume_sync(sync_service).await;
     }
 
     pub(crate) fn watch_activity_health(self: &Arc<Self>) {

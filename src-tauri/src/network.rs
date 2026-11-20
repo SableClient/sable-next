@@ -1,25 +1,26 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, LazyLock};
 
 use sable_core::Core;
+use tokio::sync::watch;
 
-struct Connection {
-    available: bool,
-    unmetered: bool,
-    core: Option<Weak<Core>>,
-}
-
-static CONNECTION: Mutex<Connection> = Mutex::new(Connection {
-    available: true,
-    unmetered: false,
-    core: None,
-});
+static STATE: LazyLock<watch::Sender<(bool, bool)>> =
+    LazyLock::new(|| watch::Sender::new((true, false)));
 
 pub(crate) fn attach(core: &Arc<Core>) {
-    let mut connection = CONNECTION
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    report(core.clone(), connection.available, connection.unmetered);
-    connection.core = Some(Arc::downgrade(core));
+    let core = Arc::downgrade(core);
+    let mut states = STATE.subscribe();
+    states.mark_changed();
+    // One task, so the states apply in the order they were reported: a lost network applied
+    // after the one that replaced it would keep sync waiting for good.
+    tauri::async_runtime::spawn(async move {
+        while states.changed().await.is_ok() {
+            let (available, unmetered) = *states.borrow_and_update();
+            let Some(core) = core.upgrade() else {
+                break;
+            };
+            core.update_network_conditions(available, unmetered).await;
+        }
+    });
 
     #[cfg(target_os = "ios")]
     if let Err(error) = crate::ios::watch_network() {
@@ -29,18 +30,5 @@ pub(crate) fn attach(core: &Arc<Core>) {
 
 #[cfg(mobile)]
 pub(crate) fn set_state(available: bool, unmetered: bool) {
-    let mut connection = CONNECTION
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    connection.available = available;
-    connection.unmetered = unmetered;
-    if let Some(core) = connection.core.as_ref().and_then(Weak::upgrade) {
-        report(core, available, unmetered);
-    }
-}
-
-fn report(core: Arc<Core>, available: bool, unmetered: bool) {
-    tauri::async_runtime::spawn(async move {
-        core.update_network_conditions(available, unmetered).await;
-    });
+    STATE.send_replace((available, unmetered));
 }

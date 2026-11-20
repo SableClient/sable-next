@@ -3660,6 +3660,7 @@ export type Rpc = {
     accessToken: (params?: Record<string, never>) => Promise<string | null>;
     openIdToken: (params?: Record<string, never>) => Promise<OpenIdTokenView>;
     syncStatus: (params?: Record<string, never>) => Promise<SyncStatus>;
+    retrySync: (params?: Record<string, never>) => Promise<null>;
     serverFeatures: (params?: Record<string, never>) => Promise<string[]>;
     delayedEventsSupported: (params?: Record<string, never>) => Promise<boolean>;
     qrGrantSupported: (params?: Record<string, never>) => Promise<boolean>;
@@ -4198,6 +4199,7 @@ export type RpcMethods = {
   'session.access_token': Rpc['session']['accessToken'];
   'session.open_id_token': Rpc['session']['openIdToken'];
   'session.sync_status': Rpc['session']['syncStatus'];
+  'session.retry_sync': Rpc['session']['retrySync'];
   'session.server_features': Rpc['session']['serverFeatures'];
   'session.delayed_events_supported': Rpc['session']['delayedEventsSupported'];
   'session.qr_grant_supported': Rpc['session']['qrGrantSupported'];
@@ -4577,6 +4579,7 @@ export function createRpc(call: RpcCall): Rpc {
       accessToken: (params = {}) => call('session.access_token', params) as ReturnType<Rpc['session']['accessToken']>,
       openIdToken: (params = {}) => call('session.open_id_token', params) as ReturnType<Rpc['session']['openIdToken']>,
       syncStatus: (params = {}) => call('session.sync_status', params) as ReturnType<Rpc['session']['syncStatus']>,
+      retrySync: (params = {}) => call('session.retry_sync', params) as ReturnType<Rpc['session']['retrySync']>,
       serverFeatures: (params = {}) => call('session.server_features', params) as ReturnType<Rpc['session']['serverFeatures']>,
       delayedEventsSupported: (params = {}) => call('session.delayed_events_supported', params) as ReturnType<Rpc['session']['delayedEventsSupported']>,
       qrGrantSupported: (params = {}) => call('session.qr_grant_supported', params) as ReturnType<Rpc['session']['qrGrantSupported']>,

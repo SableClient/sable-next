@@ -1,21 +1,19 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures_util::future::{Either, select};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::{Client, config::RequestConfig};
-#[cfg(any(target_family = "wasm", test))]
-use matrix_sdk_ui::sync_service::State;
-use matrix_sdk_ui::sync_service::SyncService;
+use matrix_sdk_ui::sync_service::{State, SyncService};
 
 use crate::{Core, ResultExt, RpcError, protocol::RpcCode};
 
-#[cfg(target_family = "wasm")]
 pub(crate) const SYNC_STALL: Duration = Duration::from_secs(90);
 
 impl Core {
     /// The wasm HTTP client ignores request timeouts, so a long-poll on a connection that died
-    /// during sleep never returns.
-    #[cfg(any(target_family = "wasm", test))]
+    /// during sleep never returns. Elsewhere it catches a sync waiting for a network the OS never
+    /// reported back.
     pub(crate) fn watch_sync_stall(
         self: &Arc<Self>,
         client: &Client,
@@ -28,11 +26,23 @@ impl Core {
 
         self.track_session_task(
             spawn(async move {
+                let mut states = sync_service.state();
                 loop {
-                    if matrix_sdk::timeout::timeout(client.wait_for_sync(), stall)
-                        .await
-                        .is_ok()
+                    // A state change restarts the wait, so a sync that just started is not
+                    // charged for the time it was stopped.
+                    let beat = std::pin::pin!(client.wait_for_sync());
+                    let changed = std::pin::pin!(states.next());
+                    match matrix_sdk::timeout::timeout(select(beat, changed), stall).await {
+                        Ok(Either::Right((None, _))) => break,
+                        Ok(_) => continue,
+                        Err(_) => {}
+                    }
+                    if !core.activity.network_available()
+                        && !core.sync_paused()
+                        && crate::watchers::server_reachable(&client).await
                     {
+                        tracing::warn!("the server answers on a network reported gone");
+                        core.retry_sync(&sync_service).await;
                         continue;
                     }
                     let transition = core.activity.transition().await;

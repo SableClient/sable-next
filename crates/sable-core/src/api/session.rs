@@ -25,6 +25,7 @@ domain! {
     access_token,
     open_id_token,
     sync_status,
+    retry_sync,
     server_features,
     delayed_events_supported,
     qr_grant_supported,
@@ -290,9 +291,20 @@ impl Handler for SyncStatusParams {
     type Ok = SyncStatus;
 
     async fn run(self, core: &Arc<Core>) -> Result<SyncStatus, RpcError> {
-        Ok(crate::watchers::sync_status(
-            core.sync_service().await?.state().get(),
-        ))
+        Ok(core.shown_sync_status(core.sync_service().await?.state().get()))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RetrySyncParams {}
+
+impl Handler for RetrySyncParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        core.retry_sync(&*core.sync_service().await?).await;
+        Ok(())
     }
 }
 

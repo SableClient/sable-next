@@ -1257,6 +1257,14 @@ export class CoreClient {
     this.localNetworkOffer = homeserverUrl(session.homeserver).hostname;
   }
 
+  async retrySync(): Promise<void> {
+    try {
+      await this.rpc.session.retrySync();
+    } catch (error) {
+      console.debug('[sable core] sync retry failed', error);
+    }
+  }
+
   async allowLocalNetwork(): Promise<void> {
     this.localNetworkOffer = null;
     await requestAndroidLocalNetwork();

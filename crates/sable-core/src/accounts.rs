@@ -1118,7 +1118,6 @@ impl Core {
         self.watch_search_index(&account_id, &client, &store_id);
         self.watch_ignored_users(&client);
         self.watch_ignored_history(&client, &sync_service);
-        #[cfg(target_family = "wasm")]
         self.watch_sync_stall(&client, &sync_service, crate::sync_support::SYNC_STALL);
         self.watch_backup_preference(&client);
         sync_service.start().await;
@@ -2095,6 +2094,48 @@ mod regression_tests {
             .await
             .expect("a stalled sync is restarted");
         assert!(matches!(restarted, Some(State::Running)));
+    }
+
+    #[tokio::test]
+    async fn a_manual_retry_starts_sync_on_a_network_reported_gone() {
+        use matrix_sdk_ui::sync_service::State;
+
+        let (_store, _server, core, _room) = core_with_room().await;
+        let sync_service = core.sync_service().await.unwrap();
+        core.update_network_conditions(false, true).await;
+        core.update_app_active(true).await;
+        assert!(matches!(sync_service.state().get(), State::Idle));
+        assert!(matches!(
+            core.shown_sync_status(sync_service.state().get()),
+            crate::protocol::SyncStatus::Offline
+        ));
+
+        core.retry_sync(&sync_service).await;
+
+        assert!(!matches!(sync_service.state().get(), State::Idle));
+    }
+
+    #[tokio::test]
+    async fn a_reachable_server_overrules_a_network_reported_gone() {
+        use std::time::Duration;
+
+        use matrix_sdk_ui::sync_service::State;
+
+        let (_store, server, core, _room) = core_with_room().await;
+        server.mock_versions().ok().mount().await;
+        let client = core.client().await.unwrap();
+        let sync_service = core.sync_service().await.unwrap();
+        core.update_network_conditions(false, true).await;
+        core.update_app_active(true).await;
+        assert!(matches!(sync_service.state().get(), State::Idle));
+        let mut states = sync_service.state();
+
+        core.watch_sync_stall(&client, &sync_service, Duration::from_millis(200));
+
+        tokio::time::timeout(Duration::from_secs(5), states.next())
+            .await
+            .expect("sync starts once the server answers");
+        assert!(core.activity.network_available());
     }
 
     #[tokio::test]

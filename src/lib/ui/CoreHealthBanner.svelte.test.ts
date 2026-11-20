@@ -20,6 +20,7 @@ const offer = Object.assign(core, {
   localNetworkOffer: 'matrix.home.example',
   allowLocalNetwork: vi.fn(() => Promise.resolve()),
   declineLocalNetwork: vi.fn(),
+  retrySync: vi.fn(() => Promise.resolve()),
 });
 
 beforeEach(() => {
@@ -53,11 +54,15 @@ test('the offer can be turned down', async () => {
   expect(offer.declineLocalNetwork).toHaveBeenCalledOnce();
 });
 
-test('without an offer the banner only says the app is offline', async () => {
+test('without an offer the banner says the app is offline and can retry', async () => {
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   Object.assign(offer, { localNetworkOffer: null });
   render(CoreHealthBanner);
   await vi.advanceTimersByTimeAsync(3000);
 
   expect(screen.getByRole('alert')).toHaveTextContent('You are offline');
   expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+
+  await user.click(screen.getByRole('button', { name: 'Retry' }));
+  expect(offer.retrySync).toHaveBeenCalledOnce();
 });

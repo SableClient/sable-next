@@ -72,6 +72,24 @@ fn redecrypted_notification(
 }
 
 impl Core {
+    /// A sync that is only waiting for a network would otherwise read as starting.
+    pub(crate) fn shown_sync_status(&self, state: SyncState) -> SyncStatus {
+        if matches!(state, SyncState::Idle)
+            && !self.sync_paused()
+            && !self.activity.network_available()
+        {
+            return SyncStatus::Offline;
+        }
+        sync_status(state)
+    }
+
+    fn emit_sync_status(&self, generation: u64, state: SyncState) {
+        self.emit_if_current(
+            generation,
+            CoreEvent::SyncStatus(self.shown_sync_status(state)),
+        );
+    }
+
     /// Restarts a stalled sync with backoff and reports each state change.
     pub(crate) fn watch_sync_state(
         self: &Arc<Self>,
@@ -84,7 +102,7 @@ impl Core {
         let restarted = sync_service.clone();
         let support_client = client.clone();
         // `Subscriber::next` yields only on *change*, so emit the first by hand.
-        core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
+        core.emit_sync_status(generation, states.get());
         self.track_session_task(
             spawn(async move {
                 let mut failures = 0u32;
@@ -99,7 +117,7 @@ impl Core {
                     };
                     let Ok(next) = next else {
                         if server_reachable(&support_client).await {
-                            core.resume_sync(&restarted).await;
+                            core.retry_sync(&restarted).await;
                         }
                         continue;
                     };
@@ -120,7 +138,7 @@ impl Core {
                             .take()
                             .is_some_and(|since| since.elapsed() >= SYNC_BACKOFF_RESET)
                     };
-                    core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
+                    core.emit_sync_status(generation, state);
                     if running {
                         let core = core.clone();
                         let rules_cleaned = rules_cleaned.clone();
