@@ -8,7 +8,7 @@
 
 FROM node:24-bookworm AS node
 
-FROM rust:1.99.1-bookworm AS rust
+FROM rust:1.100.0-bookworm AS rust
 ARG TARGETARCH
 ARG SCCACHE_VERSION=0.18.0
 RUN case "$TARGETARCH" in \
