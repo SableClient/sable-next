@@ -16,6 +16,15 @@ export interface Crop {
   maxEdge?: number;
 }
 
+function isOpaque(context: CanvasRenderingContext2D, { width, height }: HTMLCanvasElement) {
+  const rows = Math.max(1, Math.floor(1_048_576 / width));
+  for (let y = 0; y < height; y += rows) {
+    const { data } = context.getImageData(0, y, width, Math.min(rows, height - y));
+    for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return false;
+  }
+  return true;
+}
+
 export async function cropImage(file: File, { rect, rotation, maxEdge }: Crop): Promise<File> {
   const bitmap = await createImageBitmap(file, {
     imageOrientation: 'from-image',
@@ -38,7 +47,11 @@ export async function cropImage(file: File, { rect, rotation, maxEdge }: Crop): 
     context.rotate((rotation * Math.PI) / 180);
     context.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
 
-    const type = KEPT_TYPES.has(file.type) ? file.type : 'image/png';
+    const type = KEPT_TYPES.has(file.type)
+      ? file.type
+      : isOpaque(context, canvas)
+        ? 'image/jpeg'
+        : 'image/png';
     const blob = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, type, 0.92);
     });

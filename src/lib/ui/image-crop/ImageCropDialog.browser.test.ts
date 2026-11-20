@@ -47,6 +47,29 @@ test('an avatar crops to the centred square', async () => {
   expect(await size(cropped as File)).toEqual({ width: 400, height: 400 });
 });
 
+test.each([
+  ['an opaque', '#3366cc', 'image/jpeg', 'photo.jpg'],
+  ['a transparent', 'transparent', 'image/png', 'photo.png'],
+])('%s picture of another format is saved as %s', async (_, fill, type, name) => {
+  await render(ImageCropHost);
+  const canvas = new OffscreenCanvas(400, 400);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No canvas context');
+  context.fillStyle = fill;
+  context.fillRect(0, 0, 400, 400);
+  const heic = new File([await canvas.convertToBlob({ type: 'image/png' })], 'photo.heic', {
+    type: 'image/heic',
+  });
+  const result = requestCrop(heic, 'avatar');
+  const apply = page.getByRole('button', { name: 'Apply' });
+  await expect.element(apply).toBeEnabled();
+  await apply.click();
+
+  const cropped = await result;
+  expect(cropped?.type).toBe(type);
+  expect(cropped?.name).toBe(name);
+});
+
 test('dragging the image moves the crop', async () => {
   await render(ImageCropHost);
   const result = requestCrop(await png(800, 400), 'avatar');
