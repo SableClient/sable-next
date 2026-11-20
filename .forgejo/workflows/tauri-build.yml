@@ -229,7 +229,7 @@ jobs:
             image="$image-server"
             prebuilt=(--build-context wasm=src/generated/wasm)
           fi
-          # The BuildKit container outlives the job so its local cache is reused across runs.
+          # Where Docker outlives the job, so does this builder and its local cache.
           builder="ci-builder-$ARCH"
           docker context inspect "ci-$ARCH" >/dev/null 2>&1 || docker context create "ci-$ARCH"
           docker buildx inspect "$builder" >/dev/null 2>&1 \
