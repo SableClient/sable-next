@@ -316,6 +316,9 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     notifying: 1,
     latest_event: {
       sender: '@alice:example.org',
+      own: false,
+      sender_label: null,
+      kind: 'text',
       body: 'Hello',
       timestamp: 1000,
       sending: false,

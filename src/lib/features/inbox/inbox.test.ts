@@ -160,7 +160,16 @@ test('notifications keep the order of the rooms they are given', () => {
       latest_event:
         timestamp === null
           ? null
-          : { sender: null, body: 'hi', timestamp, sending: false, event_id: null },
+          : {
+              sender: null,
+              own: false,
+              sender_label: null,
+              kind: 'text',
+              body: 'hi',
+              timestamp,
+              sending: false,
+              event_id: null,
+            },
     });
 
   const ordered = notifications(
@@ -192,7 +201,16 @@ test('an invite without a sender still lists', () => {
     inviter(
       room({
         state: 'invited',
-        latest_event: { sender: '@a:x', body: '', timestamp: 1, sending: false, event_id: null },
+        latest_event: {
+          sender: '@a:x',
+          own: false,
+          sender_label: null,
+          kind: 'text',
+          body: '',
+          timestamp: 1,
+          sending: false,
+          event_id: null,
+        },
       })
     )
   ).toBe('@a:x');

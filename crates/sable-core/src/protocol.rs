@@ -2847,13 +2847,35 @@ pub enum PushFetchView {
 pub struct LatestEventView {
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub sender: Option<OwnedUserId>,
-    /// Plain text: a list row must not run untrusted HTML.
+    /// Sent by this account, including a local echo.
+    pub own: bool,
+    /// Only in a room with more than two people, and never for `own`. A
+    /// per-message profile name wins over the member's.
+    pub sender_label: Option<String>,
+    pub kind: LatestEventKind,
+    /// Plain text: a list row must not run untrusted HTML. For a non-text
+    /// `kind` this is the caption or poll question, empty when there is none.
     pub body: String,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub timestamp: Option<u64>,
     pub sending: bool,
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub event_id: Option<OwnedEventId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum LatestEventKind {
+    Text,
+    Image,
+    Video,
+    Audio,
+    Voice,
+    File,
+    Sticker,
+    Location,
+    Poll,
 }
 
 #[derive(Debug, Clone, Serialize)]

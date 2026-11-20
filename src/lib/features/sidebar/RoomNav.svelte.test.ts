@@ -1223,9 +1223,67 @@ test('a message preview replaces the DM topic', async () => {
   expect(roomTopics()).toEqual(['See you at noon']);
 });
 
-function latest(body: string, timestamp: number): LatestEventView {
-  return { sender: '@bob:example.org', body, timestamp, sending: false, event_id: `$${timestamp}` };
+function latest(
+  body: string,
+  timestamp: number,
+  overrides: Partial<LatestEventView> = {}
+): LatestEventView {
+  return {
+    sender: '@bob:example.org',
+    own: false,
+    sender_label: null,
+    kind: 'text',
+    body,
+    timestamp,
+    sending: false,
+    event_id: `$${timestamp}`,
+    ...overrides,
+  };
 }
+
+test.each([
+  ['a one-to-one DM does not name the other party', true, { sender_label: null }, 'See you'],
+  ['a group names the sender', false, { sender_label: 'Bob' }, 'nav.previewFrom:Bob,See you'],
+  ['own messages are prefixed in a DM', true, { own: true }, 'nav.previewOwn:See you'],
+  ['own messages are prefixed in a group', false, { own: true }, 'nav.previewOwn:See you'],
+  ['an image shows its label', false, { kind: 'image', body: '' }, 'nav.previewImage'],
+  [
+    'a captioned image shows label and caption',
+    false,
+    { kind: 'image', body: 'Sunset', sender_label: 'Bob' },
+    'nav.previewFrom:Bob,nav.previewCaption:nav.previewImage,Sunset',
+  ],
+  ['a voice message is not an audio file', true, { kind: 'voice', body: '' }, 'nav.previewVoice'],
+  [
+    'an own sticker',
+    true,
+    { kind: 'sticker', body: '', own: true },
+    'nav.previewOwn:nav.previewSticker',
+  ],
+  [
+    'a poll shows its question',
+    false,
+    { kind: 'poll', body: 'Lunch?' },
+    'nav.previewCaption:nav.previewPoll,Lunch?',
+  ],
+] as const)('%s', async (_name, direct, overrides, expected) => {
+  visit('/home');
+  setPreference('showHome', true);
+  setPreference('messagePreviews', 'all');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!r:example.org',
+      name: 'Room',
+      is_direct: direct,
+      direct_targets: direct ? ['@bob:example.org'] : [],
+      latest_event: latest('See you', 1, overrides),
+    }),
+  ];
+  await mountNav();
+  await tick();
+
+  expect(roomTopics()).toEqual([expected]);
+});
 
 test('hovering a collapsed room row shows its full name in a tooltip', async () => {
   roomsFixture.rooms = [

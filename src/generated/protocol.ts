@@ -624,10 +624,23 @@ export type KeywordNotificationView = {
 	mode: MentionNotificationModeView,
 };
 
+export type LatestEventKind = "text" | "image" | "video" | "audio" | "voice" | "file" | "sticker" | "location" | "poll";
+
 /**  Structured, so arranging and localising the preview stays with the UI. */
 export type LatestEventView = {
 	sender: string | null,
-	/**  Plain text: a list row must not run untrusted HTML. */
+	/**  Sent by this account, including a local echo. */
+	own: boolean,
+	/**
+	 *  Only in a room with more than two people, and never for `own`. A
+	 *  per-message profile name wins over the member's.
+	 */
+	sender_label: string | null,
+	kind: LatestEventKind,
+	/**
+	 *  Plain text: a list row must not run untrusted HTML. For a non-text
+	 *  `kind` this is the caption or poll question, empty when there is none.
+	 */
 	body: string,
 	timestamp: number | null,
 	sending: boolean,

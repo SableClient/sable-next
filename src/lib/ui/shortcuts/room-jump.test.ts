@@ -16,7 +16,16 @@ function room(overrides: Partial<RoomListItemView> & { room_id: string }): RoomL
 }
 
 function latest(timestamp: number): RoomListItemView['latest_event'] {
-  return { sender: null, body: '', timestamp, sending: false, event_id: null };
+  return {
+    sender: null,
+    own: false,
+    sender_label: null,
+    kind: 'text',
+    body: '',
+    timestamp,
+    sending: false,
+    event_id: null,
+  };
 }
 
 test('filterRoomsByQuery excludes rooms that are not joined', () => {

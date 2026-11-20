@@ -281,6 +281,7 @@ mod tests {
             voice_roster: None,
             avatar_override: None,
             bridge: None,
+            latest_sender: None,
         };
         let mut cache = HashMap::from([(kept.to_owned(), info()), (gone.to_owned(), info())]);
         let mut rows = RoomListRows::default();
@@ -313,6 +314,7 @@ mod tests {
             voice_roster: None,
             avatar_override: None,
             bridge: None,
+            latest_sender: None,
         }
     }
 

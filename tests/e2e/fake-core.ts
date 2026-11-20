@@ -203,6 +203,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       marked_unread: false,
       latest_event: {
         sender: '@alice:example.test',
+        own: false,
+        sender_label: null,
+        kind: 'text',
         body: 'General message 19',
         timestamp: 1_700_000_000_019,
         sending: false,
@@ -228,6 +231,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       highlight: 0,
       latest_event: {
         sender: '@ada:example.test',
+        own: false,
+        sender_label: null,
+        kind: 'text',
         body: 'invited you',
         timestamp: 1_700_000_000_000,
         sending: false,

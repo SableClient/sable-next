@@ -178,12 +178,33 @@
     return peers.length === 1 ? peers[0] : null;
   }
 
+  const PREVIEW_LABELS = {
+    image: 'nav.previewImage',
+    video: 'nav.previewVideo',
+    audio: 'nav.previewAudio',
+    voice: 'nav.previewVoice',
+    file: 'nav.previewFile',
+    sticker: 'nav.previewSticker',
+    location: 'nav.previewLocation',
+    poll: 'nav.previewPoll',
+  } as const;
+
   function messagePreview(room: RoomListItemView): string | null {
     const mode = preferences.messagePreviews;
     const shown = room.is_direct
       ? mode === 'direct' || mode === 'all'
       : mode === 'rooms' || mode === 'all';
-    return shown ? room.latest_event?.body || null : null;
+    const event = room.latest_event;
+    if (!shown || !event) return null;
+    let text = event.body;
+    if (event.kind !== 'text') {
+      const label = i18n.t(PREVIEW_LABELS[event.kind]);
+      text = text ? i18n.t('nav.previewCaption', { label, caption: text }) : label;
+    }
+    if (!text) return null;
+    if (event.own) return i18n.t('nav.previewOwn', { text });
+    if (event.sender_label) return i18n.t('nav.previewFrom', { name: event.sender_label, text });
+    return text;
   }
 
   const peerProfiles = new PeerProfiles(core);
