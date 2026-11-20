@@ -86,6 +86,24 @@ test('lists a gallery pdf as a file the viewer can open, and skips other files',
   ]);
 });
 
+test('lists videos so a GIF opened from the timeline is the one the viewer shows', () => {
+  const clip = {
+    kind: 'video',
+    filename: 'clip.mp4',
+    caption: null,
+    source: 'mxc://example.org/clip',
+    mime: 'video/mp4',
+    width: null,
+    height: null,
+    blurhash: null,
+    thumbnail: null,
+    spoiler: null,
+  } as const;
+  const items = timelineMediaItems([gallery([clip])]);
+
+  expect(items).toMatchObject([{ kind: 'video', eventId: '$gallery:gallery:0' }]);
+});
+
 test('a gallery item id leads back to its event', () => {
   expect(galleryEventId(galleryItemId('$gallery', 3))).toBe('$gallery');
   expect(galleryEventId('$plain:example.org')).toBe('$plain:example.org');

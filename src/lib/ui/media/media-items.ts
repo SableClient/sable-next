@@ -45,6 +45,20 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
             },
           ];
         }
+        if (item.kind === 'video') {
+          return [
+            {
+              ...shared,
+              kind: 'video',
+              width: item.width,
+              height: item.height,
+              blurhash: item.blurhash,
+              thumbnail: item.thumbnail,
+              spoiler: item.spoiler,
+              playback: null,
+            },
+          ];
+        }
         if (item.kind === 'file' && isPdfAttachment(item.mime, item.filename)) {
           return [{ ...shared, kind: 'file', size: item.size }];
         }
@@ -54,6 +68,7 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
     if (
       content.kind !== 'image' &&
       content.kind !== 'sticker' &&
+      content.kind !== 'video' &&
       !(content.kind === 'file' && isPdfAttachment(content.mime, content.filename))
     ) {
       return [];
