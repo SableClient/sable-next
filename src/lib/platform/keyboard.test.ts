@@ -239,15 +239,17 @@ test('pinch zoom and panning do not become keyboard insets', async () => {
 });
 
 test.each([
-  [500, 0, true],
-  [500, 300, true],
-  [800, 0, false],
+  [800, 500, true],
+  [500, 500, true],
+  [800, 800, false],
 ])(
-  'a visual viewport %i tall and panned %i under an 800 window shows a keyboard=%s',
-  (height, offsetTop, shown) => {
-    vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height, offsetTop }));
-    vi.stubGlobal('innerHeight', 800);
+  'a window %i tall with a visual viewport %i tall shows a keyboard=%s',
+  (innerHeight, height, shown) => {
+    vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height }));
+    vi.stubGlobal('innerHeight', innerHeight);
+    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(800);
     expect(softwareKeyboardShown()).toBe(shown);
+    vi.restoreAllMocks();
   }
 );
 
