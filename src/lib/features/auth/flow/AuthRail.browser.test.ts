@@ -5,6 +5,7 @@ import { render } from 'vitest-browser-svelte';
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { expectNoA11yViolations } from '#lib/test-support/a11y.js';
+import { setCurrentLanguage } from '#lib/language.svelte.js';
 import { navigated } from '#lib/test-support/app-navigation.js';
 import AuthRailHarness from './AuthRailHarness.test.svelte';
 
@@ -12,6 +13,8 @@ afterEach(() => {
   for (const edge of ['top', 'right', 'bottom', 'left']) {
     document.documentElement.style.removeProperty(`--safe-area-inset-${edge}`);
   }
+  document.documentElement.dir = 'ltr';
+  setCurrentLanguage('en', 'ltr');
 });
 
 test('active cards stay outside the edge fades and system insets', async () => {
@@ -49,6 +52,27 @@ test('active cards stay outside the edge fades and system insets', async () => {
         expect(nav.right).toBeLessThanOrEqual(width - right);
         expect(nav.top).toBeGreaterThanOrEqual(32);
       }
+    }
+  }
+});
+
+test('right-to-left layouts centre the active card', async () => {
+  document.documentElement.dir = 'rtl';
+  setCurrentLanguage('ar', 'rtl');
+  const screen = await render(AuthRailHarness);
+  const shell = screen.container.querySelector<HTMLElement>('.rail-shell');
+  if (!shell) throw new Error('.rail-shell is not rendered');
+  for (const width of [390, 1280]) {
+    await page.viewport(width, 844);
+    for (const activeIndex of [0, 1, 0]) {
+      await screen.rerender({ activeIndex });
+      await expect
+        .poll(() => {
+          const card = activeCard(shell);
+          const rail = shell.getBoundingClientRect();
+          return Math.abs(card.left + card.right - rail.left - rail.right);
+        })
+        .toBeLessThan(2);
     }
   }
 });

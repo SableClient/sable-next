@@ -41,8 +41,9 @@
     if (options.length !== items.length) return;
 
     const observer = new ResizeObserver(() => {
+      const rtl = getComputedStyle(root).direction === 'rtl';
       optionBounds = options.map((option) => ({
-        left: option.offsetLeft,
+        left: rtl ? option.offsetLeft + option.offsetWidth - root.clientWidth : option.offsetLeft,
         width: option.offsetWidth,
       }));
     });

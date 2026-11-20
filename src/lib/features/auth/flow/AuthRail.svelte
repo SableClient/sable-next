@@ -6,6 +6,7 @@
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import { cubicOut } from 'svelte/easing';
   import { i18n } from '#lib/i18n.js';
+  import { currentDirection, inlineSide } from '#lib/language.svelte.js';
   import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import { HorizontalSwipe } from '#lib/ui/horizontal-swipe.svelte.js';
 
@@ -54,7 +55,7 @@
   });
 
   function cardTarget(rail: HTMLDivElement, card: HTMLElement): number {
-    return Math.max(0, card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2);
+    return card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2;
   }
 
   function animateToCard(rail: HTMLDivElement, card: HTMLElement): void {
@@ -90,7 +91,10 @@
     const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
     const card = cardElements(rail)[activeIndex] as HTMLElement | undefined;
     const here = card ? cardTarget(rail, card) : rail.scrollLeft;
-    return [canBack ? 0 : here, canForward ? maxScroll : here];
+    const back = canBack ? 0 : here;
+    const end = currentDirection() === 'rtl' ? -maxScroll : maxScroll;
+    const forward = canForward ? end : here;
+    return [Math.min(back, forward), Math.max(back, forward)];
   }
 
   function handleScroll(): void {
@@ -157,8 +161,9 @@
     }
 
     let targetIndex: number | undefined;
-    if (result.direction === 'left' && canForward) targetIndex = activeIndex + 1;
-    if (result.direction === 'right' && canBack) targetIndex = activeIndex - 1;
+    const direction = result.direction && inlineSide(result.direction);
+    if (direction === 'left' && canForward) targetIndex = activeIndex + 1;
+    if (direction === 'right' && canBack) targetIndex = activeIndex - 1;
 
     if (targetIndex === undefined || !cardElements(rail)[targetIndex]) {
       settleToCard(activeIndex);
@@ -339,7 +344,7 @@
 
   .rail-shell::before,
   .rail-shell::after {
-    background: linear-gradient(90deg, var(--bg-container), transparent);
+    background: linear-gradient(calc(90deg * var(--inline-sign)), var(--bg-container), transparent);
     content: '';
     inset-block: 0;
     pointer-events: none;
@@ -353,7 +358,11 @@
   }
 
   .rail-shell::after {
-    background: linear-gradient(270deg, var(--bg-container), transparent);
+    background: linear-gradient(
+      calc(-90deg * var(--inline-sign)),
+      var(--bg-container),
+      transparent
+    );
     inset-inline-end: 0;
   }
 
