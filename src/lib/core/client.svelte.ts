@@ -67,6 +67,8 @@ const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const SLOW_START_MS = 15_000;
 const LOCAL_NETWORK_SETTLED_MS = 30_000;
+const LOCAL_NETWORK_CONFIRM_MS = 5000;
+const LOCAL_NETWORK_REPEATS = 3;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
 const MAX_PROFILE_LOOKUPS = 24;
@@ -239,6 +241,9 @@ export class CoreClient {
   private readonly changedProfiles = new Set<string>();
   private profileChangeTimer: ReturnType<typeof setTimeout> | null = null;
   private localNetworkClearTimer: ReturnType<typeof setTimeout> | null = null;
+  private offlineSpell = 0;
+  private reachableOfflineSpells: number[] = [];
+  private pageProbe: { at: number; reachable: Promise<boolean> } | null = null;
   private profileLookups = 0;
   private readonly profileLookupQueue: {
     resolve: () => void;
@@ -1005,6 +1010,8 @@ export class CoreClient {
     this.cancelLocalNetworkClear();
     this.localNetworkBlocked = null;
     this.localNetworkOffer = null;
+    this.reachableOfflineSpells = [];
+    this.pageProbe = null;
   }
 
   /** Both events fire only on a change, so a session that starts unverified
@@ -1234,6 +1241,7 @@ export class CoreClient {
       for (const userId of retry) this.invalidateProfile(userId);
     }
     if (status.state !== 'offline') {
+      this.offlineSpell += 1;
       this.localNetworkOffer = null;
       if (this.localNetworkBlocked !== null) {
         this.localNetworkClearTimer ??= setTimeout(() => {
@@ -1279,11 +1287,34 @@ export class CoreClient {
     const session = this.session;
     if (!session) return;
     const revision = this.accountRevision;
+    const spell = this.offlineSpell;
     const blocked =
-      (await grantLocalNetworkAccess(session.homeserver)) ||
+      (await this.probeHomeserver(session.homeserver)) ||
       (navigator.onLine && (await localNetworkDenied()));
-    if (!blocked || revision !== this.accountRevision || this.sync?.state !== 'offline') return;
+    if (!blocked) return;
+    const now = Date.now();
+    this.reachableOfflineSpells = this.reachableOfflineSpells
+      .filter((at) => now - at < LOCAL_NETWORK_SETTLED_MS)
+      .concat(now);
+    if (this.reachableOfflineSpells.length < LOCAL_NETWORK_REPEATS) {
+      await sleep(LOCAL_NETWORK_CONFIRM_MS);
+    }
+    if (
+      revision !== this.accountRevision ||
+      spell !== this.offlineSpell ||
+      this.sync?.state !== 'offline'
+    ) {
+      return;
+    }
     this.localNetworkBlocked = homeserverUrl(session.homeserver).hostname;
+  }
+
+  private probeHomeserver(homeserver: string): Promise<boolean> {
+    const now = Date.now();
+    if (this.pageProbe === null || now - this.pageProbe.at >= LOCAL_NETWORK_SETTLED_MS) {
+      this.pageProbe = { at: now, reachable: grantLocalNetworkAccess(homeserver) };
+    }
+    return this.pageProbe.reachable;
   }
 
   private cancelLocalNetworkClear(): void {

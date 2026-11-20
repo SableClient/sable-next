@@ -1093,24 +1093,53 @@ test('a restored session asks for local network access from the page', async () 
 test('an offline core with a homeserver the page reaches reports the browser blocking it', async () => {
   const { core, fake, fetchMock } = await startGated(() => Promise.resolve(new Response('{}')));
 
+  vi.useFakeTimers();
   fake.emit({ type: 'sync_status', state: 'offline' });
-  await vi.waitFor(() => {
-    expect(core.localNetworkBlocked).toBe('example.org');
-  });
-
-  fetchMock.mockImplementation(() => Promise.reject(new TypeError('offline')));
-  fake.emit({ type: 'sync_status', state: 'live' });
-  fake.emit({ type: 'sync_status', state: 'offline' });
-  await vi.waitFor(() => {
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await vi.advanceTimersByTimeAsync(5000);
   expect(core.localNetworkBlocked).toBe('example.org');
 
-  vi.useFakeTimers();
+  fake.emit({ type: 'sync_status', state: 'live' });
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(core.localNetworkBlocked).toBe('example.org');
+
   fake.emit({ type: 'sync_status', state: 'live' });
   vi.advanceTimersByTime(30_000);
   expect(core.localNetworkBlocked).toBeNull();
+  vi.useRealTimers();
+});
+
+test('a short offline spell with a homeserver the page reaches is not blamed on the browser', async () => {
+  const { core, fake } = await startGated(() => Promise.resolve(new Response('{}')));
+
+  vi.useFakeTimers();
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.advanceTimersByTimeAsync(1000);
+  fake.emit({ type: 'sync_status', state: 'live' });
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.advanceTimersByTimeAsync(4000);
+  expect(core.localNetworkBlocked).toBeNull();
+
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(core.localNetworkBlocked).toBe('example.org');
+  vi.useRealTimers();
+});
+
+test('a homeserver the page reaches that keeps dropping sync reports the browser blocking it', async () => {
+  const { core, fake } = await startGated(() => Promise.resolve(new Response('{}')));
+
+  vi.useFakeTimers();
+  for (let spell = 0; spell < 2; spell += 1) {
+    fake.emit({ type: 'sync_status', state: 'offline' });
+    await vi.advanceTimersByTimeAsync(100);
+    fake.emit({ type: 'sync_status', state: 'live' });
+  }
+  expect(core.localNetworkBlocked).toBeNull();
+
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.advanceTimersByTimeAsync(100);
+  expect(core.localNetworkBlocked).toBe('example.org');
   vi.useRealTimers();
 });
 
@@ -1118,11 +1147,12 @@ test('an offline core reports the browser blocking it when the permission was de
   localNetwork.denied = true;
   const { core, fake } = await startGated(() => Promise.reject(new TypeError('blocked')));
 
+  vi.useFakeTimers();
   fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.advanceTimersByTimeAsync(5000);
 
-  await vi.waitFor(() => {
-    expect(core.localNetworkBlocked).toBe('example.org');
-  });
+  expect(core.localNetworkBlocked).toBe('example.org');
+  vi.useRealTimers();
 });
 
 test('an offline core the page cannot reach either is just offline', async () => {

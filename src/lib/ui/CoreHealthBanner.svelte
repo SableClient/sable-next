@@ -109,6 +109,7 @@
 
   .message {
     margin: 0;
+    user-select: text;
   }
 
   :global(.reload-button) {
