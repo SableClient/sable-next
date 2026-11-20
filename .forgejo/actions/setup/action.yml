@@ -94,7 +94,7 @@ runs:
       with:
         shared-key: ${{ inputs.rust-cache-key }}
         cache-on-failure: true
-        cache-targets: ${{ inputs.rust-cache-targets == 'true' || inputs.build == 'true' }}
+        cache-targets: ${{ inputs.rust-cache-targets == 'true' || (inputs.build == 'true' && env.RUSTC_WRAPPER == '') }}
         save-if: ${{ github.ref == 'refs/heads/main' || inputs.rust-cache-save == 'true' }}
 
     - name: Install JavaScript dependencies

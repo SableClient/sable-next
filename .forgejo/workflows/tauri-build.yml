@@ -678,6 +678,9 @@ jobs:
         shell: bash
     timeout-minutes: 60
     env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
       VERSION: ${{ needs.setup-release.outputs.version }}
       TAG: ${{ needs.setup-release.outputs.tag }}
       SHA: ${{ github.sha }}
@@ -737,6 +740,9 @@ jobs:
       - name: Remove the signing keychain
         if: ${{ always() && env.APPLE_CERTIFICATE != '' }}
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+      - name: Show sccache stats
+        if: ${{ always() && env.RUSTC_WRAPPER != '' }}
+        run: sccache --show-stats || true
       - name: Upload native addon symbols
         run: node scripts/ci/upload-sentry-symbols.mjs electron/dist
       - name: Verify native core shutdown
@@ -759,6 +765,9 @@ jobs:
       ipa_version: ${{ steps.ipa.outputs.version }}
       ipa_build: ${{ steps.ipa.outputs.build }}
     env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
       RUST_TARGETS: aarch64-apple-ios
@@ -838,6 +847,9 @@ jobs:
             echo "version=$short_version"
             echo "build=$bundle_version"
           } >> "$GITHUB_OUTPUT"
+      - name: Show sccache stats
+        if: ${{ always() && env.RUSTC_WRAPPER != '' }}
+        run: sccache --show-stats || true
       - name: Attach iOS bundle to release
         env:
           IPA_PATH: ${{ steps.ipa.outputs.path }}
