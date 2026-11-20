@@ -36,6 +36,10 @@
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { registrationEnabled, ssoRedirect } from '#lib/deployment/policy.js';
   import { loginConfiguration, clearLoginConfiguration } from '#lib/deployment/deployment.js';
+  import { loadLoginThemeColors, setLoginThemePreview } from '#lib/deployment/theme.svelte.js';
+  import { systemDark } from '#lib/platform/system-theme.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { resolveTheme } from '#lib/settings/theme.js';
   import { passwordFields } from '../shared/password-fields.svelte.js';
   import { shouldAutoRedirect } from './auto-redirect';
 
@@ -154,6 +158,27 @@
   let isSetupRoute = $derived(page.url.pathname.startsWith(resolve('setup')));
   let requestedStage = $derived(stageIndexForPath(page.url.pathname, stageRegistry));
   let signedIn = $derived(core.status === 'ready' && !isAddingAccount);
+  const loginThemeUrl = $derived.by(() => {
+    if (signedIn || isSetupRoute || !flow.loginProviderReady || !preferences.deploymentTheme) {
+      return null;
+    }
+    const { themeUrl, lightThemeUrl, darkThemeUrl } = loginConfiguration().branding;
+    const kind = resolveTheme(preferences.theme, systemDark.current);
+    return (kind === 'dark' ? darkThemeUrl : lightThemeUrl) ?? themeUrl;
+  });
+  $effect(() => {
+    const url = loginThemeUrl;
+    if (!url) return;
+    const controller = new AbortController();
+    void loadLoginThemeColors(url, controller.signal).then((colors) => {
+      if (!controller.signal.aborted) setLoginThemePreview(colors);
+    });
+    return () => {
+      controller.abort();
+      setLoginThemePreview('');
+    };
+  });
+
   let stages = $derived(
     stageRegistry.map((stage, index) => ({
       ...stage,
