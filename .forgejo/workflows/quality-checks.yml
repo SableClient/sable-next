@@ -29,8 +29,7 @@ on:
 
 concurrency:
   group: quality-checks-${{ github.workflow }}-${{ github.ref }}
-  # A newer main push must not cancel a Cloudflare apply midway.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
