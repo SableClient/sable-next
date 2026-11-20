@@ -2,22 +2,30 @@ name: Quality checks
 
 on:
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - '.changeset/**'
-      - 'fastlane/**'
-      - 'src-tauri/**'
-      - 'electron/**'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.changeset/**'
+      - '!fastlane/**'
+      - '!src-tauri/**'
+      # Tests and the Vite config read these.
+      - 'docs/settings.md'
+      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/ios-project.yml'
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - '.changeset/**'
-      - 'fastlane/**'
-      - 'src-tauri/**'
-      - 'electron/**'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.changeset/**'
+      - '!fastlane/**'
+      - '!src-tauri/**'
+      # Tests and the Vite config read these.
+      - 'docs/settings.md'
+      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/ios-project.yml'
 
 concurrency:
   group: quality-checks-${{ github.workflow }}-${{ github.ref }}
