@@ -101,11 +101,11 @@ function settingsMarkdown({ specs, placement }: Settings): string {
     '# Settings reference',
     '',
     'These names and values are accepted by `settingsDefaults` and `settingsLocked` in',
-    '[`config.json`](web.md#configuration). Invalid values are ignored, and numbers outside',
-    'their range are clamped.',
+    '[`config.json`](https://docs.sable.moe/installation/self-hosting/#configuration). Invalid',
+    'values are ignored, and numbers outside their range are clamped.',
     '',
-    '[`/.well-known/sable`](web.md#homeserver-configuration) accepts the same settings',
-    'except those marked deployment only.',
+    '[`/.well-known/sable`](https://docs.sable.moe/installation/homeserver-configuration/)',
+    'accepts the same settings except those marked deployment only.',
   ];
   const accountKeys = new Set<string>(ACCOUNT_PREFERENCES);
   for (const [category, entries] of groups) {

@@ -58,3 +58,22 @@ cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm
 `mise run check` runs the whole set. `sable-core` does not build at `opt-level = 0`, so the workspace profiles already raise it. The wasm tests run in a SharedWorker inside Chrome and need `chromedriver`.
 
 The `rust-quality` workflow runs the same commands, with `cargo deny check` and `cargo fmt --check`.
+
+## Server mode
+
+With the Python `cryptography` package installed, run the server OIDC login against a local mock provider:
+
+```sh
+cargo build -p sable-server
+SABLE_TEST_BIN="$PWD/target/debug/sable-server" python3 crates/sable-server/tests/oidc_e2e.py
+```
+
+To check that a previously released server still opens the stores after an upgrade and rollback, build the current server and frontend, then run the browser test with the previous binary:
+
+```sh
+SABLE_TEST_PREVIOUS_SERVER_BIN=/path/to/previous/sable-server \
+  pnpm exec playwright test -c tests/e2e/playwright.ws-server.config.ts \
+  -g 'separate server users keep Matrix accounts and media isolated'
+```
+
+The test uses temporary data and a local test homeserver.

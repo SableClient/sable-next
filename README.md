@@ -232,9 +232,10 @@ Put Node, pnpm, Rust (with the `wasm32-unknown-unknown` target) and
 
 ## Self-hosting
 
-See the [web client guide](docs/web.md) for Docker and client configuration, or
-the [server mode guide](docs/server.md) to run Sable and its Matrix stores on
-your server.
+See the [web client guide](https://docs.sable.moe/installation/self-hosting/) for
+Docker and client configuration, or the
+[server mode guide](https://docs.sable.moe/installation/server-mode/) to run Sable
+and its Matrix stores on your server.
 
 ## Apps
 
