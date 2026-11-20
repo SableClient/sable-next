@@ -60,6 +60,13 @@
       groupName: 'docker',
     },
     {
+      description: 'One Node.js version across mise, package.json, CI and the container builds',
+      matchDatasources: ['docker', 'node-version'],
+      matchPackageNames: ['/(?:^|/)node$/'],
+      groupName: 'node',
+      commitMessageTopic: 'Node.js',
+    },
+    {
       matchDatasources: ['git-refs'],
       matchPackageNames: [
         'https://github.com/matrix-org/matrix-rust-sdk{,.git}',
