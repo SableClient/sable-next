@@ -27,7 +27,13 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { createDragList, type DropEdge, type DropInstruction } from '#lib/ui/drag-list.js';
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
-  import { matrixLinkPath, copyRoomLink, joinVia, roomSectionPath } from '#lib/rooms/permalink.js';
+  import {
+    matrixLinkPath,
+    copyRoomLink,
+    joinVia,
+    roomSectionPath,
+    type PermalinkFormat,
+  } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { layoutSpaceIds, withoutSpace, withSpace } from '#lib/spaces/sidebar-layout.js';
   import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
@@ -461,6 +467,24 @@
     }
   }
 
+  function copyChildLink(
+    child: HierarchyRoomView,
+    parentId: string | null,
+    format: PermalinkFormat
+  ): void {
+    const edge =
+      parentId === null
+        ? undefined
+        : childEdges(merged, parentId).find((edge) => edge.room_id === child.room_id);
+    const routing = joinedIds.has(child.room_id)
+      ? undefined
+      : {
+          via: edge?.via ?? [],
+          parentId: parentId !== null && joinedIds.has(parentId) ? parentId : spaceId,
+        };
+    void copyRoomLink(core, child, null, format, routing);
+  }
+
   async function remove(section: HierarchySection, entry: HierarchyRoom): Promise<void> {
     const parentId = section.space?.room_id ?? spaceId;
     if (!parentId) return;
@@ -887,9 +911,7 @@
         ) => {
           void join(child, via, parentId, action);
         }}
-        onCopyLink={(child: HierarchyRoomView) => {
-          void copyRoomLink(core, child);
-        }}
+        onCopyLink={copyChildLink}
         onRemove={(section: HierarchySection, entry: HierarchyRoom) => {
           void remove(section, entry);
         }}

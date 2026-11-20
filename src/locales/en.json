@@ -1416,6 +1416,7 @@
     "copySelection": "Copy selection",
     "copyLink": "Copy link address",
     "copyMessageLink": "Copy external link",
+    "copyExternalLink": "Copy external link",
     "copyMatrixLink": "Copy matrix link",
     "linkCopied": "Link copied",
     "shareLink": "Share link",

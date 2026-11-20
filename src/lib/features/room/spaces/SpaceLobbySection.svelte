@@ -18,6 +18,7 @@
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import type { PermalinkFormat } from '#lib/rooms/permalink.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -60,7 +61,11 @@
       parentId: string,
       action: LobbyAction
     ) => void;
-    onCopyLink: (child: HierarchyRoomView) => void;
+    onCopyLink: (
+      child: HierarchyRoomView,
+      parentId: string | null,
+      format: PermalinkFormat
+    ) => void;
     onRemove: (section: HierarchySection, entry: HierarchyRoom) => void;
     dragList: DragList<LobbyDragItem>;
     onDropRoom: (
@@ -231,12 +236,13 @@
           >
             <HouseIcon size={16} />{i18n.t('room.lobbyOpenSubspace')}
           </ActionMenuItem>
-          <ActionMenuItem
-            onSelect={() => {
-              onCopyLink(sectionSpace);
-            }}
-          >
-            <LinkIcon size={16} />{i18n.t('room.menuCopyLink')}
+          <ActionMenuItem onSelect={() => onCopyLink(sectionSpace, ownerId, 'matrix')}>
+            <LinkIcon size={16} />
+            {i18n.t('timeline.copyMatrixLink')}
+          </ActionMenuItem>
+          <ActionMenuItem onSelect={() => onCopyLink(sectionSpace, ownerId, 'external')}>
+            <LinkIcon size={16} />
+            {i18n.t('timeline.copyExternalLink')}
           </ActionMenuItem>
           {#if joinedSpace}
             <ActionMenuItem
@@ -408,12 +414,13 @@
                   </button>
                 {/snippet}
                 <IconContext values={{ 'aria-hidden': 'true' }}>
-                  <ActionMenuItem
-                    onSelect={() => {
-                      onCopyLink(child);
-                    }}
-                  >
-                    <LinkIcon size={16} />{i18n.t('room.menuCopyLink')}
+                  <ActionMenuItem onSelect={() => onCopyLink(child, parentId, 'matrix')}>
+                    <LinkIcon size={16} />
+                    {i18n.t('timeline.copyMatrixLink')}
+                  </ActionMenuItem>
+                  <ActionMenuItem onSelect={() => onCopyLink(child, parentId, 'external')}>
+                    <LinkIcon size={16} />
+                    {i18n.t('timeline.copyExternalLink')}
                   </ActionMenuItem>
                   {#if canManage}
                     <ActionMenuItem

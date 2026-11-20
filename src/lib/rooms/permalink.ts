@@ -8,6 +8,7 @@ import type { RoomListItemView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
+import { mentionUri } from '#lib/model/model.js';
 import { splitVia } from '#lib/rooms/join-address.js';
 import { matrixLinkAction, matrixLinkParameters, parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
@@ -148,22 +149,32 @@ export function matrixEventUri(roomId: string, eventId: string, via: readonly st
   return `matrix:${path}${query === '' ? '' : `?${query}`}`;
 }
 
+export type PermalinkFormat = 'matrix' | 'external';
+
 export async function copyRoomLink(
-  core: Pick<CoreClient, 'rpc'>,
+  core: Pick<CoreClient, 'rpc' | 'session'>,
   room: Pick<RoomListItemView, 'room_id' | 'canonical_alias'>,
   eventId?: string | null,
-  format: 'matrix' | 'external' = 'external'
+  format: PermalinkFormat = 'external',
+  hierarchy?: { via: readonly string[]; parentId: string | null }
 ): Promise<boolean> {
   try {
-    const via =
-      room.canonical_alias && !eventId
-        ? []
+    const alias = eventId ? null : room.canonical_alias;
+    const address = alias ?? room.room_id;
+    let via: readonly string[] = [];
+    if (!alias) {
+      via = hierarchy
+        ? await joinVia(core, hierarchy.via, hierarchy.parentId)
         : await core.rpc.rooms.viaServers({ room_id: room.room_id });
-    await copyText(
-      eventId && format === 'matrix'
-        ? matrixEventUri(room.room_id, eventId, via)
-        : matrixToUrl(eventId ? room.room_id : (room.canonical_alias ?? room.room_id), via, eventId)
-    );
+    }
+    const link =
+      format === 'external'
+        ? matrixToUrl(address, via, eventId)
+        : eventId
+          ? matrixEventUri(room.room_id, eventId, via)
+          : mentionUri(address, via);
+    if (link === undefined) throw new Error('Invalid Matrix room address');
+    await copyText(link);
   } catch (error) {
     console.debug('[sable room] copy link failed', error);
     toasts.error(t('errors.copyFailed'));

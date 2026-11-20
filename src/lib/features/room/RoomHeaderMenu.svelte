@@ -21,7 +21,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { copyRoomLink } from '#lib/rooms/permalink.js';
+  import { copyRoomLink, type PermalinkFormat } from '#lib/rooms/permalink.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
@@ -80,9 +80,9 @@
     (room?.unread ?? 0) > 0 || (room?.highlight ?? 0) > 0 || (room?.marked_unread ?? false)
   );
 
-  async function copyLink(): Promise<void> {
+  function copyLink(format: PermalinkFormat): void {
     if (!room) return;
-    await copyRoomLink(core, room);
+    void copyRoomLink(core, room, null, format);
   }
 </script>
 
@@ -173,9 +173,13 @@
         {i18n.t('room.rulesTitle')}
       </ActionMenuItem>
     {/if}
-    <ActionMenuItem onSelect={copyLink}>
+    <ActionMenuItem onSelect={() => copyLink('matrix')}>
       <LinkIcon />
-      {i18n.t('room.menuCopyLink')}
+      {i18n.t('timeline.copyMatrixLink')}
+    </ActionMenuItem>
+    <ActionMenuItem onSelect={() => copyLink('external')}>
+      <LinkIcon />
+      {i18n.t('timeline.copyExternalLink')}
     </ActionMenuItem>
     <ActionMenuItem onSelect={onSettings}>
       <GearIcon />

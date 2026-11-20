@@ -14,6 +14,7 @@
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
+  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import LockOpenIcon from 'phosphor-svelte/lib/LockOpenIcon';
   import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
   import GavelIcon from 'phosphor-svelte/lib/GavelIcon';
@@ -34,6 +35,8 @@
   import { openDirectMessage as openDm } from '#lib/core/api/rooms.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { mentionUri } from '#lib/model/model.js';
+  import type { PermalinkFormat } from '#lib/rooms/permalink.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { formatNowInZone } from '#lib/ui/date-time.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -268,8 +271,9 @@
     await profileActions.copy(userId);
   }
 
-  async function copyProfileLink(): Promise<void> {
-    await profileActions.copy(profileLink);
+  function copyProfileLink(format: PermalinkFormat): void {
+    const link = format === 'matrix' ? mentionUri(userId, []) : profileLink;
+    if (link) void profileActions.copy(link);
   }
 
   async function copyServer(): Promise<void> {
@@ -402,8 +406,13 @@
         <ActionMenuItem onSelect={copyUserId}>
           {i18n.t('timeline.profileCopyId')}
         </ActionMenuItem>
-        <ActionMenuItem onSelect={copyProfileLink}>
-          {i18n.t('timeline.profileCopyLink')}
+        <ActionMenuItem onSelect={() => copyProfileLink('matrix')}>
+          <LinkIcon />
+          {i18n.t('timeline.copyMatrixLink')}
+        </ActionMenuItem>
+        <ActionMenuItem onSelect={() => copyProfileLink('external')}>
+          <LinkIcon />
+          {i18n.t('timeline.copyExternalLink')}
         </ActionMenuItem>
       </IconContext>
     </ActionMenu>

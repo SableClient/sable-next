@@ -270,10 +270,6 @@
     markRoomUnread(room.room_id, core.rpc.timeline);
   }
 
-  async function copyLink(): Promise<void> {
-    await copyRoomLink(core, room);
-  }
-
   async function copyId(): Promise<void> {
     try {
       await copyText(room.room_id);
@@ -400,9 +396,13 @@
         {i18n.t('room.menuShowSpaceTimeline')}
       </ActionMenuItem>
     {/if}
-    <ActionMenuItem onSelect={copyLink}>
+    <ActionMenuItem onSelect={() => void copyRoomLink(core, room, null, 'matrix')}>
       <LinkIcon />
-      {i18n.t('room.menuCopyLink')}
+      {i18n.t('timeline.copyMatrixLink')}
+    </ActionMenuItem>
+    <ActionMenuItem onSelect={() => void copyRoomLink(core, room, null, 'external')}>
+      <LinkIcon />
+      {i18n.t('timeline.copyExternalLink')}
     </ActionMenuItem>
     {#if preferences.developerTools}
       <ActionMenuItem onSelect={copyId}>
