@@ -1,16 +1,15 @@
-//! The block structure markdown-it gives a message, read with pulldown-cmark
-//! from the source [`prepare`] rewrote.
+//! Reads a message's blocks from comrak's tree.
 
-use std::iter::Peekable;
 use std::ops::Range;
 
-use pulldown_cmark::{
-    CodeBlockKind, Event, HeadingLevel, LinkType, OffsetIter, Options, Parser, Tag, TagEnd,
-};
+use comrak::nodes::{ListType, Node, NodeLink, NodeValue, Sourcepos};
+use comrak::{Arena, Options, parse_document};
 
 use super::inline::{EM, Glyph, Mark, STRIKE, STRONG, Token};
 use super::links::{normalize_link, valid_link};
-use super::source::{content_of, flanking_chars, prepare};
+use super::source::{
+    BACKSLASHED_PIPE, ESCAPED_AMPERSAND, ESCAPED_BACKSLASH, FUNCTION_DOLLAR, UNSPACED_QUOTE, mark,
+};
 use crate::text::{head, span, tail};
 
 pub(super) enum Block<I> {
@@ -89,48 +88,10 @@ impl<I> Block<I> {
     }
 }
 
-/// Whether the delimiter run at `start..end` is left- and right-flanking,
-/// which markdown-it requires of a `~~` that opens and one that closes.
-fn flanking(source: &str, start: usize, end: usize) -> (bool, bool) {
-    let before = head(source, start).chars().next_back().unwrap_or(' ');
-    let after = tail(source, end).chars().next().unwrap_or(' ');
-    flanking_chars(before, after)
-}
-
 fn glyphs(text: &str, literal: bool) -> Vec<Glyph> {
     text.chars().map(|c| Glyph { c, literal }).collect()
 }
-
-/// `text` as pulldown-cmark read it from `range`; entities and escapes are literal, except `\|` in a table cell.
-fn read_glyphs(text: &str, source: &str, range: Range<usize>, bare_pipes: bool) -> Vec<Glyph> {
-    let entity = source
-        .get(range.clone())
-        .is_some_and(|raw| raw.starts_with('&'));
-    let literal = |c: char| entity || !(bare_pipes && c == '|');
-    if source.get(range.clone()) != Some(text) {
-        return text
-            .chars()
-            .map(|c| Glyph {
-                c,
-                literal: literal(c),
-            })
-            .collect();
-    }
-    let mut out = glyphs(text, false);
-    let backslashes = head(source, range.start)
-        .bytes()
-        .rev()
-        .take_while(|byte| *byte == b'\\')
-        .count();
-    if backslashes % 2 == 1
-        && let Some(first) = out.first_mut()
-    {
-        first.literal = literal(first.c);
-    }
-    out
-}
-
-/// A line break and the whitespace before it, kept as markdown-it keeps it.
+/// A line break and the whitespace before it.
 fn line_break(tokens: &mut Vec<Token>, source: &str, range: Range<usize>) {
     let before = if source.as_bytes().get(range.start) == Some(&b'\\') {
         0
@@ -154,222 +115,8 @@ fn line_break(tokens: &mut Vec<Token>, source: &str, range: Range<usize>) {
     tokens.push(Token::Break(tail(raw, kept.len()).to_owned()));
 }
 
-#[derive(Default)]
-struct Inlines {
-    tokens: Vec<Token>,
-    strikes: Vec<Option<&'static str>>,
-    links: Vec<Option<usize>>,
-    images: Vec<Option<usize>>,
-    alt: Option<(String, String, String, usize)>,
-    skip: usize,
-    last_end: usize,
-    bare_pipes: bool,
-}
-
-impl Inlines {
-    fn text(&mut self, text: &str, literal: bool) {
-        self.tokens.push(Token::Text(glyphs(text, literal)));
-    }
-
-    fn math(&mut self, latex: &str, display: bool) {
-        self.tokens.push(Token::Math {
-            latex: latex.trim().to_owned(),
-            display,
-        });
-    }
-
-    fn link_start(&mut self, source: &str, range: &Range<usize>, link_type: LinkType, dest: &str) {
-        let href = if link_type == LinkType::Email {
-            normalize_link(&format!("mailto:{dest}"))
-        } else {
-            normalize_link(dest)
-        };
-        if valid_link(&href) {
-            self.tokens.push(Token::Open(Mark::Link(href)));
-            self.links.push(None);
-            self.last_end = range.start + 1;
-        } else if matches!(link_type, LinkType::Autolink | LinkType::Email) {
-            self.text(source.get(range.clone()).unwrap_or_default(), false);
-            self.skip = 1;
-        } else {
-            self.text("[", false);
-            self.links.push(Some(range.end));
-            self.last_end = range.start + 1;
-        }
-    }
-
-    /// The source after a link's label, which markdown-it keeps as text when
-    /// it refuses the link.
-    fn after_label(&self, source: &str, end: usize) -> String {
-        span(source, self.last_end.min(end), end).to_owned()
-    }
-
-    fn image_alt(&mut self, event: Event<'_>) {
-        let Some((_, _, alt, depth)) = self.alt.as_mut() else {
-            return;
-        };
-        match event {
-            Event::Start(Tag::Image { .. }) => *depth += 1,
-            Event::End(TagEnd::Image) if *depth > 0 => *depth -= 1,
-            Event::End(TagEnd::Image) => {
-                if let Some((src, title, alt, _)) = self.alt.take() {
-                    self.tokens.push(Token::Image { src, alt, title });
-                }
-            }
-            Event::Text(text) | Event::Code(text) => alt.push_str(&text),
-            _ => {}
-        }
-    }
-
-    fn event(&mut self, source: &str, event: Event<'_>, range: Range<usize>) {
-        let opens = matches!(event, Event::Start(Tag::Link { .. } | Tag::Image { .. }));
-        if self.skip > 0 {
-            match event {
-                Event::Start(Tag::Link { .. }) => self.skip += 1,
-                Event::End(TagEnd::Link) => self.skip -= 1,
-                _ => {}
-            }
-        } else if self.alt.is_some() {
-            self.image_alt(event);
-        } else {
-            self.read(source, event, range.clone());
-        }
-        if !opens || self.alt.is_some() {
-            self.last_end = self.last_end.max(range.end);
-        }
-    }
-
-    fn read(&mut self, source: &str, event: Event<'_>, range: Range<usize>) {
-        match event {
-            Event::Text(text) => {
-                let glyphs = read_glyphs(&text, source, range, self.bare_pipes);
-                self.tokens.push(Token::Text(glyphs));
-            }
-            Event::InlineMath(latex) => self.math(&latex, false),
-            Event::DisplayMath(latex) if latex.trim().is_empty() => {
-                self.text(source.get(range).unwrap_or_default(), false);
-            }
-            Event::DisplayMath(latex) => self.math(&latex, true),
-            Event::Code(code) => self.tokens.push(Token::Code(code.into_string())),
-            Event::InlineHtml(html) | Event::Html(html) => self.text(&html, false),
-            Event::SoftBreak | Event::HardBreak => line_break(&mut self.tokens, source, range),
-            Event::Start(Tag::Emphasis) => self.tokens.push(Token::Open(Mark::Em)),
-            Event::End(TagEnd::Emphasis) => self.tokens.push(Token::Close(EM)),
-            Event::Start(Tag::Strong) => self.tokens.push(Token::Open(Mark::Strong)),
-            Event::End(TagEnd::Strong) => self.tokens.push(Token::Close(STRONG)),
-            Event::Start(Tag::Strikethrough) => {
-                let double = source
-                    .get(range.start..)
-                    .is_some_and(|rest| rest.starts_with("~~"));
-                let real = double
-                    && flanking(source, range.start, range.start + 2).0
-                    && flanking(source, range.end - 2, range.end).1;
-                let refused = if double { "~~" } else { "~" };
-                self.strikes.push((!real).then_some(refused));
-                if real {
-                    self.tokens.push(Token::Open(Mark::Strike));
-                } else {
-                    self.text(refused, false);
-                }
-            }
-            Event::End(TagEnd::Strikethrough) => match self.strikes.pop().flatten() {
-                Some(refused) => self.text(refused, false),
-                None => self.tokens.push(Token::Close(STRIKE)),
-            },
-            Event::Start(Tag::Link {
-                link_type,
-                dest_url,
-                ..
-            }) => self.link_start(source, &range, link_type, &dest_url),
-            Event::End(TagEnd::Link) => {
-                if let Some(end) = self.links.pop().flatten() {
-                    let label_end = self.after_label(source, end);
-                    self.text(&label_end, false);
-                } else {
-                    let suffix = self.after_label(source, range.end);
-                    self.tokens.push(Token::LinkEnd(suffix));
-                }
-            }
-            Event::Start(Tag::Image {
-                dest_url, title, ..
-            }) => {
-                let src = normalize_link(&dest_url);
-                if valid_link(&src) {
-                    self.alt = Some((src, title.into_string(), String::new(), 0));
-                } else {
-                    self.text("![", false);
-                    self.images.push(Some(range.end));
-                    self.last_end = range.start + 2;
-                }
-            }
-            Event::End(TagEnd::Image) => {
-                if let Some(end) = self.images.pop().flatten() {
-                    let label_end = self.after_label(source, end);
-                    self.text(&label_end, false);
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-type Events<'a> = Peekable<OffsetIter<'a>>;
-
-fn inline_until(events: &mut Events<'_>, source: &str, bare_pipes: bool) -> Vec<Token> {
-    let mut inlines = Inlines {
-        bare_pipes,
-        ..Inlines::default()
-    };
-    for (event, range) in events.by_ref() {
-        if matches!(
-            event,
-            Event::End(TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::TableCell)
-        ) {
-            break;
-        }
-        inlines.event(source, event, range);
-    }
-    inlines.tokens
-}
-
-/// The text after `-#` and its spaces when `line` is a line of subtext.
-fn subtext(mut line: Vec<Token>) -> Result<Vec<Token>, Vec<Token>> {
-    let Some(Token::Text(glyphs)) = line.first_mut() else {
-        return Err(line);
-    };
-    let marker = matches!(
-        glyphs.as_slice(),
-        [
-            Glyph {
-                c: '-',
-                literal: false
-            },
-            Glyph {
-                c: '#',
-                literal: false
-            },
-            Glyph { c: ' ' | '\t', .. },
-            ..
-        ]
-    );
-    if !marker {
-        return Err(line);
-    }
-    let spaces = glyphs
-        .iter()
-        .skip(2)
-        .take_while(|glyph| matches!(glyph.c, ' ' | '\t'))
-        .count();
-    glyphs.drain(..2 + spaces);
-    if glyphs.is_empty() {
-        line.remove(0);
-    }
-    if line.is_empty() { Err(line) } else { Ok(line) }
-}
-
-/// A paragraph, or the subtext it is: [`prepare`] gives every subtext line a
-/// paragraph of its own.
-fn paragraphs(tokens: Vec<Token>) -> Vec<Block<Vec<Token>>> {
+/// A paragraph, or a math block when display math is its only content.
+fn paragraph(tokens: Vec<Token>) -> Block<Vec<Token>> {
     if let [
         Token::Math {
             latex,
@@ -377,125 +124,9 @@ fn paragraphs(tokens: Vec<Token>) -> Vec<Block<Vec<Token>>> {
         },
     ] = tokens.as_slice()
     {
-        return vec![Block::Math(latex.clone())];
+        return Block::Math(latex.clone());
     }
-    if tokens.iter().any(|token| matches!(token, Token::Break(_))) {
-        return vec![Block::Paragraph(tokens)];
-    }
-    match subtext(tokens) {
-        Ok(content) => vec![Block::Subtext(content)],
-        Err(tokens) => vec![Block::Paragraph(tokens)],
-    }
-}
-
-/// A fence's language from its info string as written: markdown-it takes the
-/// first word before resolving escapes, so an escaped one is no language.
-fn fence_language(source: &str, start: usize) -> String {
-    let line = tail(source, start).lines().next().unwrap_or_default();
-    let fence = content_of(line).trim_start();
-    let marker = fence.chars().next().unwrap_or('`');
-    let info = fence.trim_start_matches(marker);
-    info.split_whitespace()
-        .next()
-        .filter(|word| {
-            word.chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
-        })
-        .unwrap_or_default()
-        .to_owned()
-}
-
-fn code_block(
-    events: &mut Events<'_>,
-    kind: &CodeBlockKind<'_>,
-    language: String,
-) -> Block<Vec<Token>> {
-    let mut text = String::new();
-    for (event, _) in events.by_ref() {
-        match event {
-            Event::Text(chunk) => text.push_str(&chunk),
-            Event::End(TagEnd::CodeBlock) => break,
-            _ => {}
-        }
-    }
-    if text.ends_with('\n') {
-        text.pop();
-    }
-    let language = match kind {
-        CodeBlockKind::Fenced(_) => language,
-        CodeBlockKind::Indented => String::new(),
-    };
-    Block::Code { language, text }
-}
-
-fn table(events: &mut Events<'_>, source: &str) -> Block<Vec<Token>> {
-    let mut rows: Vec<Vec<Cell<Vec<Token>>>> = Vec::new();
-    let mut header = false;
-    while let Some((event, _)) = events.next() {
-        match event {
-            Event::Start(Tag::TableHead) => {
-                header = true;
-                rows.push(Vec::new());
-            }
-            Event::Start(Tag::TableRow) => {
-                header = false;
-                rows.push(Vec::new());
-            }
-            Event::Start(Tag::TableCell) => {
-                let content = inline_until(events, source, true);
-                if let Some(row) = rows.last_mut() {
-                    row.push(Cell { header, content });
-                }
-            }
-            Event::End(TagEnd::Table) => break,
-            _ => {}
-        }
-    }
-    Block::Table(rows)
-}
-
-const fn heading_level(level: HeadingLevel) -> u8 {
-    match level {
-        HeadingLevel::H1 => 1,
-        HeadingLevel::H2 => 2,
-        HeadingLevel::H3 => 3,
-        HeadingLevel::H4 => 4,
-        HeadingLevel::H5 => 5,
-        HeadingLevel::H6 => 6,
-    }
-}
-
-/// A heading's content without the edge whitespace markdown-it trims, and an
-/// ATX heading's closing run after a tab, which pulldown-cmark keeps.
-fn trimmed(mut tokens: Vec<Token>, atx: bool) -> Vec<Token> {
-    let space = |glyph: &Glyph| matches!(glyph.c, ' ' | '\t');
-    if let Some(Token::Text(glyphs)) = tokens.first_mut() {
-        let lead = glyphs.iter().take_while(|glyph| space(glyph)).count();
-        glyphs.drain(..lead);
-    }
-    if let Some(Token::Text(glyphs)) = tokens.last_mut() {
-        while glyphs.last().is_some_and(space) {
-            glyphs.pop();
-        }
-        let hashes = glyphs
-            .iter()
-            .rev()
-            .take_while(|glyph| glyph.c == '#' && !glyph.literal)
-            .count();
-        let before = glyphs.len() - hashes;
-        let spaced = before
-            .checked_sub(1)
-            .and_then(|last| glyphs.get(last))
-            .is_some_and(space);
-        if atx && hashes > 0 && spaced {
-            glyphs.truncate(before);
-            while glyphs.last().is_some_and(space) {
-                glyphs.pop();
-            }
-        }
-    }
-    tokens.retain(|token| !matches!(token, Token::Text(glyphs) if glyphs.is_empty()));
-    tokens
+    Block::Paragraph(tokens)
 }
 
 /// `ProseMirror` fills a container left empty with an empty paragraph.
@@ -506,83 +137,385 @@ fn filled(mut blocks: Vec<Block<Vec<Token>>>) -> Vec<Block<Vec<Token>>> {
     blocks
 }
 
-fn list(events: &mut Events<'_>, source: &str, start: Option<u64>) -> Block<Vec<Token>> {
-    let mut items = Vec::new();
-    while let Some((event, _)) = events.next() {
-        match event {
-            Event::Start(Tag::Item) => items.push(filled(blocks_until(events, source))),
-            Event::End(TagEnd::List(_)) => break,
-            _ => {}
-        }
-    }
-    Block::List {
-        order: start.map(|start| start.max(1)),
-        items,
-    }
+fn entity_end(text: &str) -> Option<usize> {
+    let end = text.find(';')?;
+    let name = span(text, 1, end);
+    let digits = name.strip_prefix('#');
+    let hex = digits.and_then(|digits| digits.strip_prefix(['x', 'X']));
+    let valid = match (hex, digits) {
+        (Some(hex), _) => hex.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        (None, Some(digits)) => digits.bytes().all(|byte| byte.is_ascii_digit()),
+        (None, None) => name.bytes().all(|byte| byte.is_ascii_alphanumeric()),
+    };
+    let empty = hex.or(digits).unwrap_or(name).is_empty();
+    (text.starts_with('&') && !empty && valid).then_some(end)
 }
 
-/// Blocks up to the end of the container being read. Inline content directly
-/// inside a list item becomes a paragraph, as markdown-it's hidden ones do.
-fn blocks_until(events: &mut Events<'_>, source: &str) -> Vec<Block<Vec<Token>>> {
-    let mut blocks = Vec::new();
-    let mut loose = Inlines::default();
-    let flush = |loose: &mut Inlines, blocks: &mut Vec<Block<Vec<Token>>>| {
-        if !loose.tokens.is_empty() {
-            blocks.extend(paragraphs(std::mem::take(&mut loose.tokens)));
-        }
-    };
-    while let Some((event, range)) = events.next() {
-        let starts_block = matches!(
-            event,
-            Event::Start(
-                Tag::Paragraph
-                    | Tag::Heading { .. }
-                    | Tag::BlockQuote(_)
-                    | Tag::CodeBlock(_)
-                    | Tag::List(_)
-                    | Tag::Table(_)
-            ) | Event::Rule
-        );
-        if starts_block {
-            flush(&mut loose, &mut blocks);
-        }
-        match event {
-            Event::End(TagEnd::BlockQuote(_) | TagEnd::Item) => break,
-            Event::Start(Tag::Paragraph) => {
-                blocks.extend(paragraphs(inline_until(events, source, false)));
-            }
-            Event::Start(Tag::Heading { level, .. }) => {
-                let atx = content_of(tail(source, range.start)).starts_with('#');
-                let tokens = trimmed(inline_until(events, source, false), atx);
-                blocks.push(Block::Heading(heading_level(level), tokens));
-            }
-            Event::Start(Tag::BlockQuote(_)) => {
-                blocks.push(Block::Quote(filled(blocks_until(events, source))));
-            }
-            Event::Start(Tag::CodeBlock(kind)) => {
-                let language = fence_language(source, range.start);
-                blocks.push(code_block(events, &kind, language));
-            }
-            Event::Start(Tag::List(start)) => blocks.push(list(events, source, start)),
-            Event::Start(Tag::Table(_)) => blocks.push(table(events, source)),
-            Event::Rule => blocks.push(Block::Rule),
-            Event::Start(Tag::HtmlBlock) | Event::End(TagEnd::HtmlBlock) => {}
-            event => loose.event(source, event, range),
+struct Reader<'s> {
+    source: &'s str,
+    lines: Vec<usize>,
+    marked: bool,
+}
+
+impl<'s> Reader<'s> {
+    fn new(source: &'s str, marked: bool) -> Self {
+        let mut lines = vec![0];
+        lines.extend(source.match_indices('\n').map(|(at, _)| at + 1));
+        Self {
+            source,
+            lines,
+            marked,
         }
     }
-    flush(&mut loose, &mut blocks);
-    blocks
+
+    /// Source text as it was typed.
+    fn typed(&self, text: &str) -> String {
+        if self.marked {
+            text.replace(BACKSLASHED_PIPE, "\\|")
+                .replace(ESCAPED_AMPERSAND, "\\&")
+                .replace(ESCAPED_BACKSLASH, "\\\\")
+                .replace(FUNCTION_DOLLAR, "$")
+                .replace(UNSPACED_QUOTE, ">")
+        } else {
+            text.to_owned()
+        }
+    }
+
+    /// Text whose backslash escapes comrak resolved.
+    fn unescaped(&self, text: &str) -> String {
+        if self.marked {
+            text.replace(BACKSLASHED_PIPE, "|")
+                .replace(ESCAPED_AMPERSAND, "&")
+                .replace(ESCAPED_BACKSLASH, "\\")
+                .replace(FUNCTION_DOLLAR, "$")
+                .replace(UNSPACED_QUOTE, ">")
+        } else {
+            text.to_owned()
+        }
+    }
+
+    /// comrak counts lines and bytes from one, and its end is the last byte.
+    fn range(&self, at: Sourcepos) -> Range<usize> {
+        let offset = |line: usize, column: usize| {
+            let start = line.checked_sub(1).and_then(|line| self.lines.get(line));
+            start.map_or(self.source.len(), |start| start + column.saturating_sub(1))
+        };
+        let start = offset(at.start.line, at.start.column).min(self.source.len());
+        let end = (offset(at.end.line, at.end.column) + 1).min(self.source.len());
+        start..end.max(start)
+    }
+
+    fn range_of(&self, node: Node<'_>) -> Range<usize> {
+        self.range(node.data.borrow().sourcepos)
+    }
+
+    fn raw(&self, range: Range<usize>) -> &'s str {
+        self.source.get(range).unwrap_or_default()
+    }
+
+    /// `text` as comrak read it from `range`: what an entity wrote is literal,
+    /// and `\|` in a table cell is a pipe like any other.
+    fn glyphs(&self, text: &str, range: Range<usize>, bare_pipes: bool) -> Vec<Glyph> {
+        let mut rest = self.raw(range);
+        if rest == text {
+            return glyphs(text, false);
+        }
+        let mut out = Vec::with_capacity(text.len());
+        let mut chars = text.chars();
+        while let Some(c) = chars.next() {
+            let entity = entity_end(rest)
+                .map(|end| (end, html_escape::decode_html_entities(head(rest, end + 1))))
+                .filter(|(end, written)| written.len() <= *end && written.starts_with(c));
+            if let Some((end, written)) = entity {
+                out.push(Glyph { c, literal: true });
+                out.extend(
+                    chars
+                        .by_ref()
+                        .take(written.chars().count().saturating_sub(1))
+                        .map(|c| Glyph { c, literal: true }),
+                );
+                rest = tail(rest, end + 1);
+            } else if rest.starts_with(c) {
+                rest = tail(rest, c.len_utf8());
+                out.push(Glyph { c, literal: false });
+            } else if bare_pipes && c == '|' && rest.starts_with("\\|") {
+                rest = tail(rest, 2);
+                out.push(Glyph { c, literal: false });
+            } else {
+                out.push(Glyph { c, literal: true });
+            }
+        }
+        out
+    }
+
+    fn inlines(&self, parent: Node<'_>, bare_pipes: bool) -> Vec<Token> {
+        let mut tokens = Vec::new();
+        self.children(parent, bare_pipes, &mut tokens);
+        tokens
+    }
+
+    fn children(&self, parent: Node<'_>, bare_pipes: bool, tokens: &mut Vec<Token>) {
+        for child in parent.children() {
+            self.inline(child, bare_pipes, tokens);
+        }
+    }
+
+    /// The source between a link's label and its end, which is text when the
+    /// link is refused.
+    fn after_label(&self, node: Node<'_>, range: &Range<usize>, marker: usize) -> String {
+        let label_end = node
+            .last_child()
+            .map_or(range.start + marker, |last| self.range_of(last).end);
+        self.typed(span(self.source, label_end.min(range.end), range.end))
+    }
+
+    fn link(&self, node: Node<'_>, link: &NodeLink, bare_pipes: bool, tokens: &mut Vec<Token>) {
+        let range = self.range_of(node);
+        let href = normalize_link(&self.unescaped(&link.url));
+        let raw = self.raw(range.clone());
+        if !raw.starts_with(['[', '<']) {
+            // A bare address is text, and its `_` and `*` are not emphasis.
+            let bare = self.typed(raw);
+            let bare = bare.chars().map(|c| Glyph {
+                c,
+                literal: matches!(c, '_' | '*' | '~'),
+            });
+            tokens.push(Token::Text(bare.collect()));
+        } else if valid_link(&href) {
+            tokens.push(Token::Open(Mark::Link(href)));
+            self.children(node, bare_pipes, tokens);
+            let suffix = self.after_label(node, &range, 1);
+            tokens.push(Token::LinkEnd(suffix));
+        } else if raw.starts_with('<') {
+            tokens.push(Token::Text(glyphs(&self.typed(raw), false)));
+        } else {
+            tokens.push(Token::Text(glyphs("[", false)));
+            self.children(node, bare_pipes, tokens);
+            tokens.push(Token::Text(glyphs(
+                &self.after_label(node, &range, 1),
+                false,
+            )));
+        }
+    }
+
+    fn image(&self, node: Node<'_>, link: &NodeLink, bare_pipes: bool, tokens: &mut Vec<Token>) {
+        let range = &self.range_of(node);
+        let src = normalize_link(&self.unescaped(&link.url));
+        if valid_link(&src) {
+            let mut alt = String::new();
+            for inner in node.descendants().skip(1) {
+                match &inner.data.borrow().value {
+                    NodeValue::Text(text) => alt.push_str(&self.unescaped(text)),
+                    NodeValue::Code(code) => alt.push_str(&self.typed(&code.literal)),
+                    _ => {}
+                }
+            }
+            tokens.push(Token::Image {
+                src,
+                alt,
+                title: self.unescaped(&link.title),
+            });
+        } else {
+            tokens.push(Token::Text(glyphs("![", false)));
+            self.children(node, bare_pipes, tokens);
+            tokens.push(Token::Text(glyphs(
+                &self.after_label(node, range, 2),
+                false,
+            )));
+        }
+    }
+
+    /// A single `~` strikes nothing.
+    fn strike(&self, node: Node<'_>, bare_pipes: bool, tokens: &mut Vec<Token>) {
+        let real = self.raw(self.range_of(node)).starts_with("~~");
+        let edge = |tokens: &mut Vec<Token>, token: Token| {
+            tokens.push(if real {
+                token
+            } else {
+                Token::Text(glyphs("~", false))
+            });
+        };
+        edge(tokens, Token::Open(Mark::Strike));
+        self.children(node, bare_pipes, tokens);
+        edge(tokens, Token::Close(STRIKE));
+    }
+
+    fn inline(&self, node: Node<'_>, bare_pipes: bool, tokens: &mut Vec<Token>) {
+        let ast = node.data.borrow();
+        let range = self.range(ast.sourcepos);
+        match &ast.value {
+            NodeValue::Text(text) => {
+                let mut glyphs = self.glyphs(text, range, bare_pipes);
+                let marks = |glyph: &Glyph| self.marked && glyph.c == BACKSLASHED_PIPE;
+                while let Some(at) = glyphs.iter().position(marks) {
+                    let pipe = Glyph {
+                        c: '|',
+                        literal: false,
+                    };
+                    let backslash = Glyph {
+                        c: '\\',
+                        literal: true,
+                    };
+                    let typed = if bare_pipes {
+                        vec![pipe]
+                    } else {
+                        vec![backslash, pipe]
+                    };
+                    glyphs.splice(at.saturating_sub(1)..=at, typed);
+                }
+                for glyph in &mut glyphs {
+                    let (c, literal) = match glyph.c {
+                        ESCAPED_AMPERSAND => ('&', true),
+                        ESCAPED_BACKSLASH => ('\\', true),
+                        FUNCTION_DOLLAR => ('$', false),
+                        UNSPACED_QUOTE => ('>', false),
+                        _ => continue,
+                    };
+                    if self.marked {
+                        *glyph = Glyph { c, literal };
+                    }
+                }
+                tokens.push(Token::Text(glyphs));
+            }
+            NodeValue::Escaped => {
+                for child in node.children() {
+                    if let NodeValue::Text(text) = &child.data.borrow().value {
+                        let literal = !(bare_pipes && text.as_ref() == "|");
+                        tokens.push(Token::Text(glyphs(text, literal)));
+                    }
+                }
+            }
+            NodeValue::HtmlInline(html) => {
+                tokens.push(Token::Text(glyphs(&self.typed(html), false)));
+            }
+            NodeValue::SoftBreak | NodeValue::LineBreak => line_break(tokens, self.source, range),
+            NodeValue::Code(code) if bare_pipes && self.marked => {
+                tokens.push(Token::Code(
+                    self.typed(&code.literal.replace(BACKSLASHED_PIPE, "|")),
+                ));
+            }
+            NodeValue::Code(code) => tokens.push(Token::Code(self.typed(&code.literal))),
+            NodeValue::Math(math) if math.display_math && math.literal.trim().is_empty() => {
+                tokens.push(Token::Text(glyphs(&self.typed(self.raw(range)), false)));
+            }
+            NodeValue::Math(math) => {
+                let latex = math.literal.trim();
+                let latex = if bare_pipes && self.marked {
+                    self.typed(&latex.replace(BACKSLASHED_PIPE, "|"))
+                } else {
+                    self.typed(latex)
+                };
+                tokens.push(Token::Math {
+                    latex,
+                    display: math.display_math,
+                });
+            }
+            NodeValue::Emph(_) => {
+                tokens.push(Token::Open(Mark::Em));
+                self.children(node, bare_pipes, tokens);
+                tokens.push(Token::Close(EM));
+            }
+            NodeValue::Strong(_) => {
+                tokens.push(Token::Open(Mark::Strong));
+                self.children(node, bare_pipes, tokens);
+                tokens.push(Token::Close(STRONG));
+            }
+            NodeValue::Strikethrough(_) => self.strike(node, bare_pipes, tokens),
+            NodeValue::Link(link) => self.link(node, link, bare_pipes, tokens),
+            NodeValue::Image(link) => self.image(node, link, bare_pipes, tokens),
+            _ => self.children(node, bare_pipes, tokens),
+        }
+    }
+
+    fn table(&self, node: Node<'_>) -> Block<Vec<Token>> {
+        let rows = node
+            .children()
+            .map(|row| {
+                let header =
+                    matches!(&row.data.borrow().value, NodeValue::TableRow(row) if row.header);
+                row.children()
+                    .map(|cell| Cell {
+                        header,
+                        content: self.inlines(cell, true),
+                    })
+                    .collect()
+            })
+            .collect();
+        Block::Table(rows)
+    }
+
+    fn blocks(&self, parent: Node<'_>) -> Vec<Block<Vec<Token>>> {
+        let mut blocks = Vec::new();
+        for node in parent.children() {
+            let ast = node.data.borrow();
+            match &ast.value {
+                NodeValue::Paragraph => blocks.push(paragraph(self.inlines(node, false))),
+                NodeValue::Subtext => blocks.push(Block::Subtext(self.inlines(node, false))),
+                NodeValue::Heading(heading) => {
+                    let tokens = self.inlines(node, false);
+                    blocks.push(Block::Heading(heading.level, tokens));
+                }
+                NodeValue::BlockQuote => blocks.push(Block::Quote(filled(self.blocks(node)))),
+                NodeValue::CodeBlock(code) => {
+                    let mut text = self.typed(&code.literal);
+                    if text.ends_with('\n') {
+                        text.pop();
+                    }
+                    let language = code
+                        .info
+                        .split_whitespace()
+                        .next()
+                        .filter(|word| {
+                            word.chars()
+                                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+                        })
+                        .unwrap_or_default()
+                        .to_owned();
+                    blocks.push(Block::Code { language, text });
+                }
+                NodeValue::List(list) => blocks.push(Block::List {
+                    order: (list.list_type == ListType::Ordered)
+                        .then(|| u64::try_from(list.start).unwrap_or(u64::MAX).max(1)),
+                    items: node
+                        .children()
+                        .map(|item| filled(self.blocks(item)))
+                        .collect(),
+                }),
+                NodeValue::Table(_) => blocks.push(self.table(node)),
+                NodeValue::ThematicBreak(_) => blocks.push(Block::Rule),
+                NodeValue::HtmlBlock(html) => {
+                    let text = self.typed(html.literal.trim_end_matches('\n'));
+                    blocks.push(paragraph(vec![Token::Text(glyphs(&text, false))]));
+                }
+                _ => {}
+            }
+        }
+        blocks
+    }
 }
 
 pub(super) fn parse(source: &str) -> Vec<Block<Vec<Token>>> {
-    let prepared = prepare(source);
-    let mut options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
-    // Math delimiters cannot be told apart from the `$` of `$[fn ...]`, which would pair with one.
-    if !prepared.contains("$[") {
-        options |= Options::ENABLE_MATH;
+    let marked = !source.contains([
+        BACKSLASHED_PIPE,
+        ESCAPED_AMPERSAND,
+        ESCAPED_BACKSLASH,
+        FUNCTION_DOLLAR,
+        UNSPACED_QUOTE,
+    ]);
+    // comrak reads a list marker that ends the source as text.
+    let mut source = source.to_owned() + "\n";
+    if marked {
+        source = mark(&source);
     }
-    let mut events = Parser::new_ext(&prepared, options)
-        .into_offset_iter()
-        .peekable();
-    blocks_until(&mut events, &prepared)
+    let mut options = Options::default();
+    options.extension.table = true;
+    options.extension.strikethrough = true;
+    options.extension.subtext = true;
+    options.extension.autolink = true;
+    options.extension.math_dollars = true;
+    options.extension.math_code = true;
+    options.parse.escaped_char_spans = true;
+    let arena = Arena::new();
+    let document = parse_document(&arena, &source, &options);
+    Reader::new(&source, marked).blocks(document)
 }

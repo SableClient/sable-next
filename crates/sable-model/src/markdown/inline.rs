@@ -259,30 +259,152 @@ fn projection(pieces: &[Piece], lo: usize, hi: usize, limit: usize) -> Vec<(char
     chars
 }
 
-/// The `||` that closes a spoiler opened before `from`, inside this scope.
-fn spoiler_close(pieces: &[Piece], from: usize, hi: usize) -> Option<usize> {
-    let mut index = from;
-    while index + 1 < hi {
-        let (Some(piece), Some(next)) = (pieces.get(index), pieces.get(index + 1)) else {
-            break;
-        };
-        if piece.opens_link() {
-            index = link_end(pieces, index, hi) + 1;
-            continue;
-        }
-        if piece.glyph('|') && next.glyph('|') {
-            return Some(index);
-        }
-        index += 1;
-    }
-    None
+/// A mark written between two copies of a marker, as `||` writes a spoiler.
+struct Delimiter {
+    marker: &'static [char],
+    mark: Mark,
 }
 
-fn spoiler_inner_valid(pieces: &[Piece], lo: usize, hi: usize) -> bool {
+/// Emphasis and strikethrough are tokens before these are read, so they have no entry.
+const DELIMITERS: &[Delimiter] = &[Delimiter {
+    marker: &['|', '|'],
+    mark: Mark::Spoiler,
+}];
+
+impl Delimiter {
+    const fn len(&self) -> usize {
+        self.marker.len()
+    }
+
+    fn open(&self) -> Piece {
+        Piece::Token(Token::Open(self.mark.clone()))
+    }
+
+    const fn close(&self) -> Piece {
+        Piece::Token(Token::Close(self.mark.rank()))
+    }
+
+    fn at(&self, pieces: &[Piece], index: usize, hi: usize) -> bool {
+        index + self.len() <= hi
+            && self
+                .marker
+                .iter()
+                .zip(pieces.get(index..).unwrap_or_default())
+                .all(|(c, piece)| piece.glyph(*c))
+    }
+
+    fn next(&self, pieces: &[Piece], from: usize, hi: usize) -> Option<usize> {
+        let mut index = from;
+        while index < hi {
+            if pieces.get(index).is_some_and(Piece::opens_link) {
+                index = link_end(pieces, index, hi) + 1;
+                continue;
+            }
+            if self.at(pieces, index, hi) {
+                return Some(index);
+            }
+            index += 1;
+        }
+        None
+    }
+
+    fn closing(&self, pieces: &[Piece], index: usize, hi: usize) -> Option<usize> {
+        let inner = index + self.len();
+        let close = self.next(pieces, inner, hi)?;
+        inner_valid(pieces, inner, close).then_some(close)
+    }
+
+    fn left_open(&self, pieces: &[Piece], from: usize) -> Option<usize> {
+        let hi = pieces.len();
+        let mut index = from;
+        while index < hi {
+            let Some(piece) = pieces.get(index) else {
+                break;
+            };
+            if piece.opens_link() {
+                index = link_end(pieces, index, hi) + 1;
+                continue;
+            }
+            if self.at(pieces, index, hi) {
+                let inner = index + self.len();
+                match self.next(pieces, inner, hi) {
+                    Some(close) if inner_valid(pieces, inner, close) => {
+                        index = close + self.len();
+                        continue;
+                    }
+                    None if inner_valid(pieces, inner, hi) => return Some(index),
+                    _ => {}
+                }
+            }
+            if piece.glyph('$')
+                && pieces.get(index + 1).is_some_and(|next| next.glyph('['))
+                && let Some(end) = mfm(pieces, index, hi, &mut Vec::new())
+            {
+                index = end;
+                continue;
+            }
+            index += 1;
+        }
+        None
+    }
+
+    /// A marker left open in one paragraph and closed in a later one marks its
+    /// part of each, since no mark's element can hold paragraphs.
+    fn across(&self, texts: &mut [Vec<Piece>]) {
+        let (mut first, mut from) = (0, 0);
+        while let Some(text) = texts.get(first) {
+            let ends = self.left_open(text, from).and_then(|start| {
+                let (last, end) = texts
+                    .iter()
+                    .enumerate()
+                    .skip(first + 1)
+                    .find_map(|(at, text)| self.next(text, 0, text.len()).map(|end| (at, end)))?;
+                inner_valid(texts.get(last)?, 0, end).then_some((start, last, end))
+            });
+            let Some((start, last, end)) = ends else {
+                first += 1;
+                from = 0;
+                continue;
+            };
+            for (at, text) in texts.iter_mut().enumerate().take(last + 1).skip(first) {
+                if at == last {
+                    text.splice(end..end + self.len(), [self.close()]);
+                } else {
+                    text.push(self.close());
+                }
+                if at == first {
+                    text.splice(start..start + self.len(), [self.open()]);
+                } else {
+                    text.insert(0, self.open());
+                }
+            }
+            first = last;
+            from = end + 2;
+        }
+    }
+}
+
+fn inner_valid(pieces: &[Piece], lo: usize, hi: usize) -> bool {
     let inner = projection(pieces, lo, hi, usize::MAX);
     match (inner.first(), inner.last()) {
         (Some(&(first, _)), Some(&(last, _))) => !is_space(first) && !is_space(last),
         _ => false,
+    }
+}
+
+pub(super) fn delimiters_across(paragraphs: &mut [&mut Vec<Token>]) {
+    if paragraphs.len() < 2 {
+        return;
+    }
+    let mut texts: Vec<Vec<Piece>> = paragraphs
+        .iter_mut()
+        .map(|tokens| pieces(std::mem::take(*tokens)))
+        .collect();
+    for delimiter in DELIMITERS {
+        delimiter.across(&mut texts);
+    }
+    for (tokens, text) in paragraphs.iter_mut().zip(texts) {
+        **tokens = self::tokens(text);
     }
 }
 
@@ -374,15 +496,16 @@ fn scope(pieces: &[Piece], lo: usize, hi: usize, out: &mut Vec<Piece>) {
             index = end + 1;
             continue;
         }
-        if piece.glyph('|')
-            && pieces.get(index + 1).is_some_and(|next| next.glyph('|'))
-            && let Some(close) = spoiler_close(pieces, index + 2, hi)
-            && spoiler_inner_valid(pieces, index + 2, close)
-        {
-            out.push(Piece::Token(Token::Open(Mark::Spoiler)));
-            scope(pieces, index + 2, close, out);
-            out.push(Piece::Token(Token::Close(SPOILER)));
-            index = close + 2;
+        if let Some((delimiter, close)) = DELIMITERS.iter().find_map(|delimiter| {
+            let close = delimiter
+                .at(pieces, index, hi)
+                .then(|| delimiter.closing(pieces, index, hi))??;
+            Some((delimiter, close))
+        }) {
+            out.push(delimiter.open());
+            scope(pieces, index + delimiter.len(), close, out);
+            out.push(delimiter.close());
+            index = close + delimiter.len();
             continue;
         }
         if piece.glyph('$')

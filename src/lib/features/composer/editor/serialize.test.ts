@@ -122,6 +122,20 @@ test('typed LaTeX is sent as data-mx-maths with the source as body', () => {
   expect(rich.formatted).toBe(expected);
 });
 
+test('maths falls back to backticks inside the dollars', () => {
+  const maths = (latex: string) => composerSchema.nodes.math_inline.create({ latex });
+  const cases = [
+    { content: [maths('a\\')], markdown: '$`a\\`$' },
+    { content: [maths('x'), composerSchema.text('5')], markdown: '$`x`$5' },
+    { content: [maths('`')], markdown: '$```$' },
+  ];
+  for (const { content, markdown } of cases) {
+    const source = docOf(para(content));
+    expect(composerMarkdown(source)).toBe(markdown);
+    expect(richFromPlain(textDoc(markdown)).toJSON()).toEqual(source.toJSON());
+  }
+});
+
 test('an existing time element survives a rich-text edit', () => {
   const message = serializeComposer(
     parseMatrixHtml('<time datetime="1970-01-01T00:00:00Z">old label</time>')

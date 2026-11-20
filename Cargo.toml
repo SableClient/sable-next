@@ -63,7 +63,7 @@ parking_lot = "0.13"
 specta = { version = "=2.0.0-rc.28", features = ["derive"] }
 specta-serde = "=0.0.15"
 specta-typescript = "=0.0.15"
-pulldown-cmark = { version = "0.13", default-features = false }
+comrak = { version = "1.1", default-features = false }
 regex-lite = "0.1"
 unicode-segmentation = "1.13"
 idna = "1.1"

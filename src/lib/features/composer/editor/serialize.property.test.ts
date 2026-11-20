@@ -84,13 +84,19 @@ const image = fc
     composerSchema.nodes.image.create({ src: normalizeLink(`mxc://a.b/${path}`), alt, title })
   );
 
+const math = fc
+  .stringMatching(/^[a-z0-9^_{}\\+*=()|~`&<>#!-]( ?[a-z0-9^_{}\\+*=()|~`&<>#!-]){0,5}$/)
+  .filter((latex) => !latex.startsWith('['))
+  .map((latex) => composerSchema.nodes.math_inline.create({ latex }));
+
 const run = fc.oneof(
   {
     weight: 4,
     arbitrary: fc.record({ text, marks }).map((part) => composerSchema.text(part.text, part.marks)),
   },
   { weight: 1, arbitrary: autolink },
-  { weight: 1, arbitrary: image }
+  { weight: 1, arbitrary: image },
+  { weight: 1, arbitrary: math }
 );
 
 const words = fc

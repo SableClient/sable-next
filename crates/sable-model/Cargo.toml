@@ -21,7 +21,7 @@ linkify = { workspace = true }
 matroska-demuxer = "0.8.1"
 mp4-atom = "0.17.1"
 png = "0.18.1"
-pulldown-cmark = { workspace = true }
+comrak = { workspace = true }
 regex-lite = { workspace = true }
 ruma-html = { workspace = true }
 ruma-common = { workspace = true, features = ["client", "server"] }

@@ -1,5 +1,13 @@
-//! A typed message to Matrix content, as the web composer's plain mode sends it, checked
-//! against `fixtures/markdown.json`.
+//! A typed message to Matrix content, checked against `fixtures/markdown.json`.
+//!
+//! The flavour is comrak's reading of GitHub markdown, with:
+//!
+//! - tables, `~~strike~~` (a single `~` strikes nothing) and `-# subtext`;
+//! - `$math$`, `$$math$$` and math in backticks inside the dollars;
+//! - `||spoiler||`, which may run across paragraphs, and `$[fn …]` functions;
+//! - `>` opening a quote only before a space;
+//! - a bare address staying text, with its `_` and `*` as written;
+//! - links to allowed schemes only, and HTML shown as the text it is.
 
 mod blocks;
 mod doc;
@@ -12,7 +20,9 @@ use linkify::{LinkFinder, LinkKind};
 use serde::{Deserialize, Serialize};
 
 use self::blocks::Block;
-use self::inline::{Inline, Mark, Token, add_mark, fold, formats, merged, sable_syntax};
+use self::inline::{
+    Inline, Mark, Token, add_mark, delimiters_across, fold, formats, merged, sable_syntax,
+};
 use crate::text::{head, is_space, tail, trim};
 
 /// The placeholder a client writes where a pill sits in the typed text.
@@ -282,8 +292,32 @@ fn plain_text(blocks: &[Block<Vec<Inline>>]) -> Option<String> {
     Some(paragraphs.join("\n\n"))
 }
 
+fn delimiters_across_paragraphs(blocks: &mut [Block<Vec<Token>>]) {
+    let mut run = Vec::new();
+    for block in blocks {
+        match block {
+            Block::Paragraph(tokens) => run.push(tokens),
+            other => {
+                delimiters_across(&mut std::mem::take(&mut run));
+                match other {
+                    Block::Quote(children) => delimiters_across_paragraphs(children),
+                    Block::List { items, .. } => {
+                        for item in items {
+                            delimiters_across_paragraphs(item);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    delimiters_across(&mut run);
+}
+
 fn token_blocks(source: &str) -> Vec<Block<Vec<Token>>> {
-    blocks::parse(source)
+    let mut blocks = blocks::parse(source);
+    delimiters_across_paragraphs(&mut blocks);
+    blocks
         .into_iter()
         .map(|block| block.map(&mut sable_syntax))
         .collect()
@@ -550,6 +584,135 @@ mod tests {
     }
 
     #[test]
+    fn a_spoiler_runs_across_paragraphs() {
+        let p = |inner: &str| format!("<p>{inner}</p>");
+        let s = |inner: &str| format!("<span data-mx-spoiler=\"\">{inner}</span>");
+        for (markdown, formatted) in [
+            ("||one\n\ntwo||", p(&s("one")) + &p(&s("two"))),
+            ("||one\ntwo||", s("one<br>two")),
+            (
+                "a ||one\n\n**two**\n\nthree|| b",
+                p(&format!("a {}", s("one")))
+                    + &p(&s("<strong>two</strong>"))
+                    + &p(&format!("{} b", s("three"))),
+            ),
+            (
+                "||one\n\ntwo|| ||three\n\nfour||",
+                p(&s("one")) + &p(&format!("{} {}", s("two"), s("three"))) + &p(&s("four")),
+            ),
+            (
+                "> ||one\n>\n> two||",
+                format!("<blockquote>{}{}</blockquote>", p(&s("one")), p(&s("two"))),
+            ),
+        ] {
+            let content = markdown_to_content(markdown, &[]);
+            assert_eq!(content.formatted_body, Some(formatted), "{markdown}");
+            assert!(
+                !content.body.contains("one"),
+                "{markdown}: {}",
+                content.body
+            );
+        }
+        for markdown in [
+            "||one\n\ntwo",
+            "|| one\n\ntwo||",
+            "||one\n\ntwo ||",
+            "||one\n\n# two||",
+        ] {
+            let html = markdown_to_content(markdown, &[])
+                .formatted_body
+                .unwrap_or_default();
+            assert!(!html.contains("data-mx-spoiler"), "{markdown}: {html}");
+        }
+    }
+
+    #[test]
+    fn a_table_can_end_a_paragraph() {
+        for markdown in ["a | b\n|-|-|", "a | b\\\n|-|-|", "text\n| a |\n|---|"] {
+            let html = markdown_to_content(markdown, &[])
+                .formatted_body
+                .unwrap_or_default();
+            assert!(html.contains("<table>"), "{markdown}: {html}");
+        }
+    }
+
+    #[test]
+    fn a_table_inside_a_quote_or_list_stays_a_table() {
+        for markdown in [
+            "> | a |\n> | - |\n> | b |",
+            "* * x\n\n    | a |\n    | - |\n    | b |",
+        ] {
+            let html = markdown_to_content(markdown, &[]).formatted_body;
+            assert!(html.unwrap_or_default().contains("<table>"), "{markdown}");
+        }
+    }
+
+    #[test]
+    fn an_escaped_ampersand_in_a_title_keeps_its_entity() {
+        assert_eq!(
+            markdown_to_content("![a](mxc://a.b/c \"\\&amp; \\\\\")", &[])
+                .formatted_body
+                .as_deref(),
+            Some("<img src=\"mxc://a.b/c\" alt=\"a\" title=\"&amp;amp; \\\">")
+        );
+        assert_eq!(
+            markdown_to_content("[a](javascript:\\&amp;)", &[]).body,
+            "[a](javascript:\\&amp;)"
+        );
+    }
+
+    #[test]
+    fn a_backslash_before_a_pipe_stays_in_its_cell() {
+        assert_eq!(
+            markdown_to_content("| `\\\\|!` |\n| - |", &[])
+                .formatted_body
+                .as_deref(),
+            Some("<table><tbody><tr><th><code>\\|!</code></th></tr></tbody></table>")
+        );
+        assert_eq!(
+            markdown_to_content("`a\\\\|b` c", &[])
+                .formatted_body
+                .as_deref(),
+            Some("<code>a\\\\|b</code> c")
+        );
+    }
+
+    #[test]
+    fn a_title_that_is_a_backslash_ends_at_its_quote() {
+        let html = markdown_to_content("![a](mxc://a.b/c \"\\\\\") ![b](mxc://a.b/d \"e\")", &[])
+            .formatted_body
+            .unwrap_or_default();
+        assert_eq!(
+            html,
+            "<img src=\"mxc://a.b/c\" alt=\"a\" title=\"\\\"> <img src=\"mxc://a.b/d\" alt=\"b\" title=\"e\">"
+        );
+    }
+
+    #[test]
+    fn a_list_marker_alone_is_an_empty_item() {
+        assert_eq!(
+            markdown_to_content("1.", &[]).formatted_body.as_deref(),
+            Some("<ol><li></li></ol>")
+        );
+        assert_eq!(
+            markdown_to_content("-", &[]).formatted_body.as_deref(),
+            Some("<ul><li></li></ul>")
+        );
+    }
+
+    #[test]
+    fn an_entity_inside_a_spoiler_keeps_the_spoiler() {
+        assert_eq!(
+            markdown_to_content("||a &amp; b||", &[])
+                .formatted_body
+                .as_deref(),
+            Some("<span data-mx-spoiler=\"\">a &amp; b</span>")
+        );
+        let written = markdown_to_content("&#124;&#124;a&#124;&#124;", &[]).formatted_body;
+        assert!(!written.unwrap_or_default().contains("data-mx-spoiler"));
+    }
+
+    #[test]
     fn a_tilde_run_opens_a_fence_whatever_follows() {
         for markdown in [
             "~~~) &amp;~~ ![](mxc://a.b/0)",
@@ -697,11 +860,30 @@ mod tests {
     }
 
     #[test]
-    fn functions_take_the_dollar_signs_math_would_pair() {
+    fn a_function_and_math_share_a_message() {
         let content = markdown_to_content("$[fg.color=f00 a]$[bg.color=000 b] $x$", &[]);
-        let html = content.formatted_body.unwrap_or_default();
-        assert!(html.contains("data-mx-color") && html.contains("data-mx-bg-color"));
-        assert!(!html.contains("data-mx-maths"));
+        assert_eq!(
+            content.formatted_body.as_deref(),
+            Some(
+                "<span data-mx-color=\"#ff0000\">a</span><span data-mx-bg-color=\"#000000\">b</span> \
+                 <span data-mx-maths=\"x\"><code>x</code></span>"
+            )
+        );
+    }
+
+    #[test]
+    fn math_in_backticks_is_read() {
+        for (markdown, latex) in [("$`a\\`$", "a\\"), ("$`x`$5", "x"), ("$`a~b`$", "a~b")] {
+            let html = markdown_to_content(markdown, &[])
+                .formatted_body
+                .unwrap_or_default();
+            assert!(
+                html.contains(&format!("data-mx-maths=\"{latex}\"")),
+                "{markdown}: {html}"
+            );
+        }
+        let cell = markdown_to_content("| $a\\|b$ |\n| - |", &[]).formatted_body;
+        assert!(cell.unwrap_or_default().contains("data-mx-maths=\"a|b\""));
     }
 
     #[test]

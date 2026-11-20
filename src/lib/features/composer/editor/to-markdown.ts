@@ -3,6 +3,7 @@ import type {
   Break,
   Heading,
   Image,
+  InlineMath,
   ListItem,
   MfmColor,
   PhrasingContent,
@@ -41,6 +42,9 @@ declare module 'mdast' {
   interface Verbatim extends Literal {
     type: 'verbatim';
   }
+  interface InlineMath extends Literal {
+    type: 'inlineMath';
+  }
   interface Subtext extends Parent {
     type: 'subtext';
     children: PhrasingContent[];
@@ -49,6 +53,7 @@ declare module 'mdast' {
     spoiler: Spoiler;
     mfmColor: MfmColor;
     verbatim: Verbatim;
+    inlineMath: InlineMath;
   }
   interface BlockContentMap {
     subtext: Subtext;
@@ -59,6 +64,7 @@ declare module 'mdast' {
     mfmColor: MfmColor;
     subtext: Subtext;
     verbatim: Verbatim;
+    inlineMath: InlineMath;
   }
 }
 
@@ -121,7 +127,7 @@ function leaf(node: ProseMirrorNode): PhrasingContent {
     case nodes.mfm_time:
       return { type: 'verbatim', value: mfmUnixtime(node.attrs.datetime as string) };
     case nodes.math_inline:
-      return { type: 'verbatim', value: `$${node.attrs.latex as string}$` };
+      return { type: 'inlineMath', value: node.attrs.latex as string };
     default:
       return { type: 'text', value: node.textContent };
   }
@@ -269,6 +275,17 @@ const image: Handle = (node: Image, parent, state, info) => {
 
 const verbatim: Handle = (node: Verbatim) => node.value;
 
+// `$…$` cannot end in a backslash, hold a backtick or stand before a digit, so
+// those are written as `$\`…\`$`.
+const inlineMath: Handle = Object.assign(
+  (node: InlineMath, _parent: unknown, state: State, info: Info) => {
+    const fenced = node.value.includes('`') || node.value.endsWith('\\') || /^\d/.test(info.after);
+    const value = fenced ? `$\`${node.value}\`$` : `$${node.value}$`;
+    return state.stack.includes('tableCell') ? value.replaceAll('|', '\\|') : value;
+  },
+  { peek: () => '$' }
+);
+
 const subtext: Handle = (node: Subtext, _parent, state, info) => {
   const tracker = state.createTracker(info);
   const exit = state.enter('phrasing');
@@ -294,6 +311,7 @@ const options: Options = {
     mfmColor,
     subtext,
     verbatim,
+    inlineMath,
   },
   unsafe: [
     { character: '|', inConstruct: 'phrasing', after: '\\|' },
