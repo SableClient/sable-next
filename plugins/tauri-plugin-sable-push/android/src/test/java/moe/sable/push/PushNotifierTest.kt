@@ -37,7 +37,7 @@ class PushNotifierTest {
         PushPolicy(context).showContent = true
         notificationManager = context.getSystemService(NotificationManager::class.java)
         mockkObject(PushPayloadDecryptor)
-        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } answers {
+        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } answers {
             JSONObject().put("sender_name", arg<String?>(5).orEmpty())
         }
         every { PushPayloadDecryptor.previewBody(any(), match { it?.toString() == richContent().toString() }) } returns
@@ -176,8 +176,8 @@ class PushNotifierTest {
     @Test
     fun aWarmDeliveryDelayedByMediaKeepsReceiptOrder() {
         val room = "!warm-history:example.org"
-        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } answers {
-            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns null
+        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } answers {
+            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } returns null
             PushNotifier.showFromPush(context, pushPayload(room, "\$second", "second"), receivedAt = 2_000L)
             null
         }
@@ -1265,7 +1265,7 @@ class PushNotifierTest {
                     """{"type":"m.room.message","content":{"body":"fetched text"},"sender":"@bob:example.org",""" +
                         """"sender_display_name":"Bob","room_name":"Fetched room","room_avatar_url":null}"""
                 )
-            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns
+            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 JSONObject().put("sender_name", "Bob")
             val payload = JSONObject().put("room_id", "!bare:example.org").put("event_id", "\$bare")
                 .put("user_id", "@alice:example.org").toString()
@@ -1292,7 +1292,7 @@ class PushNotifierTest {
                     """{"type":"m.room.message","content":{"body":"secret"},"sender":"@bob:example.org",""" +
                         """"sender_display_name":"Bob","room_name":"Room","encrypted":true}"""
                 )
-            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns
+            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 JSONObject().put("sender_name", "Bob")
             val payload = { event: String ->
                 JSONObject().put("room_id", "!bare:example.org").put("event_id", event)
@@ -1379,8 +1379,8 @@ class PushNotifierTest {
         val contents = mutableListOf<JSONObject?>()
         mockkObject(PushPayloadDecryptor)
         try {
-            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } answers {
-                contents.add(arg(6))
+            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } answers {
+                contents.add(arg(7))
                 JSONObject().put("own_name", "Alice").put("own_avatar", JSONObject.NULL)
             }
             PushNotifier.showFromPush(context, imagePush(room))
@@ -1410,7 +1410,7 @@ class PushNotifierTest {
     fun senderNamesComeFromRustForEveryDelivery() {
         PushPolicy(context).accounts = mapOf("@alice:example.org" to "ALICE")
         PushPolicy(context).showEncryptedContent = true
-        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns
+        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } returns
             JSONObject().put("sender_name", "Mum")
         val clear = JSONObject().put("type", "m.room.message")
             .put("content", JSONObject().put("body", "hello"))
@@ -1466,14 +1466,14 @@ class PushNotifierTest {
                 }
             }
             verify(atLeast = 1) { PushPayloadDecryptor.media(any(), "@alice:example.org", "ALICE",
-                "!$delivery:example.org", "@bob:example.org", "Bob", any()) }
+                "!$delivery:example.org", "@bob:example.org", "Bob", any(), any()) }
             PushPolicy(context).showEncryptedContent = true
         }
     }
 
     @Test
     fun anUnavailableResolverUsesTheSenderId() {
-        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns null
+        every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } returns null
         val notification = warmNotification("!fallback:example.org", "\$fallback", "hello")
             .put("sender", "@bob:example.org").put("sender_display_name", "\u200b\u2800")
         PushNotifier.show(context, notification)
@@ -1503,7 +1503,7 @@ class PushNotifierTest {
         val room = "!profiles:example.org"
         val push = { event: String, name: String, profile: String? ->
             val content = JSONObject().put("msgtype", "m.text").put("body", "hi")
-            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any()) } returns
+            every { PushPayloadDecryptor.media(any(), any(), any(), any(), any(), any(), any(), any()) } returns
                 JSONObject().put("sender_name", name).apply { profile?.let { put("sender_profile", it) } }
             val notification = JSONObject()
                 .put("room_id", room).put("event_id", event).put("user_id", "@alice:example.org")

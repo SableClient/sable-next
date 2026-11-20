@@ -347,10 +347,13 @@ impl PushSession {
 
     /// `sender` asks for the avatars, `content` for the message's image and per-message
     /// profile; leave out the content when the notification may not show the message.
+    /// `payload_avatar` is the sender avatar the SDK resolved with the pushed event, which
+    /// this store may have no member for.
     pub async fn media(
         &self,
         sender: Option<&str>,
         payload_name: Option<&str>,
+        payload_avatar: Option<&str>,
         content: Option<&serde_json::Value>,
     ) -> PushMedia {
         let sender_name = self.sender_name(sender, payload_name, content).await;
@@ -365,11 +368,12 @@ impl PushSession {
         let profile_avatar = profile
             .as_ref()
             .and_then(|profile| profile.avatar_url.as_deref());
-        let sender_url = match (profile_avatar, sender) {
-            (Some(url), _) => Some(url)
+        let sender_url = match (profile_avatar, payload_avatar, sender) {
+            (Some(url), _, _) => Some(url)
                 .filter(|url| !url.is_empty())
                 .map(ruma::OwnedMxcUri::from),
-            (None, Some(sender)) => match ruma::UserId::parse(sender) {
+            (None, Some(url), Some(_)) => Some(ruma::OwnedMxcUri::from(url)),
+            (None, None, Some(sender)) => match ruma::UserId::parse(sender) {
                 Ok(sender) => room
                     .get_member_no_sync(&sender)
                     .await
@@ -378,7 +382,7 @@ impl PushSession {
                     .and_then(|member| member.avatar_url().map(ToOwned::to_owned)),
                 Err(_) => None,
             },
-            (None, None) => None,
+            (None, _, None) => None,
         };
         let room_url = match sender {
             Some(_) => crate::view::room_avatar_url(&room)
@@ -561,7 +565,7 @@ pub async fn cold_push_media(
     content: Option<&serde_json::Value>,
 ) -> PushMedia {
     match PushSession::cached(&cold_push_store_dir(data_dir), user_id, device_id, room_id).await {
-        Some(session) => session.media(sender, payload_name, content).await,
+        Some(session) => session.media(sender, payload_name, None, content).await,
         None => PushMedia {
             sender_name: push_sender_name(sender, payload_name, content),
             ..PushMedia::default()

@@ -138,6 +138,7 @@ internal object PushPayloadDecryptor {
         roomId: String,
         sender: String,
         payloadName: String,
+        payloadAvatar: String,
         content: String,
     ): String?
 
@@ -148,13 +149,15 @@ internal object PushPayloadDecryptor {
         roomId: String,
         sender: String?,
         payloadName: String?,
+        payloadAvatar: String?,
         content: JSONObject?,
     ): JSONObject? {
         if (!available(context)) return null
         val json = try {
             nativePushMedia(
                 context.dataDir.absolutePath, userId, deviceId, roomId,
-                sender.orEmpty(), payloadName.orEmpty(), content?.toString().orEmpty(),
+                sender.orEmpty(), payloadName.orEmpty(), payloadAvatar.orEmpty(),
+                content?.toString().orEmpty(),
             )
         } catch (error: Throwable) {
             Log.i(TAG, "Push media unavailable: ${error.message}")

@@ -1590,7 +1590,12 @@ async fn push_sender_names_without_a_room() {
     let mut session = session(&fixture).await;
     session.room_id = room_id!("!missing:example.org").to_owned();
     let media = session
-        .media(Some("@bob:example.org"), Some("\u{200b}\u{2800}"), None)
+        .media(
+            Some("@bob:example.org"),
+            Some("\u{200b}\u{2800}"),
+            None,
+            None,
+        )
         .await;
     assert_eq!(media.sender_name, "@bob:example.org");
     drop(session);
@@ -1621,12 +1626,43 @@ async fn one_push_session_fetches_the_event_and_its_media() {
         .media(
             Some(&event.sender),
             event.sender_display_name.as_deref(),
+            event.sender_avatar_url.as_deref(),
             Some(&event.content),
         )
         .await;
     assert_eq!(
         std::fs::read(media.image.unwrap().path).unwrap(),
         thumbnails["cat"]
+    );
+
+    drop(session);
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_push_sender_takes_the_avatar_resolved_with_the_event() {
+    let fixture = ColdFixture::new("fetched-avatar", media_room(None), None).await;
+    let thumbnails = mount_thumbnails(&fixture, 0..=2).await;
+    let session = session(&fixture).await;
+
+    let ghost = session
+        .media(
+            Some("@ghost:example.org"),
+            Some("Ghost"),
+            Some("mxc://example.org/cat"),
+            None,
+        )
+        .await;
+    assert_eq!(
+        std::fs::read(ghost.sender.unwrap()).unwrap(),
+        thumbnails["cat"]
+    );
+    let member = session
+        .media(Some("@sender:example.org"), None, None, None)
+        .await;
+    assert_eq!(
+        std::fs::read(member.sender.unwrap()).unwrap(),
+        thumbnails["face"]
     );
 
     drop(session);
@@ -1779,7 +1815,7 @@ async fn push_sender_names_follow_plain_and_sealed_profile_overrides() {
                 COLD_ROOM,
                 Some("@sender:example.org"),
                 Some("Payload"),
-                None,
+                None
             )
             .await
             .sender_name,

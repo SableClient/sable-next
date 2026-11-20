@@ -325,7 +325,8 @@ object PushNotifier {
         val mediaContent = content?.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.P }
             ?: content?.let { JSONObject(it.toString()).apply { remove("msgtype") } }
         val media = PushPayloadDecryptor.media(context, userId, deviceId, roomId, sender,
-            notification.optString("sender_display_name"), mediaContent) ?: return
+            notification.optString("sender_display_name"), notification.optString("sender_avatar_url"),
+            mediaContent) ?: return
         val fields = if (isInvite(notification)) {
             listOf("sender_name" to SENDER_NAME_KEY)
         } else {

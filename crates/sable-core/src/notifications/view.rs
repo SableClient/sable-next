@@ -81,7 +81,9 @@ pub(super) async fn fetch_push_event_with(
             if event.sender_display_name.is_none() {
                 event.sender_display_name = Some(sender_name(client, room_id, &event.sender).await);
             }
-            PushFetchView::Event { event }
+            PushFetchView::Event {
+                event: Box::new(event),
+            }
         }
         Ok(NotificationStatus::EventFilteredOut | NotificationStatus::EventRedacted) => {
             PushFetchView::Discard
@@ -158,6 +160,7 @@ fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
             .unwrap_or_default(),
         sender: item.event.sender().to_string(),
         sender_display_name: item.sender_display_name.and_then(visible_name),
+        sender_avatar_url: item.sender_avatar_url,
         room_name: item.room_computed_display_name,
         room_avatar_url: item.room_avatar_url,
         encrypted: item.is_room_encrypted == Some(true),

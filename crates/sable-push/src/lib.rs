@@ -365,6 +365,9 @@ struct PushTarget {
     sender_display_name: Option<String>,
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[serde(default)]
+    sender_avatar_url: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[serde(default)]
     counts: Option<Counts>,
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[serde(default)]
@@ -664,6 +667,31 @@ impl Alert<'_> {
         }
     }
 
+    async fn media(
+        &self,
+        session: Option<&PushSession>,
+        sender_id: Option<&str>,
+        content: Option<&Value>,
+        invite: bool,
+    ) -> PushMedia {
+        match (sender_id, session) {
+            (Some(sender), Some(session)) if !invite => {
+                self.stage.set("media");
+                optional_work(
+                    self.optional_deadline,
+                    Box::pin(session.media(
+                        Some(sender),
+                        self.target.sender_display_name.as_deref(),
+                        self.target.sender_avatar_url.as_deref(),
+                        content,
+                    )),
+                )
+                .await
+            }
+            _ => PushMedia::default(),
+        }
+    }
+
     fn ring_payload(&self, sender: &str) -> Option<Value> {
         let event = self.event.as_ref()?;
         let mut ring = ring(event, sender)?;
@@ -751,21 +779,9 @@ impl Alert<'_> {
             }
             _ => false,
         };
-        let media = match (sender_id.as_deref(), &session) {
-            (Some(sender), Some(session)) if !invite => {
-                self.stage.set("media");
-                optional_work(
-                    self.optional_deadline,
-                    Box::pin(session.media(
-                        Some(sender),
-                        self.target.sender_display_name.as_deref(),
-                        content,
-                    )),
-                )
-                .await
-            }
-            _ => PushMedia::default(),
-        };
+        let media = self
+            .media(session.as_ref(), sender_id.as_deref(), content, invite)
+            .await;
         let room_name = media.room_name.unwrap_or(room_name);
         let message = self.message(&current, &sender, &room_name);
         let members = session.as_ref().and_then(PushSession::joined_members);
@@ -1393,6 +1409,7 @@ mod tests {
             content: json!({"notification_type":"ring","sender_ts":1_000}),
             sender: "@bob:example.org".to_owned(),
             sender_display_name: Some("Bob".to_owned()),
+            sender_avatar_url: None,
             room_name: "Lounge".to_owned(),
             room_avatar_url: None,
             encrypted: true,

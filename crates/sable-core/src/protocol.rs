@@ -2824,6 +2824,7 @@ pub struct PushEventView {
     pub content: serde_json::Value,
     pub sender: String,
     pub sender_display_name: Option<String>,
+    pub sender_avatar_url: Option<String>,
     pub room_name: String,
     pub room_avatar_url: Option<String>,
     pub encrypted: bool,
@@ -2835,7 +2836,7 @@ pub struct PushEventView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PushFetchView {
-    Event { event: PushEventView },
+    Event { event: Box<PushEventView> },
     Discard,
     Unavailable,
 }

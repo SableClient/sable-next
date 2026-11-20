@@ -49,6 +49,7 @@ export function readPushFetch(value: unknown): PushFetchView | null {
       content: event.content ?? null,
       sender: event.sender,
       sender_display_name: text(event.sender_display_name) ?? null,
+      sender_avatar_url: text(event.sender_avatar_url) ?? null,
       room_name: text(event.room_name) ?? '',
       room_avatar_url: text(event.room_avatar_url) ?? null,
       encrypted: event.encrypted === true,

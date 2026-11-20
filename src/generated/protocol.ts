@@ -1197,6 +1197,7 @@ export type PushEventView = {
 	content: unknown,
 	sender: string,
 	sender_display_name: string | null,
+	sender_avatar_url: string | null,
 	room_name: string,
 	room_avatar_url: string | null,
 	encrypted: boolean,
