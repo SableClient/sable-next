@@ -163,7 +163,9 @@ jobs:
   deploy:
     name: Deploy to Cloudflare
     needs: build-web
-    if: ${{ github.event_name == 'push' }}
+    # Forgejo copies this condition onto the called jobs, where the event is
+    # workflow_call, so it tests the ref.
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     uses: ./.forgejo/workflows/cloudflare-web.yml
     secrets: inherit
   docker:
