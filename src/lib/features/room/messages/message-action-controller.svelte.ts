@@ -111,8 +111,9 @@ export class MessageActionExecutor {
       canRedactOthers,
       canViewRedacted:
         item.content.kind === 'redacted' &&
-        canRedactOthers &&
-        (item.redacted_on_ban === true || serverFeatures(core).includes(MSC2815)),
+        ((canRedactOthers && item.redacted_on_ban === true) ||
+          ((canRedactOthers || preferences.developerTools) &&
+            serverFeatures(core).includes(MSC2815))),
       canToggleReaction: onToggleReaction !== undefined,
       canMarkUnread: onMarkUnread !== undefined,
       canReply: onReply !== undefined,
