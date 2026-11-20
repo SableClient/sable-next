@@ -32,7 +32,7 @@
   import { VirtualWindow } from '#lib/ui/virtual-window.svelte.js';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
-  import { RecentReactions } from '#lib/emoji/recents.svelte.js';
+  import { useRecentReactions } from '#lib/emoji/recents.svelte.js';
   import { emoteRecents } from '#lib/model/model.js';
   import { readRecentStickers, rememberSticker } from '#lib/emoji/recent-packs.svelte.js';
 
@@ -70,7 +70,7 @@
     onPickGif,
   }: Props = $props();
   const core = useCoreClient();
-  const history = new RecentReactions(core);
+  const history = useRecentReactions(core);
 
   type PickerRow =
     | { id: string; kind: 'lead' }

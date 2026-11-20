@@ -1,3 +1,5 @@
+import { createContext } from 'svelte';
+
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { DAY_MS } from '#lib/day.js';
 import { parseShortcodes } from '#lib/emoji/recent-packs.svelte.js';
@@ -54,4 +56,14 @@ export class RecentReactions {
       };
     });
   }
+}
+
+type RecentReactionsCore = ConstructorParameters<typeof RecentReactions>[0];
+
+const [useShared, provideRecentReactions, hasShared] = createContext<RecentReactions>();
+
+export { provideRecentReactions };
+
+export function useRecentReactions(core: RecentReactionsCore): RecentReactions {
+  return hasShared() ? useShared() : new RecentReactions(core);
 }

@@ -24,6 +24,7 @@
   import { OpenRoomSearch, provideOpenRoomSearch } from '#lib/features/room/room-panels.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
+  import { provideRecentReactions, RecentReactions } from '#lib/emoji/recents.svelte.js';
   import { EventItems, provideEventItems } from '#lib/features/room/messages/event-items.svelte.js';
   import {
     provideRoomScopes,
@@ -192,6 +193,7 @@
   providePersonaStore(new PersonaStore(core));
   const bookmarks = new Bookmarks(core.rpc.account);
   provideBookmarks(bookmarks);
+  provideRecentReactions(new RecentReactions(core));
   provideEventItems(new EventItems(core.rpc.timeline, () => core.session?.user_id ?? null));
   const roomScopes = new RoomScopes(core);
   provideRoomScopes(roomScopes);

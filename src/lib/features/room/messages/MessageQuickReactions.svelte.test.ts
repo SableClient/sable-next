@@ -8,6 +8,7 @@ import type { ImagePackView } from '#src/generated/protocol';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { RecentReactions } from '#lib/emoji/recents.svelte.js';
 
 import MessageQuickReactionsHarness from './MessageQuickReactionsHarness.test.svelte';
 
@@ -57,4 +58,26 @@ test('renders a suggested custom reaction as its emote image', async () => {
     expect(button.querySelector('.quick-reaction-image')).toBeInTheDocument();
   });
   expect(document.body).not.toHaveTextContent('mxc://example.org/neocat');
+});
+
+test('shows the shared history on the first frame instead of the defaults', async () => {
+  core.rpc.messages.frequentReactions.mockResolvedValue(['🐈']);
+  let history!: RecentReactions;
+  const stop = $effect.root(() => {
+    history = new RecentReactions(
+      core as unknown as ConstructorParameters<typeof RecentReactions>[0]
+    );
+  });
+  await vi.waitFor(() => {
+    expect(history.current).toEqual(['🐈']);
+  });
+
+  const { container } = render(MessageQuickReactionsHarness, {
+    count: 1,
+    onReact: vi.fn(),
+    history,
+  });
+
+  expect(container.querySelector('.quick-reaction')).toHaveTextContent('🐈');
+  stop();
 });
