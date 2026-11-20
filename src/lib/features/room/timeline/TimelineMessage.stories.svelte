@@ -1,14 +1,9 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
-  import { expect } from 'storybook/test';
 
   import TimelineMessage from './TimelineMessage.svelte';
   import type { TimelineItemProps } from './timeline-row.svelte';
-  import type {
-    PerMessageProfileView,
-    TimelineItemContentView,
-    TimelineItemView,
-  } from '#src/generated/protocol';
+  import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
 
   const noop = () => {};
   const id = 'foobar';
