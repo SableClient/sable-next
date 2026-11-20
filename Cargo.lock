@@ -8325,7 +8325,7 @@ dependencies = [
  "icu_properties",
  "idna",
  "image-webp",
- "jiff 0.2.46",
+ "jiff 1.0.1",
  "linkify",
  "matroska-demuxer",
  "mp4-atom",

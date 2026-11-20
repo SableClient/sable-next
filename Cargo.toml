@@ -76,7 +76,7 @@ html-escape = "0.3"
 html5ever = "0.39"
 linkify = "0.11"
 tempfile = "3"
-jiff = { version = "0.2", default-features = false, features = ["std"] }
+jiff = { version = "1.0", default-features = false, features = ["std"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
