@@ -41,6 +41,7 @@ import {
 } from '#lib/deployment/e2ee-policy.js';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
+import { forgetAccountStorage } from './account-storage';
 import { clearRoomTimelines } from '#lib/rooms/timeline.svelte.js';
 import { MemberPreviews } from '#lib/rooms/member-previews.svelte.js';
 import { clearRecentSearches } from '#lib/search/recent-searches.svelte.js';
@@ -1095,6 +1096,7 @@ export class CoreClient {
           return;
         }
         this.replaceSession(null);
+        if (this.accounts.length === 0) forgetAccountStorage();
         this.reauthenticationAccountId =
           this.accounts.find((account) => account.needs_reauth)?.account_id ?? null;
         this.restoreFailed = false;
