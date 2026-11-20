@@ -1,7 +1,12 @@
 {
+  "upcoming": {
+    "added": [
+      "deploymentTheme"
+    ],
+    "changed": []
+  },
   "v26.11.4": {
     "added": [
-      "deploymentTheme",
       "hideSentBeforeJoined"
     ],
     "changed": []
