@@ -10,8 +10,8 @@
 set -euo pipefail
 
 version="${1:?usage: reproduce-android.sh <version>}"
-node_version=24.22.0
-node_sha256=cc2f601cee82d9a5a233302fe307abc600727035fd7d2c3a3571755989e95008
+node_version=26.13.1
+node_sha256=5c063e46bab0fbc1c17cc445d7ff129cbdcd0471be6ed83b6ab864f8143bc864
 tools_url=https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
 tools_sha256=4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583
 ndk_version="$(sed -n 's/^ANDROID_NDK_VERSION = "\(.*\)"$/\1/p' .mise/config.toml)"

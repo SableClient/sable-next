@@ -23,6 +23,14 @@
         'datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s*\\S+\\s*=\\s*"(?<currentValue>[^"]+)";',
       ],
     },
+    {
+      description: 'node_sha256 on the next line is not updated, take it from SHASUMS256.txt',
+      customType: 'regex',
+      managerFilePatterns: ['/^scripts/ci/reproduce-android\\.sh$/'],
+      matchStrings: ['node_version=(?<currentValue>\\S+)'],
+      depNameTemplate: 'node',
+      datasourceTemplate: 'node-version',
+    },
   ],
   packageRules: [
     {
