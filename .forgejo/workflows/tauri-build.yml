@@ -249,8 +249,8 @@ jobs:
               --label "org.opencontainers.image.source=$FORGEJO_URL/$GITHUB_REPOSITORY" \
               --label "org.opencontainers.image.revision=$revision" \
               --label "org.opencontainers.image.version=$VERSION" \
-              --cache-from "type=registry,ref=$image:buildcache-$ARCH" \
-              --cache-to "type=registry,ref=$image:buildcache-$ARCH,mode=max,ignore-error=true" \
+              --cache-from "type=s3,region=$SCCACHE_REGION,bucket=$SCCACHE_BUCKET,endpoint_url=$SCCACHE_ENDPOINT,prefix=buildkit/sable-next/,name=$IMAGE_KIND-$ARCH" \
+              --cache-to "type=s3,region=$SCCACHE_REGION,bucket=$SCCACHE_BUCKET,endpoint_url=$SCCACHE_ENDPOINT,prefix=buildkit/sable-next/,name=$IMAGE_KIND-$ARCH,mode=max,ignore-error=true" \
               --output "type=image,name=$image,push-by-digest=true,name-canonical=true,push=true" \
               --metadata-file "$RUNNER_TEMP/build-metadata.json" && break
             [ "$attempt" -lt 3 ] || exit 1
