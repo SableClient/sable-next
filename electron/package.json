@@ -24,7 +24,7 @@
     "@vencord/venmic": "7.2.5"
   },
   "devDependencies": {
-    "@sentry/electron": "8.3.0",
+    "@sentry/electron": "8.4.0",
     "@types/node": "26.6.6",
     "electron": "45.3.4",
     "electron-builder": "26.18.0",
