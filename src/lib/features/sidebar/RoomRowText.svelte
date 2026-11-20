@@ -1,13 +1,21 @@
+<script module lang="ts">
+  export interface RoomPreview {
+    sender: string | null;
+    text: string;
+  }
+</script>
+
 <script lang="ts">
   import type { RoomListItemView, StatusView } from '#src/generated/protocol';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import CalendarRowEvent from '#lib/features/calendar/CalendarRowEvent.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import { i18n } from '#lib/i18n.js';
 
   interface Props {
     name: string;
     room?: RoomListItemView;
-    preview?: string | null;
+    preview?: RoomPreview | null;
     peerStatus?: StatusView | null;
   }
 
@@ -17,7 +25,13 @@
 <span class="room-text">
   <span class="room-name"><bdi>{name}</bdi></span>
   {#if preview}
-    <span class="room-topic"><bdi>{preview}</bdi></span>
+    <span class="room-topic">
+      {#if preview.sender}
+        <strong class="room-preview-sender"
+          >{i18n.t('nav.previewSender', { name: preview.sender })}</strong
+        >
+      {/if}<bdi>{preview.text}</bdi>
+    </span>
   {:else if room?.is_direct && room.topic && preferences.showDmTopics}
     <span class="room-topic"><bdi>{room.topic}</bdi></span>
   {:else if peerStatus}
@@ -49,6 +63,11 @@
     flex: 1;
     flex-direction: column;
     min-width: 0;
+  }
+
+  .room-preview-sender {
+    font-weight: var(--font-weight-600);
+    margin-inline-end: var(--space-050);
   }
 
   .room-status-emoji {

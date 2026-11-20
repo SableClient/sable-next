@@ -61,7 +61,7 @@
   import RoomOptionsButton from './RoomOptionsButton.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import RoomRowStatus from './RoomRowStatus.svelte';
-  import RoomRowText from './RoomRowText.svelte';
+  import RoomRowText, { type RoomPreview } from './RoomRowText.svelte';
   import RoomThreadLines from './RoomThreadLines.svelte';
   import RoomVoiceLive from './RoomVoiceLive.svelte';
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
@@ -189,7 +189,7 @@
     poll: 'nav.previewPoll',
   } as const;
 
-  function messagePreview(room: RoomListItemView): string | null {
+  function messagePreview(room: RoomListItemView): RoomPreview | null {
     const mode = preferences.messagePreviews;
     const shown = room.is_direct
       ? mode === 'direct' || mode === 'all'
@@ -202,9 +202,8 @@
       text = text ? i18n.t('nav.previewCaption', { label, caption: text }) : label;
     }
     if (!text) return null;
-    if (event.own) return i18n.t('nav.previewOwn', { text });
-    if (event.sender_label) return i18n.t('nav.previewFrom', { name: event.sender_label, text });
-    return text;
+    const sender = event.own ? i18n.t('nav.previewYou') : event.sender_label;
+    return { sender, text };
   }
 
   const peerProfiles = new PeerProfiles(core);

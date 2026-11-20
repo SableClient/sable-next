@@ -1243,22 +1243,32 @@ function latest(
 
 test.each([
   ['a one-to-one DM does not name the other party', true, { sender_label: null }, 'See you'],
-  ['a group names the sender', false, { sender_label: 'Bob' }, 'nav.previewFrom:Bob,See you'],
-  ['own messages are prefixed in a DM', true, { own: true }, 'nav.previewOwn:See you'],
-  ['own messages are prefixed in a group', false, { own: true }, 'nav.previewOwn:See you'],
+  ['a group names the sender', false, { sender_label: 'Bob' }, 'nav.previewSender:BobSee you'],
+  [
+    'own messages are prefixed in a DM',
+    true,
+    { own: true },
+    'nav.previewSender:nav.previewYouSee you',
+  ],
+  [
+    'own messages are prefixed in a group',
+    false,
+    { own: true },
+    'nav.previewSender:nav.previewYouSee you',
+  ],
   ['an image shows its label', false, { kind: 'image', body: '' }, 'nav.previewImage'],
   [
     'a captioned image shows label and caption',
     false,
     { kind: 'image', body: 'Sunset', sender_label: 'Bob' },
-    'nav.previewFrom:Bob,nav.previewCaption:nav.previewImage,Sunset',
+    'nav.previewSender:Bobnav.previewCaption:nav.previewImage,Sunset',
   ],
   ['a voice message is not an audio file', true, { kind: 'voice', body: '' }, 'nav.previewVoice'],
   [
     'an own sticker',
     true,
     { kind: 'sticker', body: '', own: true },
-    'nav.previewOwn:nav.previewSticker',
+    'nav.previewSender:nav.previewYounav.previewSticker',
   ],
   [
     'a poll shows its question',
@@ -1283,6 +1293,24 @@ test.each([
   await tick();
 
   expect(roomTopics()).toEqual([expected]);
+});
+
+test('the preview sender is set apart from the message', async () => {
+  visit('/home');
+  setPreference('showHome', true);
+  setPreference('messagePreviews', 'all');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!r:example.org',
+      name: 'Room',
+      latest_event: latest('See you', 1, { sender_label: 'Bob' }),
+    }),
+  ];
+  await mountNav();
+  await tick();
+
+  const sender = document.querySelector('.room-row .room-topic strong');
+  expect(sender?.textContent).toBe('nav.previewSender:Bob');
 });
 
 test('hovering a collapsed room row shows its full name in a tooltip', async () => {
