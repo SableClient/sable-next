@@ -526,6 +526,17 @@ test('arrow keys pan when zoomed and navigate otherwise', async () => {
   });
 });
 
+test('a timeline update keeps the image navigated to', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  await openImage([imageItem, videoItem]);
+
+  await user.keyboard('{ArrowRight}');
+  viewer.items = [imageItem, videoItem];
+  await tick();
+
+  expect(document.querySelector('video')).toBeInTheDocument();
+});
+
 test('takes a typed zoom percentage', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));

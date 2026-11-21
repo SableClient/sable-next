@@ -79,7 +79,7 @@
     () => item !== undefined,
     () => onClose()
   );
-  let index = $derived(
+  const index = $derived(
     Math.max(
       0,
       items.findIndex((item) => item.eventId === selectedEventId)
@@ -222,11 +222,11 @@
   });
 
   function previous(): void {
-    if (index > 0) index -= 1;
+    if (index > 0) mediaViewerState.eventId = items[index - 1].eventId;
   }
 
   function next(): void {
-    if (index < items.length - 1) index += 1;
+    if (index < items.length - 1) mediaViewerState.eventId = items[index + 1].eventId;
   }
 
   const MIN_ZOOM = 0.1;
