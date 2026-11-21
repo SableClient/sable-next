@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import type { MembershipChangeView, TimelineItemView } from '#src/generated/protocol';
 
@@ -65,6 +65,24 @@ const t = (key: string, values?: Record<string, unknown>): string => {
   };
   return (templates[key] ?? key).replace('{{users}}', String(values?.users));
 };
+
+test('each sentence is pluralised by the people in its own segment', () => {
+  const translate = vi.fn((key: string) => key);
+  const segments = memberGroupSegments([
+    member('a', 'joined'),
+    member('b', 'joined'),
+    member('a', 'left'),
+  ]);
+  memberGroupSummary(segments, translate, 'en');
+  expect(translate).toHaveBeenCalledWith(
+    'timeline.memberGroup.joined',
+    expect.objectContaining({ count: 2 })
+  );
+  expect(translate).toHaveBeenCalledWith(
+    'timeline.memberGroup.left',
+    expect.objectContaining({ count: 1 })
+  );
+});
 
 function text(tokens: MemberGroupToken[]): string {
   return tokens

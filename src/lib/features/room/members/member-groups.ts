@@ -178,7 +178,10 @@ function segmentTokens(
   if (shown.length < users.length) {
     names.push([{ kind: 'others', count: users.length - shown.length, segment: index }]);
   }
-  const sentence = t(`timeline.memberGroup.${segment.category}`, { users: MARK });
+  const sentence = t(`timeline.memberGroup.${segment.category}`, {
+    users: MARK,
+    count: users.length,
+  });
   const at = sentence.indexOf(MARK);
   if (at === -1) return [{ kind: 'text', text: sentence }];
   return [

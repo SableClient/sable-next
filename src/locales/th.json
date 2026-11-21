@@ -159,11 +159,11 @@
     "powerLevelMember": "สมาชิก",
     "markUnread": "ทำเครื่องหมายว่ายังไม่ได้อ่านจากตรงนี้",
     "memberGroup": {
-      "knock_retracted": "{{users}} ถอนคำขอเข้าห้อง",
-      "invitation_rejected": "{{users}} ปฏิเสธคำเชิญ",
-      "knocked": "{{users}} ขอเข้าห้อง",
-      "joined": "{{users}} เข้าร่วมห้อง",
-      "left": "{{users}} ออกจากห้อง"
+      "knock_retracted_other": "{{users}} ถอนคำขอเข้าห้อง",
+      "invitation_rejected_other": "{{users}} ปฏิเสธคำเชิญ",
+      "knocked_other": "{{users}} ขอเข้าห้อง",
+      "joined_other": "{{users}} เข้าร่วมห้อง",
+      "left_other": "{{users}} ออกจากห้อง"
     },
     "membership": {
       "invitation_rejected": "{{user}} ปฏิเสธคำเชิญ",

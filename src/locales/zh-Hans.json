@@ -943,7 +943,7 @@
     },
     "locationShowMap": "显示地图",
     "memberGroup": {
-      "left": "{{users}} 离开了房间",
+      "left_other": "{{users}} 离开了房间",
       "heading": {
         "joined": "已加入",
         "left": "已离开",
@@ -957,15 +957,15 @@
       },
       "showEvents_other": "显示 {{count, number}} 个事件",
       "hideEvents": "隐藏事件",
-      "joined": "{{users}} 加入了房间",
-      "invitation_rejected": "{{users}} 拒绝了邀请",
-      "knocked": "{{users}} 申请加入",
-      "knock_retracted": "{{users}} 撤回了加入申请",
-      "other": "{{users}} 的成员身份已更新",
-      "avatar": "{{users}} 更换了头像",
+      "joined_other": "{{users}} 加入了房间",
+      "invitation_rejected_other": "{{users}} 拒绝了邀请",
+      "knocked_other": "{{users}} 申请加入",
+      "knock_retracted_other": "{{users}} 撤回了加入申请",
+      "other_other": "{{users}} 的成员身份已更新",
+      "avatar_other": "{{users}} 更换了头像",
       "others_other": "另外 {{count, number}} 人",
-      "invited": "{{users}} 收到了邀请",
-      "name": "{{users}} 更改了名称"
+      "invited_other": "{{users}} 收到了邀请",
+      "name_other": "{{users}} 更改了名称"
     },
     "backToConversation": "返回对话",
     "originalMessage": "原始消息",
