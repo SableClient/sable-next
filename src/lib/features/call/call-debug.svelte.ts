@@ -3,7 +3,6 @@ import type { CallModePreference } from '#lib/settings/definitions.js';
 
 export type CallDebug = {
   requested: CallModePreference;
-  nativeForced: boolean;
   mode: CallMode;
   reason: CallModeReason | undefined;
   stickyAvailable: boolean | undefined;

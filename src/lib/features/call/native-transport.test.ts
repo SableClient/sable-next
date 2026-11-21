@@ -35,6 +35,7 @@ const plugin = {
   setAudioInput: vi.fn(() => Promise.resolve(snapshot(6))),
   setNativeCallParticipantVolume: vi.fn(() => Promise.resolve(snapshot(9))),
   disconnectNativeCall: vi.fn(() => Promise.resolve(snapshot(10))),
+  reconcileNativeCallBackends: vi.fn(() => Promise.resolve(snapshot(11))),
 };
 
 const platform = vi.hoisted(() => ({ android: true }));
@@ -189,4 +190,76 @@ test('the native transport lists and selects microphones on Android only', async
   platform.android = false;
   const ios = await createNativeTransport('7', '@kris:example.org:PHONE');
   expect(ios?.capabilities.audioInputs).toBeUndefined();
+});
+
+test('a multi-server call publishes on its own backend and subscribes to the others', async () => {
+  vi.useFakeTimers();
+  const backends = [
+    { id: 'own', url: 'wss://own.example.org', jwt: 'own-jwt', identity: 'self' },
+    { id: 'other', url: 'wss://other.example.org', jwt: 'other-jwt', identity: 'self' },
+  ];
+  plugin.connectNativeCall.mockClear();
+  plugin.reconcileNativeCallBackends.mockClear();
+  plugin.reconcileNativeCallBackends.mockResolvedValueOnce(snapshot(20));
+  const transport = await createNativeTransport('7', 'self');
+  await transport?.connect({
+    url: 'wss://ignored.example.org',
+    token: 'ignored',
+    microphoneEnabled: true,
+    cameraEnabled: false,
+    encryptionKeys: [],
+    publisherId: 'own',
+    backends,
+  });
+
+  expect(plugin.connectNativeCall).toHaveBeenCalledWith(
+    expect.objectContaining({ url: 'wss://own.example.org', token: 'own-jwt' })
+  );
+  expect(plugin.reconcileNativeCallBackends).toHaveBeenCalledWith({
+    callId: '7',
+    publisherId: 'own',
+    backends: [
+      { id: 'own', url: 'wss://own.example.org', token: 'own-jwt' },
+      { id: 'other', url: 'wss://other.example.org', token: 'other-jwt' },
+    ],
+  });
+  expect(transport?.getState().unreachableBackends).toBeUndefined();
+
+  plugin.reconcileNativeCallBackends.mockResolvedValueOnce(
+    snapshot(21, { subscriberBackends: ['other'] })
+  );
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(plugin.reconcileNativeCallBackends).toHaveBeenCalledTimes(2);
+  expect(transport?.getState().unreachableBackends).toBeUndefined();
+
+  await transport?.disconnect();
+  vi.useRealTimers();
+});
+
+test('a backend that stays disconnected is reported unreachable and retried', async () => {
+  vi.useFakeTimers();
+  plugin.reconcileNativeCallBackends.mockClear();
+  plugin.reconcileNativeCallBackends.mockImplementation(() => Promise.resolve(snapshot(30)));
+  const transport = await createNativeTransport('7', 'self');
+  await transport?.connect({
+    url: 'wss://own.example.org',
+    token: 'jwt',
+    microphoneEnabled: true,
+    cameraEnabled: false,
+    encryptionKeys: [],
+    publisherId: 'own',
+    backends: [
+      { id: 'own', url: 'wss://own.example.org', jwt: 'own-jwt', identity: 'self' },
+      { id: 'other', url: 'wss://other.example.org', jwt: 'other-jwt', identity: 'self' },
+    ],
+  });
+
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(transport?.getState().unreachableBackends).toEqual(['other']);
+  expect(plugin.reconcileNativeCallBackends).toHaveBeenCalledTimes(2);
+
+  await transport?.disconnect();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(plugin.reconcileNativeCallBackends).toHaveBeenCalledTimes(2);
+  vi.useRealTimers();
 });

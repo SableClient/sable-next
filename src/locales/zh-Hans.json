@@ -277,7 +277,6 @@
     "debugLabel": "通话模式调试",
     "debugMode": "模式",
     "debugRequested": "已请求",
-    "debugNativeForced": "旧版（原生应用）",
     "debugReason": "选择原因",
     "debugSticky": "粘性事件",
     "debugPeers": "对端",

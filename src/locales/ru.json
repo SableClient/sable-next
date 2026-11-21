@@ -3213,7 +3213,6 @@
     "screenAudioChoice": "Что слышно в звонке",
     "screenVolume": "Громкость экрана {{name}}",
     "debugRequested": "Запрошено",
-    "debugNativeForced": "Устаревший (нативное приложение)",
     "debugNoPeers": "Нет",
     "debugTransport": "Транспорт",
     "debugBackends": "Бэкенды",

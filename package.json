@@ -49,7 +49,7 @@
     "@fontsource-variable/vazirmatn": "5.3.0",
     "@internationalized/date": "^3.12.4",
     "@leeoniya/ufuzzy": "1.0.19",
-    "@sableclient/tauri-plugin-livekit-mobile": "^0.7.0",
+    "@sableclient/tauri-plugin-livekit-mobile": "^0.8.0",
     "@sableclient/twemoji-font": "^1.0.4",
     "@sapphi-red/web-noise-suppressor": "0.4.1",
     "@tanstack/virtual-core": "3.19.11",

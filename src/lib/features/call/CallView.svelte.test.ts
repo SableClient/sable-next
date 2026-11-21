@@ -280,7 +280,6 @@ test('the debug overlay follows its own switch under developer tools', () => {
   preferences.developerTools = true;
   recordCallDebug({
     requested: 'auto',
-    nativeForced: false,
     mode: 'compatibility',
     reason: undefined,
     stickyAvailable: undefined,

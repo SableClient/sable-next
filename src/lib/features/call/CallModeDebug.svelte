@@ -27,11 +27,7 @@
     <dt>{i18n.t('call.debugMode')}</dt>
     <dd>{i18n.t(`call.debugModes.${debug.mode}`)}</dd>
     <dt>{i18n.t('call.debugRequested')}</dt>
-    <dd>
-      {debug.nativeForced
-        ? i18n.t('call.debugNativeForced')
-        : i18n.t(REQUESTED_LABELS[debug.requested])}
-    </dd>
+    <dd>{i18n.t(REQUESTED_LABELS[debug.requested])}</dd>
     <dt>{i18n.t('call.debugReason')}</dt>
     <dd>{debug.reason ? i18n.t(`call.debugReasons.${debug.reason}`) : '-'}</dd>
     <dt>{i18n.t('call.debugSticky')}</dt>

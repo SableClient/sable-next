@@ -9,6 +9,7 @@ import { isAndroid } from '#lib/platform/os.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import type {
+  CallBackendGrant,
   CallConnectionQuality,
   CallEncryptionKey,
   CallParticipant,
@@ -16,9 +17,12 @@ import type {
   CallTransportConnection,
   CallTransportState,
 } from './call-transport';
-import { idleTransportState } from './call-transport';
+import { idleTransportState, ignoreError } from './call-transport';
 
 type Plugin = NonNullable<Awaited<ReturnType<typeof loadNativeCalls>>>;
+
+const RETRY_FIRST_MS = 2_000;
+const RETRY_MAX_MS = 30_000;
 
 const QUALITIES = new Set<CallConnectionQuality>(['lost', 'poor', 'good', 'excellent']);
 
@@ -103,11 +107,20 @@ export async function createNativeTransport(
   const queuedKeys: CallEncryptionKey[] = [];
   let connected = false;
   let disposed = false;
+  let backends: CallBackendGrant[] = [];
+  let publisherId: string | undefined;
+  let subscribed: string[] = [];
+  let unreachable: string[] = [];
+  let latest: NativeCallSnapshot | undefined;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let retryDelay = RETRY_FIRST_MS;
 
-  const adopt = (snapshot: NativeCallSnapshot): void => {
-    if (snapshot.revision <= revision) return;
-    revision = snapshot.revision;
-    state = stateOf(snapshot, identity);
+  const publish = (): void => {
+    if (!latest) return;
+    state = {
+      ...stateOf(latest, identity),
+      ...(unreachable.length > 0 ? { unreachableBackends: unreachable } : {}),
+    };
     const view: CallTransportState = { ...state, participants: [...state.participants] };
     for (const listener of listeners) {
       try {
@@ -116,6 +129,46 @@ export async function createNativeTransport(
         console.warn('[sable call] state listener failed', error);
       }
     }
+  };
+
+  const adopt = (snapshot: NativeCallSnapshot): void => {
+    if (snapshot.revision <= revision) return;
+    revision = snapshot.revision;
+    latest = snapshot;
+    subscribed = snapshot.subscriberBackends ?? [];
+    unreachable = unreachable.filter((id) => !subscribed.includes(id));
+    publish();
+  };
+
+  const missing = (): string[] =>
+    backends.map(({ id }) => id).filter((id) => id !== publisherId && !subscribed.includes(id));
+
+  const reconcile = async (): Promise<void> => {
+    if (!publisherId || backends.length === 0) return;
+    adopt(
+      await plugin.reconcileNativeCallBackends({
+        callId,
+        publisherId,
+        backends: backends.map(({ id, url, jwt }) => ({ id, url, token: jwt })),
+      })
+    );
+    scheduleRetry();
+  };
+
+  const scheduleRetry = (): void => {
+    if (disposed || retryTimer !== undefined || missing().length === 0) return;
+    retryTimer = setTimeout(() => {
+      retryTimer = undefined;
+      if (disposed) return;
+      unreachable = missing();
+      publish();
+      if (unreachable.length === 0) {
+        retryDelay = RETRY_FIRST_MS;
+        return;
+      }
+      retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+      void reconcile().catch(ignoreError);
+    }, retryDelay);
   };
 
   const encode = (key: CallEncryptionKey): string => uint8ArrayToBase64(key.key);
@@ -140,11 +193,12 @@ export async function createNativeTransport(
         return;
       }
       unlisten = stop;
+      const publisher = options.backends?.find(({ id }) => id === options.publisherId);
       adopt(
         await plugin.connectNativeCall({
           callId,
-          url: options.url,
-          token: options.token,
+          url: publisher?.url ?? options.url,
+          token: publisher?.jwt ?? options.token,
           microphoneEnabled: options.microphoneEnabled,
           audioProcessing: {
             echoCancellation: preferences.echoCancellation,
@@ -164,6 +218,12 @@ export async function createNativeTransport(
       const pending = queuedKeys.splice(0, queuedKeys.length);
       for (const key of pending) await pushKey(key);
 
+      if (publisher) {
+        backends = options.backends ?? [];
+        publisherId = options.publisherId;
+        await reconcile();
+      }
+
       if (options.cameraEnabled) {
         try {
           adopt(await plugin.setNativeCallCameraEnabled({ callId, enabled: true }));
@@ -174,6 +234,7 @@ export async function createNativeTransport(
     },
     disconnect: async () => {
       disposed = true;
+      clearTimeout(retryTimer);
       try {
         adopt(await plugin.disconnectNativeCall({ callId }));
       } finally {
@@ -198,6 +259,11 @@ export async function createNativeTransport(
         return;
       }
       await pushKey(key);
+    },
+    reconcileBackends: async (next, nextPublisherId) => {
+      backends = next;
+      publisherId = nextPublisherId ?? publisherId;
+      if (connected && !disposed) await reconcile();
     },
     subscribe: (listener) => {
       listeners.add(listener);

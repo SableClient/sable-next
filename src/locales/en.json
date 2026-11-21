@@ -4113,7 +4113,6 @@
     "debugLabel": "Call mode debug",
     "debugMode": "Mode",
     "debugRequested": "Requested",
-    "debugNativeForced": "Legacy (native app)",
     "debugReason": "Chosen because",
     "debugSticky": "Sticky events",
     "debugPeers": "Peers",

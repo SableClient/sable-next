@@ -213,8 +213,8 @@ importers:
         specifier: 1.0.19
         version: 1.0.19
       '@sableclient/tauri-plugin-livekit-mobile':
-        specifier: ^0.7.0
-        version: 0.7.0
+        specifier: ^0.8.0
+        version: 0.8.0
       '@sableclient/twemoji-font':
         specifier: ^1.0.4
         version: 1.0.4
@@ -2569,8 +2569,8 @@ packages:
   '@rolldown/pluginutils@1.1.1':
     resolution: {integrity: sha512-glFIJDvLNDtJhT9qrMFWLPbvS+skxgt4L0K8Ei2YtnhPysAJnsI7nyxSJxKj4ADeKX0OLjC4ntRkwpLOoS3rwA==}
 
-  '@sableclient/tauri-plugin-livekit-mobile@0.7.0':
-    resolution: {integrity: sha512-lnEXBNeNvu3BpHZ1KIVo9QbJWAr3oQjzL8sgYX3FyycU5DsfZComBWBjRJubKLxQW3uTPNuY6x7DgOrERpyt+Q==}
+  '@sableclient/tauri-plugin-livekit-mobile@0.8.0':
+    resolution: {integrity: sha512-Vd/faMbKh/DkikDjcNN7jp6dMMGeDWlPxb/2Y1oN4ENM5N7jtVVQLZ9x2YN6CS0TzHHbkmU2mtdNciG+zt3U5A==}
 
   '@sableclient/twemoji-font@1.0.4':
     resolution: {integrity: sha512-LzvQB/VZtv5KEq1VYq2azr7v7cYT8oklOVRGkAN2RNwa3sF0XcnqM3lBHSYRFXQleGLSUgs3gA0slbwkD2+sJw==}
@@ -7933,7 +7933,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.1.1': {}
 
-  '@sableclient/tauri-plugin-livekit-mobile@0.7.0':
+  '@sableclient/tauri-plugin-livekit-mobile@0.8.0':
     dependencies:
       '@tauri-apps/api': 2.12.5
 

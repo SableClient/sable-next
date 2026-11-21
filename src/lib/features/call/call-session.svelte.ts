@@ -293,11 +293,7 @@ export class CallSession {
           this.#client.rpc,
           roomId,
           serviceUrl,
-          hasNativeCalls()
-            ? 'legacy'
-            : preferences.callMode === 'auto'
-              ? null
-              : preferences.callMode,
+          preferences.callMode === 'auto' ? null : preferences.callMode,
           media.camera ? 'video' : 'audio'
         )
       );
@@ -330,14 +326,12 @@ export class CallSession {
                 : 'native';
             return { transport: injected, kind };
           }
-          if (grant.mode === 'legacy') {
-            const native = await createNativeTransport(
-              String(grant.session),
-              grant.identity,
-              this.#deps.roomName?.(roomId) ?? roomId
-            );
-            if (native) return { transport: native, kind: 'native' };
-          }
+          const native = await createNativeTransport(
+            String(grant.session),
+            grant.identity,
+            this.#deps.roomName?.(roomId) ?? roomId
+          );
+          if (native) return { transport: native, kind: 'native' };
           if (grant.backends.length) {
             const multi = await import('./multi-sfu-transport');
             return {
@@ -371,7 +365,6 @@ export class CallSession {
       }
       recordCallDebug({
         requested: preferences.callMode,
-        nativeForced: hasNativeCalls(),
         mode: grant.mode,
         reason: grant.mode_reason,
         stickyAvailable: grant.sticky_available,
