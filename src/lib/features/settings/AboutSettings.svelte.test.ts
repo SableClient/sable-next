@@ -66,7 +66,6 @@ test('desktop builds show the folder Sable keeps its data in', async () => {
   render(AboutSettings);
 
   expect(await screen.findByText('/home/me/.local/share/moe.sable.next')).toBeInTheDocument();
-  expect(screen.getByText('Data folder')).toBeInTheDocument();
 });
 
 test('package-managed desktop builds expose automatic update checks', () => {

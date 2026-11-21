@@ -199,14 +199,17 @@ describe('custom panel search', () => {
   it('hides conditional panels until they are enabled', async () => {
     const { settingsCategories } = await import('#lib/settings/registry.js');
     const { preferences } = await import('#lib/settings/preferences.svelte.js');
-    const { t } = await import('#lib/i18n.js');
     const previous = preferences.developerTools;
+    const translateAccess = (key: string) =>
+      key === 'settings.developerAccessTokenTitle' ? 'Access token' : key;
     try {
       preferences.developerTools = false;
-      expect(searchSettings('access token', settingsCategories, t, context)).toEqual([]);
+      expect(searchSettings('access token', settingsCategories, translateAccess, context)).toEqual(
+        []
+      );
       preferences.developerTools = true;
       expect(
-        searchSettings('access token', settingsCategories, t, context).some(
+        searchSettings('access token', settingsCategories, translateAccess, context).some(
           (hit) => hit.setting.focusId === 'access-token'
         )
       ).toBe(true);

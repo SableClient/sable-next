@@ -278,7 +278,7 @@ test.each(['list', 'gallery'] as const)(
     await rerender({ threads: collectForumThreads([redacted, root], null) });
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Pinned threads' })).not.toBeInTheDocument();
-    expect(screen.getByText('No threads yet.')).toBeVisible();
+    expect(document.querySelector('.forum-thread-list-empty')).not.toBeNull();
   }
 );
 

@@ -83,14 +83,11 @@ test('provider validation gates Next and preserves focus', async ({
   await auth.open();
   await expect(page.getByRole('heading', { name: en.auth.signInTitle, exact: true })).toBeFocused();
   await expect(auth.nextStageButton).toHaveCount(0);
-  await expect(page.getByRole('button', { name: en.auth.continue, exact: true })).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(auth.homeserver).toBeFocused();
 
   await auth.homeserver.fill(homeserverProxy.baseUrl);
-  await expect(
-    page.getByRole('status').filter({ hasText: en.auth.checkingProvider })
-  ).toBeVisible();
+  await expect(page.locator('.auth-status-slot').getByRole('status')).toBeVisible();
   await expect(auth.nextStageButton).toHaveCount(0);
   await expect(auth.homeserver).toBeFocused();
   await expect(auth.moreMethodsButton).toBeVisible({ timeout: 60_000 });

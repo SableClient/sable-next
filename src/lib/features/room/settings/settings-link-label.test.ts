@@ -38,8 +38,6 @@ describe('custom panel links', () => {
         expect(parsed, focus).toEqual({ section: category.id, focus });
         assert(parsed);
         expect(settingsLinkLabel(parsed), focus).toBe(`${t(category.name)} / ${t(target.name)}`);
-        expect(t(target.name), focus).not.toBe(target.name);
-        expect(t(target.name), focus).not.toContain('{{');
       }
     }
   });

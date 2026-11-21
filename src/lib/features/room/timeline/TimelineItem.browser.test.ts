@@ -1,7 +1,5 @@
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { commands, page, userEvent } from 'vitest/browser';
-
-import en from '../../../../locales/en.json' with { type: 'json' };
 import { render } from 'vitest-browser-svelte';
 
 import type { ProfileView, TimelineItemView } from '#src/generated/protocol';
@@ -340,14 +338,14 @@ test('a hover action still fires when the row loses hover and focus mid-press', 
   await page.viewport(1280, 700);
   document.body.style.paddingTop = '120px';
   const onReply = vi.fn();
-  const screen = await mountItem(message('menu-2', '@alice:example.test', 'Alice'), 'modern', {
+  await mountItem(message('menu-2', '@alice:example.test', 'Alice'), 'modern', {
     onReply,
   });
   const row = document.querySelector<HTMLElement>('article.message');
   if (!row) throw new Error('the message row is not rendered');
   await userEvent.hover(row);
-  const reply = screen.getByRole('button', { name: en.timeline.reply, exact: true });
-  const button = reply.element() as HTMLElement;
+  const button = row.querySelector<HTMLElement>('.message-actions .message-action-button');
+  if (!button) throw new Error('the reply action is not rendered');
   await userEvent.hover(button);
   button.dispatchEvent(
     new PointerEvent('pointerdown', {

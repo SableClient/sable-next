@@ -39,16 +39,16 @@ const base = {
 test('an empty forum offers to start its first thread', async () => {
   const create = vi.fn();
   render(ForumThreadList, { ...base, onCreate: create });
-  expect(screen.getByText('No threads yet.')).toBeVisible();
+  expect(document.querySelector('.forum-thread-list-empty')).not.toBeNull();
   await userEvent.setup().click(screen.getByRole('button', { name: 'New thread' }));
   expect(create).toHaveBeenCalledOnce();
 });
 
 test('a search that misses says so only once every thread is loaded', async () => {
   const { rerender } = render(ForumThreadList, { ...base, filtered: true, canLoadMore: true });
-  expect(screen.queryByText('No threads match your search.')).not.toBeInTheDocument();
+  expect(document.querySelector('.forum-thread-list-empty')).toBeNull();
   await rerender({ canLoadMore: false });
-  expect(screen.getByText('No threads match your search.')).toBeVisible();
+  expect(document.querySelector('.forum-thread-list-empty')).not.toBeNull();
 });
 
 test('reaching the end of the list loads older threads', () => {

@@ -80,7 +80,7 @@ test('removing a widget with permission takes it out of the room state', async (
     .getByRole('button', { name: 'Remove Dashboard' })
     .click();
 
-  await expect(page.getByText('This room has no widgets.')).toBeVisible();
+  await expect(page.locator('.widgets-empty')).toBeVisible();
 
   await expect
     .poll(() =>

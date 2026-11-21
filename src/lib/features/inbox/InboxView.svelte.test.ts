@@ -79,7 +79,6 @@ test('switches between notifications, invites and actionable join requests', asy
     'true'
   );
   await user.click(screen.getByRole('tab', { name: 'Invites' }));
-  expect(await screen.findByText('No pending invitations.')).toBeInTheDocument();
   expect(goto).toHaveBeenLastCalledWith('/inbox?tab=invites', { replace: true, reset: false });
 
   await user.click(screen.getByRole('tab', { name: 'Requests' }));

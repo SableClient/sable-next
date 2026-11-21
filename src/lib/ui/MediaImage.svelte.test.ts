@@ -307,7 +307,7 @@ test('a failed hidden image keeps its caption private and its retry accessible',
   });
   await settle();
 
-  expect(screen.getByText('Media unavailable')).toBeInTheDocument();
+  expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
   expect(screen.queryByText(/Secret ending/)).not.toBeInTheDocument();
   expect(retryButton()).toBeEnabled();
 });

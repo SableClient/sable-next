@@ -15,7 +15,6 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (original) => ({
 
 import { core } from '#lib/core/__mocks__/context.js';
 import { goto } from '#lib/test-support/app-navigation.js';
-import { i18n } from '#lib/i18n.js';
 import UserLinkCard from './UserLinkCard.svelte';
 
 beforeEach(() => {
@@ -28,6 +27,13 @@ afterEach(() => {
   core.rpc.rooms.createDm.mockReset();
 });
 
+async function cancelDialog(): Promise<void> {
+  const dialog = await screen.findByRole('dialog');
+  const cancel = dialog.querySelector('button[type="button"]');
+  assert(cancel);
+  await userEvent.click(cancel);
+}
+
 test('waits for the room list before deciding whether to create a DM', async () => {
   roomList.settled = false;
   render(UserLinkCard, { props: { userId: '@alice:example.org', startChat: true } });
@@ -39,9 +45,9 @@ test('waits for the room list before deciding whether to create a DM', async () 
 
 test('a chat action asks before creating a DM, then navigates after confirmation', async () => {
   render(UserLinkCard, { props: { userId: '@alice:example.org', startChat: true } });
-  await screen.findByRole('dialog');
+  const dialog = await screen.findByRole('dialog');
   expect(core.rpc.rooms.createDm).not.toHaveBeenCalled();
-  const form = screen.getByRole('button', { name: i18n.t('direct.submit') }).closest('form');
+  const form = dialog.querySelector('form');
   assert(form);
   await fireEvent.submit(form);
   await vi.waitFor(() => {
@@ -67,7 +73,7 @@ test('a user URI without a chat action displays a profile without opening a DM',
 test('cancelling a chat action leaves the profile open without creating a room', async () => {
   render(UserLinkCard, { props: { userId: '@alice:example.org', startChat: true } });
   await screen.findByRole('dialog');
-  await userEvent.click(screen.getByRole('button', { name: i18n.t('common.cancel') }));
+  await cancelDialog();
   await vi.waitFor(() => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -80,7 +86,7 @@ test('a cancelled chat action is not asked again when the room list reconnects',
     props: { userId: '@alice:example.org', startChat: true },
   });
   await screen.findByRole('dialog');
-  await userEvent.click(screen.getByRole('button', { name: i18n.t('common.cancel') }));
+  await cancelDialog();
   await vi.waitFor(() => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });

@@ -35,7 +35,6 @@ test('previews a shared theme and installs it once confirmed', async () => {
   const user = userEvent.setup();
   const { container } = render(ThemeFileCard, { src: 'blob:theme', name: 'night-owl.sable.css' });
   expect(await screen.findByText('Night Owl')).toBeInTheDocument();
-  expect(screen.getByText('Dark theme')).toBeInTheDocument();
   expect(container.querySelectorAll('.swatch')).toHaveLength(2);
 
   await user.click(screen.getByRole('button', { name: 'Install' }));

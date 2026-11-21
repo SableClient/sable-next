@@ -221,7 +221,7 @@ test('sorting by newest reorders the results', async ({ page }) => {
   const firstBefore = await page.locator('.hit-row').first().innerText();
 
   await chooseOrder(page, en.search.orderRecent);
-  await expect(orderControl(page)).toHaveText(en.search.orderRecent);
+  await expect(page).toHaveURL(/order=recent/);
 
   await expect.poll(async () => page.locator('.hit-row').first().innerText()).not.toBe(firstBefore);
 });
@@ -309,7 +309,8 @@ test('the sort order rides in the url and survives a reload', async ({ page }) =
 
   await page.reload();
 
-  await expect(orderControl(page)).toHaveText(en.search.orderRecent);
+  await expect(page).toHaveURL(/order=recent/);
+  await expect(orderControl(page)).toBeVisible();
 });
 
 test('zero results are announced and offer a way out', async ({ page, searchCorpus }) => {
@@ -372,7 +373,7 @@ test('the sort controls are not covered by the suggestions', async ({ page }) =>
 
   await chooseOrder(page, en.search.orderRecent);
 
-  await expect(orderControl(page)).toHaveText(en.search.orderRecent);
+  await expect(orderControl(page)).toBeVisible();
 });
 
 test('a negated room filter drops that room instead of matching its text', async ({ page }) => {

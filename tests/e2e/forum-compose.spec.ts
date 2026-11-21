@@ -100,7 +100,7 @@ test('the search bar filters threads and starts one from what was typed', async 
   await expect(main.locator('[contenteditable="true"]')).toHaveCount(0);
 
   await search.fill('Holiday rota');
-  await expect(main.getByText(en.forum.noMatches)).toBeVisible();
+  await expect(main.locator('.forum-thread-list-empty')).toBeVisible();
   await search.press('Enter');
   await expect(main.getByRole('textbox', { name: en.forum.titleLabel })).toHaveValue(
     'Holiday rota'

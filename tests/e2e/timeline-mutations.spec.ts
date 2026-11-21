@@ -1,7 +1,6 @@
 // Asserts the same messages stay on screen, not that scrollTop is unchanged: a
 // virtualised list renumbers rows constantly, and the text is what a reader sees.
 
-import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test } from './fixtures/test';
 import { solidPng } from './fixtures/png';
 
@@ -60,7 +59,7 @@ test('a deletion above the viewport does not move the reader', async ({
 
   await admin.redact(deepRoom.roomId, doomed);
 
-  await expect(timeline.itemByEventId(doomed)).toContainText(en.timeline.redacted, {
+  await expect(timeline.itemByEventId(doomed).locator('.redacted')).toBeVisible({
     timeout: 20_000,
   });
   await expect.poll(() => timeline.visibleRange()).toEqual(before);

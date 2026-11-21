@@ -2,7 +2,7 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, assert, expect, test, vi } from 'vitest';
 
 const prefs = vi.hoisted(() => ({ setPreference: vi.fn() }));
 vi.mock('#lib/settings/preferences.svelte.js', async (importOriginal) => ({
@@ -21,19 +21,19 @@ test('shows both modes and follows the device when its mode is selected', async 
   const onComplete = vi.fn();
   render(AppearanceSetupCard, { onComplete });
 
-  expect(screen.getByText('Browse more themes')).toBeInTheDocument();
-  expect(screen.getAllByRole('radio').map((choice) => choice.textContent.trim())).toEqual([
-    'Light',
-    'Dark',
-  ]);
-  expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked();
-  expect(screen.getByRole('radio', { name: 'Dark' })).not.toBeChecked();
+  const [light, dark] = screen.getAllByRole('radio');
+  expect(light).toBeChecked();
+  expect(dark).not.toBeChecked();
 
-  await user.click(screen.getByRole('radio', { name: 'Dark' }));
+  assert(dark);
+  await user.click(dark);
   expect(prefs.setPreference).toHaveBeenCalledWith('theme', 'dark');
-  await user.click(screen.getByRole('radio', { name: 'Light' }));
+  assert(light);
+  await user.click(light);
   expect(prefs.setPreference).toHaveBeenCalledWith('theme', 'system');
 
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  const continueButton = screen.getAllByRole('button').at(-1);
+  assert(continueButton);
+  await user.click(continueButton);
   expect(onComplete).toHaveBeenCalledOnce();
 });

@@ -95,7 +95,7 @@ test('renders the extension badge and human-readable size for a file attachment'
   await settle();
 
   expect(screen.getByText('1.5 MB')).toHaveClass('media-file-size');
-  expect(screen.getByText('Download')).toBeInTheDocument();
+  expect(document.querySelector('.media-download')).not.toBeNull();
 });
 
 test('offers a PDF as a file plus a preview that opens the viewer', async () => {

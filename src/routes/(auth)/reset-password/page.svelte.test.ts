@@ -26,12 +26,12 @@ test('follows a homeserver change in the URL', async () => {
   Object.assign(core, { status: 'ready', loginFlows });
   render(Page);
 
-  expect(await screen.findByText('Resetting with a.example')).toBeInTheDocument();
+  expect(await screen.findByText(/a\.example/)).toBeInTheDocument();
   const form = document.querySelector('main');
 
   (page.url as { search: string }).search = '?server=b.example';
 
-  expect(await screen.findByText('Resetting with b.example')).toBeInTheDocument();
+  expect(await screen.findByText(/b\.example/)).toBeInTheDocument();
   expect(loginFlows).toHaveBeenLastCalledWith('b.example');
   expect(document.querySelector('main')).toBe(form);
 });

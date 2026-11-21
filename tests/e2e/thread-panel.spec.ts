@@ -535,6 +535,6 @@ for (const threadPresentation of ['timeline', 'panel']) {
       )
       .toContain('backward');
     expect(await page.evaluate(() => window.__e2ePaginationDirections)).not.toContain('forward');
-    await expect(thread.getByText(en.timeline.loadFailed)).toHaveCount(0);
+    await expect(thread.getByRole('alert')).toHaveCount(0);
   });
 }

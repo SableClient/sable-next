@@ -77,7 +77,7 @@ test('shows an empty message when there are no widgets', () => {
     onClose: vi.fn(),
   });
 
-  expect(screen.getByText('This room has no widgets.')).toBeInTheDocument();
+  expect(container.querySelector('.widgets-empty')).not.toBeNull();
   expect(container.querySelector('iframe')).not.toBeInTheDocument();
 });
 

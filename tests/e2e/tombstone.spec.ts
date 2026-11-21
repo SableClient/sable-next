@@ -51,8 +51,9 @@ test('an upgraded room leads back to the room it replaced', async ({
   await timeline.expectRevealed();
   await timeline.scrollToAndNotify(0);
 
-  await expect(page.getByText(en.timeline.predecessor)).toBeVisible({ timeout: 20_000 });
-  await page.getByRole('button', { name: en.timeline.predecessorOpen }).click();
+  const predecessor = page.locator('.predecessor');
+  await expect(predecessor).toBeVisible({ timeout: 20_000 });
+  await predecessor.getByRole('button').click();
 
   await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(roomId)), {
     timeout: 20_000,

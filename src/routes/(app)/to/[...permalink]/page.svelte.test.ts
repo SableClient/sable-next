@@ -25,14 +25,15 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (original) => ({
 
 import { page } from '$app/state';
 import { core } from '#lib/core/__mocks__/context.js';
-import { i18n } from '#lib/i18n.js';
 import Page from './+page.svelte';
 
 test('a cancelled chat prompt stays closed when its history entry pops', async () => {
   core.userProfile.mockResolvedValue({ display_name: 'Alice', avatar_url: null });
   render(Page);
-  await screen.findByRole('dialog');
-  await userEvent.click(screen.getByRole('button', { name: i18n.t('common.cancel') }));
+  const dialog = await screen.findByRole('dialog');
+  const cancel = dialog.querySelector('button[type="button"]');
+  if (!cancel) throw new Error('the confirm dialog has no cancel button');
+  await userEvent.click(cancel);
   await vi.waitFor(() => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });

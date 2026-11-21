@@ -6,7 +6,6 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
-import en from '../../../locales/en.json' with { type: 'json' };
 import Harness from './RoomComposerHarness.test.svelte';
 
 const platform = vi.hoisted(() => ({ android: false }));
@@ -52,8 +51,10 @@ test('a multiline expanded composer fits above the landscape phone keyboard', as
   setPreference('richTextComposer', true);
   setPreference('composerForm', 'tall');
   const screen = await mountComposer();
-  const composer = screen.getByRole('combobox', { name: en.timeline.messagePlaceholder });
-  await userEvent.click(screen.getByRole('button', { name: en.composer.expand }));
+  const composer = screen.getByRole('combobox');
+  const expand = document.querySelector<HTMLElement>('.composer-expand');
+  if (!expand) throw new Error('the expand button is not rendered');
+  await userEvent.click(expand);
   await expect.poll(() => document.querySelector('.editor.expanded')).not.toBeNull();
   await page.viewport(844, 390);
   document.documentElement.style.setProperty('--keyboard-height', '190px');
@@ -70,20 +71,19 @@ test('a multiline expanded composer fits above the landscape phone keyboard', as
   const row = document.querySelector('.composer-row') as HTMLElement;
   expect(row.getBoundingClientRect().height).toBeLessThan(100);
   const editorBox = editor.getBoundingClientRect();
-  const send = screen
-    .getByRole('button', { name: en.timeline.sendMessage })
-    .element()
-    .getBoundingClientRect();
-  expect(send.height).toBeGreaterThanOrEqual(40);
-  expect(send.top).toBeLessThan(editorBox.bottom);
-  expect(send.bottom).toBeGreaterThan(editorBox.top);
+  const send = document.querySelector<HTMLElement>('.composer-send');
+  if (!send) throw new Error('the send button is not rendered');
+  const sendBox = send.getBoundingClientRect();
+  expect(sendBox.height).toBeGreaterThanOrEqual(40);
+  expect(sendBox.top).toBeLessThan(editorBox.bottom);
+  expect(sendBox.bottom).toBeGreaterThan(editorBox.top);
 });
 
 test('opening the keyboard keeps the portrait composer readable', async () => {
   await page.viewport(412, 844);
   setPreference('composerForm', 'tall');
   const screen = await mountComposer();
-  await userEvent.click(screen.getByRole('combobox', { name: en.timeline.messagePlaceholder }));
+  await userEvent.click(screen.getByRole('combobox'));
   await page.viewport(412, 400);
   await expect.poll(() => window.innerHeight).toBe(400);
   await new Promise(requestAnimationFrame);
@@ -106,11 +106,11 @@ test('the android keyboard keeps a wide portrait composer tall', async () => {
   await page.viewport(540, 1000);
   setPreference('composerForm', 'tall');
   const screen = await mountComposer();
-  await userEvent.click(screen.getByRole('combobox', { name: en.timeline.messagePlaceholder }));
+  await userEvent.click(screen.getByRole('combobox'));
   await page.viewport(540, 400);
   await expect.poll(() => window.innerHeight).toBe(400);
   await new Promise(requestAnimationFrame);
   await new Promise(requestAnimationFrame);
   expect(document.querySelector('.composer-row')?.classList.contains('short')).toBe(false);
-  await expect.element(screen.getByRole('button', { name: en.composer.expand })).toBeVisible();
+  expect(document.querySelector('.composer-expand')).not.toBeNull();
 });
