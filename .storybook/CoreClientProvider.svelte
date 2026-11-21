@@ -27,6 +27,7 @@
   } from '#lib/features/room/messages/message-menu-open.svelte.ts';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.ts';
   import { provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.ts';
+  import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.ts';
 
   let { children }: { children: Snippet } = $props();
 
@@ -90,6 +91,7 @@
   provideMessageMenu(new OpenMessageMenu());
   providePersonaStore(new PersonaStore(mockCore));
   provideRoomList(new RoomList(mockCore));
+  provideSpaceSidebar(new SpaceSidebar());
 </script>
 
 <!-- The root layout does the same for the app. -->

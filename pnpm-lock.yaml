@@ -543,6 +543,9 @@ importers:
       storybook:
         specifier: 10.6.7
         version: 10.6.7(@types/react@19.3.0)(react@19.3.1)
+      storybook-addon-rtl:
+        specifier: ^3.0.2
+        version: 3.0.2(storybook@10.6.7(@types/react@19.3.0)(react@19.3.1))
       stylelint:
         specifier: ^18.0.0
         version: 18.0.0
@@ -5895,6 +5898,11 @@ packages:
 
   std-env@4.3.0:
     resolution: {integrity: sha512-OtU/EgQ1kIm5KwqQpBC6ZEMXrZRui11w8zgfTWp8cdO9B8OaPsbA8bTHO2P+HNo1VlUTGMVBwPhydu6poeXiag==}
+
+  storybook-addon-rtl@3.0.2:
+    resolution: {integrity: sha512-b3OxFvIe1Nct+lS6PA1oOalBGkfI3RE4Efju/3WE69tzmFtCUuU/eNLasjtp07TxbtsRsIg+1OkyPycnk4YPkA==}
+    peerDependencies:
+      storybook: ^10.0.0
 
   storybook@10.6.7:
     resolution: {integrity: sha512-/1h87XqC+8tZ5PQ/GVWOg78tCQuEAshYWwok5niBcnHEKzZy6Ls06uuT5/rhQ3iUB0y8iexEVHmUe3jaaxNguw==}
@@ -11740,6 +11748,10 @@ snapshots:
   stat-mode@1.0.0: {}
 
   std-env@4.3.0: {}
+
+  storybook-addon-rtl@3.0.2(storybook@10.6.7(@types/react@19.3.0)(react@19.3.1)):
+    dependencies:
+      storybook: 10.6.7(@types/react@19.3.0)(react@19.3.1)
 
   storybook@10.6.7(@types/react@19.3.0)(react@19.3.1):
     dependencies:

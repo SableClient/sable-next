@@ -27,7 +27,15 @@
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,
-    space_children: [],
+    space_children: [
+      {
+        room_id: '!foo',
+        via: [],
+        order: null,
+        origin_server_ts: Date.now(),
+        suggested: true,
+      },
+    ],
     bridge: null,
     unread: 1,
     notifying: 0,
