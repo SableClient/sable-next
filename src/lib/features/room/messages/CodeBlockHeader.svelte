@@ -1,11 +1,10 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
-  import ListNumbersIcon from 'phosphor-svelte/lib/ListNumbersIcon';
-  import TextAlignJustifyIcon from 'phosphor-svelte/lib/TextAlignJustifyIcon';
   import { untrack } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
+  import CodeViewControls from '#lib/ui/CodeViewControls.svelte';
   import { Copied } from '#lib/ui/copied.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
@@ -35,24 +34,7 @@
 <div class="code-head">
   <span class="code-language">{language ?? i18n.t('timeline.codeLabel')}</span>
   <TooltipProvider>
-    <PanelHeaderButton
-      label={i18n.t('timeline.wrapCode')}
-      aria-pressed={wrapped}
-      onclick={() => (wrapped = !wrapped)}
-    >
-      <TextAlignJustifyIcon />
-    </PanelHeaderButton>
-
-    {#if numbered}
-      <PanelHeaderButton
-        label={i18n.t('timeline.codeLineNumbers')}
-        aria-pressed={lineNumbers}
-        onclick={() => (lineNumbers = !lineNumbers)}
-      >
-        <ListNumbersIcon />
-      </PanelHeaderButton>
-    {/if}
-
+    <CodeViewControls bind:wrapped bind:lineNumbers numberable={numbered} />
     <PanelHeaderButton
       label={copied.value ? i18n.t('common.copied') : i18n.t('common.copy')}
       onclick={() => copied.copy(block.textContent)}

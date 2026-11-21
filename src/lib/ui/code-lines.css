@@ -1,0 +1,42 @@
+.code-body .code-lines {
+  display: block;
+  white-space: normal;
+}
+
+:not([data-wrapped]) > .code-body .code-lines {
+  width: max-content;
+}
+
+.code-body .code-line {
+  display: block;
+  min-height: var(--code-line-height);
+  position: relative;
+  white-space: pre;
+}
+
+[data-wrapped] > .code-body,
+[data-wrapped] > .code-body .code-line {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+[data-line-numbers] > .code-body .code-lines {
+  --code-gutter: calc(var(--code-line-digits) * 1ch + var(--space-400));
+
+  counter-reset: code-line;
+  padding-inline-start: var(--code-gutter);
+}
+
+[data-line-numbers] > .code-body .code-line::before {
+  content: counter(code-line) / '';
+  counter-increment: code-line;
+  inset-block-start: 0;
+  inset-inline-start: calc(-1 * var(--code-gutter));
+  opacity: var(--opacity-secondary);
+  padding-inline-end: var(--space-300);
+  pointer-events: none;
+  position: absolute;
+  text-align: end;
+  user-select: none;
+  width: var(--code-gutter);
+}

@@ -463,11 +463,8 @@
 
       const figure = document.createElement('div');
       figure.className = 'code-block';
-      if (numbered) {
-        const digits = Math.max(2, String(lineCount).length);
-        figure.style.setProperty('--code-line-digits', String(digits));
-        splitCodeLines(code);
-      }
+      block.classList.add('code-body');
+      if (numbered) splitCodeLines(code);
 
       mounted.push(
         mount(CodeBlockHeader, {
@@ -895,52 +892,10 @@
     padding: var(--space-200);
   }
 
-  .formatted-body :global(.code-block[data-wrapped] :is(pre, .code-line)) {
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-  }
-
   .formatted-body :global(pre code) {
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
     font-variant-ligatures: none;
-  }
-
-  .formatted-body :global(.code-lines) {
-    display: block;
-    white-space: normal;
-  }
-
-  .formatted-body :global(.code-block:not([data-wrapped]) .code-lines) {
-    width: max-content;
-  }
-
-  .formatted-body :global(.code-line) {
-    display: block;
-    min-height: var(--code-line-height);
-    position: relative;
-    white-space: pre;
-  }
-
-  .formatted-body :global(.code-block[data-line-numbers] .code-lines) {
-    --code-gutter: calc(var(--code-line-digits) * 1ch + var(--space-400));
-
-    counter-reset: code-line;
-    padding-inline-start: var(--code-gutter);
-  }
-
-  .formatted-body :global(.code-block[data-line-numbers] .code-line)::before {
-    content: counter(code-line) / '';
-    counter-increment: code-line;
-    inset-block-start: 0;
-    inset-inline-start: calc(-1 * var(--code-gutter));
-    opacity: var(--opacity-secondary);
-    padding-inline-end: var(--space-300);
-    pointer-events: none;
-    position: absolute;
-    text-align: end;
-    user-select: none;
-    width: var(--code-gutter);
   }
 
   :root[data-code-ligatures='on'] .formatted-body :global(code) {

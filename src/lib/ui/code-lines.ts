@@ -1,3 +1,5 @@
+import './code-lines.css';
+
 export function splitCodeLines(container: HTMLElement): void {
   const doc = container.ownerDocument;
   const fragment = doc.createDocumentFragment();
@@ -48,6 +50,8 @@ export function splitCodeLines(container: HTMLElement): void {
   }
 
   for (const child of [...container.childNodes]) walk(child);
+  const digits = Math.max(2, String(fragment.childElementCount).length);
+  container.style.setProperty('--code-line-digits', String(digits));
   container.classList.add('code-lines');
   container.replaceChildren(fragment);
 }
