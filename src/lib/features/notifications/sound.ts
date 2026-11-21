@@ -1,7 +1,7 @@
 import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { nativeCallOwnsAudio } from '#lib/platform/calls.js';
-import { isAndroid } from '#lib/platform/os.js';
-import { playNativeChime } from '#lib/platform/native-notifications.js';
+import { isAndroid, isIos } from '#lib/platform/os.js';
+import { playIosChime, playNativeChime } from '#lib/platform/native-notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { type RangePreference } from '#lib/settings/definitions.js';
 
@@ -144,6 +144,12 @@ export function releaseNotificationAudio(): void {
 export async function playNotificationSound(name: keyof NotificationSounds): Promise<void> {
   if (name === 'notification' && isAndroid()) {
     await playNativeChime(preferences[SOUNDS[name].volumePreference] * GAIN_MODIFIER);
+    return;
+  }
+  // A system sound, so the ringer switch mutes it.
+  if (name === 'notification' && isIos()) {
+    if (nativeCallOwnsAudio() || preferences[SOUNDS[name].volumePreference] === 0) return;
+    await playIosChime();
     return;
   }
   await start(name, { exclusive: true });

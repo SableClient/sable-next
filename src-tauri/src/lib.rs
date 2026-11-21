@@ -835,6 +835,10 @@ fn app_builder(sentry_client: Option<&::sentry::Client>) -> tauri::Builder<tauri
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the command list grows with each native command"
+)]
 pub fn run() {
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let sentry_guard = sentry::init();
@@ -899,6 +903,8 @@ pub fn run() {
             ios::donate_sent_message,
             #[cfg(target_os = "ios")]
             ios::haptic_feedback,
+            #[cfg(target_os = "ios")]
+            ios::play_notification_chime,
             #[cfg(target_os = "ios")]
             ios::set_system_bars_hidden,
             #[cfg(target_os = "ios")]

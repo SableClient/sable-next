@@ -137,6 +137,8 @@ targets:
       - path: LaunchScreen.storyboard
       - path: ../../ios/PrivacyInfo.xcprivacy
         buildPhase: resources
+      - path: ../../ios/Sounds/msg.caf
+        buildPhase: resources
     info:
       path: {{app.name}}_iOS/Info.plist
       properties:

@@ -137,6 +137,10 @@ export async function playNativeChime(volume: number): Promise<void> {
   await invoke('plugin:sable-push|play_chime', { volume });
 }
 
+export async function playIosChime(): Promise<void> {
+  await invoke('play_notification_chime');
+}
+
 export interface NativePushTransport {
   provider: string | null;
   distributor: string | null;

@@ -99,6 +99,34 @@ test('plays through the native notification stream on Android', async () => {
   vi.doUnmock('#lib/platform/native-notifications.js');
 });
 
+test('plays the system chime on iOS', async () => {
+  const playIosChime = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+  let inCall = false;
+  vi.resetModules();
+  vi.doMock('#lib/platform/os.js', () => ({
+    isAndroid: () => false,
+    isIos: () => true,
+    isNativeMobile: () => true,
+  }));
+  vi.doMock('#lib/platform/calls.js', () => ({ nativeCallOwnsAudio: () => inCall }));
+  vi.doMock('#lib/platform/native-notifications.js', () => ({ playIosChime }));
+  const { preferences } = await import('#lib/settings/preferences.svelte.js');
+  ({ playNotificationSound } = await import('./sound'));
+
+  await playNotificationSound('notification');
+  inCall = true;
+  await playNotificationSound('notification');
+  inCall = false;
+  preferences.soundsNotificationVolume = 0;
+  await playNotificationSound('notification');
+
+  expect(playIosChime).toHaveBeenCalledOnce();
+  expect(fetch).not.toHaveBeenCalled();
+  vi.doUnmock('#lib/platform/os.js');
+  vi.doUnmock('#lib/platform/calls.js');
+  vi.doUnmock('#lib/platform/native-notifications.js');
+});
+
 test('stays silent while a native iOS call owns the audio session', async () => {
   vi.resetModules();
   vi.doMock('#lib/platform/calls.js', () => ({ nativeCallOwnsAudio: () => true }));

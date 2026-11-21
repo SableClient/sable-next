@@ -1,7 +1,7 @@
 use std::{
     ffi::{CString, OsStr},
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
@@ -916,6 +916,38 @@ fn end_background_task(task: &AtomicUsize) {
         // SAFETY: identifier came from beginBackgroundTask and the swap above ensures it is ended only once
         let _: () = unsafe { msg_send![shared_application(), endBackgroundTask: identifier] };
     }
+}
+
+#[link(name = "AudioToolbox", kind = "framework")]
+unsafe extern "C" {
+    fn AudioServicesCreateSystemSoundID(url: &NSURL, sound: *mut u32) -> i32;
+    fn AudioServicesPlaySystemSound(sound: u32);
+}
+
+#[tauri::command]
+pub(crate) fn play_notification_chime() -> Result<(), String> {
+    static CHIME: OnceLock<Result<u32, String>> = OnceLock::new();
+    let sound = CHIME
+        .get_or_init(|| {
+            let url = objc2_foundation::NSBundle::mainBundle()
+                .URLForResource_withExtension(
+                    Some(&NSString::from_str("msg")),
+                    Some(&NSString::from_str("caf")),
+                )
+                .ok_or_else(|| "msg.caf is missing from the app bundle".to_owned())?;
+            let mut sound = 0;
+            // SAFETY: NSURL is toll-free bridged to CFURL and `sound` is a valid out pointer
+            let status = unsafe { AudioServicesCreateSystemSoundID(&url, &raw mut sound) };
+            if status == 0 {
+                Ok(sound)
+            } else {
+                Err(format!("AudioServicesCreateSystemSoundID: {status}"))
+            }
+        })
+        .clone()?;
+    // SAFETY: the sound came from AudioServicesCreateSystemSoundID and is never disposed
+    unsafe { AudioServicesPlaySystemSound(sound) };
+    Ok(())
 }
 
 #[tauri::command]
