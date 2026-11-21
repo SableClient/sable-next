@@ -30,7 +30,7 @@
   import { i18n } from '#lib/i18n.js';
   import { serverNameOf } from '#lib/matrix-id.js';
   import { isPackChange } from '#lib/emoji/load-packs.js';
-  import { capturesFromCamera, pickFiles } from '#lib/platform/files.js';
+  import { capturesFromCamera, pickFiles, withResolvedMime } from '#lib/platform/files.js';
   import { isAndroid } from '#lib/platform/os.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { outgoingPersona } from '#lib/personas/outgoing-persona.js';
@@ -1163,7 +1163,12 @@
       }
 
       error = null;
-      staged = stageFiles(staged, files, () => nextStagedId++, preferences.imageMetadata);
+      staged = stageFiles(
+        staged,
+        files.map(withResolvedMime),
+        () => nextStagedId++,
+        preferences.imageMetadata
+      );
       if (desktop) editor.focus();
     } catch (cause) {
       if (current()) {

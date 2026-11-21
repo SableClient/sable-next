@@ -306,8 +306,12 @@ export function mimeFromName(name: string): string {
 
 const AMBIGUOUS_MIMES = new Set(['', 'application/octet-stream', 'application/ogg']);
 
+function typeScriptNamedVideo(file: File): boolean {
+  return file.type.startsWith('video/') && /\.m?ts$/i.test(file.name);
+}
+
 export function withResolvedMime(file: File): File {
-  if (!AMBIGUOUS_MIMES.has(file.type)) return file;
+  if (!AMBIGUOUS_MIMES.has(file.type) && !typeScriptNamedVideo(file)) return file;
   const mime = mimeFromName(file.name);
   if (mime === 'application/octet-stream') return file;
   return new File([file], file.name, { type: mime, lastModified: file.lastModified });

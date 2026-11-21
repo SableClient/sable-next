@@ -169,6 +169,15 @@ test.each(['', 'application/octet-stream', 'application/ogg'])(
   }
 );
 
+test.each([
+  ['main.ts', 'video/mp2t'],
+  ['main.ts', 'video/vnd.dlna.mpeg-tts'],
+  ['module.mts', 'video/mp2t'],
+])('a TypeScript file named %s reported as %j is sent as source', (name, type) => {
+  const file = new File([new Uint8Array(1)], name, { type });
+  expect(withResolvedMime(file).type).toBe('application/typescript');
+});
+
 test('a file with a trustworthy type is left untouched', () => {
   const file = new File([new Uint8Array(1)], 'memo.ogg', { type: 'video/ogg' });
   expect(withResolvedMime(file)).toBe(file);

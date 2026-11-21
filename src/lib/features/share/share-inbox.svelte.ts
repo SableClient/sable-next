@@ -67,7 +67,7 @@ export class ShareInbox {
         );
       })
     );
-    return [...read, ...this.#webFiles];
+    return [...read, ...this.#webFiles.map(withResolvedMime)];
   }
 
   async clear(): Promise<void> {
