@@ -466,8 +466,112 @@ pub fn install_os_keyring_or_files(service: String, directory: &Path) -> Result<
         std::fs::create_dir_all(directory)?;
         crate::store::write_atomic(&choice, b"keyring")?;
     }
+    #[cfg(target_os = "windows")]
+    install(Box::new(dpapi::ProtectedFiles {
+        directory: directory.join("protected-secrets"),
+        keyring,
+    }));
+    #[cfg(not(target_os = "windows"))]
     install(Box::new(keyring));
     Ok(())
+}
+
+/// Credential Manager refuses writes once it is full (`ERROR_NOT_ENOUGH_MEMORY`), so new keys are
+/// sealed to the Windows user with DPAPI instead. Keys saved in Credential Manager are still read.
+#[cfg(target_os = "windows")]
+mod dpapi {
+    use std::path::PathBuf;
+
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Cryptography::{
+        CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
+    };
+
+    use super::SecretBackend;
+    use super::keyring::Keyring;
+    use crate::store::StoreError;
+
+    pub(super) struct ProtectedFiles {
+        pub(super) directory: PathBuf,
+        pub(super) keyring: Keyring,
+    }
+
+    #[expect(unsafe_code, reason = "DPAPI is only reachable through its C API")]
+    fn transform(input: &[u8], protect: bool) -> Result<Vec<u8>, StoreError> {
+        let data = CRYPT_INTEGER_BLOB {
+            cbData: u32::try_from(input.len()).map_err(StoreError::backend)?,
+            pbData: input.as_ptr().cast_mut(),
+        };
+        let mut output = CRYPT_INTEGER_BLOB {
+            cbData: 0,
+            pbData: std::ptr::null_mut(),
+        };
+        // SAFETY: both calls only read `data`, which borrows `input`, and allocate `output`.
+        let done = unsafe {
+            if protect {
+                CryptProtectData(
+                    &raw const data,
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    CRYPTPROTECT_UI_FORBIDDEN,
+                    &raw mut output,
+                )
+            } else {
+                CryptUnprotectData(
+                    &raw const data,
+                    std::ptr::null_mut(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    CRYPTPROTECT_UI_FORBIDDEN,
+                    &raw mut output,
+                )
+            }
+        };
+        if done == 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
+        // SAFETY: on success `output` holds `cbData` bytes allocated with `LocalAlloc`, freed here once.
+        unsafe {
+            let bytes = std::slice::from_raw_parts_mut(output.pbData, output.cbData as usize);
+            let copy = bytes.to_vec();
+            zeroize::Zeroize::zeroize(bytes);
+            LocalFree(output.pbData.cast());
+            Ok(copy)
+        }
+    }
+
+    impl SecretBackend for ProtectedFiles {
+        fn get(&self, name: &str) -> Result<Option<Vec<u8>>, StoreError> {
+            match std::fs::read(self.directory.join(name)) {
+                Ok(sealed) => transform(&sealed, false).map(Some),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    self.keyring.get(name)
+                }
+                Err(error) => Err(error.into()),
+            }
+        }
+
+        fn set(&self, name: &str, secret: &[u8]) -> Result<(), StoreError> {
+            std::fs::create_dir_all(&self.directory)?;
+            crate::store::write_atomic_private(
+                &self.directory.join(name),
+                &transform(secret, true)?,
+            )?;
+            Ok(())
+        }
+
+        fn delete(&self, name: &str) -> Result<(), StoreError> {
+            match std::fs::remove_file(self.directory.join(name)) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            self.keyring.delete(name)
+        }
+    }
 }
 
 /// Makes [`install_os_keyring_or_files`] keep the keys under `directory` in files from now on.

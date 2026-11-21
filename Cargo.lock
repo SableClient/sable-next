@@ -8262,6 +8262,7 @@ dependencies = [
  "web-time",
  "webpki-roots 1.0.12",
  "windows-native-keyring-store",
+ "windows-sys 0.61.2",
  "wiremock",
  "zbus-secret-service-keyring-store",
  "zeroize",
