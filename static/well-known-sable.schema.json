@@ -358,7 +358,7 @@
           "default": "3"
         },
         "showHome": {
-          "title": "All rooms in the sidebar",
+          "title": "Show Home with all rooms",
           "type": "boolean",
           "default": false
         },
@@ -1219,7 +1219,7 @@
           "default": "3"
         },
         "showHome": {
-          "title": "All rooms in the sidebar",
+          "title": "Show Home with all rooms",
           "type": "boolean",
           "default": false
         },

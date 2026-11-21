@@ -32,7 +32,7 @@ accepts the same settings except those marked deployment only.
 - `showDmTopics` (Show topics in direct messages): `true` or `false`. Default `true`.
 - `messagePreviews` (Message previews): One of `off`, `direct`, `rooms`, `all`. Default `off`.
 - `subspaceHierarchyLimit` (Subspace nesting depth): One of `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`. Default `3`.
-- `showHome` (All rooms in the sidebar): `true` or `false`. Default `false`.
+- `showHome` (Show Home with all rooms): `true` or `false`. Default `false`.
 - `restoreLastRoom` (Restore last viewed room): `true` or `false`. Default `true`.
 - `showUnreadCounts` (Show counts on quiet rooms): `true` or `false`. Default `false`.
 - `badgeCountDMsOnly` (Show counts on quiet direct messages): `true` or `false`. Default `true`.

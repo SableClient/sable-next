@@ -2528,7 +2528,7 @@
     "messagePreviewsRooms": "Rooms",
     "messagePreviewsAll": "Direct messages and rooms",
     "subspaceHierarchyLimit": "Subspace nesting depth",
-    "showHome": "All rooms in the sidebar",
+    "showHome": "Show Home with all rooms",
     "restoreLastRoom": "Restore last viewed room",
     "restoreLastRoomHint": "Open the last room you viewed when starting {{appName}}.",
     "showSearch": "Show search in the sidebar",
