@@ -1,7 +1,13 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { on } from 'svelte/events';
-  import { RoomEvent, Track, type Participant, type RemoteTrack } from 'livekit-client';
+  import {
+    RoomEvent,
+    Track,
+    type Participant,
+    type RemoteTrack,
+    type RemoteTrackPublication,
+  } from 'livekit-client';
   import type { Room as LivekitRoom } from 'livekit-client';
   import type { RnnoiseWorkletNode } from '@sapphi-red/web-noise-suppressor';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -32,6 +38,8 @@
 
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- audio graph bookkeeping, never rendered from
   const filtered = new Map<HTMLMediaElement, Filtered>();
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- element bookkeeping, never rendered from
+  const publications = new Map<HTMLMediaElement, RemoteTrackPublication>();
   let amplifier: Output | undefined;
   let amplify: ((element: HTMLMediaElement) => void) | undefined;
 
@@ -45,7 +53,10 @@
     }
   };
 
+  /* Muting the element is not enough: a voice came through when its owner unmuted (#2086),
+     so the server is also told to stop sending. */
   const refresh = (element: HTMLMediaElement): void => {
+    publications.get(element)?.setEnabled(!deafened);
     levelOf(
       element,
       deafened,
@@ -147,7 +158,11 @@
       });
     };
 
-    const attach = (track: RemoteTrack, identity: string): void => {
+    const attach = (
+      track: RemoteTrack,
+      publication: RemoteTrackPublication,
+      identity: string
+    ): void => {
       if (track.kind !== Track.Kind.Audio || !track.sid || attached.has(track.sid)) return;
       try {
         const element = track.attach();
@@ -161,6 +176,8 @@
           if (!filtered.get(element)?.live) untrack(() => refresh(element));
         });
         attached.set(track.sid, { track, element, off });
+        publications.set(element, publication);
+        publication.setEnabled(!untrack(() => deafened));
         if (bank && !screen) route(bank.context, track, element, bank);
         levelOf(
           element,
@@ -192,6 +209,7 @@
       } finally {
         entry.off();
         unroute(entry.element);
+        publications.delete(entry.element);
         entry.element.remove();
         attached.delete(sid);
         audioElements = untrack(() => audioElements).filter((element) => element !== entry.element);
@@ -216,12 +234,15 @@
       if (entry) route(bank?.context ?? (amplifier ??= openAmplifier()), entry.track, element);
     };
 
-    const onSubscribed = (track: RemoteTrack, _publication: unknown, participant: Participant) =>
-      attach(track, participant.identity);
+    const onSubscribed = (
+      track: RemoteTrack,
+      publication: RemoteTrackPublication,
+      participant: Participant
+    ) => attach(track, publication, participant.identity);
 
     for (const participant of currentRoom.remoteParticipants.values()) {
       for (const publication of participant.audioTrackPublications.values()) {
-        if (publication.track) attach(publication.track, participant.identity);
+        if (publication.track) attach(publication.track, publication, participant.identity);
       }
     }
     currentRoom

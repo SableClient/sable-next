@@ -43,6 +43,8 @@ function fakeTrack(sid: string) {
   };
 }
 
+const fakePublication = () => ({ setEnabled: vi.fn() });
+
 function fakeRoom(initialTrack?: RemoteTrack): FakeRoom {
   const listeners = new Map<RoomEvent, Set<(...args: unknown[]) => void>>();
   let playbackAllowed = true;
@@ -52,7 +54,9 @@ function fakeRoom(initialTrack?: RemoteTrack): FakeRoom {
         'participant',
         {
           identity: 'participant',
-          audioTrackPublications: new Map([['publication', { track: initialTrack }]]),
+          audioTrackPublications: new Map([
+            ['publication', { ...fakePublication(), track: initialTrack }],
+          ]),
         },
       ],
     ]),
@@ -102,7 +106,7 @@ test('attaches existing and newly subscribed remote audio and reports playback s
     'audio.playback_allowed': true,
   });
 
-  room.emit(RoomEvent.TrackSubscribed, next, undefined, { identity: 'next' });
+  room.emit(RoomEvent.TrackSubscribed, next, fakePublication(), { identity: 'next' });
   expect(next.attach).toHaveBeenCalledOnce();
   expect(document.querySelectorAll('audio')).toHaveLength(2);
 
@@ -130,7 +134,7 @@ test('applies a per-participant volume to attached audio', () => {
   const elements = () => [...document.querySelectorAll('audio')];
   expect(elements()[0].volume).toBe(0.4);
 
-  room.emit(RoomEvent.TrackSubscribed, fakeTrack('next'), undefined, { identity: 'next' });
+  room.emit(RoomEvent.TrackSubscribed, fakeTrack('next'), fakePublication(), { identity: 'next' });
   expect(elements()[1].volume).toBe(0);
 });
 
@@ -157,8 +161,8 @@ test('updates voice and screen volume for late subscriptions', async () => {
     const sharedAudio = Object.assign(fakeTrack('late-screen'), {
       source: Track.Source.ScreenShareAudio,
     });
-    room.emit(RoomEvent.TrackSubscribed, voice, undefined, { identity });
-    room.emit(RoomEvent.TrackSubscribed, sharedAudio, undefined, { identity });
+    room.emit(RoomEvent.TrackSubscribed, voice, fakePublication(), { identity });
+    room.emit(RoomEvent.TrackSubscribed, sharedAudio, fakePublication(), { identity });
     await tick();
     const [element, screenElement] = document.querySelectorAll('audio');
     expect(element.volume).toBe(1);
@@ -212,6 +216,24 @@ test('stays muted while deafened when livekit unmutes an element as a participan
   await tick();
 
   expect(element.muted).toBe(true);
+});
+
+test('asks the server to stop sending audio while deafened, and to resume after (#2086)', async () => {
+  const room = fakeRoom();
+  const playback = $state({ deafened: true });
+  render(CallAudio, {
+    room: room.room,
+    get deafened() {
+      return playback.deafened;
+    },
+  });
+  const publication = fakePublication();
+  room.emit(RoomEvent.TrackSubscribed, fakeTrack('voice'), publication, { identity: 'next' });
+  expect(publication.setEnabled).toHaveBeenLastCalledWith(false);
+
+  playback.deafened = false;
+  await tick();
+  expect(publication.setEnabled).toHaveBeenLastCalledWith(true);
 });
 
 test('leaves a released element alone when livekit recycles it for the next call (#1468)', () => {
@@ -278,7 +300,7 @@ test('plays a shared screen at its own volume, apart from the voice', () => {
     room: room.room,
     volumeOf: (_identity: string, screen: boolean) => (screen ? 0.25 : 0.8),
   });
-  room.emit(RoomEvent.TrackSubscribed, screenAudio, undefined, { identity: 'participant' });
+  room.emit(RoomEvent.TrackSubscribed, screenAudio, fakePublication(), { identity: 'participant' });
 
   const [voiceElement, screenElement] = document.querySelectorAll('audio');
   expect(voiceElement.volume).toBe(0.8);
@@ -297,9 +319,9 @@ test('plays a voice at its own volume on an element livekit recycled from a scre
     room: room.room,
     volumeOf: (_identity: string, screen: boolean) => (screen ? 0 : 0.8),
   });
-  room.emit(RoomEvent.TrackSubscribed, screenAudio, undefined, { identity: 'participant' });
+  room.emit(RoomEvent.TrackSubscribed, screenAudio, fakePublication(), { identity: 'participant' });
   room.emit(RoomEvent.TrackUnsubscribed, screenAudio);
-  room.emit(RoomEvent.TrackSubscribed, voice, undefined, { identity: 'participant' });
+  room.emit(RoomEvent.TrackSubscribed, voice, fakePublication(), { identity: 'participant' });
   await tick();
 
   expect(element.volume).toBe(0.8);
@@ -384,7 +406,9 @@ test('keeps incoming filters across participant updates', async () => {
     const screenAudio = Object.assign(fakeTrack('screen'), {
       source: Track.Source.ScreenShareAudio,
     });
-    room.emit(RoomEvent.TrackSubscribed, screenAudio, undefined, { identity: 'participant' });
+    room.emit(RoomEvent.TrackSubscribed, screenAudio, fakePublication(), {
+      identity: 'participant',
+    });
     await tick();
     expect(bank.create).toHaveBeenCalledOnce();
     expect(bank.context.createMediaStreamSource).toHaveBeenCalledOnce();

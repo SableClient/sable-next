@@ -352,8 +352,11 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     }
   };
 
+  /* Audio the server was told not to send cannot be measured here, so use its speaking state. */
   const speakingOf = (participant: LocalParticipant | RemoteParticipant): boolean =>
-    voiceActivity.speaking(participant.identity) ?? participant.isSpeaking;
+    (participant.getTrackPublication(Track.Source.Microphone)?.isEnabled === false
+      ? undefined
+      : voiceActivity.speaking(participant.identity)) ?? participant.isSpeaking;
 
   const syncParticipants = (): void => {
     const participants = [...room.remoteParticipants.values()].map((participant) =>
