@@ -25,6 +25,7 @@ accepts the same settings except those marked deployment only.
 - `alwaysShowAltText` (Always show image descriptions): `true` or `false`. Default `false`.
 - `nameColorCorrection` (Improve name colour readability): One of `strong`, `weak`, `off`. Default `strong`.
 - `showRoomIcon` (Room icons): One of `always`, `sometimes`, `collapsed`, `never`. Default `always`.
+- `showEncryptionStatusIcon` (Show encryption status icon): `true` or `false`. Default `true`.
 - `voiceParticipantPlacement` (Voice room participants): One of `both`, `below`, `inline`. Default `both`.
 - `showRoomBanners` (Room banners above the list): `true` or `false`. Default `true`.
 - `bannerFit` (Banner size): One of `fixed`, `image`. Default `fixed`.

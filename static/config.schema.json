@@ -464,6 +464,11 @@
           ],
           "default": "always"
         },
+        "showEncryptionStatusIcon": {
+          "title": "Show encryption status icon",
+          "type": "boolean",
+          "default": true
+        },
         "voiceParticipantPlacement": {
           "title": "Voice room participants",
           "enum": [
@@ -1976,6 +1981,11 @@
             "never"
           ],
           "default": "always"
+        },
+        "showEncryptionStatusIcon": {
+          "title": "Show encryption status icon",
+          "type": "boolean",
+          "default": true
         },
         "voiceParticipantPlacement": {
           "title": "Voice room participants",
