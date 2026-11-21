@@ -1427,7 +1427,7 @@
     "deleteReason": "Reason (optional, shown to the room)",
     "copyMessage": "Copy message",
     "copySelection": "Copy selection",
-    "copyLink": "Copy link address",
+    "copyLink": "Copy URL",
     "copyMessageLink": "Copy external link",
     "copyExternalLink": "Copy external link",
     "copyMatrixLink": "Copy matrix link",
