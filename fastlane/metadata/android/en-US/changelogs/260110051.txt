@@ -1,0 +1,5 @@
+- Added wrapping and line number controls for code blocks.
+- Added wrapping and line number controls to the file viewer.
+- Sable asks for confirmation before giving someone a role equal to your own, since you cannot lower it again yourself.
+- A room's menu can convert it to a direct message, like `/converttodm` does.
+- On a Sable whose host set a branding theme, Settings > Appearance has a switch to turn that theme off and use the Sable default.

@@ -1,5 +1,79 @@
 # Sable Changelog
 
+## 26.11.5 (2026-11-21)
+
+### Features
+
+* Added wrapping and line number controls for code blocks.
+* Added wrapping and line number controls to the file viewer.
+* Sable asks for confirmation before giving someone a role equal to your own, since you cannot lower it again yourself.
+* A room's menu can convert it to a direct message, like `/converttodm` does.
+* On a Sable whose host set a branding theme, Settings > Appearance has a switch to turn that theme off and use the Sable default.
+* The sidebar message preview shows who sent the message, using their per-message profile name when they spoke as one, and labels images, voice messages, files, stickers, locations and polls instead of showing their file name.
+* The mobile apps can now join calls in Matrix 2.0 and Compatibility mode, and the Call mode setting applies on mobile. Before, the iOS and Android apps always joined in Legacy mode and could not join a call started in Matrix 2.0 mode.
+* On a homeserver with the MSC4563 `direct_message` push rule, group and bridged direct chats follow your direct message alert default.
+* Added a toggle hide the encryption status icon in the room header.
+* Made room list sorting a sort icon.
+* Add an Invite option to the menu at the top of a space's room list.
+* Keyboard shortcuts can be removed from the keyboard settings page.
+* The unread dot of a room can now be set to Default, Show or Hide from the room menu, and rooms with a hidden dot are marked in the room list.
+* Server admins can view deleted messages in rooms they don't moderate (MSC2815) when developer tools are enabled.
+
+### Fixes
+
+* A room set to All messages rings for its messages again, as legacy did, and stays silent for bridge delivery reports, deleted messages and room setting changes. Pick All messages again on rooms that already have it.
+* The AppImage starts again when Sable relaunches itself.
+* A collapsible section stays open in the composer while you write it, and the cursor starts in its title.
+* Centre the sender avatar in the compact timeline layout again.
+* Exported emote packs write their `pack.json` without padding, so it is smaller to store and to paste elsewhere.
+* Fix cropping or rotating a HEIC photo saving it as a PNG several times its size, it is now saved as a JPEG unless it has transparency.
+* Deafening now stays silent when someone unmutes after you deafened. Before, their voice could come through.
+* Ctrl+Q quits Sable and Ctrl+W closes the window again on Linux and Windows.
+* A call that drops plays the leave sound, so you can hear that you are no longer in it.
+* Clamp all expanded reply cards to 5 lines.
+* Opening a GIF or a video without controls from the timeline shows that item in the media viewer instead of another image.
+* Past messages shared with an invite are no longer lost when the room shows up as joined before the join request finishes.
+* Inviting someone to an encrypted room no longer fails when the room’s past messages can’t be shared with them. The invite goes out, and the dialog and /invite say when the history didn’t.
+* iOS notification badges count new messages while the app is closed the way the app does, following the badge settings, and drop rooms as soon as they are read elsewhere.
+* Fix the adaptive Enter key sending from the iOS on-screen keyboard while iOS has the page scrolled up for the keyboard.
+* iOS and Android notifications show the sender's avatar resolved with the message, so bridged senders keep theirs.
+* Searching for a Japanese word no longer returns messages that only share one of its characters.
+* Galleries are laid out as in Sable legacy again: three images show one tall beside two stacked, and larger ones fill square grids instead of leaving a gap.
+* Screen readers announce the site name and description of a link preview, not only its title.
+* On Linux, hardware video encoding is off unless you turn it on. It was switched on after the first launch, which could leave viewers of a screen share with a black picture.
+* On Linux, the tray icon appears when Sable starts at login before the desktop's tray is ready.
+* Fix the "browser is blocking your local network" banner appearing when the homeserver drops a single sync request, for example while rate limiting. The banner text can now be selected.
+* On Android, Sable no longer shows the local network permission prompt by itself when it loses its connection. A banner explains why it would help and asks first.
+* Show the colors and corner radius of a homeserver's theme on the login screen once the server is picked. The full theme still applies after signing in.
+* Signing out no longer fails when another saved account has lost its login.
+* Long presses open after half a second instead of 0.6 s, and Android no longer buzzes twice for one.
+* On macOS, closing the window hides Sable instead of destroying the window, so the Dock badge keeps counting. Quit with Cmd+Q.
+* Offer matrix uri links for all copy link menus.
+* Clicking another button while a menu is open now acts on that button straight away. Before, the first click only closed the menu, so the pinned messages list and other header buttons sometimes seemed not to respond.
+* Fix a `||spoiler||` that spans a blank line being sent as plain text with the bars visible.
+* The call output volume and the volume of a participant or shared screen can be set to any percentage instead of steps of 5%.
+* Images in Bluesky, Mastodon and other post previews open in the media viewer instead of the post's page.
+* Link previews in private rooms no longer wait about ten seconds per link when the preview service cannot verify your homeserver, and a preview session is no longer shared between accounts.
+* The message menu shows your recently used reactions straight away instead of flashing the default ones first.
+* Reaction emoji are no longer cut off on the left at some zoom levels, such as 110%.
+* Opening the attach sheet on a phone no longer asks for photo access. The recent photos row explains what it is for and asks only when you choose to turn it on, and it says so when it shows only the photos you allowed.
+* A reply to an edited message now quotes the edited text even when that message is further up than the loaded timeline. Before, the reply line showed the text from before the edit.
+* Fix the room list and unread badges of the previous login showing up after signing in again on an iPhone or iPad restored from a backup.
+* Read receipts no longer cover right-to-left messages.
+* The settings dialog is no longer cut off when the interface language is right-to-left.
+* Sign-in and setup cards stay on screen in right-to-left languages.
+* Closing settings opened over a thread closes settings, not the thread behind it.
+* Turning off Spell check now stops the underlines in every text field, such as your display name, pronouns and status, not only in the composer.
+* Keep name colours readable in membership and state lines instead of fading them with the rest of the line
+* A swipe that starts towards the room list no longer replies to a message when it turns back the other way.
+* Fix sync staying stuck until the app was restarted after a short network drop, most often on Android. The offline banner now has a Retry button.
+* Pressing a message or forum thread on a touch screen no longer flashes the desktop action buttons.
+* A tweet link ending in a language code, such as `/en`, shows the translated text with a "Translated from" line under it.
+* TypeScript files are no longer sent as videos.
+* The emoji and sticker settings page no longer lags with packs of hundreds of images.
+
+* Math now works in the same message as a colour or time function, and survives switching the composer between rich and plain text.
+
 ## 26.11.4 (2026-11-19)
 
 ### Features
