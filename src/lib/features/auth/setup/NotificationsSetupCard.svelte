@@ -13,7 +13,6 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
-  import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   type GroupMode = Extract<NotificationModeView, 'all' | 'mentions'>;
@@ -21,15 +20,14 @@
   interface Props {
     askDefault: boolean;
     onComplete: () => void;
-    onSkip: () => void;
+    saving?: boolean;
   }
 
-  let { askDefault, onComplete, onSkip }: Props = $props();
+  let { askDefault, onComplete, saving = $bindable(false) }: Props = $props();
   const core = useCoreClient();
   let permission = $state<Awaited<ReturnType<typeof permissionState>> | null>(null);
   let groupMode = $state<GroupMode>('all');
   let groupModeChanged = false;
-  let saving = $state(false);
   let error = $state<string | null>(null);
   const contentId = $props.id();
 
@@ -169,8 +167,6 @@
     {i18n.t('auth.continue')}
   </Button>
 </form>
-
-<AuthSecondaryAction label={i18n.t('auth.skipForNow')} onclick={onSkip} disabled={saving} />
 
 <style>
   .notifications-setup-card {

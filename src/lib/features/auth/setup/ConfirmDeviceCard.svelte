@@ -23,15 +23,21 @@
     onComplete: () => void;
     onSkip: () => void;
     onReset: (recoveryKey: string) => void;
+    view?: 'choices' | 'recovery' | 'reset' | 'skip';
+    prompted?: boolean;
   }
 
-  let { onComplete, onSkip, onReset }: Props = $props();
+  let {
+    onComplete,
+    onSkip,
+    onReset,
+    view = $bindable('choices'),
+    prompted = $bindable(false),
+  }: Props = $props();
   const core = useCoreClient();
   const verification = new DeviceVerification(core);
   let reset = $state(new IdentityReset(core));
-  let view = $state<'choices' | 'recovery' | 'reset' | 'skip'>('choices');
   let understood = $state(false);
-  let prompted = $state(false);
   let completing = false;
   let card = $state<HTMLElement>();
   let shownView: typeof view = 'choices';
@@ -286,11 +292,8 @@
   {/if}
 </div>
 
-{#if prompted && !verified && view === 'choices'}
-  {#if !resetOnly}
-    <AuthSecondaryAction label={i18n.t('setup.cantConfirm')} onclick={() => (view = 'reset')} />
-  {/if}
-  <AuthSecondaryAction label={i18n.t('auth.skipForNow')} onclick={() => (view = 'skip')} />
+{#if prompted && !verified && view === 'choices' && !resetOnly}
+  <AuthSecondaryAction label={i18n.t('setup.cantConfirm')} onclick={() => (view = 'reset')} />
 {/if}
 
 <style>

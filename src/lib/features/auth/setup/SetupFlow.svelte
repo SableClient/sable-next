@@ -17,19 +17,9 @@
   import { telemetryConsentPending } from '#lib/platform/telemetry.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
-  import TelemetryConsentCard from '../consent/TelemetryConsentCard.svelte';
-  import AuthRail from '../flow/AuthRail.svelte';
-  import AuthStageCard from '../flow/AuthStageCard.svelte';
-  import ProfileCard from '../profile/ProfileCard.svelte';
   import { ProfileController, profileOnboardingMarker } from '../profile/profile-controller.svelte';
-  import RecoverySetupCard from '../recovery/RecoverySetupCard.svelte';
-  import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
-  import ConfirmDeviceCard from './ConfirmDeviceCard.svelte';
-  import NotificationsSetupCard from './NotificationsSetupCard.svelte';
-  import AppearanceSetupCard from './AppearanceSetupCard.svelte';
-  import ChatStyleSetupCard from './ChatStyleSetupCard.svelte';
-  import SettingsSyncCard from './SettingsSyncCard.svelte';
-  import SetupDoneCard from './SetupDoneCard.svelte';
+  import SetupActions from './SetupActions.svelte';
+  import SetupRail from './SetupRail.svelte';
   import {
     encryptionKnown,
     isAccountStep,
@@ -55,6 +45,7 @@
   let accountFinished = $state.raw<AccountStep[]>([]);
   let permissionAskable = false;
   let newRecoveryKey = $state<string | null>(null);
+  let logoutFailed = $state(false);
   let started = false;
   let leaving = false;
 
@@ -184,11 +175,14 @@
   async function logout(): Promise<void> {
     const key = recordKey;
     leaving = true;
+    logoutFailed = false;
     try {
       await logoutWithPush(core, pushOverride());
     } catch (error) {
+      console.warn('[sable setup] signing out failed', error);
       leaving = false;
-      throw error;
+      logoutFailed = true;
+      return;
     }
     if (key) removeLocalValue(key);
     await goto(resolve(core.session ? '/(app)/rooms' : '/(auth)/login'));
@@ -229,143 +223,33 @@
     <p>{i18n.t('setup.checking')}</p>
   {/if}
 </div>
-{#if !record}
-  <AuthSecondaryAction label={i18n.t('auth.skipForNow')} onclick={skipChecking} />
-{:else}
-  <AuthRail
+{#if record}
+  <SetupRail
+    {steps}
     {activeIndex}
-    total={steps.length}
-    canBack={activeIndex > 0}
-    canForward={activeIndex < pendingIndex || (activeIndex === pendingIndex && canSkipAhead)}
-    progress={steps.length > 1
-      ? i18n.t('setup.progress', { current: activeIndex + 1, total: steps.length })
-      : undefined}
-    onBack={() => {
-      activate(activeIndex - 1);
+    {pendingIndex}
+    {canSkipAhead}
+    {userId}
+    {profile}
+    askNotificationDefault={!accountFinished.includes('notifications')}
+    bind:newRecoveryKey
+    loggingOut={signOut.checking || signOut.signingOut}
+    {logoutFailed}
+    onActivate={activate}
+    onAdvance={(step, reload) => {
+      if (step === 'notifications') permissionAskable = false;
+      advance(step, reload);
     }}
-    onForward={() => {
-      activate(activeIndex + 1);
-    }}
-  >
-    {#each steps as step, index (step)}
-      <AuthStageCard
-        active={index === activeIndex}
-        reachable={index <= pendingIndex || (index === pendingIndex + 1 && canSkipAhead)}
-        before={index < activeIndex}
-        after={index > activeIndex}
-        unavailableLabel={i18n.t('setup.finishCurrentStep')}
-        onActivate={() => {
-          activate(index);
-        }}
-      >
-        {#if step === 'device'}
-          <ConfirmDeviceCard
-            onComplete={() => {
-              advance('device');
-            }}
-            onSkip={() => {
-              advance('device');
-            }}
-            onReset={(recoveryKey: string) => {
-              newRecoveryKey = recoveryKey;
-              advance('device');
-            }}
-          />
-        {:else if step === 'recovery'}
-          <RecoverySetupCard
-            recoveryKey={newRecoveryKey}
-            onComplete={() => {
-              newRecoveryKey = null;
-              advance('recovery');
-            }}
-            onSkip={() => {
-              advance('recovery');
-            }}
-          />
-        {:else if step === 'notifications'}
-          <NotificationsSetupCard
-            askDefault={!accountFinished.includes('notifications')}
-            onComplete={() => {
-              permissionAskable = false;
-              advance('notifications');
-            }}
-            onSkip={() => {
-              permissionAskable = false;
-              advance('notifications');
-            }}
-          />
-        {:else if step === 'appearance'}
-          <AppearanceSetupCard
-            onComplete={() => {
-              advance('appearance');
-            }}
-          />
-        {:else if step === 'layout'}
-          <ChatStyleSetupCard onComplete={() => advance('layout')} />
-        {:else if step === 'sync'}
-          <SettingsSyncCard
-            onComplete={() => {
-              advance('sync');
-            }}
-            onSkip={() => {
-              advance('sync');
-            }}
-          />
-        {:else if step === 'done'}
-          <SetupDoneCard
-            active={index === activeIndex}
-            onComplete={() => {
-              advance('done');
-            }}
-          />
-        {:else if step === 'profile'}
-          <ProfileCard
-            {userId}
-            displayName={profile.displayName}
-            pronouns={profile.pronouns}
-            nameColor={profile.nameColor}
-            status={profile.status}
-            bannerPreview={profile.shownBanner}
-            avatarPreview={profile.shownAvatar}
-            isSaving={profile.isSaving}
-            error={index === activeIndex ? profile.error : null}
-            onDisplayName={(value: string) => {
-              profile.setDisplayName(value);
-            }}
-            onPronouns={(value: string) => {
-              profile.setPronouns(value);
-            }}
-            onNameColor={(value: string) => {
-              profile.setNameColor(value);
-            }}
-            onStatus={(value: string) => {
-              profile.setStatus(value);
-            }}
-            onBanner={(file: File | null) => {
-              profile.setBanner(file);
-            }}
-            onAvatar={(file: File | null) => {
-              profile.setAvatar(file);
-            }}
-            onContinue={() => void profile.save()}
-            onSkip={() => void profile.skip()}
-          />
-        {:else}
-          <TelemetryConsentCard
-            onAnswer={(enabled: boolean) => {
-              advance('consent', enabled);
-            }}
-          />
-        {/if}
-      </AuthStageCard>
-    {/each}
-  </AuthRail>
+    onLogout={() => void signOut.request(logout)}
+  />
+{:else}
+  <SetupActions
+    skip={{ onclick: skipChecking }}
+    loggingOut={signOut.checking || signOut.signingOut}
+    {logoutFailed}
+    onLogout={() => void signOut.request(logout)}
+  />
 {/if}
-<AuthSecondaryAction
-  label={i18n.t('settings.logout')}
-  disabled={signOut.checking || signOut.signingOut}
-  onclick={() => void signOut.request(logout)}
-/>
 <SignOutWarningDialog guard={signOut} />
 
 <style>

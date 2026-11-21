@@ -17,7 +17,7 @@ import { CoreError } from '#src/transport';
 import RecoverySetupCard from './RecoverySetupCard.svelte';
 
 function setup(recoveryKey: string | null = null) {
-  const props = { recoveryKey, onComplete: vi.fn(), onSkip: vi.fn() };
+  const props = { recoveryKey, onComplete: vi.fn() };
   render(RecoverySetupCard, props);
   return { user: userEvent.setup(), ...props };
 }
@@ -38,7 +38,6 @@ test('a created key cannot be left before it is kept somewhere', async () => {
   await vi.waitFor(() => {
     expect(keyField()).toHaveValue('EsTa bLiS hEd');
   });
-  expect(button(/Skip for now/)).not.toBeInTheDocument();
   expect(continueButton()).toBeDisabled();
   await user.type(keyField(), '{Enter}');
   expect(onComplete).not.toHaveBeenCalled();

@@ -22,7 +22,7 @@ Object.assign(core.rpc.account, { sealedData: accountData });
 import SettingsSyncCard from './SettingsSyncCard.svelte';
 
 async function setup() {
-  const props = { onComplete: vi.fn(), onSkip: vi.fn() };
+  const props = { onComplete: vi.fn() };
   render(SettingsSyncCard, props);
   await vi.waitFor(() => {
     expect(screen.getByRole('button', { name: /Turn on sync|Use synced settings/ })).toBeEnabled();
@@ -61,12 +61,4 @@ test('encrypted settings this device cannot open yet still count as found', asyn
   await setup();
 
   expect(screen.getByRole('button', { name: 'Use synced settings' })).toBeInTheDocument();
-});
-
-test('not now leaves sync off', async () => {
-  const { user, onSkip } = await setup();
-
-  await user.click(screen.getByRole('button', { name: 'Not now' }));
-  expect(onSkip).toHaveBeenCalledOnce();
-  expect(prefs.setPreference).not.toHaveBeenCalled();
 });

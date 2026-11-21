@@ -66,8 +66,8 @@ const device = (device_id: string, is_own: boolean, cross_signed: boolean): Devi
   last_seen_ip: null,
 });
 
-function setup() {
-  const props = { onComplete: vi.fn(), onSkip: vi.fn(), onReset: vi.fn() };
+function setup(view: 'choices' | 'skip' = 'choices') {
+  const props = { onComplete: vi.fn(), onSkip: vi.fn(), onReset: vi.fn(), view };
   render(ConfirmDeviceCard, props);
   return { user: userEvent.setup(), ...props };
 }
@@ -127,13 +127,12 @@ test('a device confirmed elsewhere moves on without a second Continue', async ()
   });
 });
 
-test('skipping asks first, and only the second tap skips', async () => {
+test('the skip view only skips on its own confirmation', async () => {
   live.encryption = status('unverified');
-  const { user, onSkip } = setup();
+  const { user, onSkip } = setup('skip');
 
-  await press(user, /Skip for now/);
-  expect(onSkip).not.toHaveBeenCalled();
   expect(await screen.findByText(/Skip confirming this device\?/)).toBeInTheDocument();
+  expect(onSkip).not.toHaveBeenCalled();
 
   await press(user, /Skip anyway/);
   await vi.waitFor(() => {
@@ -186,12 +185,10 @@ test('moving to another view puts focus on its heading', async () => {
   live.encryption = status('unverified');
   const { user } = setup();
 
-  await press(user, /Skip for now/);
+  await press(user, /Can’t confirm\?/);
 
-  expect(
-    await screen.findByRole('heading', { name: /Skip confirming this device\?/ })
-  ).toHaveFocus();
-  await press(user, /Go back/);
+  expect(await screen.findByRole('heading', { name: 'Reset your digital identity' })).toHaveFocus();
+  await press(user, /^Back$/);
   expect(await screen.findByRole('heading', { name: 'Confirm it’s you' })).toHaveFocus();
 });
 

@@ -26,7 +26,6 @@ test('Enter in a field continues, and a save error is shown in the status line',
     onBanner: vi.fn(),
     onAvatar: vi.fn(),
     onContinue,
-    onSkip: vi.fn(),
   };
   render(ProfileCard, props);
 

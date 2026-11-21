@@ -15,7 +15,6 @@
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
-  import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   interface Props {
@@ -35,7 +34,6 @@
     onBanner: (file: File | null) => void;
     onAvatar: (file: File | null) => void;
     onContinue: () => void;
-    onSkip: () => void;
   }
 
   let {
@@ -55,7 +53,6 @@
     onBanner,
     onAvatar,
     onContinue,
-    onSkip,
   }: Props = $props();
 
   let moreOpen = $state(false);
@@ -80,7 +77,7 @@
         class="avatar-preview"
         id={userId}
         src={avatarPreview}
-        alt=""
+        decorative
         name={displayName || userId}
         size="large"
       />
@@ -227,8 +224,6 @@
     {i18n.t('auth.continue')}
   </Button>
 </form>
-
-<AuthSecondaryAction label={i18n.t('auth.skipForNow')} onclick={onSkip} disabled={isSaving} />
 
 <style>
   .profile-card {

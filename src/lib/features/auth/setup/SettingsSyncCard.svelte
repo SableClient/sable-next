@@ -7,15 +7,13 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
-  import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   interface Props {
     onComplete: () => void;
-    onSkip: () => void;
   }
 
-  let { onComplete, onSkip }: Props = $props();
+  let { onComplete }: Props = $props();
   const core = useCoreClient();
   let synced = $state<boolean | null>(null);
 
@@ -62,8 +60,6 @@
     {i18n.t(synced ? 'setup.syncAdopt' : 'setup.syncTurnOn')}
   </Button>
 </div>
-
-<AuthSecondaryAction label={i18n.t('setup.syncNotNow')} onclick={onSkip} />
 
 <style>
   .settings-sync-card {

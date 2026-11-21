@@ -13,18 +13,16 @@
   import AuthField from '../shared/AuthField.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
-  import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   interface Props {
     recoveryKey?: string | null;
     onComplete: () => void;
-    onSkip: () => void;
+    createdKey?: string;
   }
 
-  let { recoveryKey: givenKey = null, onComplete, onSkip }: Props = $props();
+  let { recoveryKey: givenKey = null, onComplete, createdKey = $bindable('') }: Props = $props();
   const core = useCoreClient();
-  let createdKey = $state('');
   let creating = $state(false);
   let confirmingReplaceBackup = $state(false);
   let error = $state<string | null>(null);
@@ -152,10 +150,6 @@
   busy={creating}
   onConfirm={() => void createRecoveryKey(true)}
 />
-
-{#if !recoveryKey}
-  <AuthSecondaryAction label={i18n.t('auth.skipForNow')} onclick={onSkip} />
-{/if}
 
 <style>
   .recovery-setup-card {

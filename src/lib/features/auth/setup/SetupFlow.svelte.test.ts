@@ -39,6 +39,28 @@ beforeEach(() => {
   });
 });
 
+test('a log out that fails stays on setup and says so', async () => {
+  logout.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+  const user = userEvent.setup();
+  render(SetupFlow);
+
+  await user.click(screen.getByRole('button', { name: 'settings.logout' }));
+  const warning = await screen.findByRole('dialog', { name: 'settings.logoutWarning.title' });
+  await user.click(within(warning).getByRole('button', { name: 'settings.logoutWarning.confirm' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('setup.logoutFailed');
+  expect(goto).not.toHaveBeenCalledWith('/login');
+});
+
+test('setup can be skipped while it is still checking', async () => {
+  const user = userEvent.setup();
+  render(SetupFlow);
+
+  await user.click(screen.getByRole('button', { name: 'auth.skipForNow' }));
+
+  expect(goto).toHaveBeenCalledWith('/rooms');
+});
+
 test('an account signed into by mistake can log out before finishing setup', async () => {
   const user = userEvent.setup();
   render(SetupFlow);

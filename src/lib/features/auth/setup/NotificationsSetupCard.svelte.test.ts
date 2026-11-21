@@ -29,7 +29,7 @@ Object.assign(core.rpc.notifications, {
 import NotificationsSetupCard from './NotificationsSetupCard.svelte';
 
 async function setup(askDefault = true) {
-  const props = { askDefault, onComplete: vi.fn(), onSkip: vi.fn() };
+  const props = { askDefault, onComplete: vi.fn() };
   render(NotificationsSetupCard, props);
   await vi.waitFor(() => {
     expect(present.permissionState).toHaveBeenCalled();

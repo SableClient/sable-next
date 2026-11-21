@@ -63,17 +63,12 @@ export class AuthFlow {
     const candidates = [
       this.setupCard.getByRole('button', { name: en.setup.skipAnyway, exact: true }),
       this.page
-        .locator('.setup-checking + .auth-secondary-action')
+        .locator('.setup-actions')
         .getByRole('button', { name: en.auth.skipForNow, exact: true }),
       this.setupCard
         .getByRole('button', {
           name: new RegExp(
-            `^(${[
-              en.auth.skipForNow,
-              en.setup.syncNotNow,
-              en.setup.doneAction,
-              en.settings.telemetryBannerDecline,
-            ].join('|')})$`
+            `^(${[en.setup.doneAction, en.settings.telemetryBannerDecline].join('|')})$`
           ),
         })
         .first(),
