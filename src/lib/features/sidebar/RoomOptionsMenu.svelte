@@ -299,7 +299,6 @@
   {anchor}
   {side}
   {align}
-  preventScroll={false}
   trigger={anchor ? undefined : optionsTrigger}
 >
   <IconContext values={{ 'aria-hidden': 'true' }}>

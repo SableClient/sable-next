@@ -22,7 +22,6 @@
     side?: 'top' | 'bottom' | 'left' | 'right';
     align?: 'start' | 'center' | 'end';
     sideOffset?: number;
-    preventScroll?: boolean;
     onOpenChange?: (open: boolean) => void;
     trigger?: Snippet<[{ props: Record<string, unknown> }]>;
     children: Snippet;
@@ -36,7 +35,6 @@
     side = 'bottom',
     align = 'end',
     sideOffset = 4,
-    preventScroll,
     onOpenChange,
     trigger,
     children,
@@ -92,7 +90,7 @@
         {align}
         {sideOffset}
         collisionPadding={collisionPadding()}
-        {preventScroll}
+        preventScroll={false}
       >
         <div class="menu-scroll-content" {@attach scrollHint}>
           {@render children()}

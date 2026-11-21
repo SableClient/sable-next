@@ -879,7 +879,6 @@
                 anchor={imageMenuAnchor}
                 side="bottom"
                 align="start"
-                preventScroll={false}
               >
                 <ActionMenuItem onSelect={() => void mediaActions.copyImage()}>
                   <CopyIcon />

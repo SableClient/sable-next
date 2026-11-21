@@ -8,17 +8,17 @@ vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 import '../../../styles.css';
 import ActionMenuHarness from './ActionMenuHarness.test.svelte';
 
-test('opening a menu does not pad the page by a bogus scrollbar width', async () => {
+test('a click outside an open menu reaches the control it lands on', async () => {
   await page.viewport(1280, 800);
-  const clientWidth = vi
-    .spyOn(document.documentElement, 'clientWidth', 'get')
-    .mockImplementation(() => window.innerWidth - 871);
-  const screen = await render(ActionMenuHarness, { onPick: vi.fn() });
+  const onOutside = vi.fn();
+  const screen = await render(ActionMenuHarness, { onPick: vi.fn(), onOutside });
 
   await screen.getByRole('button', { name: 'Room options' }).click();
-  await expect.element(screen.getByRole('menu', { name: 'Room options' })).toBeVisible();
+  const menu = screen.getByRole('menu', { name: 'Room options' });
+  await expect.element(menu).toBeVisible();
 
-  expect(document.body.style.paddingRight).toBe('871px');
-  expect(getComputedStyle(document.body).paddingRight).toBe('0px');
-  clientWidth.mockRestore();
+  await screen.getByRole('button', { name: 'Outside' }).click({ timeout: 2000 });
+
+  expect(onOutside).toHaveBeenCalledOnce();
+  await expect.element(menu).not.toBeInTheDocument();
 });

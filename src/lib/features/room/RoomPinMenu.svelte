@@ -50,7 +50,6 @@
   side="bottom"
   align="center"
   sideOffset={4}
-  preventScroll={false}
   trigger={triggerHidden ? undefined : pinTrigger}
   onOpenChange={(next) => {
     if (!next && roomId) void pins.refresh(roomId);

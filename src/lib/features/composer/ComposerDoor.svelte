@@ -96,6 +96,7 @@
         align="start"
         sideOffset={8}
         collisionPadding={collisionPadding()}
+        preventScroll={false}
       >
         <DropdownMenu.Item
           class="menu-item"

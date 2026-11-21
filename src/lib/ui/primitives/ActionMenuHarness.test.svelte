@@ -6,9 +6,10 @@
 
   interface Props {
     onPick: () => void;
+    onOutside?: () => void;
   }
 
-  let { onPick }: Props = $props();
+  let { onPick, onOutside }: Props = $props();
 </script>
 
 <ActionMenu label="Room options">
@@ -22,3 +23,4 @@
     <ActionMenuItem checked onSelect={onPick}>All messages</ActionMenuItem>
   </ActionMenuSub>
 </ActionMenu>
+<button type="button" onclick={onOutside}>Outside</button>

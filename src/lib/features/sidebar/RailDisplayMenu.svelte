@@ -27,14 +27,7 @@
   ] as const;
 </script>
 
-<ActionMenu
-  bind:open
-  label={i18n.t('nav.displayOptions')}
-  {anchor}
-  side="right"
-  align="start"
-  preventScroll={false}
->
+<ActionMenu bind:open label={i18n.t('nav.displayOptions')} {anchor} side="right" align="start">
   {#each displayToggles as toggle (toggle.key)}
     {@const on = preferences[toggle.key]}
     <ActionMenuCheckItem
