@@ -13,7 +13,7 @@
 </script>
 
 <IconButton
-  class={`nav ${direction}`}
+  class={`viewer-nav viewer-${direction}`}
   label={i18n.t(direction === 'previous' ? 'viewer.previous' : 'viewer.next')}
   size="large"
   {onclick}
@@ -21,7 +21,7 @@
 >
 
 <style>
-  :global(.nav) {
+  :global(.viewer-nav) {
     background: var(--surface-container-hover);
     color: var(--surface-on-container);
     position: absolute;
@@ -31,37 +31,37 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.nav) {
+    :global(.viewer-nav) {
       transition:
         opacity var(--motion-normal) var(--ease-smooth-out),
         visibility var(--motion-normal);
     }
   }
 
-  :global(.nav:hover) {
+  :global(.viewer-nav:hover) {
     background: var(--surface-container-active);
   }
 
-  :global(.previous) {
+  :global(.viewer-previous) {
     left: max(0.25rem, var(--safe-left));
   }
 
-  :global(.next) {
+  :global(.viewer-next) {
     right: max(0.25rem, var(--safe-right));
   }
 
   @media (--compact-layout) {
-    :global(.nav) {
+    :global(.viewer-nav) {
       display: none;
     }
   }
 
   @media (--app-layout) {
-    :global(.previous) {
+    :global(.viewer-previous) {
       left: 1.5rem;
     }
 
-    :global(.next) {
+    :global(.viewer-next) {
       right: 1.5rem;
     }
   }
