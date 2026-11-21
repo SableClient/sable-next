@@ -28,6 +28,8 @@ export const receiptReserve: Attachment<HTMLElement> = (node) => {
   };
   const observer = new ResizeObserver(measure);
   observer.observe(node);
+  const space = node.querySelector('.receipt-space');
+  if (space) observer.observe(space);
   return () => {
     observer.disconnect();
     delete node.dataset.receiptNarrow;
