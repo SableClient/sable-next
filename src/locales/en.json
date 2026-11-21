@@ -4249,6 +4249,8 @@
     "pressKeys": "Press keys, Esc to cancel…",
     "conflict": "That combination is already used by “{{name}}”.",
     "resetOne": "Reset to default",
+    "unbind": "Remove shortcut",
+    "unbound": "Not set",
     "resetAll": "Reset every shortcut",
     "categoryCall": "Calls",
     "categoryComposer": "Composer",

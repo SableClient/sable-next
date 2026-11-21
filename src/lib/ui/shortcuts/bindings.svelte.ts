@@ -12,8 +12,7 @@ function parse(parsed: unknown): Array<[string, string]> {
   if (typeof parsed !== 'object' || parsed === null) return [];
 
   return Object.entries(parsed as Record<string, unknown>).filter(
-    (entry): entry is [string, string] =>
-      SHORTCUT_IDS.has(entry[0]) && typeof entry[1] === 'string' && entry[1] !== ''
+    (entry): entry is [string, string] => SHORTCUT_IDS.has(entry[0]) && typeof entry[1] === 'string'
   );
 }
 
@@ -42,6 +41,11 @@ export function rebind(id: ShortcutId, binding: string): void {
 
   if (binding === shortcut.binding) overrides.delete(id);
   else overrides.set(id, binding);
+  persist();
+}
+
+export function unbind(id: ShortcutId): void {
+  overrides.set(id, '');
   persist();
 }
 

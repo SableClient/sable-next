@@ -168,6 +168,18 @@ test('mod resolves to the platform modifier before comparing', () => {
   expect(conflicts).toHaveLength(1);
 });
 
+test('unbound shortcuts never conflict', () => {
+  const conflicts = findShortcutConflicts(
+    [
+      { id: 'a', binding: '' },
+      { id: 'b', binding: '' },
+    ],
+    false
+  );
+
+  expect(conflicts).toHaveLength(0);
+});
+
 test('formats a mac binding with symbols', () => {
   expect(formatBinding('mod+shift+n', true)).toBe('⌘+⇧+N');
 });

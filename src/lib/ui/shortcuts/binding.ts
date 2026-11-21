@@ -160,8 +160,12 @@ export function findShortcutConflicts(
   const conflicts: Array<[ConflictCandidate, ConflictCandidate]> = [];
 
   for (const [i, a] of candidates.entries()) {
+    if (a.binding === '') continue;
     for (const b of candidates.slice(i + 1)) {
-      if (canonicalBinding(a.binding, isMac) === canonicalBinding(b.binding, isMac)) {
+      if (
+        b.binding !== '' &&
+        canonicalBinding(a.binding, isMac) === canonicalBinding(b.binding, isMac)
+      ) {
         conflicts.push([a, b]);
       }
     }

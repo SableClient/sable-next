@@ -1,5 +1,6 @@
 <script lang="ts">
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
   import { settingFocusId } from '#lib/settings/registry.js';
@@ -18,6 +19,7 @@
     resetAllBindings,
     resetBinding,
     shortcutCapture,
+    unbind,
   } from '#lib/ui/shortcuts/bindings.svelte.js';
   import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { SHORTCUT_CATEGORIES, SHORTCUTS, type ShortcutId } from '#lib/ui/shortcuts/shortcuts.js';
@@ -105,8 +107,24 @@
                 >
                   {capturing === shortcut.id
                     ? i18n.t('shortcuts.pressKeys')
-                    : formatBinding(shortcut.binding, isMac)}
+                    : shortcut.binding === ''
+                      ? i18n.t('shortcuts.unbound')
+                      : formatBinding(shortcut.binding, isMac)}
                 </Button>
+                {#if shortcut.binding !== ''}
+                  <IconButton
+                    variant="subtle"
+                    label={i18n.t('shortcuts.unbind')}
+                    size="small"
+                    onclick={() => {
+                      unbind(shortcut.id);
+                      capturing = null;
+                      rejected = null;
+                    }}
+                  >
+                    <XIcon />
+                  </IconButton>
+                {/if}
                 {#if isRebound(shortcut.id)}
                   <IconButton
                     variant="subtle"

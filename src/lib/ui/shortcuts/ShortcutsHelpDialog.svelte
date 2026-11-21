@@ -37,7 +37,9 @@
       </IconButton>
     </div>
     {#each SHORTCUT_CATEGORIES as category (category.id)}
-      {@const items = shortcuts.filter((shortcut) => shortcut.category === category.id)}
+      {@const items = shortcuts.filter(
+        (shortcut) => shortcut.category === category.id && shortcut.binding !== ''
+      )}
       <section aria-labelledby="shortcuts-{category.id}">
         <h3 id="shortcuts-{category.id}">{i18n.t(category.labelKey)}</h3>
         <ul>
