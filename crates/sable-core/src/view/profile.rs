@@ -87,7 +87,9 @@ pub(crate) fn per_message_profile(
         color_on_light: color.on_light,
         color_on_dark: color.on_dark,
         has_fallback: profile.has_fallback.unwrap_or(false),
-        biography: profile.biography,
+        biography: profile
+            .biography
+            .map(|biography| crate::matrix_html::display_html("", Some(&biography))),
         banner_url: profile.banner_url,
         is_animal: profile.is_animal,
         has_animal: profile.has_animal,
@@ -150,6 +152,28 @@ mod tests {
                 .as_deref(),
             Some("mxc://example.org/a")
         );
+    }
+
+    #[test]
+    fn a_profile_biography_is_sanitised_before_it_reaches_the_ui() {
+        let content = json!({ "m.per_message_profile": {
+            "net.f0rest.biography": "<p>hello <strong>there</strong></p>\
+                <img src=x onerror=alert(1)>\
+                <span style=\"position:fixed\">overlay</span>\
+                <a href=\"javascript:alert(1)\">link</a>\
+                <script>alert(1)</script>",
+        } });
+
+        let biography = per_message_profile(Some(&content))
+            .expect("a profile")
+            .biography
+            .expect("a biography");
+
+        assert!(biography.contains("<strong>there</strong>"), "{biography}");
+        assert!(!biography.contains("onerror"), "{biography}");
+        assert!(!biography.contains("style="), "{biography}");
+        assert!(!biography.contains("javascript:"), "{biography}");
+        assert!(!biography.contains("<script"), "{biography}");
     }
 
     #[test]
