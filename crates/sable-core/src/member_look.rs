@@ -102,7 +102,9 @@ pub(crate) fn member_look(member: Option<&Value>, pronouns: Option<&Value>) -> M
         .unwrap_or_default();
     MemberLookView {
         display_name: member.display_name,
-        avatar_url: member.avatar_url,
+        avatar_url: member
+            .avatar_url
+            .and_then(|url| crate::media::mxc_only(&url)),
         color_on_light: colors.as_ref().and_then(|colors| colors.on_light.clone()),
         color_on_dark: colors.and_then(|colors| colors.on_dark),
         pronouns: pronouns
@@ -311,6 +313,21 @@ mod tests {
         assert_eq!(
             member_look(None, Some(&json!({ "pronouns": "x" }))).pronouns,
             []
+        );
+    }
+
+    #[test]
+    fn a_remote_member_avatar_reads_as_missing() {
+        let remote = json!({
+            "displayname": "Ana",
+            "avatar_url": "https://tracker.example/pixel.png",
+        });
+        assert_eq!(member_look(Some(&remote), None).avatar_url, None);
+
+        let matrix = json!({ "avatar_url": "mxc://example.org/face" });
+        assert_eq!(
+            member_look(Some(&matrix), None).avatar_url.as_deref(),
+            Some("mxc://example.org/face")
         );
     }
 

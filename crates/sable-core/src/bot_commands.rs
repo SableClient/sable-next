@@ -59,7 +59,7 @@ pub(crate) fn descriptions(state: &[Raw<AnyStateEvent>]) -> Vec<BotCommand> {
             Some(BotCommandDescription {
                 sender: event.sender.clone(),
                 sender_name: text("displayname").and_then(visible_name),
-                sender_avatar: text("avatar_url"),
+                sender_avatar: text("avatar_url").and_then(|url| crate::media::mxc_only(&url)),
                 content: event.content.clone(),
             })
         })

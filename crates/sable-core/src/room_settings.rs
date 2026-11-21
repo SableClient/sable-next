@@ -630,7 +630,7 @@ impl Core {
             };
             let (display_name, avatar_url) = (
                 text("displayname").and_then(visible_name),
-                text("avatar_url"),
+                text("avatar_url").and_then(|url| crate::media::mxc_only(&url)),
             );
             self.overlay_profile(&room_id, &user_id, display_name.clone(), avatar_url.clone())
                 .await;

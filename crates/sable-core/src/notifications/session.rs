@@ -369,10 +369,8 @@ impl PushSession {
             .as_ref()
             .and_then(|profile| profile.avatar_url.as_deref());
         let sender_url = match (profile_avatar, payload_avatar, sender) {
-            (Some(url), _, _) => Some(url)
-                .filter(|url| !url.is_empty())
-                .map(ruma::OwnedMxcUri::from),
-            (None, Some(url), Some(_)) => Some(ruma::OwnedMxcUri::from(url)),
+            (Some(url), _, _) => crate::media::mxc_only(url).map(ruma::OwnedMxcUri::from),
+            (None, Some(url), Some(_)) => crate::media::mxc_only(url).map(ruma::OwnedMxcUri::from),
             (None, None, Some(sender)) => match ruma::UserId::parse(sender) {
                 Ok(sender) => room
                     .get_member_no_sync(&sender)

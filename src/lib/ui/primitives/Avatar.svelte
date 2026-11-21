@@ -63,9 +63,13 @@
   let fallback = $derived(initials ?? toInitials(name));
   let accessibleLabel = $derived(alt ?? name ?? fallback);
   let isMxc = $derived((src?.startsWith('mxc://') || src?.startsWith('{')) ?? false);
+  let isLocalPreview = $derived(src?.startsWith('blob:') ?? false);
+  let showable = $derived(isMxc || isLocalPreview);
   let paintedSrc = $state<string | null>(null);
   let failedSrc = $state<string | null>(null);
-  let pictureShown = $derived(!!src && failedSrc !== src && (isMxc || paintedSrc === src));
+  let pictureShown = $derived(
+    !!src && showable && failedSrc !== src && (isMxc || paintedSrc === src)
+  );
   let plate = $derived(color ?? (id === null ? undefined : identityColor(id)));
   let tint = $derived(paintedSrc === src ? undefined : plate);
   let hovered = $state(false);
@@ -152,7 +156,7 @@
           }}
         />
       {/if}
-    {:else if src}
+    {:else if showable && src}
       <img
         {src}
         alt=""
@@ -177,7 +181,7 @@
   </div>
 {/snippet}
 
-{#if openable && src && name}
+{#if openable && showable && src && name}
   {#snippet avatarButtonTrigger({ props: tooltipProps }: { props: Record<string, unknown> })}
     <button
       {...tooltipProps}

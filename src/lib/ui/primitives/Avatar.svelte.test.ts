@@ -101,9 +101,9 @@ test('an undecodable picture falls back to the initials', async () => {
   expect(fallback()?.style.display).toBe('');
 });
 
-test('a plain image url shows the initials until it loads, and again if it fails', async () => {
+test('a local preview shows the initials until it loads, and again if it fails', async () => {
   const { rerender } = render(Avatar, {
-    props: { src: 'https://example.org/a.png', name: 'Sable' },
+    props: { src: 'blob:https://example.org/a', name: 'Sable' },
   });
   const image = () => root().querySelector<HTMLImageElement>('img.avatar-image');
 
@@ -115,16 +115,26 @@ test('a plain image url shows the initials until it loads, and again if it fails
   expect(fallback()?.style.display).toBe('none');
   expect(image()?.style.display).toBe('');
 
-  await rerender({ src: 'https://example.org/broken.png', name: 'Sable' });
+  await rerender({ src: 'blob:https://example.org/built', name: 'Sable' });
   image()?.dispatchEvent(new Event('error'));
   await tick();
   expect(fallback()?.style.display).toBe('');
   expect(image()?.style.display).toBe('none');
 });
 
+test('a remote avatar keeps the initials instead of fetching it', () => {
+  render(Avatar, {
+    props: { src: 'https://tracker.example/pixel.png', name: 'Sable', openable: true },
+  });
+
+  expect(root().querySelector('img')).toBeNull();
+  expect(fallback()).toBeInTheDocument();
+  expect(root().parentElement).not.toHaveClass('avatar-button');
+});
+
 test('leaves a picture on a transparent box, so a transparent png keeps its own shape', () => {
   render(Avatar, {
-    props: { src: 'https://example.org/avatar.png', name: 'Sable', color: 'rgb(1, 2, 3)' },
+    props: { src: 'blob:https://example.org/avatar', name: 'Sable', color: 'rgb(1, 2, 3)' },
   });
 
   expect(root().style.background).toBe('');

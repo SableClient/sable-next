@@ -1067,6 +1067,15 @@ pub(crate) fn mxc_uri(url: &str) -> Result<OwnedMxcUri, RpcError> {
     Ok(uri)
 }
 
+#[must_use]
+pub(crate) fn mxc_only(url: &str) -> Option<String> {
+    let url = url.trim();
+    let uri = OwnedMxcUri::from(url);
+    uri.parts()
+        .is_ok_and(|(_, media_id)| !media_id.is_empty())
+        .then(|| url.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use matrix_sdk::ruma::OwnedUserId;
@@ -1074,8 +1083,25 @@ mod tests {
     use super::{
         AttachmentConfig, AttachmentInfo, AttachmentInfoView, Mime, PerMessageProfileView,
         SPOILER_PROPERTY, attachment_caption, attachment_extra_content, attachment_info,
-        attachment_profile, outgoing_mentions,
+        attachment_profile, mxc_only, outgoing_mentions,
     };
+
+    #[test]
+    fn only_well_formed_matrix_media_urls_survive() {
+        for url in ["mxc://example.org/avatar", "  mxc://example.org/avatar  "] {
+            assert!(mxc_only(url).is_some(), "{url}");
+        }
+        for url in [
+            "https://tracker.example/pixel.png",
+            "http://tracker.example/pixel.png",
+            "data:image/png;base64,AA",
+            "mxc://example.org",
+            "mxc://example.org/",
+            "",
+        ] {
+            assert_eq!(mxc_only(url), None, "{url}");
+        }
+    }
 
     #[test]
     fn audio_metadata_rides_inside_info_and_reads_back() {

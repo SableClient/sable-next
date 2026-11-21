@@ -945,7 +945,7 @@ test('a live voice room shows each participant avatar once in the list beneath i
     Promise.resolve({
       user_id: userId,
       display_name: userId === '@alice:example.org' ? 'Alice' : 'Bob',
-      avatar_url: `https://example.org/avatars/${userId}.png`,
+      avatar_url: `blob:avatar-${userId}`,
     })
   );
   roomsFixture.rooms = [
@@ -964,7 +964,7 @@ test('a live voice room shows each participant avatar once in the list beneath i
 
   const list = screen.getByRole('list', { name: 'nav.voiceLive:2' });
   for (const name of ['Alice', 'Bob']) {
-    const avatarUrl = `https://example.org/avatars/@${name.toLowerCase()}:example.org.png`;
+    const avatarUrl = `blob:avatar-@${name.toLowerCase()}:example.org`;
     const avatar = within(list).getByRole('button', { name }).querySelector('img');
     expect(avatar).toHaveAttribute('src', avatarUrl);
     expect(document.querySelectorAll(`img[src="${avatarUrl}"]`)).toHaveLength(1);
