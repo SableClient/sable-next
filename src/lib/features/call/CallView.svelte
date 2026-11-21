@@ -420,7 +420,6 @@
     ]}
     style:--tile-aspect={aspect}
     style:--notice-height="{noticeHeight}px"
-    style:--dock-height="{dockHeight}px"
   >
     {#if session.failure}
       {@const failure = session.failure}
@@ -696,12 +695,9 @@
     flex: 1;
     min-height: 0;
     padding: calc(var(--space-200) + var(--control-height-300) + var(--space-200)) var(--space-300)
-      max(
-        var(--dock-height),
-        calc(
-          var(--control-height-500) + var(--space-150) * 2 + var(--border-width) * 2 +
-            var(--space-300) * 2
-        )
+      calc(
+        var(--control-height-500) + var(--space-150) * 2 + var(--border-width) * 2 +
+          var(--space-300) * 2
       );
   }
 
@@ -712,12 +708,9 @@
   }
 
   .media.locked {
-    padding-block-end: max(
-      var(--dock-height),
-      calc(
-        var(--control-height-500) + var(--space-150) * 3 + var(--border-width) * 2 +
-          var(--space-300) * 2 + var(--space-500)
-      )
+    padding-block-end: calc(
+      var(--control-height-500) + var(--space-150) * 3 + var(--border-width) * 2 +
+        var(--space-300) * 2 + var(--space-500)
     );
   }
 
