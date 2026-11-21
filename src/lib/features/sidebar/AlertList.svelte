@@ -17,6 +17,7 @@
   let { isDrawer = true }: Props = $props();
 
   const alertProviders = useAlertProviders();
+  console.log(alertProviders);
   const activeAlerts = $derived(
     ALERT_MODULES.map((module, index) => ({ module, provider: alertProviders[index] })).filter(
       ({ provider }) => provider.priority !== null
