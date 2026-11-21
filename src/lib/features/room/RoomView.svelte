@@ -39,6 +39,7 @@
   import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { matrixLinkPath, copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import { backToRoomList, searchInRoom, trackRoomEntry } from './room-navigation.js';
+  import { isPublicRoom } from '#lib/rooms/public-room.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
@@ -936,7 +937,7 @@
     {roomAvatar}
     topic={roomTopic}
     encrypted={resolvedRoom?.encrypted ?? null}
-    publicRoom={resolvedRoom?.join_rule === 'public'}
+    publicRoom={resolvedRoom ? isPublicRoom(resolvedRoom, roomList.rooms) : false}
     presence={dmPresence?.presence ?? null}
     isVoice={resolvedRoom?.room_kind === 'voice'}
     callParticipants={resolvedRoom?.call_participants ?? []}
