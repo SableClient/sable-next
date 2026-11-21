@@ -221,6 +221,8 @@
     document.documentElement.dataset.blurMedia = preferences.blurMedia ? 'on' : 'off';
     document.documentElement.dataset.blurAvatars = preferences.blurAvatars ? 'on' : 'off';
     document.documentElement.dataset.blurEmotes = preferences.blurEmotes ? 'on' : 'off';
+    if (preferences.composerSpellcheck) document.documentElement.removeAttribute('spellcheck');
+    else document.documentElement.spellcheck = false;
   });
 
   $effect(() => {

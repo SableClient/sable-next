@@ -2626,7 +2626,7 @@
     "imageMetadataAll": "Remove all metadata",
     "imageMetadataKeep": "Keep all metadata",
     "composerSpellcheck": "Spell check",
-    "composerSpellcheckHint": "Underline misspelled words in the composer. Corrections come from your browser or system dictionary.",
+    "composerSpellcheckHint": "Underline misspelled words as you type. Corrections come from your browser or system dictionary.",
     "composerAutocapitalize": "Capitalize sentences",
     "composerAutocapitalizeHint": "Start each sentence with a capital letter as you type. Only applies to on-screen keyboards.",
     "emoticonToEmoji": "Convert emoticons to emoji",
