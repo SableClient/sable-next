@@ -79,12 +79,7 @@
     () => item !== undefined,
     () => onClose()
   );
-  const index = $derived(
-    Math.max(
-      0,
-      items.findIndex((item) => item.eventId === selectedEventId)
-    )
-  );
+  const index = $derived(items.findIndex((item) => item.eventId === selectedEventId));
   let item = $derived<MediaItem | undefined>(items[index]);
   let spoiler = $derived(item?.kind === 'image' || item?.kind === 'video' ? item.spoiler : null);
   let spoilerKey = $derived(spoilerVisibilityKey(item?.eventId, item?.source, spoiler));
@@ -289,7 +284,7 @@
   }
 
   function handleKeydown(event: KeyboardEvent): void {
-    if (event.defaultPrevented || imageMenuOpen) return;
+    if (event.defaultPrevented || imageMenuOpen || isEditableTarget(event.target)) return;
     if (event.key === 'Escape') onClose();
     if (
       isImage &&
@@ -298,7 +293,6 @@
       !event.altKey &&
       !event.shiftKey &&
       event.key.toLowerCase() === 'c' &&
-      !isEditableTarget(event.target) &&
       (window.getSelection()?.isCollapsed ?? true)
     ) {
       event.preventDefault();
@@ -627,6 +621,11 @@
         {...overlayLayer()}
         style={`height: calc(100dvh - var(--titlebar-height)); inset: var(--titlebar-height) 0 0; opacity: ${String(1 - Math.min(0.75, Math.abs(swipeY) / 400))}; position: fixed; width: 100vw;`}
         aria-label={i18n.t('viewer.title')}
+        onEscapeKeydown={(event: KeyboardEvent) => {
+          if (!view.editingZoom) return;
+          event.preventDefault();
+          view.editingZoom = false;
+        }}
         onInteractOutside={(event: PointerEvent) => {
           if (event.target instanceof Element && event.target.closest('.titlebar')) {
             event.preventDefault();

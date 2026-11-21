@@ -537,6 +537,32 @@ test('a timeline update keeps the image navigated to', async () => {
   expect(document.querySelector('video')).toBeInTheDocument();
 });
 
+test('keys typed in the zoom field stay in the field', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  await openImage([imageItem, videoItem], onClose);
+
+  await user.click(screen.getByRole('button', { name: '100%' }));
+  await user.click(screen.getByRole('textbox', { name: 'viewer.setZoom' }));
+  await user.keyboard('{ArrowRight}-{Escape}');
+
+  expect(screen.getByRole('img')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '100%' })).toBeInTheDocument();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+test('closes when the open image leaves the list', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  await openImage([imageItem, videoItem], onClose);
+
+  viewer.items = [videoItem];
+  await tick();
+
+  expect(onClose).toHaveBeenCalled();
+});
+
 test('takes a typed zoom percentage', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
