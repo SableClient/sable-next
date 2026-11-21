@@ -4,10 +4,11 @@ import type { Decorator, Preview, SvelteRenderer } from '@storybook/sveltekit';
 import '../src/styles.css';
 
 import CoreClientProvider from './CoreClientProvider.svelte';
+import type { RpcOverrides } from './mock-rpc';
 
-const provideCoreClient: Decorator = (story) => ({
+const provideCoreClient: Decorator = (story, context) => ({
   Component: CoreClientProvider,
-  props: { children: story },
+  props: { children: story, rpc: context.parameters.rpc as RpcOverrides | undefined },
 });
 
 const preview: Preview = {

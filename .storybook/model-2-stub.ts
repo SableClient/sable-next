@@ -178,3 +178,4 @@ export const receiverFormats = () => false;
 export const markdownToDoc = () => undefined;
 export const markdownToContent = () => undefined;
 export const topicToHtml = () => undefined;
+export const mergeSettings = (_base: unknown, local: unknown) => local;

@@ -115,6 +115,7 @@
     "@axe-core/playwright": "^4.14.0",
     "@csstools/postcss-global-data": "4.0.0",
     "@eslint/js": "^10.0.1",
+    "@faker-js/faker": "10.6.0",
     "@playwright/test": "^1.64.0",
     "@sentry/cli": "3.8.2",
     "@sentry/sveltekit": "^11.10.0",

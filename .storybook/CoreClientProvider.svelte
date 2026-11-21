@@ -4,7 +4,6 @@
 
   import type { CoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
-  import { createRpc } from '#src/generated/protocol';
   import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.ts';
   import { provideSenderRoles } from '#lib/features/room/members/sender-roles.ts';
   import {
@@ -29,7 +28,10 @@
   import { provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.ts';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.ts';
 
-  let { children }: { children: Snippet } = $props();
+  import { untrack } from 'svelte';
+  import { mockRpc as generatedRpc, type RpcOverrides } from './mock-rpc';
+
+  let { children, rpc = {} }: { children: Snippet; rpc?: RpcOverrides } = $props();
 
   const getRemoteMedia = async (url: string) => {
     const res = await fetch(url);
@@ -65,12 +67,7 @@
   };
 
   const noop = () => {};
-  const mockRpc = {
-    rpc: createRpc(() => {
-      console.trace();
-      return new Promise(() => {});
-    }),
-  };
+  const mockRpc = { rpc: generatedRpc(untrack(() => rpc)) };
   const mockCore = {
     ...mockRpc,
     onProfileChanged: () => noop,
