@@ -138,7 +138,6 @@
   );
 
   let noticeHeight = $state(0);
-  let dockHeight = $state(0);
   let mediaWidth = $state(0);
   let mediaHeight = $state(0);
   let aspect = $derived(mediaWidth > 0 && mediaWidth < NARROW_STAGE_PX ? 1 : 16 / 9);
@@ -326,7 +325,7 @@
   </header>
 
   {#if !failed}
-    <div class="dock chrome" bind:clientHeight={dockHeight}>
+    <div class="dock chrome">
       <CallControls
         microphoneEnabled={session.microphoneEnabled && !session.deafened}
         pushToTalk={session.inputMode === 'push-to-talk'}
@@ -694,11 +693,7 @@
     display: flex;
     flex: 1;
     min-height: 0;
-    padding: calc(var(--space-200) + var(--control-height-300) + var(--space-200)) var(--space-300)
-      calc(
-        var(--control-height-500) + var(--space-150) * 2 + var(--border-width) * 2 +
-          var(--space-300) * 2
-      );
+    padding: var(--space-300);
   }
 
   .media.with-notice {
@@ -712,10 +707,6 @@
       var(--control-height-500) + var(--space-150) * 3 + var(--border-width) * 2 +
         var(--space-300) * 2 + var(--space-500)
     );
-  }
-
-  .resting .media {
-    padding-block-end: var(--space-300);
   }
 
   .resting .media:not(.with-notice) {
