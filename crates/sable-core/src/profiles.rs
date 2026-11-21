@@ -29,7 +29,7 @@ const LEGACY_PROFILE_FIELDS: [&str; 4] = [
 const SUPPORTER_FIELD: &str = "moe.sable.app.supporter_awards";
 const MAX_SUPPORTER_FIELD_BYTES: usize = 16 * 1024;
 
-const RENDERED_PROFILE_FIELDS: [&str; 24] = [
+const RENDERED_PROFILE_FIELDS: [&str; 26] = [
     "displayname",
     "avatar_url",
     "m.biography",
@@ -38,10 +38,12 @@ const RENDERED_PROFILE_FIELDS: [&str; 24] = [
     "chat.commet.profile_bio",
     "chat.commet.profile_color_scheme",
     "chat.commet.profile_banner",
+    "m.banner_url",
     COMMET_STATUS_FIELD,
     STABLE_STATUS_FIELD,
     STATUS_FIELD,
     "io.fsky.nyx.pronouns",
+    "m.pronouns",
     "us.cloke.msc4175.tz",
     "m.tz",
     "eu.she-a.color",
@@ -220,7 +222,16 @@ pub(crate) fn pronoun_sets(value: Option<&serde_json::Value>) -> Vec<PronounView
 }
 
 fn profile_pronouns(response: &ProfileResponse) -> Vec<PronounView> {
-    pronoun_sets(profile_field(response, "io.fsky.nyx.pronouns"))
+    ["m.pronouns", "io.fsky.nyx.pronouns"]
+        .into_iter()
+        .map(|name| pronoun_sets(profile_field(response, name)))
+        .find(|sets| !sets.is_empty())
+        .unwrap_or_default()
+}
+
+fn profile_banner(response: &ProfileResponse) -> Option<String> {
+    profile_text(profile_field(response, "m.banner_url"))
+        .or_else(|| profile_text(profile_field(response, "chat.commet.profile_banner")))
 }
 
 fn profile_timezone(response: &ProfileResponse) -> Option<String> {
@@ -312,7 +323,7 @@ pub(crate) fn profile_view(user_id: OwnedUserId, response: &ProfileResponse) -> 
         bio: profile_bio(response),
         hero_color: profile_hero_color(response),
         hero_brightness: profile_hero_brightness(response),
-        banner_url: profile_text(profile_field(response, "chat.commet.profile_banner")),
+        banner_url: profile_banner(response),
         status: profile_status(response),
         pronouns: profile_pronouns(response),
         timezone: profile_timezone(response),
@@ -410,6 +421,38 @@ mod tests {
 
         let unstable = view(&json!({ "us.cloke.msc4175.tz": "Asia/Tokyo" }));
         assert_eq!(unstable.timezone.as_deref(), Some("Asia/Tokyo"));
+    }
+
+    #[test]
+    fn the_stable_pronouns_win_over_the_unstable_ones() {
+        let both = view(&json!({
+            "m.pronouns": [{ "summary": "she" }],
+            "io.fsky.nyx.pronouns": [{ "summary": "he" }],
+        }));
+        assert_eq!(both.pronouns.len(), 1);
+        assert_eq!(both.pronouns[0].summary, "she");
+        assert!(both.extra.is_empty());
+
+        let unstable = view(&json!({ "io.fsky.nyx.pronouns": [{ "summary": "he" }] }));
+        assert_eq!(unstable.pronouns[0].summary, "he");
+        assert!(unstable.extra.is_empty());
+    }
+
+    #[test]
+    fn the_stable_banner_wins_over_the_unstable_one() {
+        let both = view(&json!({
+            "m.banner_url": "mxc://example.org/stable",
+            "chat.commet.profile_banner": "mxc://example.org/unstable",
+        }));
+        assert_eq!(both.banner_url.as_deref(), Some("mxc://example.org/stable"));
+        assert!(both.extra.is_empty());
+
+        let unstable = view(&json!({ "chat.commet.profile_banner": "mxc://example.org/unstable" }));
+        assert_eq!(
+            unstable.banner_url.as_deref(),
+            Some("mxc://example.org/unstable")
+        );
+        assert!(unstable.extra.is_empty());
     }
 
     #[test]
