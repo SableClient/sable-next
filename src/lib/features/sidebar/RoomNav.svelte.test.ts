@@ -311,6 +311,45 @@ test('a subspace context menu opens its lobby', async () => {
   expect(onNavigate).toHaveBeenCalledWith('/space/!nested%3Aexample.org/lobby');
 });
 
+test.each([
+  ['an unpinned subspace offers pinning', false, /nav\.pinToSidebar/],
+  ['a pinned subspace offers unpinning', true, /nav\.unpinFromSidebar/],
+])('%s from its context menu', async (_, pinned, item) => {
+  visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!root:example.org',
+      name: 'Root',
+      room_kind: 'space',
+      space_children: [
+        {
+          room_id: '!nested:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
+      ],
+    }),
+    makeRoom({ room_id: '!nested:example.org', name: 'Nested', room_kind: 'space' }),
+  ];
+  listSections(
+    sectionView('!root:example.org', {
+      subspaces: [treeCategory('!nested:example.org', 0, [])],
+    })
+  );
+  const onTogglePin = vi.fn();
+  await mountNav({
+    pinnedSpaceIds: new Set(pinned ? ['!nested:example.org'] : []),
+    onTogglePin,
+  });
+
+  await openMenu('Nested');
+  await user.click(await screen.findByRole('menuitem', { name: item }));
+
+  expect(onTogglePin).toHaveBeenCalledWith('!nested:example.org');
+});
+
 test('nests subspaces with thread lines and links past the depth limit to the lobby', async () => {
   visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   const edge = (roomId: string) => ({

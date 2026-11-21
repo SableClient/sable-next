@@ -25,6 +25,7 @@
     setFolderIcon,
     ungroupFolder,
     withoutSpace,
+    withSpace,
     type DropInstruction,
     type LayoutRef,
     type SidebarFolder,
@@ -201,6 +202,12 @@
     return folderName(folder, (roomId) => roomList.byId(roomId)?.name ?? null) ?? '';
   }
 
+  function togglePin(roomId: string): void {
+    spaceSidebar.write(
+      pinnedSpaceIds.has(roomId) ? withoutSpace(entries, roomId) : withSpace(entries, roomId)
+    );
+  }
+
   const railProps = {
     get layout() {
       return entries;
@@ -306,6 +313,8 @@
           callRoomId={call.active ? call.roomId : null}
           {callParticipants}
           callVoiceStates={call.voiceStates}
+          {pinnedSpaceIds}
+          onTogglePin={togglePin}
         />
       </div>
       {@render callBar()}
@@ -337,6 +346,8 @@
           callRoomId={call.active ? call.roomId : null}
           {callParticipants}
           callVoiceStates={call.voiceStates}
+          {pinnedSpaceIds}
+          onTogglePin={togglePin}
         />
         <ResizeHandle
           value={roomNavWidth}

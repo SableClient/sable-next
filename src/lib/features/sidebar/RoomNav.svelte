@@ -131,6 +131,8 @@
     callParticipants?: readonly string[];
     callVoiceStates?: ReadonlyMap<string, CallVoiceState>;
     onCallVolume?: (userId: string, volume: number) => void;
+    pinnedSpaceIds?: ReadonlySet<string>;
+    onTogglePin?: (roomId: string) => void;
   }
 
   let {
@@ -144,6 +146,8 @@
     callParticipants = [],
     callVoiceStates = new Map(),
     onCallVolume,
+    pinnedSpaceIds = new Set(),
+    onTogglePin,
   }: Props = $props();
 
   let volumeTarget = $state<{ userId: string; name: string; anchor: HTMLElement } | null>(null);
@@ -953,6 +957,12 @@
 
 {#if contextRoom}
   {@const fromTrigger = contextAnchor !== null && 'focus' in contextAnchor}
+  {@const pinRoomId = contextRoom.room_id}
+  {@const pinnable =
+    onTogglePin !== undefined &&
+    contextRoom.room_kind === 'space' &&
+    contextRoom.state === 'joined'}
+  {@const pinned = pinnedSpaceIds.has(pinRoomId)}
   {#key contextRoom.room_id}
     <RoomOptionsMenu
       room={contextRoom}
@@ -964,6 +974,8 @@
       onSettings={openSettings}
       onLeave={openLeave}
       onLobby={openLobby}
+      onPin={pinnable && !pinned ? () => onTogglePin?.(pinRoomId) : undefined}
+      onUnpin={pinnable && pinned ? () => onTogglePin?.(pinRoomId) : undefined}
     />
   {/key}
 {/if}
