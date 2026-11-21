@@ -169,10 +169,20 @@ test('the list options menu renders its checkable items (#1341)', async () => {
   await expect
     .element(screen.getByRole('menuitemcheckbox', { name: 'Group favourites' }))
     .toBeVisible();
-  await expect
-    .element(screen.getByRole('menuitemradio', { name: 'Recent activity' }))
-    .toBeVisible();
   await expectNoA11yViolations(document.body, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
+});
+
+test('the room sort menu offers unread first and persists the choice', async () => {
+  roomsFixture.rooms = [room({ room_id: '!a:example.org', name: 'General' })];
+  const screen = await mountNav();
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Sort rooms: Recent activity' })
+  );
+  await expect.element(screen.getByRole('menuitemradio', { name: 'Unread first' })).toBeVisible();
+  await userEvent.click(screen.getByRole('menuitemradio', { name: 'Unread first' }));
+  await expect
+    .element(screen.getByRole('button', { name: 'Sort rooms: Unread first' }))
+    .toBeVisible();
 });
 
 test('a long room list mounts only the rows near the viewport and follows the scroll', async () => {

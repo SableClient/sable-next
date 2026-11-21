@@ -250,8 +250,8 @@ accepts the same settings except those marked deployment only.
 - `roomBannerHeight`: Number from 56 to 500. Default `190`.
 - `doubleTapReaction`: Text. Default `❤️`.
 - `memberSort`: One of `name-asc`, `name-desc`, `newest`, `oldest`. Default `name-asc`.
-- `roomSort`: One of `recent`, `name-asc`, `name-desc`. Default `recent`.
-- `directSort`: One of `recent`, `name-asc`, `name-desc`. Default `recent`.
+- `roomSort`: One of `recent`, `unread-first`, `name-asc`, `name-desc`. Default `recent`.
+- `directSort`: One of `recent`, `unread-first`, `name-asc`, `name-desc`. Default `recent`.
 - `composerButtonOrder`: List of `gif`, `sticker`, `emoticon`, `persona`, `format`, `separator:0`, `separator:1`, `separator:2`, `separator:3`, `separator:4`, `separator:5`, `separator:6`, `separator:7`, `separator:8`. Default `["gif","sticker","emoticon","separator:0","persona","format"]`.
 - `personaGrid`: `true` or `false`. Default `true`.
 - `personaAlternateAvatar`: `true` or `false`. Default `false`.

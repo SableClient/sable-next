@@ -8,8 +8,6 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { groupsFavourites, setGroupsFavourites } from '#lib/rooms/favourite-grouping.svelte.js';
-  import { ROOM_SORTS, ROOM_SORT_LABELS } from '#lib/rooms/room-sort.js';
-  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import ActionMenuCheckItem from '#lib/ui/primitives/ActionMenuCheckItem.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
@@ -17,7 +15,6 @@
   interface Props {
     activeSpace: RoomListItemView | null;
     favouriteView: string;
-    sortKey: 'directSort' | 'roomSort';
     markReadDisabled: boolean;
     onMarkRead: () => void;
     onInvite: (room: RoomListItemView) => void;
@@ -28,7 +25,6 @@
   let {
     activeSpace,
     favouriteView,
-    sortKey,
     markReadDisabled,
     onMarkRead,
     onInvite,
@@ -67,18 +63,8 @@
     setGroupsFavourites(favouriteView, !groupFavourites);
   }}
 />
-<ActionMenuSeparator />
-{#if !activeSpace}
-  {#each ROOM_SORTS as option (option)}
-    <ActionMenuCheckItem
-      checked={preferences[sortKey] === option}
-      label={i18n.t(ROOM_SORT_LABELS[option])}
-      onSelect={() => {
-        setPreference(sortKey, option);
-      }}
-    />
-  {/each}
-{:else}
+{#if activeSpace}
+  <ActionMenuSeparator />
   <ActionMenuItem
     disabled={!canInvite}
     onSelect={() => {

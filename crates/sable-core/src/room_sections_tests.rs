@@ -188,6 +188,31 @@ fn name_sorts_ignore_case_and_accents_and_ties_keep_the_list_order() {
 }
 
 #[test]
+fn unread_first_keeps_recent_order_within_unread_and_read() {
+    let mut marked = row("marked");
+    marked.counts.marked = true;
+    let rows = [
+        row("read-early"),
+        unread(row("unread-late"), 2, 0),
+        row("read-late"),
+        unread(row("unread-early"), 1, 0),
+        marked,
+    ];
+    let sections = RoomSections::build(
+        &rows,
+        &RoomListOptionsView {
+            room_sort: RoomSortView::UnreadFirst,
+            ..RoomListOptionsView::default()
+        },
+    );
+
+    assert_eq!(
+        section(&sections, HOME).rooms,
+        ids(&["unread-late", "unread-early", "marked", "read-early", "read-late"])
+    );
+}
+
+#[test]
 fn direct_messages_follow_their_own_sort() {
     let options = RoomListOptionsView {
         room_sort: RoomSortView::NameAsc,

@@ -1026,6 +1026,7 @@ pub struct RoomUnreadView {
 pub enum RoomSortView {
     #[default]
     Recent,
+    UnreadFirst,
     NameAsc,
     NameDesc,
 }

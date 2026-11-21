@@ -140,6 +140,8 @@
     "favourites": "Favourites",
     "groupFavourites": "Group favourites",
     "sortRecent": "Recent activity",
+    "sortUnreadFirst": "Unread first",
+    "sortRooms": "Sort rooms",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
     "unspaced": "Rooms outside spaces",

@@ -1,5 +1,6 @@
 //! The sidebar's sections, favourites, space trees and badges, built from the room list rows.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
@@ -341,6 +342,20 @@ impl<'a> Lists<'a> {
         match sort {
             RoomSortView::Recent => {
                 rows.sort_by_key(|row| self.position.get(row.room_id.as_str()).copied());
+            }
+            RoomSortView::UnreadFirst => {
+                rows.sort_by(|left, right| {
+                    let left_unread = has_unread(self.badge(left));
+                    let right_unread = has_unread(self.badge(right));
+                    match (left_unread, right_unread) {
+                        (true, false) => Ordering::Less,
+                        (false, true) => Ordering::Greater,
+                        _ => self
+                            .position
+                            .get(left.room_id.as_str())
+                            .cmp(&self.position.get(right.room_id.as_str())),
+                    }
+                });
             }
             RoomSortView::NameAsc | RoomSortView::NameDesc => {
                 let mut keyed: Vec<_> = rows

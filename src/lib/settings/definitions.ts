@@ -368,8 +368,12 @@ const SETTINGS = {
   memberSort: choice<MemberSort>(['name-asc', 'name-desc', 'newest', 'oldest'], 'name-asc', {
     account: true,
   }),
-  roomSort: choice<RoomSort>(['recent', 'name-asc', 'name-desc'], 'recent', { account: true }),
-  directSort: choice<RoomSort>(['recent', 'name-asc', 'name-desc'], 'recent', { account: true }),
+  roomSort: choice<RoomSort>(['recent', 'unread-first', 'name-asc', 'name-desc'], 'recent', {
+    account: true,
+  }),
+  directSort: choice<RoomSort>(['recent', 'unread-first', 'name-asc', 'name-desc'], 'recent', {
+    account: true,
+  }),
   groupMembersByPresence: toggle(true, { account: true }),
   filterPronounsByLanguage: toggle(true, { account: true }),
   showPronouns: toggle(true, { account: true }),

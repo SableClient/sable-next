@@ -856,6 +856,7 @@
         "roomSort": {
           "enum": [
             "recent",
+            "unread-first",
             "name-asc",
             "name-desc"
           ],
@@ -864,6 +865,7 @@
         "directSort": {
           "enum": [
             "recent",
+            "unread-first",
             "name-asc",
             "name-desc"
           ],
@@ -2374,6 +2376,7 @@
         "roomSort": {
           "enum": [
             "recent",
+            "unread-first",
             "name-asc",
             "name-desc"
           ],
@@ -2382,6 +2385,7 @@
         "directSort": {
           "enum": [
             "recent",
+            "unread-first",
             "name-asc",
             "name-desc"
           ],

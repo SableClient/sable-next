@@ -1570,7 +1570,7 @@ export type RoomSectionsUpdate = {
 	room_spaces: RoomSpacesView[] | null,
 };
 
-export type RoomSortView = "recent" | "name-asc" | "name-desc";
+export type RoomSortView = "recent" | "unread-first" | "name-asc" | "name-desc";
 
 /**  Where a room sits in the spaces this account has joined. */
 export type RoomSpacesView = {

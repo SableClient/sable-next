@@ -57,6 +57,7 @@
   import RoomNavActions from './RoomNavActions.svelte';
   import RoomListHeading from './RoomListHeading.svelte';
   import RoomListMenuItems from './RoomListMenuItems.svelte';
+  import RoomListSortButton from './RoomListSortButton.svelte';
   import RoomNavHeader from './RoomNavHeader.svelte';
   import RoomOptionsButton from './RoomOptionsButton.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
@@ -479,7 +480,6 @@
     <RoomListMenuItems
       {activeSpace}
       {favouriteView}
-      {sortKey}
       markReadDisabled={!sectionUnread}
       onMarkRead={markSectionRead}
       onInvite={(room) => {
@@ -488,6 +488,10 @@
       onSettings={openSettings}
       onLeave={openLeave}
     />
+  {/snippet}
+
+  {#snippet roomSortControl()}
+    <RoomListSortButton {sortKey} />
   {/snippet}
 
   {#snippet optionsButton(room: RoomListItemView, parentSpaceId: string | null)}
@@ -819,6 +823,7 @@
           onToggle={() => {
             roomsClosed = !roomsClosed;
           }}
+          trailing={activeSpace ? undefined : roomSortControl}
         />
       {/if}
 
