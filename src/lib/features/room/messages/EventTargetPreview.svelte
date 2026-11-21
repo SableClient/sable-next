@@ -126,7 +126,7 @@
     />{/if}
   <span class={['target-copy', { wrap: body !== undefined }]}>
     <SenderName displayName={name} {colors} nameClass="target-name" compact />
-    {#if body}{@render body()}{:else}<span>{preview?.body ?? ''}</span>{/if}
+    {#if body}{@render body()}{:else}<span class="target-body">{preview?.body ?? ''}</span>{/if}
   </span>
 </button>
 
@@ -253,5 +253,15 @@
 
   .target-expanded .target-copy > :not(.target-name) {
     filter: none;
+  }
+
+  .target-expanded .target-body {
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 </style>

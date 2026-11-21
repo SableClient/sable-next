@@ -199,6 +199,24 @@ test('a compact reply preview keeps the name gutter level with the message body'
   expect(gutter.getBoundingClientRect().top).toBe(body.getBoundingClientRect().top);
 });
 
+test.each([
+  ['preserves short multiline quotes', 'First line\nSecond line', 2],
+  ['clamps explicit lines', 'One\nTwo\nThree\nFour\nFive\nSix', 5],
+  ['clamps wrapped lines', 'A long reply with no explicit line breaks. '.repeat(20), 5],
+] as const)('an expanded reply %s', async (_description, text, lines) => {
+  setPreference('replyPreviewStyle', 'expanded');
+  const item = replyToAlice('expanded-reply', '@bob:example.test', 'Bob');
+  if (!item.in_reply_to) throw new Error('Missing reply target');
+  item.in_reply_to.body = text;
+  await mountItem(item);
+  await document.fonts.ready;
+
+  const body = document.querySelector('.reply-expanded .reply-body');
+  if (!body) throw new Error('Missing reply text');
+  const lineHeight = Number.parseFloat(getComputedStyle(body).lineHeight);
+  expect(Math.abs(body.getBoundingClientRect().height - lineHeight * lines)).toBeLessThan(1);
+});
+
 test('a mobile connected reply aligns its preview text with the sender name', async () => {
   await page.viewport(390, 844);
   setPreference('replyPreviewStyle', 'connected');
