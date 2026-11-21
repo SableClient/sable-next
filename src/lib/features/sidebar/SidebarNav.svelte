@@ -349,16 +349,6 @@
           {pinnedSpaceIds}
           onTogglePin={togglePin}
         />
-        <ResizeHandle
-          value={roomNavWidth}
-          min={MIN_ROOM_NAV_WIDTH}
-          max={MAX_ROOM_NAV_WIDTH}
-          label={i18n.t('nav.resizeRooms')}
-          grow="right"
-          step={ROOM_NAV_WIDTH_STEP}
-          onResize={(next) => (roomNavWidth = clampRoomNavWidth(next))}
-          onCommit={persistRoomNavWidth}
-        />
         {#if !collapsed}
           <AlertDrawer />
         {/if}
@@ -367,6 +357,16 @@
       {#if !collapsed}
         <UserQuickTools />
       {/if}
+      <ResizeHandle
+        value={roomNavWidth}
+        min={MIN_ROOM_NAV_WIDTH}
+        max={MAX_ROOM_NAV_WIDTH}
+        label={i18n.t('nav.resizeRooms')}
+        grow="right"
+        step={ROOM_NAV_WIDTH_STEP}
+        onResize={(next) => (roomNavWidth = clampRoomNavWidth(next))}
+        onCommit={persistRoomNavWidth}
+      />
     </nav>
   {/if}
   <FolderRenameDialog
@@ -391,6 +391,7 @@
   .desktop-navigation {
     display: none;
     flex-direction: column;
+    position: relative;
   }
 
   .desktop-navigation-main {
@@ -439,7 +440,7 @@
       display: flex;
     }
 
-    .desktop-navigation-main :global(.resize-handle) {
+    .desktop-navigation :global(.resize-handle) {
       inset-inline-end: -0.25rem;
     }
   }
