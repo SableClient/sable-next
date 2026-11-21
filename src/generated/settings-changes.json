@@ -1,7 +1,8 @@
 {
   "upcoming": {
     "added": [
-      "deploymentTheme"
+      "deploymentTheme",
+      "showEncryptionStatusIcon"
     ],
     "changed": []
   },
