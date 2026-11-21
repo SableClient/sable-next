@@ -350,6 +350,54 @@ test('logging out selects another saved account instead of returning to sign-in'
   });
 });
 
+test('logging out skips a saved account whose login cannot be opened', async () => {
+  const broken: SessionInfo = { ...otherSession, account_id: 'account-c', device_id: 'OLD' };
+  const accounts = { accounts: [session, broken, otherSession] };
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': () => accounts.accounts,
+  });
+  const call = fake.call.getMockImplementation();
+  if (!call) throw new Error('missing transport handler');
+  fake.call.mockImplementation((method, params) => {
+    if (method !== 'session.switch_account') return call(method, params);
+    return (params as { account_id: string }).account_id === broken.account_id
+      ? Promise.reject(new CoreError(transportFailure('e16')))
+      : Promise.resolve(otherSession);
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  accounts.accounts = [broken, otherSession];
+  await core.logout();
+
+  expect(core.session).toEqual(otherSession);
+  expect(core.status).toBe('ready');
+});
+
+test('logging out ends signed out when no saved account opens', async () => {
+  const accounts = { accounts: [session, otherSession] };
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': () => accounts.accounts,
+  });
+  const call = fake.call.getMockImplementation();
+  if (!call) throw new Error('missing transport handler');
+  fake.call.mockImplementation((method, params) =>
+    method === 'session.switch_account'
+      ? Promise.reject(new CoreError(transportFailure('e16')))
+      : call(method, params)
+  );
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  accounts.accounts = [otherSession];
+  await core.logout();
+
+  expect(core.session).toBeNull();
+  expect(core.status).toBe('signed-out');
+});
+
 test("logging out forgets that account's recent searches and keeps the others'", async () => {
   const accounts = { accounts: [session, otherSession] };
   const fake = fakeTransport({

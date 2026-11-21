@@ -884,16 +884,27 @@ export class CoreClient {
 
     try {
       await this.refreshAccounts();
-      const fallbackAccountId = this.accounts.find((account) => !account.needs_reauth)?.account_id;
-      if (fallbackAccountId !== undefined) {
-        await this.switchAccount(fallbackAccountId);
-        return;
-      }
+      if (await this.switchToFallback()) return;
       this.status = 'signed-out';
     } catch (error) {
+      console.warn('[sable core] no saved account opened after signing out', error);
       this.status = 'signed-out';
-      throw error;
     }
+  }
+
+  private async switchToFallback(): Promise<boolean> {
+    let failure: Error | null = null;
+    for (const account of this.accounts) {
+      if (account.needs_reauth) continue;
+      try {
+        await this.switchAccount(account.account_id);
+        return true;
+      } catch (error) {
+        failure = error instanceof Error ? error : new Error(String(error));
+      }
+    }
+    if (failure !== null) throw failure;
+    return false;
   }
 
   async resetCaches(): Promise<void> {
@@ -1097,11 +1108,7 @@ export class CoreClient {
       } else {
         await this.refreshAccounts();
         if (generation !== this.generation) return;
-        const fallback = this.accounts.find((account) => !account.needs_reauth);
-        if (fallback) {
-          await this.switchAccount(fallback.account_id);
-          return;
-        }
+        if (await this.switchToFallback()) return;
         this.replaceSession(null);
         if (this.accounts.length === 0) forgetAccountStorage();
         this.reauthenticationAccountId =
@@ -1401,12 +1408,7 @@ export class CoreClient {
     try {
       await this.refreshAccounts();
       if (generation !== this.generation) return;
-      const fallbackAccountId = this.accounts.find((account) => !account.needs_reauth)?.account_id;
-      if (fallbackAccountId === undefined) {
-        this.status = 'signed-out';
-        return;
-      }
-      await this.switchAccount(fallbackAccountId);
+      if (!(await this.switchToFallback())) this.status = 'signed-out';
     } catch (error) {
       if (generation !== this.generation) return;
       reportSessionFailure('restore_fallback', error);
