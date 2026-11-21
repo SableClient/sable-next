@@ -348,8 +348,10 @@
     font-size: var(--font-size-body);
     font-style: normal;
     line-height: 1;
+    margin-inline: calc(var(--space-050) * -1);
     max-width: 9.375rem;
     overflow-x: clip;
+    padding-inline: var(--space-050);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
