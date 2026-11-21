@@ -16,9 +16,11 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 
 vi.mock('#lib/core/context.js');
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('#lib/platform/clipboard.js', () => ({ copyText: vi.fn(() => Promise.resolve()) }));
 import { goto } from '#lib/test-support/app-navigation.js';
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
+import { copyText } from '#lib/platform/clipboard.js';
 
 const core = baseCore;
 Object.assign(core.rpc.rooms, { preview: vi.fn<() => Promise<{ name: string | null }>>() });
@@ -513,8 +515,8 @@ test('a code block gains a language label and a copy control', async () => {
 
   expect(screen.getByText('rust')).toHaveClass('code-language');
   expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
-  // Short blocks are not collapsible.
   expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Line numbers' })).not.toBeInTheDocument();
   expect(document.querySelector('.code-block')).not.toHaveAttribute('data-collapsed');
 });
 
@@ -536,13 +538,14 @@ test('a code block drops the newline the fence left at its end', async () => {
   expect(document.querySelector('pre code')?.textContent).toBe('one\ntwo');
 });
 
-test('an unlabelled block falls back to a generic label', async () => {
+test('an unlabelled block falls back to a generic label and starts wrapped', async () => {
   render(FormattedBody, {
     props: { html: '<pre><code>plain</code></pre>' },
   });
   await tick();
 
   expect(screen.getByText('Code')).toHaveClass('code-language');
+  expect(screen.getByRole('button', { name: 'Wrap' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('a long block starts collapsed and expands on demand', async () => {
@@ -559,6 +562,49 @@ test('a long block starts collapsed and expands on demand', async () => {
 
   expect(block).not.toHaveAttribute('data-collapsed');
   expect(screen.getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
+});
+
+test('multiline code can toggle wrapping and line numbers and copy its source', async () => {
+  const source = 'let a = 1;\n\nlet b = 2;';
+  const { container } = render(FormattedBody, {
+    props: { html: '<pre><code class="language-text">' + source + '</code></pre>' },
+  });
+  await tick();
+
+  const block = container.querySelector('.code-block');
+  const wrap = screen.getByRole('button', { name: 'Wrap' });
+  expect(block).not.toHaveAttribute('data-wrapped');
+  await user.click(wrap);
+  expect(block).toHaveAttribute('data-wrapped');
+  expect(wrap).toHaveAttribute('aria-pressed', 'true');
+
+  const lines = screen.getByRole('button', { name: 'Line numbers' });
+  expect(block).toHaveAttribute('data-line-numbers');
+  await user.click(screen.getByRole('button', { name: 'Copy' }));
+  expect(copyText).toHaveBeenCalledWith(source);
+  expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument();
+
+  await user.click(lines);
+  expect(block).not.toHaveAttribute('data-line-numbers');
+  expect(lines).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('keeps line wrappers after syntax highlighting resolves', async () => {
+  const highlighter = await import('#lib/ui/code-highlight.js');
+  vi.spyOn(highlighter, 'highlightCode').mockResolvedValue(
+    '<a-c>/*\n * note\n */</a-c>\n<a-k>fn</a-k> main() {}'
+  );
+
+  render(FormattedBody, {
+    props: { html: '<pre><code class="language-rust">/*\n * note\n */\nfn main() {}</code></pre>' },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('pre code a-k')).not.toBeNull();
+  });
+
+  expect(document.querySelectorAll('.code-line')).toHaveLength(4);
+  expect(document.querySelector('pre code')?.textContent).toBe('/*\n * note\n */\nfn main() {}');
 });
 
 test('an unhighlightable language leaves the escaped source intact', async () => {

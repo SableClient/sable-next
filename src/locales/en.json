@@ -1247,6 +1247,8 @@
     "codeLabel": "Code",
     "expandCode": "Expand",
     "collapseCode": "Collapse",
+    "wrapCode": "Wrap",
+    "codeLineNumbers": "Line numbers",
     "showPeek": "Show content",
     "hidePeek": "Hide content",
     "addReaction": "Add reaction",

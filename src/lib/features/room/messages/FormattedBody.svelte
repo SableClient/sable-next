@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { matrixLinkPath } from '#lib/rooms/permalink.js';
-  import { copyText } from '#lib/platform/clipboard.js';
   import { mount, unmount, untrack, type Component } from 'svelte';
   import { on } from 'svelte/events';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
@@ -42,9 +41,10 @@
   import { parseSettingsLink } from '../settings/settings-link';
   import { replyPreviewBody } from './reply-preview';
   import { FormattedBodyImages } from './formatted-body-images';
+  import CodeBlockHeader from './CodeBlockHeader.svelte';
   import EmoteCard from './EmoteCard.svelte';
   import ImageSpoilerControl from '#lib/ui/ImageSpoilerControl.svelte';
-  import { toasts } from '#lib/ui/toasts.svelte.js';
+  import { splitCodeLines } from '#lib/ui/code-lines.js';
 
   interface Props {
     html: string;
@@ -247,7 +247,7 @@
     return (node: HTMLElement) => {
       void html;
       return untrack(() => {
-        const icons: ReturnType<typeof mount>[] = [];
+        const mounted: ReturnType<typeof mount>[] = [];
         for (const table of node.querySelectorAll('table')) {
           if (table.parentElement?.classList.contains('table-scroll')) continue;
           const scroller = document.createElement('div');
@@ -263,7 +263,7 @@
           const label = document.createElement('span');
           label.textContent = anchor.textContent;
           anchor.replaceChildren(holder, label);
-          icons.push(mount(icon, { target: holder }));
+          mounted.push(mount(icon, { target: holder }));
           return label;
         };
         for (const anchor of node.querySelectorAll('a')) {
@@ -322,7 +322,7 @@
           }
         }
 
-        decorateCodeBlocks(node);
+        decorateCodeBlocks(node, mounted);
         const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
         if (maths.length > 0) void renderMaths(maths);
 
@@ -342,7 +342,7 @@
           offFocusOut();
           offWindowBlur();
           closeDefinition();
-          for (const icon of icons) void unmount(icon);
+          for (const component of mounted) void unmount(component);
         };
       });
     };
@@ -449,57 +449,45 @@
     }
   }
 
-  function codeLanguage(block: HTMLElement): string | null {
-    return classLanguage(block.querySelector('code')) ?? classLanguage(block);
-  }
-
-  function decorateCodeBlocks(node: HTMLElement): void {
+  function decorateCodeBlocks(node: HTMLElement, mounted: ReturnType<typeof mount>[]): void {
     for (const block of node.querySelectorAll<HTMLPreElement>('pre')) {
       if (block.dataset.codeHandled !== undefined) continue;
       block.dataset.codeHandled = '';
 
-      const language = codeLanguage(block);
+      const code = block.querySelector('code');
+      const language = classLanguage(code) ?? classLanguage(block);
       trimTrailingNewline(block);
-      const long = block.textContent.split('\n').length > CODE_LINE_LIMIT;
+      const lineCount = block.textContent.split('\n').length;
+      const collapsible = lineCount > CODE_LINE_LIMIT;
+      const numbered = code !== null && code.textContent.includes('\n');
 
       const figure = document.createElement('div');
       figure.className = 'code-block';
-      if (long) figure.dataset.collapsed = '';
-
-      const header = document.createElement('div');
-      header.className = 'code-head';
-
-      const label = document.createElement('span');
-      label.className = 'code-language';
-      label.textContent = language ?? i18n.t('timeline.codeLabel');
-      header.append(label);
-
-      const copy = document.createElement('button');
-      copy.type = 'button';
-      copy.className = 'code-action';
-      copy.dataset.codeCopy = '';
-      copy.textContent = i18n.t('common.copy');
-      header.append(copy);
-
-      if (long) {
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'code-action';
-        toggle.dataset.codeToggle = '';
-        toggle.textContent = i18n.t('timeline.expandCode');
-        header.append(toggle);
+      if (numbered) {
+        const digits = Math.max(2, String(lineCount).length);
+        figure.style.setProperty('--code-line-digits', String(digits));
+        splitCodeLines(code);
       }
 
+      mounted.push(
+        mount(CodeBlockHeader, {
+          target: figure,
+          props: { block, figure, language, numbered, collapsible },
+        })
+      );
       block.replaceWith(figure);
-      figure.append(header, block);
-      void paintHighlight(block, language);
+      figure.append(block);
+      if (code !== null && language !== null) void paintHighlight(code, language, numbered);
     }
   }
 
-  async function paintHighlight(block: HTMLPreElement, language: string | null): Promise<void> {
-    const code = block.querySelector('code');
-    const source = code?.textContent;
-    if (!code || !source || language === null || source.length > CODE_HIGHLIGHT_LIMIT) return;
+  async function paintHighlight(
+    code: HTMLElement,
+    language: string,
+    numbered: boolean
+  ): Promise<void> {
+    const source = code.textContent;
+    if (!source || source.length > CODE_HIGHLIGHT_LIMIT) return;
 
     const html = await import('#lib/ui/code-highlight.js')
       .then(({ highlightCode }) => highlightCode(source, language))
@@ -510,38 +498,7 @@
     // The row may have scrolled out of the virtualiser while the grammar loaded.
     if (html === null || !code.isConnected) return;
     code.innerHTML = html;
-  }
-
-  function handleCodeAction(target: Element): boolean {
-    const button = target.closest<HTMLButtonElement>('.code-action');
-    const figure = button?.closest<HTMLElement>('.code-block');
-    const block = figure?.querySelector('pre');
-    if (!button || !figure || !block) return false;
-
-    if (button.dataset.codeToggle !== undefined) {
-      const collapsed = figure.dataset.collapsed !== undefined;
-      if (collapsed) delete figure.dataset.collapsed;
-      else figure.dataset.collapsed = '';
-      button.textContent = collapsed
-        ? i18n.t('timeline.collapseCode')
-        : i18n.t('timeline.expandCode');
-      return true;
-    }
-
-    if (button.dataset.codeCopy === undefined) return false;
-    const label = button;
-    void copyText(block.textContent)
-      .then(() => {
-        label.textContent = i18n.t('common.copied');
-        setTimeout(() => {
-          if (label.isConnected) label.textContent = i18n.t('common.copy');
-        }, 1500);
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable code] clipboard unavailable', error);
-        toasts.error(i18n.t('errors.actionFailed'));
-      });
-    return true;
+    if (numbered) splitCodeLines(code);
   }
 
   function reveal(target: Element): boolean {
@@ -609,10 +566,6 @@
     }
     if (definitionPinned) closeDefinition();
 
-    if (handleCodeAction(target)) {
-      event.preventDefault();
-      return;
-    }
     if (reveal(target)) {
       event.preventDefault();
       return;
@@ -931,44 +884,6 @@
     position: relative;
   }
 
-  .formatted-body :global(.code-head) {
-    align-items: center;
-    background: var(--surface-container);
-    border-bottom: var(--border-width) solid var(--surface-container-line);
-    color: var(--surface-on-container);
-    display: flex;
-    gap: var(--space-200);
-    min-height: var(--control-height-small);
-    padding: 0 var(--space-200);
-  }
-
-  .formatted-body :global(.code-language) {
-    color: var(--surface-var-on-container);
-    flex: 1;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .formatted-body :global(.code-action) {
-    background: none;
-    border: 0;
-    border-radius: var(--radius-pill);
-    color: var(--primary-main);
-    cursor: pointer;
-    flex: 0 0 auto;
-    font: inherit;
-    font-size: var(--font-size-small);
-    padding: 0 var(--space-200);
-  }
-
-  .formatted-body :global(.code-action:hover) {
-    background: var(--surface-container-hover);
-  }
-
   /* An expanded block never scrolls vertically: a scroller there would swallow
      the wheel whenever the pointer crossed it, stalling the timeline. */
   .formatted-body :global(pre) {
@@ -980,10 +895,52 @@
     padding: var(--space-200);
   }
 
+  .formatted-body :global(.code-block[data-wrapped] :is(pre, .code-line)) {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
   .formatted-body :global(pre code) {
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
     font-variant-ligatures: none;
+  }
+
+  .formatted-body :global(.code-lines) {
+    display: block;
+    white-space: normal;
+  }
+
+  .formatted-body :global(.code-block:not([data-wrapped]) .code-lines) {
+    width: max-content;
+  }
+
+  .formatted-body :global(.code-line) {
+    display: block;
+    min-height: var(--code-line-height);
+    position: relative;
+    white-space: pre;
+  }
+
+  .formatted-body :global(.code-block[data-line-numbers] .code-lines) {
+    --code-gutter: calc(var(--code-line-digits) * 1ch + var(--space-400));
+
+    counter-reset: code-line;
+    padding-inline-start: var(--code-gutter);
+  }
+
+  .formatted-body :global(.code-block[data-line-numbers] .code-line)::before {
+    content: counter(code-line) / '';
+    counter-increment: code-line;
+    inset-block-start: 0;
+    inset-inline-start: calc(-1 * var(--code-gutter));
+    opacity: var(--opacity-secondary);
+    padding-inline-end: var(--space-300);
+    pointer-events: none;
+    position: absolute;
+    text-align: end;
+    user-select: none;
+    width: var(--code-gutter);
   }
 
   :root[data-code-ligatures='on'] .formatted-body :global(code) {
