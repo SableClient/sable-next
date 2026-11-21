@@ -216,6 +216,7 @@
       border: var(--border-width) solid var(--surface-container-line);
       border-radius: var(--radius);
       height: min(52rem, calc(100dvh - 3rem - var(--safe-top) - var(--safe-bottom)));
+      inset-inline-start: auto;
       /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
       left: calc(50% + (var(--safe-left) - var(--safe-right)) / 2);
       padding: 0;
