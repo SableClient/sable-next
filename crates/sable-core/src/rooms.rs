@@ -607,6 +607,11 @@ impl Core {
                 (resolved.room_id, resolved.servers)
             }
         };
+        if let Some(room) = client.get_room(&room_id)
+            && let Some(route) = crate::routing::Route::cached(&room).await
+        {
+            servers.extend(route.into_servers());
+        }
         servers.extend(room_id.server_name().map(ToOwned::to_owned));
         servers.extend(resolved);
 

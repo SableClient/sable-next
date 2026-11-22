@@ -4678,6 +4678,54 @@ async fn join_by_alias_caps_the_servers_of_a_big_room() {
 }
 
 #[tokio::test]
+async fn accepting_an_invite_joins_through_the_inviter_server() {
+    use matrix_sdk_test::{InvitedRoomBuilder, stripped_state_event};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let me = client.user_id().unwrap().to_owned();
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_invited_room(
+                InvitedRoomBuilder::new(room_id!("!target:creator.example")).add_state_event(
+                    stripped_state_event!({
+                        "type": "m.room.member", "sender": "@friend:inviter.example",
+                        "state_key": me, "content": { "membership": "invite" }
+                    }),
+                ),
+            );
+        })
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex("^/_matrix/client/v3/join/(!|%21)target"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"room_id": "!target:creator.example"})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    core.join_room("!target:creator.example", &[])
+        .await
+        .unwrap();
+
+    let requests = server.server().received_requests().await.unwrap();
+    let join = requests
+        .iter()
+        .find(|request| request.url.path().contains("/join/"))
+        .unwrap();
+    let via: Vec<String> = join
+        .url
+        .query_pairs()
+        .filter(|(key, _)| key == "via")
+        .map(|(_, value)| value.into_owned())
+        .collect();
+    assert_eq!(via, ["inviter.example", "creator.example"]);
+}
+
+#[tokio::test]
 async fn knock_by_alias_targets_the_resolved_room_id() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
