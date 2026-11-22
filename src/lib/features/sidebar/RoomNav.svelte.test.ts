@@ -666,6 +666,30 @@ test('message search from a space is scoped to that space', async () => {
   );
 });
 
+test('a space with rules offers them beneath the lobby', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!space:example.org', name: 'Design', room_kind: 'space' }),
+  ];
+  visit('/space/!space:example.org', { spaceId: '!space:example.org' });
+  core.rpc.room_state.rules.mockResolvedValueOnce({
+    source_room_id: '!space:example.org',
+    html: '<p>Be kind</p>',
+    version: 1,
+    require_acceptance: false,
+    accepted: false,
+    updated_at: null,
+  });
+
+  await mountNav();
+
+  const rulesLink = await screen.findByRole('link', { name: 'room.rulesTitle' });
+  expect(rulesLink).toHaveAttribute('href', '/space/!space%3Aexample.org/rules');
+  expect(rulesLink.previousElementSibling).toHaveAttribute(
+    'href',
+    '/space/!space%3Aexample.org/lobby'
+  );
+});
+
 test('a space you cannot add rooms to does not show a create action', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!space:example.org', name: 'Design', room_kind: 'space' }),

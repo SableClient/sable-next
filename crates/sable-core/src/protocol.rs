@@ -3205,6 +3205,8 @@ pub struct RoomRulesView {
     pub version: i64,
     pub require_acceptance: bool,
     pub accepted: bool,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub updated_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

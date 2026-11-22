@@ -13,6 +13,7 @@ function view(overrides: Partial<RoomRulesView> = {}): RoomRulesView {
     version: 2,
     require_acceptance: true,
     accepted: false,
+    updated_at: null,
     ...overrides,
   };
 }

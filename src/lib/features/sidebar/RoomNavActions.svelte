@@ -12,6 +12,7 @@
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
+  import ScrollIcon from 'phosphor-svelte/lib/ScrollIcon';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import {
@@ -34,6 +35,7 @@
   const core = useCoreClient();
 
   let spacePermissions = $state<RoomPermissionsView | null>(null);
+  let hasSpaceRules = $state(false);
   let directSection = $derived(pathname.startsWith('/direct'));
   // Keyed on the id: a room list diff hands back a fresh object for the
   // same space, and the permission effect below would re-run on every one.
@@ -51,6 +53,13 @@
     activeSpace === null
       ? resolve('explore')
       : resolve('/(app)/space/[spaceId]/lobby', {
+          spaceId: roomPathParam(activeSpace, roomList.rooms),
+        })
+  );
+  let rulesHref = $derived(
+    activeSpace === null
+      ? null
+      : resolve('/(app)/space/[spaceId]/rules', {
           spaceId: roomPathParam(activeSpace, roomList.rooms),
         })
   );
@@ -109,6 +118,33 @@
       });
     return () => {
       current = false;
+    };
+  });
+
+  // The Rules action appears only when the space actually has rules.
+  $effect(() => {
+    const spaceId = activeSpaceId;
+    hasSpaceRules = false;
+    if (!spaceId) return;
+
+    let current = true;
+    const check = () => {
+      void core.rpc.room_state
+        .rules({ room_id: spaceId })
+        .then((rules) => {
+          if (current) hasSpaceRules = rules !== null;
+        })
+        .catch((error: unknown) => {
+          console.debug('[sable nav] space rules unavailable', error);
+        });
+    };
+    check();
+    const stop = core.subscribeEvents((event) => {
+      if (event.type === 'room_rules_changed') check();
+    });
+    return () => {
+      current = false;
+      stop();
     };
   });
 </script>
@@ -187,6 +223,9 @@
       {@render findOrJoin(i18n.t('nav.findOrJoin'), LinkIcon)}
     {/if}
     {@render action(browseHref, browseLabel, activeSpace === null ? CompassIcon : FlagIcon)}
+    {#if hasSpaceRules && rulesHref !== null}
+      {@render action(rulesHref, i18n.t('room.rulesTitle'), ScrollIcon)}
+    {/if}
     {@render action(searchHref, i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
   {/if}
 </div>

@@ -40,7 +40,7 @@ export function spaceNavigationHref(
   return savedPath;
 }
 
-const SPACE_PAGES = new Set(['create-room', 'create-space']);
+const SPACE_PAGES = new Set(['create-room', 'create-space', 'rules']);
 
 function segmentUnder(root: string, path: string): string | null {
   if (!path.startsWith(`${root}/`)) return null;

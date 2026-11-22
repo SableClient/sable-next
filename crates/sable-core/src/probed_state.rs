@@ -24,13 +24,13 @@ pub(crate) struct ProbedState {
 pub(crate) enum Probed {
     Unknown,
     Absent,
-    Present(Value),
+    Present(Value, Option<u64>),
 }
 
 #[derive(Default)]
 struct ProbedRoom {
     full: Option<HashMap<String, Vec<RoomStateEventView>>>,
-    keys: HashMap<(String, String), Option<Value>>,
+    keys: HashMap<(String, String), Option<(Value, Option<u64>)>>,
     written: u64,
 }
 
@@ -53,14 +53,14 @@ impl ProbedState {
                 .get(event_type)
                 .and_then(|events| events.iter().find(|event| event.state_key == state_key))
                 .map_or(Probed::Absent, |event| {
-                    Probed::Present(event.content.clone())
+                    Probed::Present(event.content.clone(), None)
                 });
         }
         match room
             .keys
             .get(&(event_type.to_owned(), state_key.to_owned()))
         {
-            Some(Some(content)) => Probed::Present(content.clone()),
+            Some(Some((content, ts))) => Probed::Present(content.clone(), *ts),
             Some(None) => Probed::Absent,
             None => Probed::Unknown,
         }
@@ -81,7 +81,7 @@ impl ProbedState {
         room_id: &RoomId,
         event_type: &str,
         state_key: &str,
-        content: Option<Value>,
+        content: Option<(Value, Option<u64>)>,
     ) {
         self.room_mut(room_id)
             .keys
@@ -111,7 +111,7 @@ impl ProbedState {
         event_type: &str,
         state_key: &str,
         now: u64,
-    ) -> Option<Value> {
+    ) -> Option<(Value, u64)> {
         self.written
             .get(&(
                 room_id.to_owned(),
@@ -119,7 +119,7 @@ impl ProbedState {
                 state_key.to_owned(),
             ))
             .filter(|(at, _)| now.saturating_sub(*at) < RECENT_STATE_MS)
-            .map(|(_, content)| content.clone())
+            .map(|(at, content)| (content.clone(), *at))
     }
 
     pub(crate) fn remember_written(
@@ -284,7 +284,7 @@ mod tests {
 
         assert_eq!(
             state.written(&room_id, "m.room.topic", "", 1_000 + RECENT_STATE_MS - 1),
-            Some(json!({"topic": "new"}))
+            Some((json!({"topic": "new"}), 1_000))
         );
         assert_eq!(
             state.written(&room_id, "m.room.topic", "", 1_000 + RECENT_STATE_MS),

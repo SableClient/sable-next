@@ -43,6 +43,7 @@ test.each([
   [`${root}/!room%3Aexample.org?thread=%24t`, true],
   [`${root}/!left%3Aexample.org`, false],
   [lobby, false],
+  [`${root}/rules`, false],
   [`${root}/create-space`, false],
   [root, false],
   ['/rooms/!room%3Aexample.org', false],

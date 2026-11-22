@@ -62,6 +62,7 @@ fn view(
     source: &OwnedRoomId,
     content: Option<&Value>,
     accepted: Option<i64>,
+    updated_at: Option<u64>,
 ) -> Option<RoomRulesView> {
     let stored = read(content);
     let text = stored.rules?.text;
@@ -76,6 +77,7 @@ fn view(
         version: stored.version,
         require_acceptance: stored.require_acceptance,
         accepted: accepted.is_some_and(|accepted| accepted >= stored.version),
+        updated_at,
     })
 }
 
@@ -172,14 +174,21 @@ fn event_type<T>(raw: &Raw<T>) -> Option<String> {
 }
 
 impl Core {
-    async fn rules_content(&self, room_id: &OwnedRoomId) -> Result<Option<Value>, RpcError> {
+    async fn rules_event(
+        &self,
+        room_id: &OwnedRoomId,
+    ) -> Result<Option<(Value, Option<u64>)>, RpcError> {
         // Neither type is synced, so a room without rules costs a request for each on its first
         // open. Together they take one round trip instead of two.
         let read = |event_type: &str| {
-            self.room_state_event_content(room_id.clone(), event_type.to_owned(), String::new())
+            self.room_state_event(room_id.clone(), event_type.to_owned(), String::new())
         };
         let (unstable, stable) = tokio::join!(read(RULES_EVENTS[0]), read(RULES_EVENTS[1]));
-        unstable?.map_or(stable, |content| Ok(Some(content)))
+        unstable?.map_or(stable, |event| Ok(Some(event)))
+    }
+
+    async fn rules_content(&self, room_id: &OwnedRoomId) -> Result<Option<Value>, RpcError> {
+        Ok(self.rules_event(room_id).await?.map(|(content, _)| content))
     }
 
     async fn accepted_rules_version(&self, room_id: &OwnedRoomId) -> Result<Option<i64>, RpcError> {
@@ -204,26 +213,26 @@ impl Core {
         &self,
         room_id: &OwnedRoomId,
     ) -> Result<Option<RoomRulesView>, RpcError> {
-        let own = self.rules_content(room_id).await?;
+        let own = self.rules_event(room_id).await?;
         let client = self.client().await?;
-        let delegated = delegate(own.as_ref()).filter(|room| {
+        let delegated = delegate(own.as_ref().map(|(content, _)| content)).filter(|room| {
             room != room_id
                 && client
                     .get_room(room)
                     .is_some_and(|room| room.state() == RoomState::Joined)
         });
-        let (source, content) = match delegated {
+        let (source, event) = match delegated {
             Some(source) => {
-                let content = self.rules_content(&source).await?;
-                (source, content)
+                let event = self.rules_event(&source).await?;
+                (source, event)
             }
             None => (room_id.clone(), own),
         };
-        if content.is_none() {
+        let Some((content, updated_at)) = event else {
             return Ok(None);
-        }
+        };
         let accepted = self.accepted_rules_version(&source).await?;
-        Ok(view(&source, content.as_ref(), accepted))
+        Ok(view(&source, Some(&content), accepted, updated_at))
     }
 
     pub(crate) async fn accept_room_rules(
@@ -446,6 +455,7 @@ mod tests {
         assert_eq!(alone.source_room_id, room_id);
         assert_eq!(alone.version, 1);
         assert!(!alone.accepted);
+        assert_eq!(alone.updated_at, Some(1));
 
         server
             .sync_room(
@@ -514,7 +524,7 @@ mod tests {
     #[test]
     fn rules_are_accepted_only_at_or_past_their_version() {
         let content = rules(3);
-        let accepted = |version| view(&room(), Some(&content), version).unwrap().accepted;
+        let accepted = |version| view(&room(), Some(&content), version, None).unwrap().accepted;
 
         assert!(!accepted(None));
         assert!(!accepted(Some(2)));
@@ -524,12 +534,13 @@ mod tests {
 
     #[test]
     fn an_event_without_rules_is_no_rules() {
-        assert!(view(&room(), None, None).is_none());
-        assert!(view(&room(), Some(&json!({ "version": 2 })), None).is_none());
+        assert!(view(&room(), None, None, None).is_none());
+        assert!(view(&room(), Some(&json!({ "version": 2 })), None, None).is_none());
         assert!(
             view(
                 &room(),
                 Some(&json!({ "rules": { "m.text": [{ "body": "  " }] }, "version": 2 })),
+                None,
                 None
             )
             .is_none()
@@ -545,7 +556,7 @@ mod tests {
             ] },
             "version": 1,
         });
-        let html = view(&room(), Some(&content), None).unwrap().html;
+        let html = view(&room(), Some(&content), None, None).unwrap().html;
 
         assert!(html.contains("<b>Be kind</b>"));
         assert!(!html.contains("onerror"));
@@ -559,7 +570,7 @@ mod tests {
             "version": "three",
             "delegate_to": { "room": 7 },
         });
-        let view = view(&room(), Some(&content), None).unwrap();
+        let view = view(&room(), Some(&content), None, None).unwrap();
 
         assert!(!view.require_acceptance);
         assert_eq!(view.version, 0);
@@ -599,7 +610,7 @@ mod tests {
         let stored = edited(None, &change);
 
         for html in [
-            view(&room(), Some(&stored), None).unwrap().html,
+            view(&room(), Some(&stored), None, None).unwrap().html,
             settings(Some(&stored)).html,
         ] {
             for part in ["<h1>", "<ol>", "<strong>kind</strong>", "<blockquote>"] {

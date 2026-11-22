@@ -72,7 +72,7 @@ export function setMobileDrawerOpen(open: boolean): void {
 const TREE_REGIONS = '[data-focus-region="rooms"], [data-focus-region="spaces"]';
 
 const ROOM_PATH =
-  /^\/(?:(?:home|rooms|direct)\/[^/]+|space\/[^/]+\/(?!lobby$|create-room$|create-space$)[^/]+)$/;
+  /^\/(?:(?:home|rooms|direct)\/[^/]+|space\/[^/]+\/(?!lobby$|create-room$|create-space$|rules$)[^/]+)$/;
 
 const LIST_PATH = /^\/(?:home|rooms|direct|space\/[^/]+)$/;
 

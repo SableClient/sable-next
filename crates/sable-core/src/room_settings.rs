@@ -496,17 +496,22 @@ pub(crate) fn join_rule_content(
     ))
 }
 
-pub(crate) fn state_event_content(raw: &str) -> Option<Value> {
+pub(crate) fn state_event(raw: &str) -> Option<(Value, Option<u64>)> {
     let value = serde_json::from_str::<Value>(raw).ok()?;
     let is_event = value
         .as_object()
         .is_some_and(|object| object.contains_key("type") || object.contains_key("event_id"));
 
     if is_event {
-        value.get("content").cloned()
+        let ts = value.get("origin_server_ts").and_then(Value::as_u64);
+        Some((value.get("content")?.clone(), ts))
     } else {
-        Some(value)
+        Some((value, None))
     }
+}
+
+pub(crate) fn state_event_content(raw: &str) -> Option<Value> {
+    state_event(raw).map(|(content, _)| content)
 }
 
 #[derive(serde::Serialize)]
@@ -744,11 +749,23 @@ impl Core {
         event_type: String,
         state_key: String,
     ) -> Result<Option<Value>, RpcError> {
-        let written =
+        Ok(self
+            .room_state_event(room_id, event_type, state_key)
+            .await?
+            .map(|(content, _)| content))
+    }
+
+    pub(crate) async fn room_state_event(
+        &self,
+        room_id: OwnedRoomId,
+        event_type: String,
+        state_key: String,
+    ) -> Result<Option<(Value, Option<u64>)>, RpcError> {
+        if let Some((content, at)) =
             self.probed_state()
-                .written(&room_id, &event_type, &state_key, crate::now_ms());
-        if written.is_some() {
-            return Ok(written);
+                .written(&room_id, &event_type, &state_key, crate::now_ms())
+        {
+            return Ok(Some((content, Some(at))));
         }
         let client = self.client().await?;
         let room = self.room(&room_id).await?;
@@ -761,44 +778,45 @@ impl Core {
             .ok()
             .flatten();
 
-        let content = event.and_then(|raw| {
-            let field = match raw {
-                RawAnySyncOrStrippedState::Sync(event) => event.get_field("content"),
-                RawAnySyncOrStrippedState::Stripped(event) => event.get_field("content"),
-            };
-            field.ok().flatten()
+        let stored = event.and_then(|raw| match raw {
+            RawAnySyncOrStrippedState::Sync(event) => Some((
+                event.get_field::<Value>("content").ok().flatten()?,
+                event.get_field::<u64>("origin_server_ts").ok().flatten(),
+            )),
+            RawAnySyncOrStrippedState::Stripped(event) => {
+                Some((event.get_field::<Value>("content").ok().flatten()?, None))
+            }
         });
 
-        if content.is_some() {
-            return Ok(content);
+        if stored.is_some() {
+            return Ok(stored);
         }
-        let probed = self
+        match self
             .probed_state()
-            .content(&room_id, &event_type, &state_key);
-        match probed {
-            Probed::Present(content) => return Ok(Some(content)),
+            .content(&room_id, &event_type, &state_key)
+        {
+            Probed::Present(content, ts) => return Ok(Some((content, ts))),
             Probed::Absent => return Ok(None),
             Probed::Unknown => {}
         }
 
-        let content = match client
-            .send(get_state_event_for_key::v3::Request::new(
-                room_id.clone(),
-                event_type.clone().into(),
-                state_key.clone(),
-            ))
-            .await
-        {
-            Ok(response) => state_event_content(response.event_or_content.get()),
+        let mut request = get_state_event_for_key::v3::Request::new(
+            room_id.clone(),
+            event_type.clone().into(),
+            state_key.clone(),
+        );
+        request.format = get_state_event_for_key::v3::StateEventFormat::Event;
+        let fetched = match client.send(request).await {
+            Ok(response) => state_event(response.event_or_content.get()),
             Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => None,
             Err(error) => {
                 return Err(self.rpc_error("room_state_event", &error));
             }
         };
         self.probed_state()
-            .remember_content(&room_id, &event_type, &state_key, content.clone());
+            .remember_content(&room_id, &event_type, &state_key, fetched.clone());
 
-        Ok(content)
+        Ok(fetched)
     }
 }
 

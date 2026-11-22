@@ -50,7 +50,7 @@
   let settledPath = $state(page.url.pathname);
   let routeChanging = $derived(pathname !== settledPath && page.params.roomId === undefined);
   let spaceIndex = $derived(/^\/space\/[^/]+$/.test(pathname));
-  let spaceLobby = $derived(/^\/space\/[^/]+\/lobby$/.test(pathname));
+  let spaceLobbyOrRules = $derived(/^\/space\/[^/]+\/(?:lobby|rules)$/.test(pathname));
   let settingsPage = $derived(/^\/settings(\/[^/]+)?$/.test(pathname));
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || spaceIndex);
   let pinnedOpen = $derived(BLANK_INDEX_PATHS.has(pathname) || spaceIndex);
@@ -60,7 +60,7 @@
     !appLayout.current &&
       !pinnedOpen &&
       !showMobileQuickTools &&
-      !spaceLobby &&
+      !spaceLobbyOrRules &&
       !settingsPage &&
       page.params.roomId === undefined
   );

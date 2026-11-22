@@ -456,6 +456,8 @@
     "lobbyLoadingMore": "Loading more rooms…",
     "topicTitle": "Room topic",
     "rulesTitle": "Rules",
+    "rulesUpdated": "Last updated {{date}}",
+    "rulesUnavailable": "The rules could not be loaded.",
     "rulesHeading": "Rules of {{name}}",
     "rulesDelegatedFrom": "{{room}} follows the rules of this space.",
     "rulesAccept": "Accept",
