@@ -72,7 +72,7 @@ fn processes() -> Result<HashMap<u32, Process>, String> {
 fn playing_pids() -> Result<Vec<u32>, String> {
     let enumerator = DeviceEnumerator::new().map_err(|error| error.to_string())?;
     let devices = enumerator
-        .get_device_collection(&Direction::Render)
+        .get_device_collection(Direction::Render)
         .map_err(|error| error.to_string())?;
     let count = devices
         .get_nbr_devices()
@@ -176,15 +176,16 @@ fn run(
     };
     let mut client =
         AudioClient::new_application_loopback_client(pid, include).map_err(describe)?;
-    let format = WaveFormat::new(32, 32, &SampleType::Float, SAMPLE_RATE, CHANNELS, None);
+    let format = WaveFormat::new(32, 32, SampleType::Float, SAMPLE_RATE, CHANNELS, None);
     client
         .initialize_client(
             &format,
-            &Direction::Capture,
-            &StreamMode::EventsShared {
+            Direction::Capture,
+            StreamMode::EventsShared {
                 autoconvert: true,
                 buffer_duration_hns: BUFFER_DURATION_HNS,
             },
+            None,
         )
         .map_err(describe)?;
     let event = client.set_get_eventhandle().map_err(describe)?;
