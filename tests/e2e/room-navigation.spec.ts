@@ -44,6 +44,20 @@ test('Alt+Shift+Up and Down switch unread rooms from the message field', async (
   await expect(app.composer).toBeVisible();
 });
 
+test('Alt+Up and Down stay in Home instead of leaving for the room list', async ({ app, page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ showHome: true }));
+  });
+  await page.goto('/home/!room%3Aexample.test');
+  await expect(page).toHaveURL(/\/home\/!room%3Aexample.test$/);
+  await expect(app.composer).toBeVisible();
+
+  await page.keyboard.press('Alt+ArrowDown');
+  await expect(page).toHaveURL(/\/home\/!second%3Aexample.test$/);
+  await page.keyboard.press('Alt+ArrowUp');
+  await expect(page).toHaveURL(/\/home\/!room%3Aexample.test$/);
+});
+
 test('mobile: opening a room leaves the message field unfocused', async ({ app, page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await app.openRooms();

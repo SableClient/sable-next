@@ -19,7 +19,7 @@
     roomListOptions,
   } from '#lib/rooms/room-list.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
-  import { HOME_SECTION, rememberLastRoom } from '#lib/rooms/last-room.js';
+  import { HOME_SECTION, rememberLastRoom, restoredRoomPath } from '#lib/rooms/last-room.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { OpenRoomSearch, provideOpenRoomSearch } from '#lib/features/room/room-panels.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -1137,9 +1137,24 @@
 
   trackRouteFocus();
 
+  function activeRoomSection(): string | null {
+    const home = resolve('/(app)/home');
+    if (page.url.pathname === home || page.url.pathname.startsWith(`${home}/`)) {
+      return HOME_SECTION;
+    }
+    return findRoomByPathId(roomList.rooms, page.params.spaceId)?.room_id ?? null;
+  }
+
   function jumpToRoom(roomId: string): void {
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself
-    void goto(roomSectionPath(roomList.rooms, roomId));
+    const path = restoredRoomPath(
+      roomList.rooms,
+      roomId,
+      activeRoomSection(),
+      preferences.showHome,
+      (spaceId) => roomList.section(spaceId)?.descendants ?? []
+    );
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- restoredRoomPath() resolves the route itself
+    void goto(path);
   }
 
   $effect(() => {
