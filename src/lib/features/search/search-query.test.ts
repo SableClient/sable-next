@@ -5,7 +5,14 @@ import type { SearchDirectory, SearchRoom, SpaceChildEdge } from '#src/generated
 import { parseSearchQuery, resolveSearchQuery } from './search-query';
 
 function edge(roomId: string): SpaceChildEdge {
-  return { room_id: roomId, via: [], order: null, origin_server_ts: 0, suggested: false };
+  return {
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 0,
+    suggested: false,
+    private: false,
+  };
 }
 
 function room(roomId: string, name: string, fields: Partial<SearchRoom> = {}): SearchRoom {

@@ -46,6 +46,7 @@ domain! {
     join,
     knock,
     via_servers,
+    upgrade_servers,
     leave,
     invite,
     create,
@@ -306,7 +307,31 @@ impl Handler for ViaServersParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
         let room = core.room(&self.room_id).await?;
-        core.room_via_servers(&room).await
+        Ok(crate::routing::Route::of(&room)
+            .await
+            .map(|route| route.to_strings())
+            .unwrap_or_default())
+    }
+}
+
+/// The servers to join a tombstoned room's successor through. Not for links.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct UpgradeServersParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+}
+
+impl Handler for UpgradeServersParams {
+    type Ok = Vec<String>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
+        let room = core.room(&self.room_id).await?;
+        Ok(crate::routing::upgrade_servers(&room)
+            .await
+            .iter()
+            .map(ToString::to_string)
+            .collect())
     }
 }
 

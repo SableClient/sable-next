@@ -34,7 +34,7 @@
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
   import { useRecentReactions } from '#lib/emoji/recents.svelte.js';
   import { emoteRecents } from '#lib/model/model.js';
-  import { readRecentStickers, rememberSticker } from '#lib/emoji/recent-packs.svelte.js';
+  import { useStickerHistory } from '#lib/emoji/sticker-history.svelte.js';
 
   interface Props {
     roomId: string;
@@ -71,6 +71,7 @@
   }: Props = $props();
   const core = useCoreClient();
   const history = useRecentReactions(core);
+  const stickerHistory = useStickerHistory(core);
 
   type PickerRow =
     | { id: string; kind: 'lead' }
@@ -96,7 +97,7 @@
   let packs = $state.raw<ImagePackView[]>([]);
   let loading = $state(true);
   let failed = $state(false);
-  let recent = $derived(tab === 'sticker' ? readRecentStickers() : []);
+  let recent = $derived(tab === 'sticker' ? stickerHistory.current : []);
   let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
   let activeCell = $state.raw<{ section: string; index: number }>({ section: '', index: 0 });
   let gridWidth = $state(0);
@@ -593,7 +594,7 @@
   function pick(image: PackImageView, keepOpen: boolean): void {
     keepPickFocus(keepOpen, image.url);
     if (!reactions) {
-      if (tab === 'sticker') rememberSticker(image.url);
+      if (tab === 'sticker') stickerHistory.remember(image.url);
       else rememberEmoji(image.url);
     }
     onPick(image, tab as ImageUsageView, keepOpen);

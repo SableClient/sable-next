@@ -812,9 +812,12 @@ impl Core {
         let (state, complete) = self.room_pack_state(client, room, network_fallback).await?;
 
         let mut packs = Vec::new();
-        let own_server = client
-            .user_id()
-            .map(|user_id| user_id.server_name().to_string());
+        let route = if state.packs.is_empty() {
+            None
+        } else {
+            crate::routing::Route::unranked(room).await
+        };
+        let via = route.map(|route| route.to_strings()).unwrap_or_default();
         for (state_key, event) in state.packs {
             if wanted.is_some_and(|keys| !keys.contains(&state_key)) {
                 continue;
@@ -832,11 +835,9 @@ impl Core {
             );
             view.stable_event = stable_event;
             view.legacy_event = legacy_event;
-            if let Some(server) = &own_server {
-                for image in &mut view.images {
-                    if let Some(source) = &mut image.source_pack {
-                        source.via.push(server.clone());
-                    }
+            for image in &mut view.images {
+                if let Some(source) = &mut image.source_pack {
+                    source.via.clone_from(&via);
                 }
             }
             if view.name.is_none() {

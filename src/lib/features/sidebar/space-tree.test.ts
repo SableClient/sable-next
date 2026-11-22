@@ -25,6 +25,7 @@ function space(roomId: string, children: string[]): RoomListItemView {
       order: null,
       origin_server_ts: index,
       suggested: false,
+      private: false,
     })),
   });
 }

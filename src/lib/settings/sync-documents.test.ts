@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clearDraft,
@@ -22,7 +22,7 @@ import {
   quietRooms,
   shownRooms,
 } from '#lib/rooms/quiet-rooms.svelte.js';
-import { readRecentStickers, writeRecentStickers } from '#lib/emoji/recent-packs.svelte.js';
+import type { RecentUse } from '#src/generated/protocol';
 import { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
 
 import { customThemes, installCustomTheme, replaceCustomThemes } from './custom-themes.svelte';
@@ -41,8 +41,16 @@ const gif = {
   mimetype: 'image/gif',
 };
 
+const stickers = {
+  current: [] as RecentUse[],
+  loaded: true,
+  follow: vi.fn<(list: string[]) => void>(),
+};
+
 function reset(): void {
-  writeRecentStickers([]);
+  stickers.current = [];
+  stickers.loaded = true;
+  stickers.follow.mockClear();
   adoptFavorites([]);
   adoptRecentGifs([]);
   adoptRoomIconOverrides([]);
@@ -59,9 +67,9 @@ afterEach(reset);
 describe('the workspace document', () => {
   it('round-trips picker and layout state', () => {
     const sidebar = new SpaceSidebar();
-    const document = workspaceDocument(sidebar);
+    const document = workspaceDocument(sidebar, stickers);
 
-    writeRecentStickers(['party']);
+    stickers.current = [{ key: 'party', uses: 4, total: 4 }];
     adoptFavorites([gif]);
     adoptRecentGifs([gif]);
     adoptRoomIconOverrides([['!room:example.org', 'never']]);
@@ -76,7 +84,7 @@ describe('the workspace document', () => {
     expect(document.adopt(content)).toBe(true);
 
     expect(content).not.toHaveProperty('recentEmotes');
-    expect(readRecentStickers()).toEqual(['party']);
+    expect(stickers.follow).toHaveBeenCalledWith(['party']);
     expect(favoriteGifs()).toEqual([gif]);
     expect(recentGifs()).toEqual([gif]);
     expect(roomIconOverrides()).toEqual({ '!room:example.org': 'never' });
@@ -87,7 +95,7 @@ describe('the workspace document', () => {
   });
 
   it('drops a favourite pointing off a provider CDN', () => {
-    const document = workspaceDocument(new SpaceSidebar());
+    const document = workspaceDocument(new SpaceSidebar(), stickers);
 
     expect(
       document.adopt({
@@ -99,7 +107,7 @@ describe('the workspace document', () => {
   });
 
   it('keeps what it holds for a field an older build left out', () => {
-    const document = workspaceDocument(new SpaceSidebar());
+    const document = workspaceDocument(new SpaceSidebar(), stickers);
     adoptBridgedSpaces(['!bridged:example.org']);
 
     expect(document.adopt({ v: 1, quietRooms: ['!space:example.org'] })).toBe(true);
@@ -109,7 +117,7 @@ describe('the workspace document', () => {
   });
 
   it('keeps the shown rooms when an older build rewrites the document without them', () => {
-    const document = workspaceDocument(new SpaceSidebar());
+    const document = workspaceDocument(new SpaceSidebar(), stickers);
     adoptShownRooms(['!shown:example.org']);
 
     expect(document.adopt({ v: 1, quietRooms: ['!space:example.org'] })).toBe(true);
@@ -117,15 +125,24 @@ describe('the workspace document', () => {
     expect(shownRooms()).toEqual(['!shown:example.org']);
   });
 
+  it('mirrors plain urls for older builds, and only once the history is known', () => {
+    const document = workspaceDocument(new SpaceSidebar(), stickers);
+    stickers.current = [{ key: 'party', uses: 4, total: 4 }];
+    expect(document.snapshot().content).toHaveProperty('recentStickers', ['party']);
+
+    stickers.loaded = false;
+    expect(document.snapshot().content).not.toHaveProperty('recentStickers');
+  });
+
   it('asks to be seeded only when there is something local to seed with', () => {
-    const document = workspaceDocument(new SpaceSidebar());
+    const document = workspaceDocument(new SpaceSidebar(), stickers);
 
     expect(document.adopt(null)).toBe(true);
 
-    writeRecentStickers(['party']);
+    stickers.current = [{ key: 'party', uses: 1, total: 1 }];
     expect(document.adopt(null)).toBe(false);
 
-    writeRecentStickers([]);
+    stickers.current = [];
     adoptRecentGifs([gif]);
     expect(document.adopt(null)).toBe(false);
   });

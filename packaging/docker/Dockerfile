@@ -50,10 +50,10 @@ RUN apt-get update \
        | tar -xz -C /tmp \
     && install "/tmp/binaryen-version_133/bin/wasm-opt" /usr/local/bin/wasm-opt \
     && rustup target add wasm32-unknown-unknown \
-    && cargo install wasm-bindgen-cli --version 0.2.130 --locked \
-    && corepack enable pnpm \
-    && corepack prepare pnpm@12.14.0 --activate
+    && cargo install wasm-bindgen-cli --version 0.2.130 --locked
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
+# Node 25+ no longer ships corepack.
+RUN npm install --global "$(node -p "require('./package.json').packageManager")"
 COPY patches ./patches
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
@@ -69,9 +69,9 @@ COPY --from=wasm-build /src/src/generated/wasm /
 
 FROM node AS frontend
 WORKDIR /src
-RUN corepack enable pnpm \
-    && corepack prepare pnpm@12.14.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
+# Node 25+ no longer ships corepack.
+RUN npm install --global "$(node -p "require('./package.json').packageManager")"
 COPY patches ./patches
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .

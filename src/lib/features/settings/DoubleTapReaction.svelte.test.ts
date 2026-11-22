@@ -71,6 +71,7 @@ describe.each(['mobile', 'desktop'])('%s picker', (layout) => {
       }
       if (method === 'packs.list_all') return Promise.resolve(packs);
       if (method === 'messages.frequent_reactions') return Promise.resolve([]);
+      if (method === 'messages.recent_stickers') return Promise.resolve([]);
       throw new Error(`Unexpected call: ${method}`);
     });
     const transport = { call, fetchMedia: () => new Promise(() => {}) } as unknown as Transport;

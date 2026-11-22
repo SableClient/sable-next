@@ -327,6 +327,7 @@ mod tests {
             order: order.map(str::to_owned),
             origin_server_ts,
             suggested: false,
+            private: false,
         }
     }
 

@@ -89,6 +89,7 @@ fn space(room_id: &str, children: &[&str]) -> Row {
                 order: None,
                 origin_server_ts: 0,
                 suggested: false,
+                private: false,
             })
             .collect(),
         ..row(room_id)

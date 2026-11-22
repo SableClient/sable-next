@@ -524,7 +524,11 @@ mod tests {
     #[test]
     fn rules_are_accepted_only_at_or_past_their_version() {
         let content = rules(3);
-        let accepted = |version| view(&room(), Some(&content), version, None).unwrap().accepted;
+        let accepted = |version| {
+            view(&room(), Some(&content), version, None)
+                .unwrap()
+                .accepted
+        };
 
         assert!(!accepted(None));
         assert!(!accepted(Some(2)));

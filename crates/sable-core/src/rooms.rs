@@ -19,7 +19,6 @@ use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::member::MembershipState;
-use matrix_sdk::ruma::events::room::tombstone::RoomTombstoneEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{
     OwnedEventId, OwnedRoomId, OwnedServerName, RoomId, RoomOrAliasId, ServerName, UInt,
@@ -438,12 +437,8 @@ impl Core {
             return Ok(());
         }
 
-        let via = self
-            .child_via(room_id)
-            .await?
-            .iter()
-            .filter_map(|server| ServerName::parse(server).ok())
-            .collect();
+        self.refuse_private_child(&space, room_id).await?;
+        let via = self.child_via(room_id).await?;
 
         let mut content = SpaceChildEventContent::new(via);
         content.suggested = suggested.unwrap_or(false);
@@ -456,60 +451,36 @@ impl Core {
         Ok(())
     }
 
-    async fn child_via(&self, room_id: &RoomId) -> Result<Vec<String>, RpcError> {
+    async fn child_via(&self, room_id: &RoomId) -> Result<Vec<OwnedServerName>, RpcError> {
         let client = self.client().await?;
-        let own = client
-            .user_id()
-            .ok_or(RpcCode::NotLoggedIn)?
-            .server_name()
-            .to_string();
-
-        let via = match client.get_room(room_id) {
-            Some(room) => self.room_via_servers(&room).await.unwrap_or_else(|error| {
-                tracing::warn!("add_to_space: no via for {room_id}: {error:?}");
-                Vec::new()
-            }),
-            None => Vec::new(),
-        };
-
-        Ok(if via.is_empty() { vec![own] } else { via })
+        if let Some(room) = client.get_room(room_id)
+            && let Some(route) = crate::routing::Route::of(&room).await
+        {
+            return Ok(route.into_servers());
+        }
+        let listed = crate::routing::Route::listed(&client, room_id).await;
+        Ok(listed.ok_or(RpcCode::UnknownRoom)?.into_servers())
     }
 
-    pub(crate) async fn room_via_servers(&self, room: &Room) -> Result<Vec<String>, RpcError> {
-        let members = room
-            .members(RoomMemberships::JOIN)
+    /// Space state would show every member a chat this account filed there privately.
+    pub(crate) async fn refuse_private_child(
+        &self,
+        space: &Room,
+        room_id: &RoomId,
+    ) -> Result<(), RpcError> {
+        let private = Self::synced_dm_spaces_of(&space.client(), room_id)
             .await
-            .or_failed(self, "room_via_servers")?;
-
-        let ranked: Vec<(String, i64)> = members
             .iter()
-            .map(|member| {
-                (
-                    member.user_id().to_string(),
-                    view::clamp_power_level(member.power_level()),
-                )
-            })
-            .collect();
-
-        let mut via = view::via_servers(&ranked);
-        if let Some(event) = room
-            .get_state_event_static::<RoomTombstoneEventContent>()
-            .await
-            .or_failed(self, "room_via_servers")?
-            .and_then(|event| event.deserialize().ok())
+            .any(|linked| linked == space.room_id());
+        if private
+            && self
+                .space_child_content(space, room_id, "refuse_private_child")
+                .await?
+                .is_none()
         {
-            let sender = match &event {
-                SyncOrStrippedState::Sync(event) => event.as_original().map(|event| &event.sender),
-                SyncOrStrippedState::Stripped(event) => Some(&event.sender),
-            };
-            if let Some(sender) = sender {
-                let server = sender.server_name().to_string();
-                if !via.contains(&server) {
-                    via.insert(0, server);
-                }
-            }
+            return Err(RpcCode::Unsupported.into());
         }
-        Ok(via)
+        Ok(())
     }
 
     async fn space_child_content(
@@ -548,6 +519,7 @@ impl Core {
         {
             Ok(content)
         } else {
+            self.refuse_private_child(space, room_id).await?;
             let via = via.ok_or(RpcCode::UnknownRoom)?;
             let via: Vec<_> = via
                 .into_iter()
@@ -635,6 +607,11 @@ impl Core {
                 (resolved.room_id, resolved.servers)
             }
         };
+        if let Some(room) = client.get_room(&room_id)
+            && let Some(route) = crate::routing::Route::cached(&room).await
+        {
+            servers.extend(route.into_servers());
+        }
         servers.extend(room_id.server_name().map(ToOwned::to_owned));
         servers.extend(resolved);
 
@@ -1047,55 +1024,6 @@ mod tests {
 
         super::migrate_saved_tombstones(&client).await.unwrap();
         assert!(!room.is_tombstoned());
-    }
-
-    #[tokio::test]
-    async fn upgrade_routes_include_the_tombstone_sender() {
-        use matrix_sdk::ruma::{room_id, serde::Raw};
-        use matrix_sdk::test_utils::mocks::MatrixMockServer;
-        use matrix_sdk_test::JoinedRoomBuilder;
-        use serde_json::json;
-        use wiremock::{
-            Mock, ResponseTemplate,
-            matchers::{method, path_regex},
-        };
-
-        let server = MatrixMockServer::new().await;
-        let client = server.client_builder().build().await;
-        let room_id = room_id!("!old:example.org");
-        server
-            .sync_room(
-                &client,
-                JoinedRoomBuilder::new(room_id).add_state_event(
-                    Raw::new(&json!({
-                        "type": "m.room.tombstone", "state_key": "", "event_id": "$upgrade",
-                        "sender": "@upgrader:[2001:db8::1]:8448", "origin_server_ts": 1,
-                        "content": {"body": "upgraded", "replacement_room": "!new:example.org"}
-                    }))
-                    .unwrap()
-                    .cast_unchecked(),
-                ),
-            )
-            .await;
-        Mock::given(method("GET"))
-            .and(path_regex("/_matrix/client/v3/rooms/.*/members"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
-            .mount(server.server())
-            .await;
-        let (core, _events) = crate::Core::new(
-            "routes",
-            Box::new(crate::store::MemorySessionStore::default()),
-        );
-        let via = core
-            .room_via_servers(&client.get_room(room_id).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(
-            via.iter()
-                .filter(|server| *server == "[2001:db8::1]:8448")
-                .count(),
-            1
-        );
     }
 
     #[tokio::test]

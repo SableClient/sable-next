@@ -68,6 +68,8 @@ domain! {
     redact_reaction,
     frequent_reactions,
     remember_emoji,
+    recent_stickers,
+    remember_sticker,
     set_typing,
     media_config,
 }
@@ -177,6 +179,10 @@ impl Handler for SendParams {
         let opt_out = (self.no_link_previews || (had_previews && link_previews.is_empty()))
             .then(|| serde_json::Value::Array(Vec::new()));
         let images = core.prepare_preview_images(&room_id, &link_previews).await;
+        let mut bot_command = self.bot_command;
+        if let Some(command) = &mut bot_command {
+            crate::bot_commands::route_rooms(&core.client().await?, command).await;
+        }
         let extra = extra_content(
             persona.as_ref().map(crate::personas::profile_extra_content),
             [
@@ -194,7 +200,7 @@ impl Handler for SendParams {
                     IMAGE_SOURCE_PACKS,
                     image_source_pack_references(&self.image_source_packs),
                 ),
-                (crate::bot_commands::COMMAND_FIELD, self.bot_command),
+                (crate::bot_commands::COMMAND_FIELD, bot_command),
                 (view::FORUM_TITLE, forum_title_value(self.forum_title)),
             ],
         );
@@ -1165,6 +1171,40 @@ impl Handler for RememberEmojiParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
         core.remember_reaction(&self.key).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RecentStickersParams {
+    pub sync: bool,
+    #[serde(default)]
+    pub legacy: Vec<String>,
+    #[serde(default)]
+    pub synced: Option<Vec<String>>,
+}
+
+impl Handler for RecentStickersParams {
+    type Ok = Vec<sable_model::emote_picker::RecentUse>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
+        core.recent_stickers(self.sync, &self.legacy, self.synced.as_deref())
+            .await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RememberStickerParams {
+    pub key: String,
+    pub sync: bool,
+}
+
+impl Handler for RememberStickerParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
+        core.remember_sticker(&self.key, self.sync).await
     }
 }
 

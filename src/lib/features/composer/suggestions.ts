@@ -151,6 +151,7 @@ function roomSuggestions(
   if (!normalizedNeedle) return [];
   const seen = new Set<string>();
   return rooms
+    .filter((room) => room.canonical_alias || room.state === 'joined')
     .map((room) => {
       const name = room.name ?? room.canonical_alias ?? room.room_id;
       return {

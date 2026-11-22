@@ -40,7 +40,7 @@ export class TombstoneJoin {
     this.joining = true;
     this.failed = false;
     try {
-      const via = await this.rpc.rooms.viaServers({ room_id: this.roomId() });
+      const via = await this.rpc.rooms.upgradeServers({ room_id: this.roomId() });
       const joinedId = await joinRoom(this.rpc, target, via);
       await this.roomList.whenListed(joinedId, 10_000);
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath() resolves the route itself

@@ -1217,11 +1217,13 @@
     input.value = '';
   }
 
-  /** The servers cost a round trip, so the mention is inserted without them. */
+  /** The servers cost a round trip. Only joined rooms are offered by id, so ours can stand in. */
   async function attachVia(address: string): Promise<void> {
     if (!address.startsWith('!')) return;
+    const own = serverNameOf(core.session?.user_id ?? '');
+    editor.attachVia(address, [own]);
     try {
-      editor.attachVia(address, await core.rpc.rooms.viaServers({ room_id: address }));
+      editor.attachVia(address, await core.rpc.rooms.viaServers({ room_id: address }), own);
     } catch (error) {
       console.debug('[sable composer] via servers unavailable', error);
     }

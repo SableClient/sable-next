@@ -3259,6 +3259,7 @@ mod regression_tests {
             })
             .expect("bookmark item written");
         let body: serde_json::Value = serde_json::from_slice(&item.body).unwrap();
+        assert!(body["uri"].as_str().unwrap().contains("?via="), "{body}");
         assert_eq!(body["msgtype"], serde_json::Value::Null, "{body}");
         assert_eq!(body["body_preview"], serde_json::Value::Null, "{body}");
     }

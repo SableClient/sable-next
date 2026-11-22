@@ -116,6 +116,12 @@
       allowedVersions: '<0.40',
     },
     {
+      description: 'Share qrcode with the pinned Matrix SDK',
+      matchManagers: ['cargo'],
+      matchPackageNames: ['qrcode'],
+      allowedVersions: '<0.15',
+    },
+    {
       description: 'Share libsqlite3-sys with the pinned Matrix SDK',
       matchManagers: ['cargo'],
       matchPackageNames: ['rusqlite'],

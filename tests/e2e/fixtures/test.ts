@@ -134,6 +134,37 @@ async function signInThroughUi(page: Page, homeserverUrl: string, username: stri
   await expect(page).toHaveURL(/\/rooms$/, { timeout: 30_000 });
 }
 
+/** storageState saves the non-extractable sealing key as `{}`. A plain session is sealed again when restored. */
+async function unsealSession(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const settled = <T>(request: IDBRequest<T>): Promise<T> =>
+      new Promise((resolve, reject) => {
+        request.onsuccess = () => {
+          resolve(request.result);
+        };
+        request.onerror = () => {
+          reject(request.error ?? new Error('Could not unseal the saved session'));
+        };
+      });
+    const database = await settled(indexedDB.open('sable-next-session'));
+    const read = (name: string) =>
+      settled<unknown>(database.transaction('session').objectStore('session').get(name));
+    const key = await read('sealing-key');
+    // WebKit cannot store the key, so its session is already plain.
+    if (key instanceof CryptoKey) {
+      const { iv, data } = (await read('current')) as {
+        iv: Uint8Array<ArrayBuffer>;
+        data: ArrayBuffer;
+      };
+      const bytes = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+      const store = database.transaction('session', 'readwrite').objectStore('session');
+      store.delete('sealing-key');
+      await settled(store.put(new Uint8Array(bytes), 'current'));
+    }
+    database.close();
+  });
+}
+
 async function saveSignedInState(
   browser: import('@playwright/test').Browser,
   baseURL: string | undefined,
@@ -151,6 +182,9 @@ async function saveSignedInState(
     timeout: 30_000,
   });
   await settle?.(page);
+  // Off the app, so its worker cannot seal the session again.
+  await page.goto('/robots.txt');
+  await unsealSession(page);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(await context.storageState({ indexedDB: true })));
   await context.close();

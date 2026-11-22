@@ -66,6 +66,7 @@
     localHierarchyRooms,
     mergeHierarchyRooms,
     pendingSuggestedOverrides,
+    privateChildIds,
     sameLobbyItem,
     type ChildOrderOverride,
     type HierarchyRoom,
@@ -601,10 +602,9 @@
     target: string,
     position: DropEdge
   ): void {
-    const siblings = edges.map((edge) => ({
-      roomId: edge.room_id,
-      order: edge.order,
-    }));
+    const siblings = edges
+      .filter((edge) => !edge.private)
+      .map((edge) => ({ roomId: edge.room_id, order: edge.order }));
     const from = siblings.findIndex((sibling) => sibling.roomId === source);
     const to = siblings.findIndex((sibling) => sibling.roomId === target);
     if (from === -1 || to === -1) return;
@@ -646,11 +646,13 @@
   }
 
   function move(section: HierarchySection, roomId: string, delta: number): void {
-    const index = section.rooms.findIndex((entry) => entry.room.room_id === roomId);
+    const privateIds = privateChildIds(section.siblings);
+    const rooms = section.rooms.filter((entry) => !privateIds.has(entry.room.room_id));
+    const index = rooms.findIndex((entry) => entry.room.room_id === roomId);
     const to = index + delta;
-    if (index === -1 || to < 0 || to >= section.rooms.length) return;
+    if (index === -1 || to < 0 || to >= rooms.length) return;
 
-    const neighbour = section.rooms[to];
+    const neighbour = rooms[to];
     reorder(section, roomId, neighbour.room.room_id, delta < 0 ? 'above' : 'below');
   }
 

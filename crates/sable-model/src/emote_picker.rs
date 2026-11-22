@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashSet;
 
 use icu_properties::{
@@ -9,7 +10,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 const QUICK_REACTIONS: [&str; 6] = ["🎉", "👀", "✅", "🙏", "🔥", "💜"];
 const RECENT_IMAGES: usize = 16;
-const FREQUENT_REACTIONS: usize = 24;
+pub const FREQUENT_REACTIONS: usize = 24;
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
@@ -19,10 +20,20 @@ pub enum EmoteCell {
     Image { image: Box<PackImageView> },
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RecentUse {
+    pub key: String,
+    /// Over the last thirty days. `total` breaks ties.
+    pub uses: u32,
+    pub total: u32,
+}
+
 #[derive(Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct EmoteRecentsInput {
-    pub recent: Vec<String>,
+    /// Newest first.
+    pub recent: Vec<RecentUse>,
     pub frequent: Vec<String>,
     pub images: Vec<PackImageView>,
     pub unicode: bool,
@@ -41,6 +52,22 @@ pub fn reaction_identity(key: &str) -> String {
     key.chars()
         .filter(|ch| !matches!(ch, '\u{fe0e}' | '\u{fe0f}'))
         .collect()
+}
+
+/// Ranks a newest first list by use, ties going to the more recent.
+/// The newest takes the last place if it ranks below that, so a pick is never invisible.
+#[must_use]
+pub fn most_used<T, U: Ord + Copy>(recent: Vec<(T, U)>, shown: usize) -> Vec<T> {
+    let mut ranked: Vec<_> = recent.into_iter().enumerate().collect();
+    ranked.sort_by_key(|(_, (_, uses))| Reverse(*uses));
+    if let Some(last) = shown.checked_sub(1)
+        && let Some(newest) = ranked.iter().position(|(age, _)| *age == 0)
+        && newest > last
+    {
+        ranked.swap(newest, last);
+    }
+    ranked.truncate(shown);
+    ranked.into_iter().map(|(_, (item, _))| item).collect()
 }
 
 #[must_use]
@@ -77,18 +104,22 @@ fn unicode_emoji(key: &str) -> bool {
 #[must_use]
 pub fn emote_recents(input: &EmoteRecentsInput) -> EmoteRecents {
     let mut seen_images = HashSet::new();
-    let images: Vec<_> = input
+    let available: Vec<_> = input
         .recent
         .iter()
-        .filter_map(|key| {
-            input
+        .filter_map(|RecentUse { key, uses, total }| {
+            let image = input
                 .images
                 .iter()
                 .find(|image| image.url == *key)
-                .or_else(|| input.images.iter().find(|image| image.shortcode == *key))
+                .or_else(|| input.images.iter().find(|image| image.shortcode == *key))?;
+            Some((image, (*uses, *total)))
         })
-        .filter(|image| seen_images.insert(&image.url))
-        .take(RECENT_IMAGES)
+        .filter(|(image, _)| seen_images.insert(&image.url))
+        .collect();
+    // Ranked after resolving, as another room's packs must not fill the window.
+    let images: Vec<_> = most_used(available, RECENT_IMAGES)
+        .into_iter()
         .cloned()
         .collect();
     if !input.unicode {
@@ -106,6 +137,7 @@ pub fn emote_recents(input: &EmoteRecentsInput) -> EmoteRecents {
     let keys = input
         .recent
         .iter()
+        .map(|recent| &recent.key)
         .filter(|key| !input.reactions && unicode_emoji(key))
         .chain(input.frequent.iter().take(FREQUENT_REACTIONS));
     let mut seen = HashSet::new();
@@ -199,6 +231,14 @@ mod tests {
         }
     }
 
+    fn once(key: &str) -> RecentUse {
+        RecentUse {
+            key: key.to_owned(),
+            uses: 1,
+            total: 1,
+        }
+    }
+
     fn keys(cells: &[EmoteCell]) -> Vec<&str> {
         cells
             .iter()
@@ -223,7 +263,7 @@ mod tests {
     #[test]
     fn reaction_picker_keeps_history_order_and_excludes_composer_recents() {
         let result = emote_recents(&EmoteRecentsInput {
-            recent: vec!["wave".into()],
+            recent: vec![once("wave")],
             frequent: vec!["❤".into(), "❤️".into(), "mxc://example.org/missing".into()],
             images: vec![image("wave", "mxc://example.org/wave")],
             unicode: true,
@@ -245,7 +285,7 @@ mod tests {
                 "猫",
                 "missing",
             ]
-            .map(str::to_owned)
+            .map(once)
             .to_vec(),
             frequent: ["❤︎", "mxc://example.org/wave", "mxc://example.org/missing"]
                 .map(str::to_owned)
@@ -272,7 +312,7 @@ mod tests {
             })
             .collect();
         let mut input = EmoteRecentsInput {
-            recent: images.iter().map(|image| image.url.clone()).collect(),
+            recent: images.iter().map(|image| once(&image.url)).collect(),
             frequent: images.iter().map(|image| image.url.clone()).collect(),
             images,
             unicode: true,
@@ -284,5 +324,50 @@ mod tests {
         input.unicode = false;
         let result = emote_recents(&input);
         assert_eq!(result.cells.len(), 16);
+    }
+
+    #[test]
+    fn stickers_rank_by_use_among_all_those_this_room_has() {
+        let images: Vec<_> = (0..30)
+            .map(|index| image(&index.to_string(), &format!("mxc://example.org/{index}")))
+            .collect();
+        let elsewhere = (0..24).map(|index| RecentUse {
+            key: format!("mxc://elsewhere.org/{index}"),
+            uses: 1000,
+            total: 1000,
+        });
+        let here = images.iter().zip(0..).map(|(image, index)| RecentUse {
+            key: image.url.clone(),
+            uses: match index {
+                10 => 9,
+                15 => 4,
+                29 => 99,
+                _ => 1,
+            },
+            total: 99,
+        });
+        let result = emote_recents(&EmoteRecentsInput {
+            recent: elsewhere.chain(here).collect(),
+            frequent: Vec::new(),
+            images: images.clone(),
+            unicode: false,
+            reactions: false,
+        });
+        let shown = keys(&result.cells);
+        assert_eq!(shown.len(), RECENT_IMAGES);
+        assert!(shown.starts_with(&[
+            "mxc://example.org/29",
+            "mxc://example.org/10",
+            "mxc://example.org/15",
+            "mxc://example.org/0"
+        ]));
+    }
+
+    #[test]
+    fn one_use_takes_the_last_place_at_most() {
+        let recent = vec![("new", 1), ("a", 5), ("b", 9), ("c", 7)];
+        assert_eq!(most_used(recent.clone(), 3), ["b", "c", "new"]);
+        assert_eq!(most_used(recent.clone(), 4), ["b", "c", "a", "new"]);
+        assert_eq!(most_used(recent, 0), Vec::<&str>::new());
     }
 }

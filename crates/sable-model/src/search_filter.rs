@@ -614,6 +614,7 @@ mod tests {
                     order: None,
                     origin_server_ts: 0,
                     suggested: false,
+                    private: false,
                 })
                 .collect(),
             ..room(room_id, name)

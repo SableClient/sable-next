@@ -34,6 +34,7 @@
         order: null,
         origin_server_ts: Date.now(),
         suggested: true,
+        private: false,
       },
     ],
     bridge: null,

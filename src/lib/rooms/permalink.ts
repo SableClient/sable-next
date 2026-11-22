@@ -112,9 +112,17 @@ export function roomSectionPath(
   return search === '' ? base : `${base}?${search}`;
 }
 
-/** An alias resolves through its own domain; only a room id needs routing help. */
-export function viaFor(address: string, via: readonly string[]): string[] {
-  return address.startsWith('#') ? [] : [...via];
+const MAX_SERVERS = 3;
+
+/** At least one server, as a room id cannot be reached without one. */
+export type Route = readonly [string, ...string[]];
+
+/** An alias resolves through its own domain; only a room id needs a route. */
+export type LinkTarget = { alias: string } | { roomId: string; via: Route };
+
+export function toRoute(servers: readonly string[]): Route | null {
+  const [first, ...rest] = [...new Set(servers)].slice(0, MAX_SERVERS);
+  return first ? [first, ...rest] : null;
 }
 
 /** Homeservers drop themselves from `via`, so a list naming only ours routes nowhere. */
@@ -128,36 +136,42 @@ export async function joinVia(
   return [...via, ...(await core.rpc.rooms.viaServers({ room_id: parentId }))];
 }
 
-/** Room ids need `via` to be routable; aliases resolve on their own. */
-export function matrixToUrl(
-  address: string,
-  via: readonly string[],
-  eventId?: string | null
-): string {
+export function matrixToUrl(target: LinkTarget, eventId?: string | null): string {
+  const [address, via] = 'alias' in target ? [target.alias, []] : [target.roomId, target.via];
+
   const matrixLinkProvider =
     preferences.matrixLinkSelector === 'sable'
       ? 'link.sable.moe'
       : preferences.matrixLinkSelector === 'custom' && preferences.matrixLinkCustom.length > 0
         ? preferences.matrixLinkCustom
         : 'matrix.to';
+
   const path = eventId
     ? `${encodeURIComponent(address)}/${encodeURIComponent(eventId)}`
     : encodeURIComponent(address);
 
-  // The query belongs inside the fragment, so it cannot be built with `URL`.
-  const query = new URLSearchParams(
-    viaFor(address, via).map((server) => ['via', server])
-  ).toString();
+  const query = new URLSearchParams(via.map((server) => ['via', server])).toString();
   return `https://${matrixLinkProvider}/#/${path}${query === '' ? '' : `?${query}`}`;
 }
 
-export function matrixEventUri(roomId: string, eventId: string, via: readonly string[]): string {
+export function matrixEventUri(roomId: string, eventId: string, via: Route): string {
   const query = new URLSearchParams(via.map((server) => ['via', server])).toString();
   const path = `roomid/${encodeURIComponent(roomId.slice(1))}/e/${encodeURIComponent(eventId.slice(1))}`;
-  return `matrix:${path}${query === '' ? '' : `?${query}`}`;
+  return `matrix:${path}?${query}`;
 }
 
 export type PermalinkFormat = 'matrix' | 'external';
+
+function linkTo(
+  target: LinkTarget,
+  eventId: string | null | undefined,
+  format: PermalinkFormat
+): string | undefined {
+  if (format === 'external') return matrixToUrl(target, eventId);
+  if ('alias' in target) return mentionUri(target.alias, []);
+  if (eventId) return matrixEventUri(target.roomId, eventId, target.via);
+  return mentionUri(target.roomId, target.via);
+}
 
 export async function copyRoomLink(
   core: Pick<CoreClient, 'rpc' | 'session'>,
@@ -168,19 +182,19 @@ export async function copyRoomLink(
 ): Promise<boolean> {
   try {
     const alias = eventId ? null : room.canonical_alias;
-    const address = alias ?? room.room_id;
-    let via: readonly string[] = [];
-    if (!alias) {
-      via = hierarchy
-        ? await joinVia(core, hierarchy.via, hierarchy.parentId)
-        : await core.rpc.rooms.viaServers({ room_id: room.room_id });
+    let target: LinkTarget;
+    if (alias) {
+      target = { alias };
+    } else {
+      const via = toRoute(
+        hierarchy
+          ? await joinVia(core, hierarchy.via, hierarchy.parentId)
+          : await core.rpc.rooms.viaServers({ room_id: room.room_id })
+      );
+      if (via === null) throw new Error('No server is known to route this room');
+      target = { roomId: room.room_id, via };
     }
-    const link =
-      format === 'external'
-        ? matrixToUrl(address, via, eventId)
-        : eventId
-          ? matrixEventUri(room.room_id, eventId, via)
-          : mentionUri(address, via);
+    const link = linkTo(target, eventId, format);
     if (link === undefined) throw new Error('Invalid Matrix room address');
     await copyText(link);
   } catch (error) {

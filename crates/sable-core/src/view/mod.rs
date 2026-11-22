@@ -15,9 +15,7 @@ mod state;
 mod thread;
 
 pub use diff::map_diff;
-pub use directory::{
-    public_room, room_preview_from_stripped_state, room_preview_view, via_servers,
-};
+pub use directory::{public_room, room_preview_from_stripped_state, room_preview_view};
 #[cfg(test)]
 pub(crate) use item::forged_state;
 pub use item::{

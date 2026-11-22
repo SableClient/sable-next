@@ -123,8 +123,9 @@ impl Handler for RemoveParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         // The spec delists by omitting `via`. The typed content has it
         // non-optional and would send `{"via": []}`, a valid array.
-        core.room(&self.space_id)
-            .await?
+        let space = core.room(&self.space_id).await?;
+        core.refuse_private_child(&space, &self.room_id).await?;
+        space
             .send_state_event_raw(
                 "m.space.child",
                 self.room_id.as_str(),

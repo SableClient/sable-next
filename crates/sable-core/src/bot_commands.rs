@@ -17,6 +17,32 @@ pub(crate) const COMMAND_DESCRIPTION_EVENT: &str = "org.matrix.msc4391.command_d
 pub(crate) const COMMAND_FIELD: &str = "org.matrix.msc4391.command";
 const MEMBER_EVENT: &str = "m.room.member";
 
+/// Fills the empty `via` the model leaves on a room that was typed or picked.
+pub(crate) async fn route_rooms(client: &matrix_sdk::Client, command: &mut Value) {
+    let Some(arguments) = command.get_mut("arguments").and_then(Value::as_object_mut) else {
+        return;
+    };
+    for argument in arguments.values_mut() {
+        let values = match argument {
+            Value::Array(values) => values.as_mut_slice(),
+            value => std::slice::from_mut(value),
+        };
+        for reference in values.iter_mut().filter_map(Value::as_object_mut) {
+            if reference.get("via") != Some(&Value::Array(Vec::new())) {
+                continue;
+            }
+            reference.remove("via");
+            let id = reference.get("id").and_then(Value::as_str);
+            if let Some(id) = id.and_then(|id| ruma::RoomId::parse(id).ok())
+                && let Some(room) = client.get_room(&id)
+                && let Some(route) = crate::routing::Route::cached(&room).await
+            {
+                reference.insert("via".to_owned(), route.to_strings().into());
+            }
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct StateFields {
     #[serde(rename = "type")]
@@ -227,5 +253,30 @@ mod tests {
             })
             .collect();
         assert_eq!(announced, [room_id.to_owned(), room_id.to_owned()]);
+    }
+
+    #[tokio::test]
+    async fn only_references_asking_for_a_route_get_one() {
+        use matrix_sdk::ruma::room_id;
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        server.sync_joined_room(&client, room_id!("!known")).await;
+        let mut command = serde_json::json!({"command": "move", "arguments": {
+            "picked": [{"type": "room_id", "id": "!known", "via": []}],
+            "declared": {"type": "room_id", "id": "!known"},
+            "unknown": {"type": "room_id", "id": "!elsewhere", "via": []},
+        }});
+
+        super::route_rooms(&client, &mut command).await;
+
+        assert_eq!(
+            command["arguments"],
+            serde_json::json!({
+                "picked": [{"type": "room_id", "id": "!known", "via": ["localhost"]}],
+                "declared": {"type": "room_id", "id": "!known"},
+                "unknown": {"type": "room_id", "id": "!elsewhere"},
+            })
+        );
     }
 }

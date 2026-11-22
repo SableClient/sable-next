@@ -25,11 +25,8 @@ import {
   quietRooms,
   shownRooms,
 } from '#lib/rooms/quiet-rooms.svelte.js';
-import {
-  parseShortcodes,
-  readRecentStickers,
-  writeRecentStickers,
-} from '#lib/emoji/recent-packs.svelte.js';
+import { parseShortcodes } from '#lib/emoji/parse-shortcodes.js';
+import type { StickerHistory } from '#lib/emoji/sticker-history.svelte.js';
 import type { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
 
 import type { SyncedDocument } from './account-sync.svelte.js';
@@ -84,7 +81,10 @@ export const settingsDocument: SyncedDocument = {
   },
 };
 
-export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
+export function workspaceDocument(
+  sidebar: SpaceSidebar,
+  stickers: Pick<StickerHistory, 'current' | 'loaded' | 'follow'>
+): SyncedDocument {
   return {
     eventType: WORKSPACE_ACCOUNT_DATA_TYPE,
     sealed: true,
@@ -92,7 +92,8 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
     snapshot: () => ({
       content: {
         v: DOCUMENT_VERSION,
-        recentStickers: readRecentStickers(),
+        // For older builds. Left out until loaded, so the account's copy is carried over.
+        ...(stickers.loaded && { recentStickers: stickers.current.map(({ key }) => key) }),
         favoriteGifs: favoriteGifs(),
         recentGifs: recentGifs(),
         roomIcons: roomIconOverrides(),
@@ -108,7 +109,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       const body = versioned(content);
       if (body === null) {
         return (
-          readRecentStickers().length === 0 &&
+          stickers.current.length === 0 &&
           favoriteGifs().length === 0 &&
           recentGifs().length === 0 &&
           Object.keys(roomIconOverrides()).length === 0 &&
@@ -122,7 +123,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
 
       // a missing field comes from a build that does not write it, so the local value stays
       const has = (field: string): boolean => field in body;
-      if (has('recentStickers')) writeRecentStickers(parseShortcodes(body.recentStickers));
+      if (has('recentStickers')) stickers.follow(parseShortcodes(body.recentStickers));
       if (has('favoriteGifs')) adoptFavorites(parseFavorites(body.favoriteGifs));
       if (has('recentGifs')) adoptRecentGifs(parseFavorites(body.recentGifs));
       if (has('roomIcons')) adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));

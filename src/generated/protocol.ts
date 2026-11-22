@@ -337,7 +337,8 @@ export type EmoteRecents = {
 };
 
 export type EmoteRecentsInput = {
-	recent: string[],
+	/**  Newest first. */
+	recent: RecentUse[],
 	frequent: string[],
 	images: PackImageView[],
 	unicode: boolean,
@@ -1275,6 +1276,13 @@ export type ReactionShortcodeView = {
 	shortcode: string,
 };
 
+export type RecentUse = {
+	key: string,
+	/**  Over the last thirty days. `total` breaks ties. */
+	uses: number,
+	total: number,
+};
+
 /**
  *  `incomplete` means secret storage exists but this device lacks secrets from
  *  it, so recovery will fix decryption.
@@ -1986,6 +1994,8 @@ export type SpaceChildEdge = {
 	origin_server_ts: number,
 	/**  The parent marked this child as worth surfacing first. */
 	suggested: boolean,
+	/**  Filed here by this account alone, so it has no route and is never written to space state. */
+	private: boolean,
 };
 
 /**
@@ -3135,6 +3145,15 @@ export type Rpc = {
     rememberEmoji: (params: {
 	key: string,
 }) => Promise<null>;
+    recentStickers: (params: {
+	sync: boolean,
+	legacy?: string[],
+	synced?: string[] | null,
+}) => Promise<RecentUse[]>;
+    rememberSticker: (params: {
+	key: string,
+	sync: boolean,
+}) => Promise<null>;
     setTyping: (params: {
 	room_id: string,
 	typing: boolean,
@@ -3500,6 +3519,9 @@ export type Rpc = {
 	reason?: string | null,
 }) => Promise<string>;
     viaServers: (params: {
+	room_id: string,
+}) => Promise<string[]>;
+    upgradeServers: (params: {
 	room_id: string,
 }) => Promise<string[]>;
     leave: (params: {
@@ -4065,6 +4087,8 @@ export type RpcMethods = {
   'messages.redact_reaction': Rpc['messages']['redactReaction'];
   'messages.frequent_reactions': Rpc['messages']['frequentReactions'];
   'messages.remember_emoji': Rpc['messages']['rememberEmoji'];
+  'messages.recent_stickers': Rpc['messages']['recentStickers'];
+  'messages.remember_sticker': Rpc['messages']['rememberSticker'];
   'messages.set_typing': Rpc['messages']['setTyping'];
   'messages.media_config': Rpc['messages']['mediaConfig'];
   'notifications.settings': Rpc['notifications']['settings'];
@@ -4160,6 +4184,7 @@ export type RpcMethods = {
   'rooms.join': Rpc['rooms']['join'];
   'rooms.knock': Rpc['rooms']['knock'];
   'rooms.via_servers': Rpc['rooms']['viaServers'];
+  'rooms.upgrade_servers': Rpc['rooms']['upgradeServers'];
   'rooms.leave': Rpc['rooms']['leave'];
   'rooms.invite': Rpc['rooms']['invite'];
   'rooms.create': Rpc['rooms']['create'];
@@ -4427,6 +4452,8 @@ export function createRpc(call: RpcCall): Rpc {
       redactReaction: (params) => call('messages.redact_reaction', params) as ReturnType<Rpc['messages']['redactReaction']>,
       frequentReactions: (params) => call('messages.frequent_reactions', params) as ReturnType<Rpc['messages']['frequentReactions']>,
       rememberEmoji: (params) => call('messages.remember_emoji', params) as ReturnType<Rpc['messages']['rememberEmoji']>,
+      recentStickers: (params) => call('messages.recent_stickers', params) as ReturnType<Rpc['messages']['recentStickers']>,
+      rememberSticker: (params) => call('messages.remember_sticker', params) as ReturnType<Rpc['messages']['rememberSticker']>,
       setTyping: (params) => call('messages.set_typing', params) as ReturnType<Rpc['messages']['setTyping']>,
       mediaConfig: (params = {}) => call('messages.media_config', params) as ReturnType<Rpc['messages']['mediaConfig']>,
     },
@@ -4534,6 +4561,7 @@ export function createRpc(call: RpcCall): Rpc {
       join: (params) => call('rooms.join', params) as ReturnType<Rpc['rooms']['join']>,
       knock: (params) => call('rooms.knock', params) as ReturnType<Rpc['rooms']['knock']>,
       viaServers: (params) => call('rooms.via_servers', params) as ReturnType<Rpc['rooms']['viaServers']>,
+      upgradeServers: (params) => call('rooms.upgrade_servers', params) as ReturnType<Rpc['rooms']['upgradeServers']>,
       leave: (params) => call('rooms.leave', params) as ReturnType<Rpc['rooms']['leave']>,
       invite: (params) => call('rooms.invite', params) as ReturnType<Rpc['rooms']['invite']>,
       create: (params) => call('rooms.create', params) as ReturnType<Rpc['rooms']['create']>,

@@ -166,6 +166,7 @@ fn space_inputs(rows: &[Row]) -> u64 {
         for edge in &row.space_children {
             edge.room_id.hash(&mut hasher);
             edge.via.hash(&mut hasher);
+            edge.private.hash(&mut hasher);
         }
         row.space_children.len().hash(&mut hasher);
     }
@@ -284,7 +285,7 @@ impl<'a> Lists<'a> {
             .iter()
             .filter(|row| is_space(row) && joined(row) && !row.is_tombstoned)
             .flat_map(|space| &space.space_children)
-            .filter(|edge| !edge.via.is_empty())
+            .filter(|edge| edge.lists_room())
             .map(|edge| edge.room_id.as_str())
             .collect();
 

@@ -65,6 +65,7 @@ mod room_sections;
 mod room_settings;
 mod room_widgets;
 mod rooms;
+mod routing;
 mod rtc;
 mod scheduled;
 mod sealed_account_data;
@@ -74,6 +75,7 @@ pub mod secrets;
 pub mod session;
 mod space_parents;
 pub mod spaces;
+mod sticker_history;
 pub mod store;
 mod store_disposal;
 #[cfg(not(target_family = "wasm"))]
@@ -89,6 +91,7 @@ mod timeline_overlay;
 mod timelines;
 pub mod tls;
 mod tunnel;
+mod usage_history;
 mod utd;
 mod verification;
 pub mod view;
@@ -218,6 +221,7 @@ pub struct Core {
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
     warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
     account_data_lock: Mutex<()>,
+    usage_history_lock: Mutex<()>,
     /// Until sync echoes the acceptance, the room would read as unaccepted.
     accepted_rules: parking_lot::Mutex<HashMap<(ruma::OwnedUserId, OwnedRoomId), i64>>,
     inbox: Mutex<inbox::InboxCache>,
@@ -408,6 +412,7 @@ impl Core {
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
             warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
             account_data_lock: Mutex::new(()),
+            usage_history_lock: Mutex::new(()),
             accepted_rules: parking_lot::Mutex::new(HashMap::new()),
             inbox: Mutex::new(inbox::InboxCache::default()),
             inbox_flush: Mutex::new(()),

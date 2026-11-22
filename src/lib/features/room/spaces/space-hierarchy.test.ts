@@ -27,6 +27,7 @@ function edge(roomId: string, overrides: Partial<SpaceChildEdge> = {}): SpaceChi
     origin_server_ts: 0,
     suggested: false,
     ...overrides,
+    private: false,
   };
 }
 

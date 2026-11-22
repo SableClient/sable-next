@@ -27,7 +27,14 @@ allow = [
   "Unlicense",
   "Zlib",
 ]
-exceptions = [{ crate = "audiofox", allow = ["GPL-2.0-or-later WITH Classpath-exception-2.0"] }]
+exceptions = [
+  { crate = "audiofox", allow = [
+    "GPL-2.0-or-later WITH Classpath-exception-2.0",
+  ] },
+  { crate = "finl_unicode", allow = [
+    "Unicode-DFS-2016",
+  ] },
+]
 
 [bans]
 multiple-versions = "deny"
