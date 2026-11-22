@@ -12,6 +12,9 @@ use crate::protocol::RoomStateEventView;
 
 const MAX_PROBED_ROOMS: usize = 32;
 
+/// A state event's content, and its `origin_server_ts` when known.
+type ProbedEvent = (Value, Option<u64>);
+
 #[derive(Default)]
 pub(crate) struct ProbedState {
     rooms: HashMap<OwnedRoomId, ProbedRoom>,
@@ -30,7 +33,7 @@ pub(crate) enum Probed {
 #[derive(Default)]
 struct ProbedRoom {
     full: Option<HashMap<String, Vec<RoomStateEventView>>>,
-    keys: HashMap<(String, String), Option<(Value, Option<u64>)>>,
+    keys: HashMap<(String, String), Option<ProbedEvent>>,
     written: u64,
 }
 
@@ -81,7 +84,7 @@ impl ProbedState {
         room_id: &RoomId,
         event_type: &str,
         state_key: &str,
-        content: Option<(Value, Option<u64>)>,
+        content: Option<ProbedEvent>,
     ) {
         self.room_mut(room_id)
             .keys

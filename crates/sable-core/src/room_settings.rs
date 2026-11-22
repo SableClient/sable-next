@@ -761,10 +761,10 @@ impl Core {
         event_type: String,
         state_key: String,
     ) -> Result<Option<(Value, Option<u64>)>, RpcError> {
-        if let Some((content, at)) =
+        let written =
             self.probed_state()
-                .written(&room_id, &event_type, &state_key, crate::now_ms())
-        {
+                .written(&room_id, &event_type, &state_key, crate::now_ms());
+        if let Some((content, at)) = written {
             return Ok(Some((content, Some(at))));
         }
         let client = self.client().await?;
@@ -791,10 +791,10 @@ impl Core {
         if stored.is_some() {
             return Ok(stored);
         }
-        match self
+        let probed = self
             .probed_state()
-            .content(&room_id, &event_type, &state_key)
-        {
+            .content(&room_id, &event_type, &state_key);
+        match probed {
             Probed::Present(content, ts) => return Ok(Some((content, ts))),
             Probed::Absent => return Ok(None),
             Probed::Unknown => {}
