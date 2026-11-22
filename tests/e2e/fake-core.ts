@@ -1135,6 +1135,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'messages.reaction_event_ids': () => [],
       'messages.redact_reaction': () => null,
       'messages.frequent_reactions': () => [],
+      'messages.recent_stickers': () => [],
       'calendar.entries': () => ({ entries: [], rsvps: [] }),
       'messages.url_preview': (params) =>
         params.url === 'https://example.test/article'

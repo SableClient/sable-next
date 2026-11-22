@@ -337,7 +337,8 @@ export type EmoteRecents = {
 };
 
 export type EmoteRecentsInput = {
-	recent: string[],
+	/**  Newest first. */
+	recent: RecentUse[],
 	frequent: string[],
 	images: PackImageView[],
 	unicode: boolean,
@@ -1273,6 +1274,13 @@ export type ReactionGroup = {
 export type ReactionShortcodeView = {
 	key: string,
 	shortcode: string,
+};
+
+export type RecentUse = {
+	key: string,
+	/**  Over the last thirty days. `total` breaks ties. */
+	uses: number,
+	total: number,
 };
 
 /**
@@ -3137,6 +3145,15 @@ export type Rpc = {
     rememberEmoji: (params: {
 	key: string,
 }) => Promise<null>;
+    recentStickers: (params: {
+	sync: boolean,
+	legacy?: string[],
+	synced?: string[] | null,
+}) => Promise<RecentUse[]>;
+    rememberSticker: (params: {
+	key: string,
+	sync: boolean,
+}) => Promise<null>;
     setTyping: (params: {
 	room_id: string,
 	typing: boolean,
@@ -4070,6 +4087,8 @@ export type RpcMethods = {
   'messages.redact_reaction': Rpc['messages']['redactReaction'];
   'messages.frequent_reactions': Rpc['messages']['frequentReactions'];
   'messages.remember_emoji': Rpc['messages']['rememberEmoji'];
+  'messages.recent_stickers': Rpc['messages']['recentStickers'];
+  'messages.remember_sticker': Rpc['messages']['rememberSticker'];
   'messages.set_typing': Rpc['messages']['setTyping'];
   'messages.media_config': Rpc['messages']['mediaConfig'];
   'notifications.settings': Rpc['notifications']['settings'];
@@ -4433,6 +4452,8 @@ export function createRpc(call: RpcCall): Rpc {
       redactReaction: (params) => call('messages.redact_reaction', params) as ReturnType<Rpc['messages']['redactReaction']>,
       frequentReactions: (params) => call('messages.frequent_reactions', params) as ReturnType<Rpc['messages']['frequentReactions']>,
       rememberEmoji: (params) => call('messages.remember_emoji', params) as ReturnType<Rpc['messages']['rememberEmoji']>,
+      recentStickers: (params) => call('messages.recent_stickers', params) as ReturnType<Rpc['messages']['recentStickers']>,
+      rememberSticker: (params) => call('messages.remember_sticker', params) as ReturnType<Rpc['messages']['rememberSticker']>,
       setTyping: (params) => call('messages.set_typing', params) as ReturnType<Rpc['messages']['setTyping']>,
       mediaConfig: (params = {}) => call('messages.media_config', params) as ReturnType<Rpc['messages']['mediaConfig']>,
     },

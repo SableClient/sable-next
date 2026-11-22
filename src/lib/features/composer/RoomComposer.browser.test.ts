@@ -44,6 +44,8 @@ function client(): CoreClient {
         mediaConfig: () => Promise.resolve({ upload_size: 100 * 1024 * 1024 }),
         frequentReactions: () => Promise.resolve(frequentReactions),
         rememberEmoji: () => Promise.resolve(null),
+        recentStickers: () => Promise.resolve([]),
+        rememberSticker: () => Promise.resolve(null),
       },
       room_state: { botCommands: () => Promise.resolve([]) },
       personas: { list: () => Promise.resolve({ personas: [], selections: [] }) },

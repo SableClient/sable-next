@@ -1,7 +1,12 @@
 import { vi, type Mock } from 'vitest';
 import { defaultE2eePolicy } from '#lib/deployment/e2ee-policy.js';
 import { MemberPreviews } from '#lib/rooms/member-previews.svelte.js';
-import { createRpc, type OAuthMetadataView, type Rpc } from '#src/generated/protocol';
+import {
+  createRpc,
+  type OAuthMetadataView,
+  type RecentUse,
+  type Rpc,
+} from '#src/generated/protocol';
 
 const pending = () => new Promise<never>(() => {});
 
@@ -60,6 +65,8 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
           reactionShortcodes: vi.fn(() => Promise.resolve([])),
           frequentReactions: vi.fn(() => Promise.resolve([])),
           rememberEmoji: vi.fn(() => Promise.resolve(null)),
+          recentStickers: vi.fn(() => Promise.resolve<RecentUse[]>([])),
+          rememberSticker: vi.fn(() => Promise.resolve(null)),
         },
         room_state: {
           event: vi.fn(() => Promise.resolve(null)),

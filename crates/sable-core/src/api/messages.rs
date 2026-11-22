@@ -68,6 +68,8 @@ domain! {
     redact_reaction,
     frequent_reactions,
     remember_emoji,
+    recent_stickers,
+    remember_sticker,
     set_typing,
     media_config,
 }
@@ -1169,6 +1171,40 @@ impl Handler for RememberEmojiParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
         core.remember_reaction(&self.key).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RecentStickersParams {
+    pub sync: bool,
+    #[serde(default)]
+    pub legacy: Vec<String>,
+    #[serde(default)]
+    pub synced: Option<Vec<String>>,
+}
+
+impl Handler for RecentStickersParams {
+    type Ok = Vec<sable_model::emote_picker::RecentUse>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
+        core.recent_stickers(self.sync, &self.legacy, self.synced.as_deref())
+            .await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct RememberStickerParams {
+    pub key: String,
+    pub sync: bool,
+}
+
+impl Handler for RememberStickerParams {
+    type Ok = ();
+
+    async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
+        core.remember_sticker(&self.key, self.sync).await
     }
 }
 

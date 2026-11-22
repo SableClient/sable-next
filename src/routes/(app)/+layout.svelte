@@ -25,6 +25,7 @@
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import { provideRecentReactions, RecentReactions } from '#lib/emoji/recents.svelte.js';
+  import { provideStickerHistory, StickerHistory } from '#lib/emoji/sticker-history.svelte.js';
   import { EventItems, provideEventItems } from '#lib/features/room/messages/event-items.svelte.js';
   import {
     provideRoomScopes,
@@ -194,6 +195,8 @@
   const bookmarks = new Bookmarks(core.rpc.account);
   provideBookmarks(bookmarks);
   provideRecentReactions(new RecentReactions(core));
+  const stickerHistory = new StickerHistory(core);
+  provideStickerHistory(stickerHistory);
   provideEventItems(new EventItems(core.rpc.timeline, () => core.session?.user_id ?? null));
   const roomScopes = new RoomScopes(core);
   provideRoomScopes(roomScopes);
@@ -403,7 +406,7 @@
 
   const syncDocuments = $derived([
     settingsDocument,
-    workspaceDocument(spaceSidebar),
+    workspaceDocument(spaceSidebar, stickerHistory),
     draftsDocumentFor(core.session?.account_id ?? ''),
     scheduledDocumentFor(core.session?.account_id ?? ''),
   ]);

@@ -137,6 +137,8 @@ function core(): CoreClient {
         mediaConfig,
         frequentReactions: () => Promise.resolve([]),
         rememberEmoji: () => Promise.resolve(null),
+        recentStickers: () => Promise.resolve([]),
+        rememberSticker: () => Promise.resolve(null),
       },
       room_state: { botCommands: () => Promise.resolve(botCommands) },
       personas: {

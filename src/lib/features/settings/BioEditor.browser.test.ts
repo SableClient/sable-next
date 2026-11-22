@@ -52,6 +52,8 @@ function client(): CoreClient {
       messages: {
         frequentReactions: () => Promise.resolve([]),
         rememberEmoji: () => Promise.resolve(null),
+        recentStickers: () => Promise.resolve([]),
+        rememberSticker: () => Promise.resolve(null),
         reactionShortcodes: () => Promise.resolve([]),
       },
     },

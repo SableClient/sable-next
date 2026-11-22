@@ -48,7 +48,6 @@ vi.mock('#lib/emoji/load-packs.js', () => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
-import { rememberSticker, writeRecentStickers } from '#lib/emoji/recent-packs.svelte.js';
 
 import EmoteBoard from './EmoteBoard.svelte';
 
@@ -61,7 +60,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  writeRecentStickers([]);
+  core.rpc.messages.recentStickers.mockResolvedValue([]);
+  core.rpc.messages.rememberSticker.mockClear();
   core.rpc.messages.frequentReactions.mockResolvedValue([]);
   core.rpc.messages.rememberEmoji.mockClear();
   core.fetchMedia.mockReset();
@@ -98,7 +98,9 @@ test('previews a search result on hover', async () => {
 
 test('previews a recent sticker on hover', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
-  rememberSticker('mxc://example.org/wave');
+  core.rpc.messages.recentStickers.mockResolvedValue([
+    { key: 'mxc://example.org/wave', uses: 1, total: 1 },
+  ]);
   const { findAllByRole, container } = render(EmoteBoard, {
     props: { roomId: '!room:example.org', tab: 'sticker', onPick: vi.fn() },
   });
@@ -107,6 +109,39 @@ test('previews a recent sticker on hover', async () => {
   await fireEvent.pointerEnter(button);
 
   expect(container.querySelector('.preview code')?.textContent).toBe(':wave:');
+});
+
+test('ranks recent stickers by use, not by the last one picked', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  core.rpc.messages.recentStickers.mockResolvedValue([
+    { key: 'mxc://example.org/wave', uses: 1, total: 1 },
+    { key: 'mxc://example.org/wink', uses: 2, total: 2 },
+  ]);
+  const { findAllByRole } = render(EmoteBoard, {
+    props: { roomId: '!room:example.org', tab: 'sticker', onPick: vi.fn() },
+  });
+
+  await findAllByRole('button', { name: ':wink:' });
+  const shown = await findAllByRole('button', { name: /^:(wink|wave):$/ });
+  expect(shown.slice(0, 2).map((button) => button.getAttribute('aria-label'))).toEqual([
+    ':wink:',
+    ':wave:',
+  ]);
+});
+
+test('a picked sticker is remembered by the core', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const { findAllByRole } = render(EmoteBoard, {
+    props: { roomId: '!room:example.org', tab: 'sticker', onPick: vi.fn() },
+  });
+
+  const [button] = await findAllByRole('button', { name: ':wave:' });
+  await fireEvent.click(button);
+
+  expect(core.rpc.messages.rememberSticker).toHaveBeenCalledWith({
+    key: 'mxc://example.org/wave',
+    sync: false,
+  });
 });
 
 test('previews a recent emote on focus', async () => {

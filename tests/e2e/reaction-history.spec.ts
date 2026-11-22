@@ -59,8 +59,8 @@ test('reaction history follows actual additions, frequency, removal, and reload'
   await expect
     .poll(async () => (await history(account)).map(({ emoji, total }) => [emoji, total]))
     .toEqual([
-      ['🔥', 2],
       ['🎉', 1],
+      ['🔥', 2],
     ]);
 
   let picker = await openPicker(page, thirdRow);
@@ -73,8 +73,8 @@ test('reaction history follows actual additions, frequency, removal, and reload'
   await firstRow.locator('button.reaction').filter({ hasText: '🔥' }).click();
   await expect(firstRow.locator('button.reaction').filter({ hasText: '🔥' })).toHaveCount(0);
   expect((await history(account)).map(({ emoji, total }) => [emoji, total])).toEqual([
-    ['🔥', 2],
     ['🎉', 1],
+    ['🔥', 2],
   ]);
 
   await firstRow.locator('article.message').click({ button: 'right' });
@@ -124,34 +124,23 @@ test.describe('touch', () => {
   });
 });
 
-test('synced history excludes expired reactions and deduplicates emoji variants', async ({
+test('synced history from another client is ranked by use and left as stored', async ({
   page,
   app,
   timeline,
   freshLogin,
 }) => {
   const account = await freshLogin();
-  const now = Date.now();
-  const day = Math.floor(now / 86_400_000);
-  const usage = (daysAgo: number, count: number) => [
-    {
-      day: day - daysAgo,
-      device: 'another-device',
-      count,
-      last_used: now - daysAgo * 86_400_000,
-    },
+  const stored = [
+    { emoji: '🎉', total: 2 },
+    { emoji: '🔥', total: 84 },
+    { emoji: '❤', total: 3 },
+    { emoji: '❤️', total: 3 },
   ];
   await account.request(
     'PUT',
     `client/v3/user/${encodeURIComponent(account.userId)}/account_data/m.recent_emoji`,
-    {
-      recent_emoji: [
-        { emoji: '🔥', total: 5000, 'moe.sable.usage': usage(31, 5000) },
-        { emoji: '❤', total: 3, 'moe.sable.usage': usage(0, 3) },
-        { emoji: '❤️', total: 3, 'moe.sable.usage': usage(0, 3) },
-        { emoji: '🎉', total: 2, 'moe.sable.usage': usage(0, 2) },
-      ],
-    }
+    { recent_emoji: stored }
   );
   const roomId = await account.createRoom({ name: 'Synced reaction history' });
   const target = await account.sendMessage(roomId, 'Synced history target');
@@ -160,13 +149,9 @@ test('synced history excludes expired reactions and deduplicates emoji variants'
   await expect(row).toBeVisible();
   const picker = await openPicker(page, row);
   const cells = picker.locator('[data-section="recent"] [role="gridcell"]');
-  await expect(cells).toHaveCount(2);
-  await expect(cells.first()).toHaveText('❤');
-  await expect(cells.last()).toHaveAttribute('aria-label', 'tada');
-  await expect
-    .poll(async () => (await history(account)).map(({ emoji, total }) => [emoji, total]))
-    .toEqual([
-      ['❤', 3],
-      ['🎉', 2],
-    ]);
+  await expect(cells).toHaveCount(3);
+  await expect(cells.nth(0)).toHaveAttribute('aria-label', 'fire');
+  await expect(cells.nth(1)).toHaveText('❤');
+  await expect(cells.nth(2)).toHaveAttribute('aria-label', 'tada');
+  expect(await history(account)).toEqual(stored);
 });
