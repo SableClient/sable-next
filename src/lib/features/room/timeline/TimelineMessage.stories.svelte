@@ -150,6 +150,24 @@
       },
     }}
   />
+  {@render message({
+    content: {
+      ...plainContent,
+      html: 'مرحبًا أيها العالم',
+    },
+  })}
+  {@render message({
+    content: {
+      ...plainContent,
+      html: 'こんにちは、世界！',
+    },
+  })}
+  {@render message({
+    content: {
+      ...plainContent,
+      html: 'Bonjour tout le monde !',
+    },
+  })}
 </Story>
 
 <Story name="With Many Pronouns">
