@@ -2011,7 +2011,6 @@
     "threadReplies_one": "{{count, number}} ответ",
     "threadReplies_few": "{{count, number}} ответа",
     "threadReplies_many": "{{count, number}} ответов",
-    "attachmentsIndexed": "Показано то, что проиндексировано на этом устройстве. Самые старые сообщения могут отсутствовать.",
     "threadOpen": "Открыть ветку",
     "deleteExplain": "Оно будет удалено для всех в этой комнате. Серверам, у которых уже есть копия, направлен запрос на удаление, но {{appName}} не гарантирует, что они его выполнят.",
     "attachmentsSpoiler": "Спойлер",

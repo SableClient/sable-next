@@ -2527,7 +2527,6 @@
     "attachmentsFilesEmpty": "Все още няма индексирани файлове на това устройство.",
     "attachmentsLinksEmpty": "Все още няма индексирани връзки на това устройство.",
     "attachmentsFailed": "Индексът за търсене на това устройство не можа да се прочете.",
-    "attachmentsIndexed": "Показване на индексираното от това устройство. Най-старата история може да не е включена.",
     "attachmentsSpoiler": "Спойлер",
     "attachmentsSpoilerReason": "Спойлер: {{reason}}",
     "attachmentsOpenItem": "{{name}}, споделено от {{sender}}, {{date}}",

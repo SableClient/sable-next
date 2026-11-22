@@ -765,7 +765,6 @@
     "attachmentsMediaEmpty": "Még nincsenek képek vagy videók indexelve ezen az eszközön.",
     "attachmentsFilesEmpty": "Ezen az eszközön még nincs indexelt fájl.",
     "attachmentsLinksEmpty": "Ezen az eszközön még nincs indexelt hivatkozás.",
-    "attachmentsIndexed": "Az eszköz által indexelt elemek láthatók. A legrégebbi előzmények hiányozhatnak.",
     "attachmentsOpenItem": "{{name}}, megosztotta: {{sender}}, {{date}}",
     "attachmentsVideoNamed": "Videó: {{name}}",
     "threadOpen": "Szál megnyitása",

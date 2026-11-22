@@ -1020,7 +1020,6 @@
     "attachmentsMediaEmpty": "此设备上尚未索引任何图片或视频。",
     "attachmentsFilesEmpty": "此设备上尚未索引任何文件。",
     "attachmentsLinksEmpty": "此设备上尚未索引任何链接。",
-    "attachmentsIndexed": "显示此设备已索引的内容。最早的历史可能未包含在内。",
     "attachmentsSpoiler": "剧透",
     "attachmentsSpoilerReason": "剧透：{{reason}}",
     "attachmentsOpenItem": "{{name}}，由 {{sender}} 分享，{{date}}",

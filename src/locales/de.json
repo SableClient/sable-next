@@ -1018,7 +1018,6 @@
     "attachmentsFailed": "Der Suchindex dieses Geräts konnte nicht gelesen werden.",
     "attachmentsVideo": "Video",
     "attachmentsVideoNamed": "Video: {{name}}",
-    "attachmentsIndexed": "Indexierte Anhänge werden angezeigt. Ältere Historie könnte dabei nicht enthalten sein.",
     "attachmentsSpoiler": "Spoiler",
     "attachmentsSpoilerReason": "Spoiler: {{reason}}",
     "attachmentsOpenItem": "„{{name}}“, geteilt von {{sender}}, {{date}}",

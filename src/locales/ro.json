@@ -1018,7 +1018,6 @@
     "forwardSelected_other": "{{count, number}} de camere selectate",
     "playVideo": "Începe {{name}}",
     "hiddenStateEvent": "{{user}} a trimis un eveniment de stare {{type}}",
-    "attachmentsIndexed": "Arată ce a indexat acest dispozitiv. Cele mai vechi s-ar putea să nu fie incluse.",
     "attachmentsSpoilerReason": "Spoiler: {{reason}}",
     "attachmentsVideo": "Video",
     "attachmentsOpenItem": "{{name}}, împărtășit la {{sender}}, {{date}}",
