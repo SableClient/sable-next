@@ -16,6 +16,7 @@
   import intersex from '#lib/supporter/app-icons/intersex.svg';
   import lesbian from '#lib/supporter/app-icons/lesbian.svg';
   import mlm from '#lib/supporter/app-icons/mlm.svg';
+  import pluraljourney from '#lib/supporter/app-icons/pluraljourneygradient.svg';
   import pride from '#lib/supporter/app-icons/pride.svg';
   import ukraine from '#lib/supporter/app-icons/ukraine.svg';
   import palestine from '#lib/supporter/app-icons/palestine.svg';
@@ -32,6 +33,7 @@
     intersex,
     lesbian,
     mlm,
+    pluraljourney,
     pride,
     ukraine,
     palestine,
