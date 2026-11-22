@@ -1543,6 +1543,7 @@ export type RoomRulesView = {
 	version: number,
 	require_acceptance: boolean,
 	accepted: boolean,
+	updated_at: number | null,
 };
 
 /**  `key` is `home`, `unspaced`, `direct` or a space's room id. */
