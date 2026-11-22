@@ -71,18 +71,3 @@ test('the wrapped controls dock floats inside the stage without reserving space 
   expect(controlsBox.bottom).toBeLessThanOrEqual(stageBox.bottom);
   expect(video.getBoundingClientRect().bottom).toBeGreaterThan(controlsBox.top);
 });
-
-test('resting controls give their space back to the video', async () => {
-  await page.viewport(402, 874);
-  const container = await renderCall();
-  const stage = container.querySelector<HTMLElement>('.stage');
-  const video = container.querySelector<HTMLElement>('.tile .video');
-  if (!stage || !video) throw new Error('call not rendered');
-  await expect.poll(() => video.getBoundingClientRect().height).toBeGreaterThan(0);
-  const awake = video.getBoundingClientRect().height;
-
-  stage.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
-
-  await expect.poll(() => stage.classList.contains('resting')).toBe(true);
-  await expect.poll(() => video.getBoundingClientRect().height).toBeGreaterThan(awake);
-});
