@@ -2981,3 +2981,38 @@ test('a send that fails after leaving the room returns its text to that room, no
   await flushed();
   expect(editorText()).toBe('meant for the first room');
 });
+
+test.each([
+  ['pending', () => new Promise<string[]>(() => {}), 'example.org'],
+  ['failed', () => Promise.reject(new Error('members unavailable')), 'example.org'],
+  ['empty', () => Promise.resolve([]), 'example.org'],
+  ['resolved', () => Promise.resolve(['busy.example']), 'busy.example'],
+])('a room mention sent with a %s via lookup stays routable', async (_, viaServers, server) => {
+  const client = Object.assign(core(), { session: { user_id: '@me:example.org' } });
+  Object.assign(client.rpc, { rooms: { viaServers } });
+  const onSend = vi.fn(async () => {});
+  draftText('#off');
+  setup({ roomId: '!room:example.org', onSend }, client, [
+    {
+      room_id: '!offtopic',
+      name: 'Offtopic',
+      display_name: 'Offtopic',
+      canonical_alias: null,
+      display_avatar_url: null,
+      state: 'joined',
+    } as unknown as RoomListItemView,
+  ]);
+
+  await press(await screen.findByRole('option', { name: /Offtopic/ }));
+  await flushed();
+  submit();
+
+  await vi.waitFor(() => {
+    expect(onSend).toHaveBeenCalledWith(
+      '!room:example.org',
+      expect.any(String),
+      expect.stringContaining(`matrix:roomid/offtopic?via=${server}"`),
+      expect.anything()
+    );
+  });
+});

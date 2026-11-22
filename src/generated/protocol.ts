@@ -1986,6 +1986,8 @@ export type SpaceChildEdge = {
 	origin_server_ts: number,
 	/**  The parent marked this child as worth surfacing first. */
 	suggested: boolean,
+	/**  Filed here by this account alone, so it has no route and is never written to space state. */
+	private: boolean,
 };
 
 /**
@@ -3502,6 +3504,9 @@ export type Rpc = {
     viaServers: (params: {
 	room_id: string,
 }) => Promise<string[]>;
+    upgradeServers: (params: {
+	room_id: string,
+}) => Promise<string[]>;
     leave: (params: {
 	room_id: string,
 }) => Promise<null>;
@@ -4160,6 +4165,7 @@ export type RpcMethods = {
   'rooms.join': Rpc['rooms']['join'];
   'rooms.knock': Rpc['rooms']['knock'];
   'rooms.via_servers': Rpc['rooms']['viaServers'];
+  'rooms.upgrade_servers': Rpc['rooms']['upgradeServers'];
   'rooms.leave': Rpc['rooms']['leave'];
   'rooms.invite': Rpc['rooms']['invite'];
   'rooms.create': Rpc['rooms']['create'];
@@ -4534,6 +4540,7 @@ export function createRpc(call: RpcCall): Rpc {
       join: (params) => call('rooms.join', params) as ReturnType<Rpc['rooms']['join']>,
       knock: (params) => call('rooms.knock', params) as ReturnType<Rpc['rooms']['knock']>,
       viaServers: (params) => call('rooms.via_servers', params) as ReturnType<Rpc['rooms']['viaServers']>,
+      upgradeServers: (params) => call('rooms.upgrade_servers', params) as ReturnType<Rpc['rooms']['upgradeServers']>,
       leave: (params) => call('rooms.leave', params) as ReturnType<Rpc['rooms']['leave']>,
       invite: (params) => call('rooms.invite', params) as ReturnType<Rpc['rooms']['invite']>,
       create: (params) => call('rooms.create', params) as ReturnType<Rpc['rooms']['create']>,

@@ -17,7 +17,14 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
 }
 
 function child(roomId: string) {
-  return { room_id: roomId, via: [], order: null, origin_server_ts: 1, suggested: false };
+  return {
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 1,
+    suggested: false,
+    private: false,
+  };
 }
 
 function lookup(rooms: readonly RoomListItemView[]) {

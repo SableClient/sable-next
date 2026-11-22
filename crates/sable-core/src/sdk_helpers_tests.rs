@@ -3205,6 +3205,9 @@ async fn space_child_writes(
         );
     }
     server.sync_room(&client, space).await;
+    server
+        .sync_joined_room(&client, room_id!("!child:example.org"))
+        .await;
     Mock::given(method("PUT"))
         .and(path_regex(
             r"^/_matrix/client/v3/rooms/[^/]+/state/m\.space\.child/",
@@ -4958,4 +4961,136 @@ async fn missing_media_is_reported_apart_from_a_failing_server() {
             ..
         })
     ));
+}
+
+#[tokio::test]
+async fn a_private_space_link_is_never_written_to_the_space() {
+    use crate::api::spaces::RemoveParams;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (space, chat) = (
+        room_id!("!space:example.org"),
+        room_id!("!chat:example.org"),
+    );
+    server.sync_joined_room(&client, space).await;
+    server.sync_joined_room(&client, chat).await;
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_custom_global_account_data(json!({
+                "type": "moe.sable.dm_spaces",
+                "content": { "rooms": { chat.as_str(): [space] } }
+            }));
+        })
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex("/members"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "chunk": [] })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex("/state/m.space.child/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$child" })))
+        .expect(0)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let (space_id, room_id) = (space.to_owned(), chat.to_owned());
+    let via = Some(vec!["example.org".to_owned()]);
+
+    let added = AddParams {
+        space_id: space_id.clone(),
+        room_id: room_id.clone(),
+        suggested: None,
+    };
+    added.run(&core).await.unwrap_err();
+    let ordered = SetChildOrderParams {
+        space_id: space_id.clone(),
+        room_id: room_id.clone(),
+        order: Some("a".to_owned()),
+        via: via.clone(),
+    };
+    ordered.run(&core).await.unwrap_err();
+    let suggested = SetChildSuggestedParams {
+        space_id: space_id.clone(),
+        room_id: room_id.clone(),
+        suggested: true,
+        via,
+    };
+    suggested.run(&core).await.unwrap_err();
+    RemoveParams { space_id, room_id }
+        .run(&core)
+        .await
+        .unwrap_err();
+}
+
+#[tokio::test]
+async fn another_rooms_tombstone_does_not_choose_who_we_join_through() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let claim = Raw::new(&json!({
+        "type": "m.room.tombstone", "state_key": "", "sender": "@mallory:evil.example",
+        "event_id": "$claim", "origin_server_ts": 1,
+        "content": { "body": "moved", "replacement_room": "!target" }
+    }))
+    .unwrap()
+    .cast_unchecked();
+    let spam = JoinedRoomBuilder::new(room_id!("!spam")).add_state_event(claim);
+    server.sync_room(&client, spam).await;
+    let core = core(&server, client).await;
+
+    let _ = core
+        .join_room("!target", &["good.example".to_owned()])
+        .await;
+
+    let requests = server.server().received_requests().await.unwrap();
+    let join = requests
+        .iter()
+        .find(|request| request.url.path().contains("/join/"))
+        .unwrap();
+    let query = join.url.query().unwrap();
+    assert!(query.contains("good.example"), "{query}");
+    assert!(!query.contains("evil.example"), "{query}");
+}
+
+#[tokio::test]
+async fn only_a_space_we_manage_routes_a_child_we_are_not_in() {
+    for power in [50, 0] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let state = |kind: &str, key: &str, content: serde_json::Value| {
+            Raw::new(&json!({
+                "type": kind, "state_key": key, "sender": "@alice:other.org",
+                "event_id": format!("${kind}{key}"), "origin_server_ts": 1, "content": content
+            }))
+            .unwrap()
+            .cast_unchecked()
+        };
+        let create = json!({ "type": "m.space", "room_version": "11" });
+        let levels = json!({ "state_default": 50, "users": { "@example:localhost": power } });
+        let child = json!({ "via": ["other.org"] });
+        let from = JoinedRoomBuilder::new(room_id!("!from"))
+            .add_state_event(state("m.room.create", "", create))
+            .add_state_event(state("m.room.power_levels", "", levels))
+            .add_state_event(state("m.space.child", "!elsewhere", child.clone()));
+        server.sync_room(&client, from).await;
+        server.sync_joined_room(&client, room_id!("!to")).await;
+        Mock::given(method("PUT"))
+            .and(path_regex("/state/m.space.child/"))
+            .and(wiremock::matchers::body_json(&child))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$moved" })))
+            .expect(u64::from(power == 50))
+            .mount(server.server())
+            .await;
+        let core = core(&server, client).await;
+
+        let added = AddParams {
+            space_id: room_id!("!to").to_owned(),
+            room_id: room_id!("!elsewhere").to_owned(),
+            suggested: None,
+        };
+
+        assert_eq!(added.run(&core).await.is_ok(), power == 50);
+    }
 }

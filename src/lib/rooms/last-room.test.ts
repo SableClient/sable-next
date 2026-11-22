@@ -21,7 +21,14 @@ function room(roomId: string, overrides: Partial<RoomListItemView> = {}): RoomLi
 const space = room('!space:example.org', {
   room_kind: 'space',
   space_children: [
-    { room_id: '!room:example.org', via: [], order: null, suggested: false, origin_server_ts: 0 },
+    {
+      room_id: '!room:example.org',
+      via: [],
+      order: null,
+      suggested: false,
+      origin_server_ts: 0,
+      private: false,
+    },
   ],
 });
 const other = room('!other:example.org', { room_kind: 'space' });
@@ -50,7 +57,14 @@ test('restores the space a room was opened from', () => {
   const second = room('!second:example.org', {
     room_kind: 'space',
     space_children: [
-      { room_id: '!room:example.org', via: [], order: null, suggested: false, origin_server_ts: 0 },
+      {
+        room_id: '!room:example.org',
+        via: [],
+        order: null,
+        suggested: false,
+        origin_server_ts: 0,
+        private: false,
+      },
     ],
   });
   expect(

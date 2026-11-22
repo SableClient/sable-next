@@ -177,6 +177,10 @@ impl Handler for SendParams {
         let opt_out = (self.no_link_previews || (had_previews && link_previews.is_empty()))
             .then(|| serde_json::Value::Array(Vec::new()));
         let images = core.prepare_preview_images(&room_id, &link_previews).await;
+        let mut bot_command = self.bot_command;
+        if let Some(command) = &mut bot_command {
+            crate::bot_commands::route_rooms(&core.client().await?, command).await;
+        }
         let extra = extra_content(
             persona.as_ref().map(crate::personas::profile_extra_content),
             [
@@ -194,7 +198,7 @@ impl Handler for SendParams {
                     IMAGE_SOURCE_PACKS,
                     image_source_pack_references(&self.image_source_packs),
                 ),
-                (crate::bot_commands::COMMAND_FIELD, self.bot_command),
+                (crate::bot_commands::COMMAND_FIELD, bot_command),
                 (view::FORUM_TITLE, forum_title_value(self.forum_title)),
             ],
         );

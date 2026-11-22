@@ -94,7 +94,14 @@ test('a display name resolves, including one with a space', () => {
 });
 
 function edge(roomId: string): SpaceChildEdge {
-  return { room_id: roomId, via: [], order: null, origin_server_ts: 0, suggested: false };
+  return {
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 0,
+    suggested: false,
+    private: false,
+  };
 }
 
 const spaceRooms = [

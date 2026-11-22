@@ -203,6 +203,27 @@ describe('attachVia', () => {
     expect(doc && serializeComposer(doc).body).toBe('#Sable later');
   });
 
+  test('replaces only the placeholder server', () => {
+    const editor = open();
+    for (const server of ['own.example', 'chosen.example']) {
+      editor.insert(
+        composerSchema.nodes.mention.create({
+          userId: '!abc:example.org',
+          name: '#Sable',
+          via: [server],
+        })
+      );
+    }
+
+    editor.attachVia('!abc:example.org', ['busy.example'], 'own.example');
+    const doc = editor.doc();
+    const formatted = doc && serializeComposer(doc).formatted;
+
+    expect(formatted).toContain('via=busy.example');
+    expect(formatted).toContain('via=chosen.example');
+    expect(formatted).not.toContain('via=own.example');
+  });
+
   test('does not become its own undo step', () => {
     const editor = open();
     editor.insert(roomMention());

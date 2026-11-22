@@ -83,21 +83,25 @@ impl RoomListRows {
                     order: None,
                     origin_server_ts: 0,
                     suggested: false,
+                    private: false,
                 });
             }
             for room_id in linked.get(&row.room_id).into_iter().flatten() {
-                if children.iter().any(|edge| edge.room_id == room_id.as_str()) {
+                if let Some(edge) = children
+                    .iter_mut()
+                    .find(|edge| edge.room_id == room_id.as_str())
+                {
+                    // A parent claim is not space state, so writing it would publish the link.
+                    edge.private = edge.origin_server_ts == 0;
                     continue;
                 }
                 children.push(SpaceChildEdge {
                     room_id: room_id.to_string(),
-                    via: room_id
-                        .server_name()
-                        .map(|server| vec![server.to_string()])
-                        .unwrap_or_default(),
+                    via: Vec::new(),
                     order: None,
                     origin_server_ts: 0,
                     suggested: false,
+                    private: true,
                 });
             }
             if children == row.space_children {
@@ -329,6 +333,7 @@ mod tests {
             order: None,
             origin_server_ts: 7,
             suggested: false,
+            private: false,
         };
         let cache = HashMap::from([(space.to_owned(), space_info(vec![edge.clone()]))]);
         let mut space_row = summary(space, &rules);
@@ -345,6 +350,30 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(rows.rows[0].space_children, [edge]);
+    }
+
+    #[test]
+    fn relink_keeps_a_private_chat_private_when_it_claims_the_space() {
+        let rules = Ruleset::server_default(user_id!("@me:example.org"));
+        let space = room_id!("!space:example.org");
+        let chat = room_id!("!chat");
+        let cache = HashMap::from([(space.to_owned(), space_info(Vec::new()))]);
+        let mut space_row = summary(space, &rules);
+        space_row.room_kind = Some(RoomKind::Space);
+        let mut rows = RoomListRows::default();
+        rows.apply(&VectorDiff::Reset {
+            values: vec![space_row, summary(chat, &rules)],
+        });
+        let links = DmSpaceLinks::from([(chat.to_owned(), vec![space.to_owned()])]);
+        let parents = ParentSpaceLinks::from([(
+            chat.to_owned(),
+            vec![(space.to_owned(), vec!["other.org".into()])],
+        )]);
+
+        rows.relink(&cache, &links, &parents);
+
+        assert!(rows.rows[0].space_children[0].private);
+        assert!(rows.rows[0].space_children[0].lists_room());
     }
 
     #[test]
@@ -376,7 +405,8 @@ mod tests {
             .iter()
             .map(|edge| (edge.room_id.as_str(), edge.via.clone()))
             .collect();
-        assert_eq!(children, [(chat.as_str(), vec!["other.org".to_owned()])]);
+        assert_eq!(children, [(chat.as_str(), Vec::<String>::new())]);
+        assert!(value.space_children.iter().all(|edge| edge.private));
         assert!(
             rows.relink(&cache, &links, &ParentSpaceLinks::new())
                 .is_empty()

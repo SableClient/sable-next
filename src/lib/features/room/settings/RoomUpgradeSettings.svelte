@@ -77,7 +77,7 @@
             (space) =>
               space.room_kind === 'space' &&
               space.state === 'joined' &&
-              space.space_children.some((child) => child.room_id === roomId)
+              space.space_children.some((child) => child.room_id === roomId && !child.private)
           )
           .map((space) => space.room_id)
   );

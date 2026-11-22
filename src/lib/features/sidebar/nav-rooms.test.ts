@@ -41,13 +41,34 @@ test('only joined spaces claim their children', () => {
   expect([...claimed]).toEqual(['!child']);
 });
 
+test('a chat filed privately in a space is claimed without a route', () => {
+  const claimed = claimedRoomIds([
+    room({
+      room_id: '!space',
+      room_kind: 'space',
+      space_children: [
+        { room_id: '!chat', via: [], private: true },
+      ] as unknown as RoomListItemView['space_children'],
+    }),
+  ]);
+
+  expect([...claimed]).toEqual(['!chat']);
+});
+
 test('a child removed from its space is not claimed', () => {
   const claimed = claimedRoomIds([
     room({
       room_id: '!space',
       room_kind: 'space',
       space_children: [
-        { room_id: '!removed', via: [], order: null, origin_server_ts: 0, suggested: false },
+        {
+          room_id: '!removed',
+          via: [],
+          order: null,
+          origin_server_ts: 0,
+          suggested: false,
+          private: false,
+        },
       ],
     }),
   ]);

@@ -65,6 +65,7 @@ mod room_sections;
 mod room_settings;
 mod room_widgets;
 mod rooms;
+mod routing;
 mod rtc;
 mod scheduled;
 mod sealed_account_data;

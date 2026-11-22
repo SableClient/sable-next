@@ -113,3 +113,8 @@ export function levelTargets(
   }
   return targets;
 }
+
+/** Children this account filed here, which space writes must leave out. */
+export function privateChildIds(edges: readonly SpaceChildEdge[]): ReadonlySet<string> {
+  return new Set(edges.filter((edge) => edge.private).map((edge) => edge.room_id));
+}

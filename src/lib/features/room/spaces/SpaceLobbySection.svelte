@@ -36,7 +36,7 @@
     LobbyAction,
     LobbyDragItem,
   } from './space-hierarchy';
-  import { placeholderRows } from './space-hierarchy';
+  import { placeholderRows, privateChildIds } from './space-hierarchy';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
 
   interface Props {
@@ -128,6 +128,7 @@
   let dropState = $state<DropState<LobbyDragItem> | null>(null);
   let headerDrop = $state(false);
   let parentId = $derived(section.parent_id);
+  let privateIds = $derived(privateChildIds(section.siblings));
   let unloaded = $derived(section.space !== null && !section.loaded && !section.failed);
 
   function dropTarget(roomId: string | null) {
@@ -323,6 +324,7 @@
           {@const roomId = child.room_id}
           {@const joined = joinedIds.has(child.room_id)}
           {@const action = entry.action}
+          {@const editable = canManage && !privateIds.has(roomId)}
           <li
             class={[
               'room',
@@ -334,14 +336,14 @@
                   dropState?.item.roomId === child.room_id && dropState.instruction === 'below',
               },
             ]}
-            {@attach canManage
+            {@attach editable
               ? dragList.draggable({ parentId, roomId }, (next) => {
                   dragging = next?.roomId ?? null;
                 })
               : undefined}
-            {@attach canManage ? dropTarget(roomId) : undefined}
+            {@attach editable ? dropTarget(roomId) : undefined}
           >
-            {#if canManage}
+            {#if editable}
               <span class="drag-handle" aria-hidden="true"><DotsSixVerticalIcon /></span>
             {/if}
             <Avatar id={child.room_id} src={child.avatar_url} name={label(child)} size="small" />
@@ -422,7 +424,7 @@
                     <LinkIcon size={16} />
                     {i18n.t('timeline.copyExternalLink')}
                   </ActionMenuItem>
-                  {#if canManage}
+                  {#if editable}
                     <ActionMenuItem
                       onSelect={() => {
                         onSetSuggested(section.parent_id, child.room_id, !entry.suggested);

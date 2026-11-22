@@ -34,6 +34,17 @@ pub struct SpaceChildEdge {
     pub origin_server_ts: u64,
     /// The parent marked this child as worth surfacing first.
     pub suggested: bool,
+    /// Filed here by this account alone, so it has no route and is never written to space state.
+    #[serde(default)]
+    pub private: bool,
+}
+
+impl SpaceChildEdge {
+    /// An edge without a route is a delisting, unless it is private.
+    #[must_use]
+    pub const fn lists_room(&self) -> bool {
+        self.private || !self.via.is_empty()
+    }
 }
 
 /// A room as the lobby knows it, from the server's hierarchy or the local room
@@ -231,7 +242,7 @@ pub fn merge_hierarchy_rooms(
                         None => children.push(edge.clone()),
                     }
                 }
-                children.retain(|edge| !edge.via.is_empty());
+                children.retain(SpaceChildEdge::lists_room);
                 children
             },
             ..room.clone()
@@ -416,6 +427,7 @@ mod tests {
             order: None,
             origin_server_ts: 0,
             suggested,
+            private: false,
         }
     }
 

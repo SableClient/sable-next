@@ -118,6 +118,7 @@ pub fn hierarchy_child_edges(
             order: event.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(event.origin_server_ts.get()),
             suggested: event.content.suggested,
+            private: false,
         })
         .collect()
 }
@@ -171,6 +172,7 @@ pub(crate) async fn space_children(room: &Room) -> Result<Vec<SpaceChildEdge>, m
             order: event.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(event.origin_server_ts.get()),
             suggested: event.content.suggested,
+            private: false,
         })
         .collect())
 }

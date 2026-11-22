@@ -54,6 +54,26 @@ test('a room topic opens its full description', async () => {
   expect(onJoin).not.toHaveBeenCalled();
 });
 
+test.each([false, true])('only a public child can be managed (private: %s)', async (isPrivate) => {
+  const root = space('!root:example.org', 'public', ['!chat']);
+  root.children = [{ ...root.children[0], private: isPrivate }];
+  const chat = { ...space('!chat', 'invite', []), is_space: false, name: 'Chat' };
+  const joined = ['!root:example.org', '!chat'];
+  const [section] = buildHierarchySections([root, chat], '!root:example.org', {
+    joined,
+    keepEmpty: [],
+  });
+  render(SpaceLobbySection, sectionProps(section, joined, { canManage: true, closed: false }));
+
+  const triggers = screen.getAllByRole('button', { name: 'Room options' });
+  await userEvent.setup().click(triggers[triggers.length - 1]);
+  await screen.findAllByRole('menuitem');
+
+  for (const name of ['Move up', 'Remove']) {
+    expect(screen.queryByRole('menuitem', { name }) === null).toBe(isPrivate);
+  }
+});
+
 test('a subspace members of its parent can join offers a join', async () => {
   const { onJoin, user } = mount('restricted', ['!root:example.org']);
 

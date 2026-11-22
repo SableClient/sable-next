@@ -327,6 +327,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       order,
       origin_server_ts: position,
       suggested: false,
+      private: false,
     });
 
     const alphaChildren = [
@@ -1918,6 +1919,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'rooms.join': (params) => params.address,
       'rooms.knock': (params) => params.address,
       'rooms.via_servers': () => ['example.test'],
+      'rooms.upgrade_servers': () => ['example.test'],
       'rooms.canonical_alias': () => ({ alias: null, alt_aliases: [] }),
       'rooms.set_canonical_alias': (params) => ({
         alias: params.alias ?? null,

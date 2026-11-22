@@ -29,6 +29,7 @@ export function space(
       order: null,
       origin_server_ts: 0,
       suggested: false,
+      private: false,
     })),
   };
 }

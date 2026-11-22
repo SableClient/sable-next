@@ -607,7 +607,7 @@ fn boolean(text: &str) -> Option<bool> {
 struct RoomInput {
     room_id: String,
     event_id: Option<String>,
-    via: Vec<String>,
+    via: Option<Vec<String>>,
 }
 
 fn room_input(input: &str) -> Option<RoomInput> {
@@ -615,20 +615,22 @@ fn room_input(input: &str) -> Option<RoomInput> {
         return Some(RoomInput {
             room_id: input.to_owned(),
             event_id: None,
-            via: Vec::new(),
+            // Asks core for a route. A declared choice has none, as bots compare it field by field.
+            via: Some(Vec::new()),
         });
     }
     let split = split_via(input);
+    let via = (!split.via.is_empty()).then_some(split.via);
     match parse_matrix_link(&split.href)? {
         MatrixLink::Room { room_id } if room_id.starts_with('!') => Some(RoomInput {
             room_id,
             event_id: None,
-            via: split.via,
+            via,
         }),
         MatrixLink::Event { room_id, event_id } if room_id.starts_with('!') => Some(RoomInput {
             room_id,
             event_id: Some(event_id),
-            via: split.via,
+            via,
         }),
         _ => None,
     }
@@ -638,7 +640,7 @@ fn room_reference_from(kind: RoomReferenceKind, room: RoomInput) -> LiteralValue
     LiteralValue::Room(RoomReference {
         kind,
         id: room.room_id,
-        via: (!room.via.is_empty()).then_some(room.via),
+        via: room.via,
         event_id: room.event_id,
     })
 }
@@ -1144,7 +1146,7 @@ mod tests {
             json!({
                 "command": "ban",
                 "arguments": {
-                    "target_room": { "type": "room_id", "id": "!room:example.org" },
+                    "target_room": { "type": "room_id", "id": "!room:example.org", "via": [] },
                     "timeout_seconds": 60,
                     "target_users": ["@a:x"],
                 },
@@ -1347,6 +1349,33 @@ mod tests {
                 panic!("a room reference");
             };
             assert_eq!(reference.via, None);
+        }
+    }
+
+    #[test]
+    fn a_declared_room_does_not_ask_for_a_route() {
+        let schema = json!({"schema_type": "union", "variants": [
+            {"schema_type": "literal", "value": {"type": "room_id", "id": "!archive"}},
+            {"schema_type": "primitive", "type": "room_id"}
+        ]});
+        let content = json!({"command": "move", "parameters": [{"key": "to", "schema": schema}]});
+        let command = parse_bot_command("@b:x", None, None, &content).unwrap();
+
+        for (typed, sent) in [
+            ("!archive", json!({"type": "room_id", "id": "!archive"})),
+            (
+                "!other",
+                json!({"type": "room_id", "id": "!other", "via": []}),
+            ),
+        ] {
+            let drafts =
+                super::ArgumentDrafts::from([("to".into(), ArgumentDraft::Text(typed.into()))]);
+            let InvocationResult::Built { invocation, .. } =
+                build_invocation(&command, &drafts, "/")
+            else {
+                panic!("built");
+            };
+            assert_eq!(invocation.arguments["to"], sent);
         }
     }
 }

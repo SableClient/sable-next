@@ -1339,14 +1339,15 @@ export class ComposerEditor {
 
   /** The servers arrive after the mention is inserted, so they are patched in
       rather than replacing what has been typed since. */
-  attachVia(userId: string, via: readonly string[]): void {
+  attachVia(userId: string, via: readonly string[], placeholder?: string): void {
     const view = this.view;
     if (!view || via.length === 0) return;
 
     const tr = view.state.tr;
     view.state.doc.descendants((node, pos) => {
       if (node.type !== composerSchema.nodes.mention) return true;
-      if (node.attrs.userId !== userId || (node.attrs.via as string[]).length > 0) return false;
+      if (node.attrs.userId !== userId) return false;
+      if ((node.attrs.via as string[]).some((server) => server !== placeholder)) return false;
       tr.setNodeMarkup(pos, undefined, { ...node.attrs, via: [...via] });
       return false;
     });

@@ -206,7 +206,14 @@ test('parentSpaceNames names a room after the first space that lists it', () => 
       name: 'Engineering',
       room_kind: 'space',
       space_children: [
-        { room_id: '!a:example.org', via: [], order: null, suggested: false, origin_server_ts: 0 },
+        {
+          room_id: '!a:example.org',
+          via: [],
+          order: null,
+          suggested: false,
+          origin_server_ts: 0,
+          private: false,
+        },
       ],
     }),
     room({ room_id: '!a:example.org', name: 'Backend' }),

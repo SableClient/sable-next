@@ -975,6 +975,7 @@ test('a space marked as bridged carries the network of its rooms', async () => {
         order: null,
         origin_server_ts: 0,
         suggested: false,
+        private: false,
       },
     ],
   };

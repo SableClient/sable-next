@@ -53,6 +53,7 @@ function room(
     canonical_alias,
     avatar_url: null,
     display_name: name,
+    state: 'joined',
   } as RoomListItemView;
 }
 
@@ -190,7 +191,14 @@ test('rooms with the same name show the space they are in', () => {
     state: 'joined',
     is_tombstoned: false,
     space_children: [
-      { room_id: '!one:example.org', via: [], order: null, origin_server_ts: 1, suggested: false },
+      {
+        room_id: '!one:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 1,
+        suggested: false,
+        private: false,
+      },
     ],
   } as RoomListItemView;
 
@@ -283,6 +291,17 @@ test('a translator passed in is what renders the command descriptions', () => {
   const [suggestion] = suggestionsFor(commandQuery('me'), [], [], [], (key) => `translated:${key}`);
 
   expect(suggestion.detail).toBe('translated:composer.slash.me.description');
+});
+
+test('a room without an alias is only suggested once joined', () => {
+  const rooms = [
+    { ...room('!invited', 'General'), state: 'invited' as const },
+    { ...room('!public', 'General two', '#general:example.org'), state: 'invited' as const },
+  ];
+
+  expect(suggestionsFor(roomQuery('gen'), [], [], rooms).map((item) => item.id)).toEqual([
+    '#general:example.org',
+  ]);
 });
 
 test('two rooms claiming one alias are suggested once', () => {
