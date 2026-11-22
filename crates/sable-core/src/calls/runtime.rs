@@ -258,7 +258,7 @@ async fn provision_focus(
     let member_id = own.member_id.as_deref().unwrap_or(&own.identity);
     if membership::is_sfu_url(focus) {
         sfu::provision_stable(room, focus, server_name, own.wire.slot(), member_id).await
-    } else if own.mode == CallMode::Matrix2 {
+    } else if own.uses_sticky_identity() {
         sfu::provision_matrix2(room, focus, own.own_device_id(), member_id).await
     } else {
         sfu::provision(room, focus, own.own_device_id()).await
@@ -1023,14 +1023,13 @@ async fn provision_missing(
 ) {
     let member_id = own.member_id.as_deref().unwrap_or(&own.identity);
     let publisher_id = publisher_backend_id(&room.room_id().to_owned(), own);
+    let sticky_identity = own.uses_sticky_identity();
     for (id, service, server_name) in missing {
-        let identity = membership::backend_identity(
-            &own.user_id,
-            own.own_device_id(),
-            member_id,
-            own.mode,
-            &service,
-        );
+        let identity = if sticky_identity && !membership::is_sfu_url(&service) {
+            own.identity.clone()
+        } else {
+            membership::backend_identity(&own.user_id, own.own_device_id(), member_id, &service)
+        };
         let provision = if membership::is_sfu_url(&service) {
             sfu::provision_stable(
                 room,
@@ -1046,7 +1045,7 @@ async fn provision_missing(
                 &service,
                 own.own_device_id(),
                 member_id,
-                own.mode == CallMode::Matrix2,
+                sticky_identity,
             )
             .await
         };

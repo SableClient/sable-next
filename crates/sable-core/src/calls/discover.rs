@@ -149,14 +149,28 @@ fn own_identity(
     device: &DeviceId,
     mode: CallMode,
     service: &str,
+    sticky_identity: bool,
 ) -> (String, String) {
     let member_id = if mode == CallMode::Matrix2 {
         TransactionId::new().to_string()
     } else {
         sfu::livekit_identity(user, device)
     };
-    let identity = membership::backend_identity(user, device, &member_id, mode, service);
+    let identity = if sticky_identity && !membership::is_sfu_url(service) {
+        membership::sticky_identity(user, device, &member_id)
+    } else {
+        membership::backend_identity(user, device, &member_id, service)
+    };
     (identity, member_id)
+}
+
+// Older Element Call and Sable only find us by the sticky identity.
+fn joins_older_call(user: &UserId, device: &DeviceId, members: &[CallMember]) -> bool {
+    let mut peers = members
+        .iter()
+        .filter(|member| member.mode == CallMode::Matrix2 && !member.is_own(user, device))
+        .peekable();
+    peers.peek().is_some() && peers.all(CallMember::uses_sticky_identity)
 }
 
 fn own_member(
@@ -166,8 +180,9 @@ fn own_member(
     wire: membership::RtcWire,
     service: String,
     focus_server: Option<OwnedServerName>,
+    sticky_identity: bool,
 ) -> CallMember {
-    let (identity, member_id) = own_identity(&user, &device, mode, &service);
+    let (identity, member_id) = own_identity(&user, &device, mode, &service, sticky_identity);
     let now = crate::now_ms();
     CallMember {
         user_id: user,
@@ -270,7 +285,16 @@ pub(super) async fn discover(
         wire,
     )
     .await?;
-    let own = own_member(user, device, mode, wire, service, focus_server);
+    let sticky_identity = mode == CallMode::Matrix2 && joins_older_call(&user, &device, &members);
+    let own = own_member(
+        user,
+        device,
+        mode,
+        wire,
+        service,
+        focus_server,
+        sticky_identity,
+    );
     Ok(Discovered {
         own,
         members,

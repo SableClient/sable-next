@@ -107,7 +107,7 @@ pub(super) fn content_at(
                     .collect(),
                 can_subscribe: [TransportKind::Livekit],
             },
-            versions: [],
+            versions: own.uses_sticky_identity().then_some([]),
             msc4354_sticky_key: own.member_id.clone(),
             screen_sharing,
         })
@@ -264,7 +264,8 @@ pub(super) struct Matrix2Out {
     slot_id: SlotId,
     member: Matrix2Member,
     transports: Matrix2Transports,
-    versions: [(); 0],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    versions: Option<[(); 0]>,
     msc4354_sticky_key: Option<String>,
     #[serde(flatten)]
     screen_sharing: Option<ScreenSharing>,

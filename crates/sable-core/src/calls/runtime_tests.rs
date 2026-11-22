@@ -1376,6 +1376,38 @@ async fn a_remote_focus_cannot_change_the_participant_identity() {
     assert!(!state.lock().await.backends.contains_key("remote"));
 }
 
+#[tokio::test]
+async fn a_matrix2_token_comes_from_the_endpoint_that_grants_the_members_identity() {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+
+    for (older, endpoint) in [(false, "/sfu/get"), (true, "/get_token")] {
+        let (_homeserver, _sfu, room, mut own, _oldest, _state) = legacy_move_fixture(true).await;
+        own.mode = CallMode::Matrix2;
+        own.member_id = Some("member".to_owned());
+        if older {
+            own.identity =
+                super::membership::sticky_identity(&own.user_id, own.own_device_id(), "member");
+        }
+        let service = wiremock::MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(endpoint))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "url": "wss://sfu.example.org", "jwt": token(&own.identity, "r"),
+            })))
+            .mount(&service)
+            .await;
+
+        let provisioned = super::provision_focus(&room, &own, &service.uri(), None).await;
+
+        assert_eq!(
+            provisioned.map(|provisioned| provisioned.identity).ok(),
+            Some(own.identity.clone()),
+            "{endpoint}"
+        );
+    }
+}
+
 #[test]
 fn legacy_mode_follows_only_jwt_services() {
     let first = member(CallMode::Legacy, 1, &["wss://sfu.example.org"]);

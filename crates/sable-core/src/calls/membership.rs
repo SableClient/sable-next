@@ -76,6 +76,7 @@ struct StickyContent {
     member: Option<StickyMemberRef>,
     #[serde(default)]
     transports: StickyTransports,
+    versions: Option<serde::de::IgnoredAny>,
     #[serde(default, rename = "org.sable.screen_sharing")]
     screen_sharing: bool,
 }
@@ -162,7 +163,14 @@ pub(crate) fn sticky_member(raw: &str) -> Option<StickyMember> {
     let device_id = member.device_id;
     let identity = match wire {
         RtcWire::Deployed if !foci.first().is_some_and(|focus| is_sfu_url(focus)) => {
-            sticky_identity(&event.sender, device_id.as_deref()?, &member.id)
+            let device = device_id.as_deref()?;
+            // Element Call up to 0.28.0 requires `versions`; later releases dropped it along with
+            // the hashed identity on JWT services.
+            if event.content.versions.is_some() {
+                sticky_identity(&event.sender, device, &member.id)
+            } else {
+                super::sfu::livekit_identity(&event.sender, device)
+            }
         }
         RtcWire::Deployed | RtcWire::Stable => stable_identity(&event.sender, &member.id),
     };
@@ -187,13 +195,10 @@ pub(crate) fn backend_identity(
     user_id: &UserId,
     device_id: &DeviceId,
     member_id: &str,
-    mode: CallMode,
     focus: &str,
 ) -> String {
     if is_sfu_url(focus) {
         stable_identity(user_id, member_id)
-    } else if mode == CallMode::Matrix2 {
-        sticky_identity(user_id, device_id, member_id)
     } else {
         super::sfu::livekit_identity(user_id, device_id)
     }
@@ -239,6 +244,13 @@ impl CallMember {
         self.device_id
             .as_deref()
             .expect("own call member has a device ID")
+    }
+
+    pub(crate) fn uses_sticky_identity(&self) -> bool {
+        self.device_id
+            .as_deref()
+            .zip(self.member_id.as_deref())
+            .is_some_and(|(device, id)| self.identity == sticky_identity(&self.user_id, device, id))
     }
 
     pub(crate) fn same_generation(&self, other: &Self) -> bool {
@@ -337,7 +349,6 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
                     user_id,
                     membership.device_id(),
                     &member_id,
-                    mode,
                     foci.first().map_or("", String::as_str),
                 ),
                 member_id: Some(member_id),
@@ -919,6 +930,7 @@ mod tests {
                     "slot_id":"m.call#ROOM",
                     "application":{"type":"m.call"},
                     "member":{"user_id":"@kris:localhost","device_id":"LAPTOP","id":"member-1"},
+                    "versions":[],
                     "transports":{"published":[{"type":"livekit","livekit_service_url":"https://focus.example.org"}]}
                 }
             }"#,
@@ -969,6 +981,24 @@ mod tests {
             advertised_service_urls(&members),
             vec!["https://sfu.two".to_owned()]
         );
+    }
+
+    #[test]
+    fn a_sticky_member_without_versions_uses_the_jwt_service_identity() {
+        let member = sticky_member(
+            r#"{
+                "sender":"@kris:localhost",
+                "content": {
+                    "slot_id":"m.call#ROOM",
+                    "application":{"type":"m.call"},
+                    "member":{"user_id":"@kris:localhost","device_id":"LAPTOP","id":"member-1","membership":"join"},
+                    "transports":{"published":[{"type":"livekit","livekit_service_url":"https://focus.example.org"}]}
+                }
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(member.identity, "@kris:localhost:LAPTOP");
     }
 
     #[test]

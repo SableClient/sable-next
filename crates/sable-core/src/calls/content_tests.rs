@@ -124,6 +124,8 @@ fn matrix2_and_legacy_membership_content_differ_in_shape() {
     let room_id = owned_room_id!("!room:example.org");
     let mut own = member(CallMode::Matrix2, 1_000, &["https://sfu.example.org"]);
     own.member_id = Some("m1".to_owned());
+    own.identity =
+        crate::calls::membership::sticky_identity(&own.user_id, own.own_device_id(), "m1");
     own.screen_sharing = true;
     assert_eq!(
         content_at(&room_id, &own, Some(CallIntent::Video), 2_000),
@@ -139,6 +141,11 @@ fn matrix2_and_legacy_membership_content_differ_in_shape() {
             "msc4354_sticky_key": "m1",
             "org.sable.screen_sharing": true,
         })
+    );
+    own.identity = "@user:example.org:DEVICE".to_owned();
+    assert!(
+        content(&room_id, &own, None).get("versions").is_none(),
+        "only older Element Call reads the sticky identity, and it requires versions"
     );
     own.mode = CallMode::Compatibility;
     own.member_id = Some(own.identity.clone());

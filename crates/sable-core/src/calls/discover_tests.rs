@@ -10,6 +10,7 @@ use crate::store::MemorySessionStore;
 async fn discover_with_peers(
     mode: CallMode,
     peers: &[(u64, &str)],
+    older_peers: bool,
     configured: Option<&str>,
 ) -> Discovered {
     use matrix_sdk::ruma::{events::AnySyncStateEvent, serde::Raw};
@@ -39,7 +40,15 @@ async fn discover_with_peers(
         let mut peer = member(mode, now - age, &[service]);
         peer.user_id = owned_user_id!("@peer:example.org");
         peer.device_id = Some(format!("DEVICE{age}").into());
-        peer.member_id = Some(format!("peer-{age}"));
+        let member_id = format!("peer-{age}");
+        if older_peers {
+            peer.identity = crate::calls::membership::sticky_identity(
+                &peer.user_id,
+                peer.own_device_id(),
+                &member_id,
+            );
+        }
+        peer.member_id = Some(member_id);
         let mut event = json!({
             "type": if mode == CallMode::Matrix2 {
                 crate::calls::membership::RTC_MEMBER_EVENT_TYPE
@@ -100,7 +109,8 @@ const PEERS: [(u64, &str); 2] = [
 #[tokio::test]
 async fn joining_an_existing_call_uses_the_oldest_focus_in_every_mode() {
     for mode in [CallMode::Legacy, CallMode::Compatibility, CallMode::Matrix2] {
-        let discovered = discover_with_peers(mode, &PEERS, Some("https://own.example.org")).await;
+        let discovered =
+            discover_with_peers(mode, &PEERS, false, Some("https://own.example.org")).await;
         assert_eq!(
             discovered.own.foci,
             vec!["https://oldest.example.org"],
@@ -112,8 +122,34 @@ async fn joining_an_existing_call_uses_the_oldest_focus_in_every_mode() {
 #[tokio::test]
 async fn joining_a_call_without_a_focus_uses_the_configured_fallback() {
     for mode in [CallMode::Legacy, CallMode::Compatibility, CallMode::Matrix2] {
-        let discovered = discover_with_peers(mode, &[], Some("https://own.example.org")).await;
+        let discovered =
+            discover_with_peers(mode, &[], false, Some("https://own.example.org")).await;
         assert_eq!(discovered.own.foci, vec!["https://own.example.org"]);
+    }
+}
+
+#[tokio::test]
+async fn a_matrix2_join_takes_the_identity_of_the_running_call() {
+    for (peers, older_peers) in [(&[][..], false), (&PEERS[..], false), (&PEERS[..], true)] {
+        let own = discover_with_peers(
+            CallMode::Matrix2,
+            peers,
+            older_peers,
+            Some("https://own.example.org"),
+        )
+        .await
+        .own;
+        let device = own.own_device_id();
+        let expected = if older_peers {
+            crate::calls::membership::sticky_identity(
+                &own.user_id,
+                device,
+                own.member_id.as_deref().unwrap(),
+            )
+        } else {
+            format!("{}:{device}", own.user_id)
+        };
+        assert_eq!(own.identity, expected, "{peers:?} {older_peers}");
     }
 }
 
