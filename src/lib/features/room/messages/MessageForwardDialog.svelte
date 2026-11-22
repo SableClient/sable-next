@@ -9,11 +9,17 @@
 
   interface Props {
     open?: boolean;
+    title?: string;
     metadataLocked?: boolean;
     onForward: (toRoomIds: string[], includeMetadata: boolean) => void;
   }
 
-  let { open = $bindable(false), metadataLocked = false, onForward }: Props = $props();
+  let {
+    open = $bindable(false),
+    title = i18n.t('timeline.forwardTitle'),
+    metadataLocked = false,
+    onForward,
+  }: Props = $props();
   const roomList = useRoomList();
   let search = $state('');
   let includeMetadata = $state(true);
@@ -43,9 +49,9 @@
   }
 </script>
 
-<DialogFrame bind:open variant="verification" label={i18n.t('timeline.forwardTitle')}>
+<DialogFrame bind:open variant="verification" label={title}>
   <div class="forward">
-    <h2>{i18n.t('timeline.forwardTitle')}</h2>
+    <h2>{title}</h2>
     <TextInput
       id={fieldId}
       bind:value={search}

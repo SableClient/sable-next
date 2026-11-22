@@ -37,3 +37,95 @@
 html[data-reduced-motion='on'] .message.highlighted {
   animation: jump-reduced var(--message-highlight-duration) steps(1, end);
 }
+
+article.message {
+  --selection-gutter: calc(0 * var(--space-100));
+}
+
+article.message.selecting {
+  --selection-gutter: calc(var(--size-x400) + var(--space-200));
+
+  cursor: pointer;
+  user-select: none;
+}
+
+.message.selecting:not(.editing) > :not(.select-toggle) {
+  pointer-events: none;
+}
+
+.select-toggle {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: var(--radii-300);
+  cursor: pointer;
+  display: flex;
+  height: var(--size-x400);
+  inset-inline-start: var(--row-inset-start, var(--page-gutter));
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  top: calc(var(--timeline-row-padding) + var(--space-100));
+  width: var(--size-x400);
+}
+
+.select-toggle::after {
+  content: '';
+  inset: calc((var(--size-x400) - var(--target-hit)) / 2);
+  position: absolute;
+}
+
+.select-toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.select-box {
+  align-items: center;
+  background: var(--bg-container);
+  border: var(--border-width-500) solid var(--sec-main);
+  border-radius: var(--radii-300);
+  box-sizing: border-box;
+  color: var(--primary-on-main);
+  display: inline-flex;
+  height: var(--size-x200);
+  justify-content: center;
+  width: var(--size-x200);
+}
+
+.select-box svg {
+  height: var(--size-x50);
+  width: var(--size-x50);
+}
+
+.select-toggle.checked .select-box {
+  background: var(--primary-main);
+  border-color: var(--primary-main);
+}
+
+.message.collapsed.selecting > .select-toggle {
+  top: 0;
+}
+
+.message.event-row.selecting > .select-toggle {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+article.message.multi-selected[data-multi-selected='true'] {
+  background: color-mix(in srgb, var(--primary-container) 55%, transparent);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 var(--border-width) var(--primary-container-line);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  article.message.multi-selected[data-multi-selected='true']:hover {
+    background: color-mix(in srgb, var(--primary-container-hover) 65%, transparent);
+  }
+}
+
+@supports not (color: color-mix(in srgb, black, white)) {
+  article.message.multi-selected[data-multi-selected='true'] {
+    background: var(--primary-container);
+  }
+}

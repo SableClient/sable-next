@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { onDestroy, untrack, type Snippet } from 'svelte';
+  import { onDestroy, tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -17,6 +17,7 @@
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
+  import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { MOTION_MS, motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
     TimelineWindow,
@@ -42,9 +43,15 @@
 
   import MessageContextMenu from '../messages/MessageContextMenu.svelte';
   import MessageDialogHost from '../messages/MessageDialogHost.svelte';
+  import MessageSelectionBar from '../messages/MessageSelectionBar.svelte';
   import { useEventItems } from '../messages/event-items.svelte.js';
   import { MessageDialogs, provideMessageDialogs } from '../messages/message-dialogs.svelte.js';
   import { OpenMessageMenu, provideMessageMenu } from '../messages/message-menu-open.svelte.js';
+  import {
+    isSelectable,
+    MessageSelection,
+    provideMessageSelection,
+  } from '../messages/message-selection.svelte.js';
   import { LoadRetry } from './load-retry';
   import TimelineItem from './TimelineItem.svelte';
   import TimelineMemberGroup from './TimelineMemberGroup.svelte';
@@ -214,6 +221,26 @@
   const visibleItems = $derived(rowModel.visibleItems);
   const entries = $derived(rowModel.entries);
   let events = $derived(new TimelineEventIndex(timeline.items, timeline.aggregations));
+  const selection = provideMessageSelection(new MessageSelection(() => visibleItems));
+  let selectionBar = $state<MessageSelectionBar>();
+  let selectableCount = $derived(visibleItems.filter(isSelectable).length);
+  holdOverlayBack(
+    () => selection.active,
+    () => {
+      selectionBar?.cancelOrClear();
+    }
+  );
+  let selectionAnnouncement = $state('');
+  let previousSelectedCount = 0;
+  $effect(() => {
+    const count = selection.count;
+    if (count === previousSelectedCount) return;
+    previousSelectedCount = count;
+    selectionAnnouncement =
+      count > 0
+        ? i18n.t('timeline.selectionAnnounce', { count })
+        : i18n.t('timeline.selectionCleared');
+  });
   function entryFor(eventId: string | null): TimelineEntry<RowValue> | undefined {
     return entries.find(({ value }) => holdsEvent(value, eventId));
   }
@@ -754,15 +781,81 @@
       })
     );
   }
+  function itemForArticle(article: HTMLElement): TimelineItemView | null {
+    const eventId = article.closest<HTMLElement>('[data-event-id]')?.dataset.eventId;
+    return eventId ? events.get(eventId) : null;
+  }
+  function exitSelection(): void {
+    const activeElement = document.activeElement;
+    const shouldRestore =
+      activeElement === null ||
+      activeElement === document.body ||
+      Boolean(activeElement.closest('.selection-bar, [role="dialog"]'));
+    if (!shouldRestore) return;
+    const fallback =
+      viewport?.querySelector<HTMLElement>(`${ARTICLE}[tabindex="0"]`) ??
+      viewport?.querySelector<HTMLElement>(ARTICLE);
+    void tick().then(() => {
+      if (
+        fallback &&
+        (document.activeElement === null ||
+          document.activeElement === document.body ||
+          !document.activeElement.isConnected)
+      ) {
+        fallback.focus();
+      }
+    });
+  }
+  function onTimelineKeydown(event: KeyboardEvent): void {
+    if (event.defaultPrevented || event.isComposing || !active || !selection.active) return;
+    if (event.target instanceof Element && event.target.closest('[role="dialog"], [role="menu"]')) {
+      return;
+    }
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (event.key === 'Escape' && !event.repeat && plain) {
+      event.preventDefault();
+      selectionBar?.cancelOrClear();
+      return;
+    }
+    const mod = isMacPlatform() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+    if (
+      mod &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === 'a' &&
+      !isEditableTarget(event.target) &&
+      !isDialogOpen()
+    ) {
+      event.preventDefault();
+      selection.selectAll();
+    }
+  }
+  function attachTimelineKeys(node: HTMLElement): () => void {
+    return on(node, 'keydown', onTimelineKeydown);
+  }
   function feedKeydown(event: KeyboardEvent): void {
     const target = event.target;
     if (!(target instanceof HTMLElement) || event.defaultPrevented) return;
     const article = target.closest<HTMLElement>(ARTICLE);
     if (!article) return;
     const plain = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
-    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+    if (
+      !selection.active &&
+      (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))
+    ) {
       event.preventDefault();
       openMenuFromKeyboard(article);
+    } else if (
+      target === article &&
+      (event.key === ' ' || (selection.active && event.key === 'Enter'))
+    ) {
+      const shiftOnly = event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey;
+      if (!plain && !(shiftOnly && selection.active)) return;
+      const item = itemForArticle(article);
+      if (!item || !isSelectable(item)) return;
+      event.preventDefault();
+      if (shiftOnly) selection.selectRange(item);
+      else selection.toggle(item);
     } else if (target === article && plain && (event.key === 'Enter' || event.key === 'F2')) {
       const control =
         article.querySelector<HTMLElement>('.message-actions button') ??
@@ -772,6 +865,7 @@
       control.focus();
     } else if (target !== article && plain && event.key === 'Escape' && !isEditableTarget(target)) {
       event.preventDefault();
+      if (selection.active) selectionBar?.cancelOrClear();
       article.focus();
     }
   }
@@ -1113,11 +1207,16 @@
       event.altKey ||
       event.shiftKey ||
       !active ||
-      !onMarkRead ||
       (event.target instanceof Element && event.target.closest('[role="dialog"], [role="menu"]'))
     ) {
       return;
     }
+    if (selection.active) {
+      event.preventDefault();
+      selectionBar?.cancelOrClear();
+      return;
+    }
+    if (!onMarkRead) return;
     event.preventDefault();
     jumpToLatest();
     if (unread.active || hasUnread) {
@@ -1212,8 +1311,27 @@
 <div
   class={['timeline-content', `spacing-${preferences.messageSpacing}`]}
   style={timelineLayoutStyle(preferences.messageSpacing)}
+  {@attach attachTimelineKeys}
 >
-  {#if revealed && unread.active && !unread.loading && (!unreadInView || unreadError !== null)}
+  <p class="screen-reader-only" role="status" aria-live="polite" aria-atomic="true">
+    {selectionAnnouncement}
+  </p>
+  {#if selection.active}
+    <MessageSelectionBar
+      bind:this={selectionBar}
+      {selection}
+      {events}
+      {roomId}
+      {threadRootId}
+      {members}
+      {selectableCount}
+      canEdit={callbacks.onEdit !== undefined}
+      canDelete={callbacks.onDelete !== undefined}
+      {canRedactOwn}
+      {canRedactOthers}
+      onExit={exitSelection}
+    />
+  {:else if revealed && unread.active && !unread.loading && (!unreadInView || unreadError !== null)}
     <div class="unread-bar">
       <Button
         class="jump-to-unread"

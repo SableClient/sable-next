@@ -197,3 +197,28 @@ test('a failed load is retried on the next call', async () => {
   await store.load();
   expect(store.has('!a:example.org', '$one')).toBe(true);
 });
+
+test('set with refresh false updates local keys without triggering a list reload until refresh is called', async () => {
+  const bookmarks = vi
+    .fn()
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([
+      bookmark('!a:example.org', '$one'),
+      bookmark('!a:example.org', '$two'),
+    ]);
+  const setBookmark = vi.fn(() => Promise.resolve(true));
+  const store = new Bookmarks(fakeCore(bookmarks, setBookmark));
+
+  await store.load();
+  await store.set('!a:example.org', '$one', true, { refresh: false });
+  await store.set('!a:example.org', '$two', true, { refresh: false });
+
+  expect(bookmarks).toHaveBeenCalledTimes(1);
+  expect(store.has('!a:example.org', '$one')).toBe(true);
+  expect(store.has('!a:example.org', '$two')).toBe(true);
+
+  await store.refresh();
+
+  expect(bookmarks).toHaveBeenCalledTimes(2);
+  expect(store.entries.map((entry) => entry.event_id)).toEqual(['$one', '$two']);
+});

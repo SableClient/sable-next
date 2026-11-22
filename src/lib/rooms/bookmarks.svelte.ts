@@ -35,26 +35,39 @@ export class Bookmarks {
   }
 
   async toggle(roomId: string, eventId: string): Promise<void> {
+    await this.set(roomId, eventId, !this.has(roomId, eventId));
+  }
+
+  async set(
+    roomId: string,
+    eventId: string,
+    bookmarked: boolean,
+    options: { refresh?: boolean } = {}
+  ): Promise<void> {
     const key = bookmarkKey(roomId, eventId);
-    const bookmarked = await this.commands.setBookmark({
+    const saved = await this.commands.setBookmark({
       room_id: roomId,
       event_id: eventId,
-      bookmarked: !this.#keys.has(key),
+      bookmarked,
       now_ms: Date.now(),
     });
 
     this.#revision += 1;
-    if (bookmarked) {
+    if (saved) {
       this.#keys.add(key);
-      this.#loaded = false;
-      if (this.#inFlight) await this.#inFlight;
-      await this.load();
+      if (options.refresh !== false) await this.refresh();
     } else {
       this.#keys.delete(key);
       this.#entries = this.#entries.filter(
         (entry) => bookmarkKey(entry.room_id, entry.event_id) !== key
       );
     }
+  }
+
+  async refresh(): Promise<void> {
+    this.#loaded = false;
+    if (this.#inFlight) await this.#inFlight;
+    await this.load();
   }
 
   async #fetch(): Promise<void> {

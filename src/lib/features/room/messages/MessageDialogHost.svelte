@@ -3,22 +3,16 @@
     EditVersionView,
     ImageSourcePackView,
     MemberView,
-    MessageKind,
     PerMessageProfileView,
     PersonaView,
     TimelineItemView,
   } from '#src/generated/protocol';
 
-  import { formattedForEditing } from '#lib/composer/composer-context.js';
-  import { editMessage } from '#lib/core/api/messages.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { projectPersona } from '#lib/personas/persona.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
-  import { outgoingPersona } from '#lib/personas/outgoing-persona.js';
   import { meowlnirFor } from '#lib/rooms/meowlnir-registry.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import StealEmotesDialog from '#lib/features/emotes/StealEmotesDialog.svelte';
@@ -27,6 +21,7 @@
   import MeowlnirBanDialog from '../members/MeowlnirBanDialog.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import EditHistoryDialog from './EditHistoryDialog.svelte';
+  import { forwardToRooms, reproxyEvent } from './message-selection.svelte.js';
   import MessageActionSheet from './MessageActionSheet.svelte';
   import type { MessageDialogs, OpenMessageDialog } from './message-dialogs.svelte.js';
   import MessageForwardDialog from './MessageForwardDialog.svelte';
@@ -111,58 +106,22 @@
   }
 
   function forward(item: TimelineItemView, toRoomIds: string[], includeMetadata: boolean): void {
-    const eventId = item.event_id;
-    if (!eventId) return;
-    for (const toRoomId of toRoomIds) {
-      void core.rpc.messages
-        .forward({
-          room_id: roomId,
-          event_id: eventId,
-          to_room_id: toRoomId,
-          include_metadata: includeMetadata,
-          persona: $state.snapshot(
-            outgoingPersona(
-              personaStore,
-              toRoomId,
-              personaSpaces(roomList, toRoomId, undefined).order
-            ).persona
-          ),
-        })
-        .catch(failed('forward'));
-    }
-  }
-
-  function reproxyKind(content: TimelineItemView['content']): MessageKind {
-    return content.kind === 'message' ? content.msgtype : 'text';
+    if (!item.event_id) return;
+    void forwardToRooms(core.rpc, personaStore, roomList, {
+      roomId,
+      eventId: item.event_id,
+      toRoomIds,
+      includeMetadata,
+    }).catch(failed('forward'));
   }
 
   function reproxy(item: TimelineItemView, persona: PersonaView | null): void {
-    const content = item.content;
     if (!item.event_id) return;
-    const media =
-      content.kind === 'image' ||
-      content.kind === 'video' ||
-      content.kind === 'audio' ||
-      content.kind === 'file';
-    if (content.kind === 'gallery' || content.kind === 'location') {
-      void core.rpc.messages
-        .reprofile({
-          room_id: roomId,
-          event_id: item.event_id,
-          thread_root: item.thread_root ?? null,
-          persona: $state.snapshot(persona ? projectPersona(persona, false) : null),
-        })
-        .catch(failed('reproxy'));
-      return;
-    }
-    if (content.kind !== 'message' && !media) return;
-    const body = content.kind === 'message' ? content.body : (content.caption ?? '');
-    void editMessage(core.rpc, roomId, item.event_id, body, {
-      formatted: formattedForEditing(content.html),
-      kind: reproxyKind(content),
-      media_caption: media,
-      thread_root: item.thread_root ?? null,
-      persona: persona ? projectPersona(persona, preferences.personaFallback && body !== '') : null,
+    void reproxyEvent(core.rpc, {
+      roomId,
+      item,
+      persona: $state.snapshot(persona),
+      personaFallback: preferences.personaFallback,
     }).catch(failed('reproxy'));
   }
 

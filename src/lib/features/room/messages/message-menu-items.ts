@@ -1,6 +1,7 @@
 import type { Component } from 'svelte';
 
 import BookmarkIcon from 'phosphor-svelte/lib/BookmarkSimpleIcon';
+import CheckSquareIcon from 'phosphor-svelte/lib/CheckSquareIcon';
 import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
 import DownloadIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
@@ -34,6 +35,7 @@ export type MessageActions = {
   onReadReceipts?: () => void;
   onEditHistory?: () => void;
   onMarkUnread?: () => void;
+  onSelect?: () => void;
   onReply?: () => void;
   onOpenThread?: () => void;
   onEdit?: () => void;
@@ -220,13 +222,22 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       run: actions.onDownloadEmotes,
     });
   }
+  if (actions.onSelect) {
+    rows.push({
+      key: 'select',
+      label: 'timeline.selectMessage',
+      icon: CheckSquareIcon,
+      run: actions.onSelect,
+      separated: true,
+    });
+  }
   if (actions.onMarkUnread) {
     rows.push({
       key: 'mark-unread',
       label: 'timeline.markUnread',
       icon: MarkUnreadIcon,
       run: actions.onMarkUnread,
-      separated: true,
+      separated: !actions.onSelect,
     });
   }
   if (actions.onViewReactions) {

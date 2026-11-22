@@ -79,3 +79,14 @@ test('banning the sender with Meowlnir sits with report, marked as destructive',
     ['meowlnir-ban', true, false],
   ]);
 });
+
+test('select row appears separated before mark unread when provided', () => {
+  const withUnread = messageMenuRows({ onSelect: () => {}, onMarkUnread: () => {} });
+  expect(withUnread.map((row) => [row.key, row.label, row.separated ?? false])).toEqual([
+    ['select', 'timeline.selectMessage', true],
+    ['mark-unread', 'timeline.markUnread', false],
+  ]);
+
+  const selectOnly = messageMenuRows({ onSelect: () => {} });
+  expect(selectOnly.map((row) => [row.key, row.separated ?? false])).toEqual([['select', true]]);
+});

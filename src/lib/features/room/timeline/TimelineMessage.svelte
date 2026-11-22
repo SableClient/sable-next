@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ReplyView } from '#src/generated/protocol';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 
   import './timeline-highlight.css';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
@@ -328,7 +329,10 @@
       `layout-${layout}`,
       {
         collapsed,
+        editing,
         highlighted,
+        selecting: row.selecting,
+        'multi-selected': row.multiSelected,
         pressed: row.press.pressing,
         'has-connected-reply':
           item.in_reply_to !== null && preferences.replyPreviewStyle === 'connected',
@@ -341,6 +345,7 @@
       },
     ]}
     data-selected={selected ? 'true' : undefined}
+    data-multi-selected={row.multiSelected ? 'true' : undefined}
     aria-labelledby={named ? `${labelId}-head` : undefined}
     aria-describedby={`${labelId}-body`}
     style:--pmp-on-light={nameColorOnLight(sender.tint?.color_on_light) ?? undefined}
@@ -365,6 +370,22 @@
     oncontextmenu={row.openContextMenu}
     {@attach row.attach}
   >
+    {#if row.selecting && row.actionable}
+      <button
+        type="button"
+        class={['select-toggle', { checked: row.multiSelected }]}
+        role="checkbox"
+        aria-checked={row.multiSelected}
+        aria-label={i18n.t(
+          row.multiSelected ? 'timeline.deselectMessageFrom' : 'timeline.selectMessageFrom',
+          { sender: sender.name }
+        )}
+      >
+        <span class="select-box" aria-hidden="true">
+          {#if row.multiSelected}<CheckIcon weight="bold" />{/if}
+        </span>
+      </button>
+    {/if}
     {#if row.swipe.offset > 0}
       <TimelineSwipeAction
         offset={row.swipe.offset}
@@ -683,11 +704,14 @@
   }
 
   .message {
+    --row-inset-start: var(--page-gutter);
+
     display: flex;
     gap: var(--timeline-row-gap);
     margin-inline: calc(-1 * var(--page-gutter));
     overflow-wrap: anywhere;
-    padding: var(--timeline-row-padding) var(--page-gutter);
+    padding: var(--timeline-row-padding) var(--page-gutter) var(--timeline-row-padding)
+      calc(var(--row-inset-start) + var(--selection-gutter));
     position: relative;
   }
 
@@ -716,11 +740,12 @@
   .message.mention-silent,
   .message.mention-loud {
     --mention-gutter: calc(var(--space-200) + var(--border-width) * 4);
+    --row-inset-start: var(--space-200);
 
     border-inline-start: calc(var(--border-width) * 4) solid;
     border-radius: 0 var(--radius) var(--radius) 0;
     margin-inline: calc(-1 * var(--mention-gutter)) calc(-1 * var(--space-200));
-    padding-inline: var(--space-200);
+    padding-inline: calc(var(--row-inset-start) + var(--selection-gutter)) var(--space-200);
   }
 
   .message.mention-silent {
@@ -746,7 +771,11 @@
     outline-offset: calc(-1 * var(--focus-ring-offset));
   }
 
-  .message:has(:focus-visible):not([data-selected='true'], :has(.reply-preview:focus-visible)) {
+  .message:has(:focus-visible):not(
+      [data-selected='true'],
+      [data-multi-selected='true'],
+      :has(.reply-preview:focus-visible)
+    ) {
     background: var(--bg-container-hover);
     border-radius: var(--radius);
     color: var(--bg-on-container);
@@ -754,22 +783,16 @@
 
   .message.collapsed {
     padding-inline-start: calc(
-      var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap)
+      var(--row-inset-start) + var(--selection-gutter) + var(--avatar-size-small) +
+        var(--timeline-row-gap)
     );
     padding-top: 0;
-  }
-
-  .message.collapsed.mention-silent,
-  .message.collapsed.mention-loud {
-    padding-inline-start: calc(
-      var(--avatar-size-small) + var(--timeline-row-gap) + var(--space-200)
-    );
   }
 
   .collapsed-pending {
     display: flex;
     inset-block-start: 0;
-    inset-inline-start: var(--page-gutter);
+    inset-inline-start: calc(var(--row-inset-start) + var(--selection-gutter));
     justify-content: center;
     position: absolute;
     width: var(--avatar-size-small);
@@ -781,17 +804,12 @@
     font-size: var(--font-size-x-small);
     font-variant-numeric: tabular-nums;
     height: calc(var(--font-size-editor) * var(--line-height-body));
-    inset-inline-start: 0;
+    inset-inline-start: var(--selection-gutter);
     justify-content: flex-end;
     white-space: nowrap;
     width: calc(
       var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap) - var(--space-100)
     );
-  }
-
-  .message.collapsed.mention-silent > .collapsed-pending,
-  .message.collapsed.mention-loud > .collapsed-pending {
-    inset-inline-start: var(--space-200);
   }
 
   .message.collapsed :global(.message-actions) {
@@ -852,8 +870,10 @@
        negative margin assumes survives. */
     .message.mention-silent,
     .message.mention-loud {
+      --row-inset-start: calc(var(--page-gutter) - var(--space-100));
+
       margin-inline: calc(-1 * var(--page-gutter));
-      padding-inline: calc(var(--page-gutter) - var(--space-100)) var(--page-gutter);
+      padding-inline: calc(var(--row-inset-start) + var(--selection-gutter)) var(--page-gutter);
     }
 
     /* The rule above resets the whole shorthand, and a collapsed row still
@@ -861,7 +881,8 @@
     .message.collapsed.mention-silent,
     .message.collapsed.mention-loud {
       padding-inline-start: calc(
-        var(--page-gutter) - var(--space-100) + var(--avatar-size-small) + var(--timeline-row-gap)
+        var(--row-inset-start) + var(--selection-gutter) + var(--avatar-size-small) +
+          var(--timeline-row-gap)
       );
     }
   }
@@ -1159,7 +1180,7 @@
   }
 
   .message.layout-compact.collapsed {
-    padding-inline: var(--page-gutter);
+    padding-inline: calc(var(--row-inset-start) + var(--selection-gutter)) var(--page-gutter);
   }
 
   .compact-gutter {
@@ -1377,7 +1398,7 @@
   }
 
   .message.layout-bubble.own.align-own.collapsed {
-    padding-inline: var(--page-gutter);
+    padding-inline: calc(var(--row-inset-start) + var(--selection-gutter)) var(--page-gutter);
   }
 
   @supports not (color: color-mix(in srgb, black, white)) {

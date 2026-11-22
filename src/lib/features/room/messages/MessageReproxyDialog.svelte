@@ -13,12 +13,19 @@
 
   interface Props {
     open?: boolean;
+    title?: string;
     personas: readonly PersonaView[];
-    current: PerMessageProfileView | null;
+    current: PerMessageProfileView | null | 'mixed';
     onChoose: (persona: PersonaView | null) => void;
   }
 
-  let { open = $bindable(false), personas, current, onChoose }: Props = $props();
+  let {
+    open = $bindable(false),
+    title = i18n.t('timeline.reproxyMessage'),
+    personas,
+    current,
+    onChoose,
+  }: Props = $props();
   let query = $state('');
   let filteredPersonas = $derived(filterPersonas(personas, query));
 
@@ -29,7 +36,7 @@
 </script>
 
 {#snippet content(desktop: boolean)}
-  <h2>{i18n.t('timeline.reproxyMessage')}</h2>
+  <h2>{title}</h2>
   <SearchField bind:value={query} class="reproxy-search" label={i18n.t('personas.search')} />
   <ul class={['reproxy-options', { dialog: desktop }]} {@attach scrollHint}>
     <li>
@@ -42,7 +49,7 @@
       >
         <Avatar size="small"><ProhibitIcon /></Avatar>
         <span class="reproxy-option-name">{i18n.t('personas.pickerOffGlobal')}</span>
-        {#if !current}<CheckIcon aria-hidden="true" />{/if}
+        {#if current === null}<CheckIcon aria-hidden="true" />{/if}
       </button>
     </li>
     {#each filteredPersonas as persona (persona.id)}
@@ -61,7 +68,9 @@
             size="small"
           />
           <span class="reproxy-option-name">{persona.display_name}</span>
-          {#if current?.id === persona.id}<CheckIcon aria-hidden="true" />{/if}
+          {#if current !== null && current !== 'mixed' && current.id === persona.id}<CheckIcon
+              aria-hidden="true"
+            />{/if}
         </button>
       </li>
     {/each}
@@ -73,7 +82,7 @@
 
 <ResponsiveDialog
   bind:open
-  label={i18n.t('timeline.reproxyMessage')}
+  label={title}
   closeLabel={i18n.t('timeline.closeMenu')}
   children={content}
 />

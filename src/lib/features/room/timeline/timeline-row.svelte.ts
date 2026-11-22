@@ -1,4 +1,5 @@
 import { onDestroy, type Snippet } from 'svelte';
+import { on } from 'svelte/events';
 
 import type {
   MemberView,
@@ -27,6 +28,7 @@ import { useSenderColors } from '../members/members.js';
 import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
 import { MessageSwipe } from '../messages/message-swipe.svelte.js';
 import { useMessageMenu } from '../messages/message-menu-open.svelte.js';
+import { hasMessageSelection, useMessageSelection } from '../messages/message-selection.svelte.js';
 import type { MessageActions } from '../messages/message-menu-items';
 import { useMessageDialogs } from '../messages/message-dialogs.svelte.js';
 import {
@@ -114,6 +116,7 @@ export class TimelineRow {
   readonly core = useCoreClient();
   readonly dialogs = useMessageDialogs();
   readonly menu = useMessageMenu();
+  readonly selection = hasMessageSelection() ? useMessageSelection() : null;
   readonly profiles = new TimelineItemProfiles(this.core);
   readonly engagement = new TimelineItemEngagement(() => this.element);
   readonly actionExecutor: MessageActionExecutor;
@@ -147,9 +150,14 @@ export class TimelineRow {
     );
     this.swipe = new MessageSwipe({
       enabled: () =>
-        this.actionable && (this.swipeOpensMembers || this.actions.onReply !== undefined),
+        !this.selecting &&
+        this.actionable &&
+        (this.swipeOpensMembers || this.actions.onReply !== undefined),
       canEdit: () =>
-        this.actionable && !this.swipeOpensMembers && this.actions.onEdit !== undefined,
+        !this.selecting &&
+        this.actionable &&
+        !this.swipeOpensMembers &&
+        this.actions.onEdit !== undefined,
       onReply: () => {
         const { selected, onCancelContext, onSwipeMembers } = this.#options();
         if (this.swipeOpensMembers) onSwipeMembers?.();
@@ -163,7 +171,7 @@ export class TimelineRow {
       },
     });
     this.press = new LongPress({
-      enabled: () => this.actionable || this.canCancelSend,
+      enabled: () => !this.selecting && (this.actionable || this.canCancelSend),
       onPress: (event) => {
         const { item } = this.#options();
         this.menu.set(item.id, false);
@@ -176,7 +184,13 @@ export class TimelineRow {
       },
     });
     this.#doubleTap = new DoubleTap(() => {
-      if (!this.actionable || !preferences.doubleTapReact || !this.actions.onReact) return;
+      if (
+        this.selecting ||
+        !this.actionable ||
+        !preferences.doubleTapReact ||
+        !this.actions.onReact
+      )
+        return;
       hapticFeedback();
       this.actions.onReact(preferences.doubleTapReaction);
     });
@@ -221,6 +235,10 @@ export class TimelineRow {
     () =>
       preferences.messageSwipeAction === 'members' && this.#options().onSwipeMembers !== undefined
   );
+  readonly selecting = $derived(this.selection?.active ?? false);
+  readonly multiSelected = $derived.by(
+    () => this.selection?.has(this.#options().item.event_id) ?? false
+  );
   readonly actionable = $derived.by(() => {
     const { item, preview } = this.#options();
     return !preview && item.event_id !== null && this.stalled === null && !this.pending;
@@ -230,7 +248,16 @@ export class TimelineRow {
     return !preview && this.pending && item.transaction_id !== null && onCancelSend !== undefined;
   });
   readonly actions = $derived.by((): MessageActions => {
-    if (!this.canCancelSend) return this.actionExecutor.actions;
+    if (!this.canCancelSend) {
+      const base = this.actionExecutor.actions;
+      if (!this.actionable || this.selection === null || this.selecting) return base;
+      return {
+        ...base,
+        onSelect: () => {
+          this.selection?.enter(this.#options().item);
+        },
+      };
+    }
     return {
       onCancelSend: () => {
         const { item, onCancelSend } = this.#options();
@@ -239,16 +266,42 @@ export class TimelineRow {
     };
   });
   readonly showActions = $derived(
-    (this.actionable || this.canCancelSend) && (this.engagement.engaged || this.actionsPinned)
+    !this.selecting &&
+      (this.actionable || this.canCancelSend) &&
+      (this.engagement.engaged || this.actionsPinned)
   );
 
   attach = (node: HTMLElement): (() => void) => {
     this.element = node;
     const detachSwipe = this.swipe.attach(node);
+    const offClick = on(node, 'click', this.#onRowClick);
     return () => {
       detachSwipe();
+      offClick();
       this.element = null;
     };
+  };
+
+  #onRowClick = (event: MouseEvent): void => {
+    const fromToggle =
+      event.target instanceof Element && event.target.closest('.select-toggle') !== null;
+    if (
+      !this.selecting ||
+      !this.actionable ||
+      (this.#options().editing && !fromToggle) ||
+      event.button !== 0 ||
+      event.defaultPrevented
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const focusedHere = this.element?.contains(document.activeElement) ?? false;
+    const { item } = this.#options();
+    if (event.shiftKey) this.selection?.selectRange(item);
+    else this.selection?.toggle(item);
+    if (focusedHere && !this.selection?.active) {
+      this.element?.focus();
+    }
   };
 
   pinActions = (open: boolean): void => {
@@ -274,6 +327,10 @@ export class TimelineRow {
   };
 
   openContextMenu = (event: MouseEvent): void => {
+    if (this.selecting) {
+      event.preventDefault();
+      return;
+    }
     const { item } = this.#options();
     if (this.press.touch || touchContextMenu(event)) {
       event.preventDefault();

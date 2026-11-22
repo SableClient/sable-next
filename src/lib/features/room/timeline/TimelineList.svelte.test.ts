@@ -7,10 +7,12 @@ import type { Window as HappyDOMWindow } from 'happy-dom';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 import { flushed } from '#lib/ui/flushed.js';
 
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { RoomListItemView, TimelineItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { timelineItem as item } from '#lib/features/room/timeline/test-items.js';
+import { Bookmarks } from '#lib/rooms/bookmarks.svelte.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 
 import { TimelineWindow, rememberTimelineView } from '#lib/timeline/timeline-window.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -24,9 +26,22 @@ vi.mock('#lib/platform/overlay-back.svelte.js', () => ({
   holdOverlayBack: () => {},
   afterOverlayPops: () => Promise.resolve(),
 }));
-vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: [] }) }));
+const roomListRooms = vi.hoisted(() => ({ rooms: [] as RoomListItemView[] }));
+
+vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>();
+  return {
+    ...actual,
+    useRoomList: () => ({ rooms: roomListRooms.rooms, roomSpaces: () => null }),
+  };
+});
 vi.mock('#lib/personas/personas.svelte.js', () => ({
-  usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),
+  usePersonaStore: () => ({
+    personas: [],
+    load: () => Promise.resolve(),
+    associationFor: () => undefined,
+    selectionFor: () => null,
+  }),
 }));
 vi.mock('../messages/event-items.svelte.js', () => ({
   useEventItems: () => ({ get: () => undefined }),
@@ -79,6 +94,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  roomListRooms.rooms = [];
+  for (const toast of toasts.items) toasts.dismiss(toast.id);
   setPreference('openRoomsAtUnread', true);
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -3478,4 +3495,222 @@ test('a mention outside the loaded timeline shows as loading, then takes focus o
     'data-event-id',
     '$far'
   );
+});
+
+async function mountSelectable(
+  items: TimelineItemView[],
+  overrides: Record<string, unknown> = {}
+): Promise<HTMLElement[]> {
+  const roomTimeline = timeline();
+  roomTimeline.items = items;
+  roomTimeline.backwardPagination = 'end';
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        roomId: '!room:example.org',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+        ...overrides,
+      },
+    },
+  });
+  const element = viewport();
+  await runAnimationFrames();
+  return [...element.querySelectorAll<HTMLElement>('article.message')];
+}
+
+test('multi-selection supports menu entry, Shift range, link suppression, keyboard controls, and focus restoration', async () => {
+  const user = userEvent.setup({ delay: null });
+  const onMarkRead = vi.fn(async () => {});
+  const articles = await mountSelectable(
+    [
+      item('a', 'Alpha', { timestamp: 1 }),
+      item('b', 'Beta', { timestamp: 2 }),
+      item('c', 'Gamma', { timestamp: 3 }),
+    ],
+    { hasUnread: true, onMarkRead, callbacks: { onDelete: () => {} } }
+  );
+
+  await user.pointer({ keys: '[MouseRight]', target: articles[0] });
+  await runAnimationFrames();
+  await user.click(screen.getByRole('menuitem', { name: 'Select' }));
+  await flushed();
+  expect(screen.getByRole('region', { name: 'Selected messages' })).toHaveTextContent('1 selected');
+
+  // Shift+click selects the range and links inside rows do not navigate while selecting.
+  await user.keyboard('{Shift>}');
+  await user.click(articles[2]);
+  await user.keyboard('{/Shift}');
+  await flushed();
+  expect(articles[1]).toHaveAttribute('data-multi-selected', 'true');
+
+  const link = document.createElement('a');
+  link.href = 'https://example.org';
+  const linkPrevented = vi.fn();
+  document.addEventListener(
+    'click',
+    (event) => {
+      if (event.defaultPrevented) linkPrevented();
+    },
+    { once: true }
+  );
+  articles[2].querySelector('.message-main')?.append(link);
+  await user.click(link);
+  await flushed();
+  expect(linkPrevented).toHaveBeenCalledOnce();
+  expect(screen.getByRole('region', { name: 'Selected messages' })).toHaveTextContent('2 selected');
+
+  // Escape exits selection without marking read, and unchecking the last checkbox returns focus to the article.
+  await user.keyboard('{Escape}');
+  await flushed();
+  expect(screen.queryByRole('region', { name: 'Selected messages' })).toBeNull();
+  expect(onMarkRead).not.toHaveBeenCalled();
+
+  articles[0].focus();
+  await user.keyboard(' ');
+  await user.keyboard('{Control>}a{/Control}');
+  await flushed();
+  expect(screen.getByRole('region', { name: 'Selected messages' })).toHaveTextContent('3 selected');
+
+  articles[1].focus();
+  await user.keyboard(' ');
+  articles[2].focus();
+  await user.keyboard('{Shift>} {/Shift}');
+  await user.keyboard('{Escape}');
+  articles[0].focus();
+  await user.keyboard(' ');
+  await flushed();
+
+  const checkbox = within(articles[0]).getByRole('checkbox');
+  checkbox.focus();
+  await user.keyboard(' ');
+  await flushed();
+  expect(screen.queryByRole('region', { name: 'Selected messages' })).toBeNull();
+  expect(document.activeElement).toBe(articles[0]);
+});
+
+test('batch copy, bookmark/unbookmark, and forward operate chronologically', async () => {
+  const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+  const forward = vi.fn(() => Promise.resolve(null));
+  Object.assign(core.rpc.messages, { forward });
+  roomListRooms.rooms = [
+    {
+      room_id: '!target:example.org',
+      display_name: 'Target Room',
+      display_avatar_url: null,
+      canonical_alias: null,
+      state: 'joined',
+      room_kind: null,
+      direct_targets: [],
+    } as unknown as RoomListItemView,
+  ];
+  const bookmarked = new Set<string>();
+  const hasSpy = vi
+    .spyOn(Bookmarks.prototype, 'has')
+    .mockImplementation((_room, eventId) => Boolean(eventId && bookmarked.has(eventId)));
+  const setSpy = vi
+    .spyOn(Bookmarks.prototype, 'set')
+    .mockImplementation((_room, eventId, state) => {
+      if (state) bookmarked.add(eventId);
+      else bookmarked.delete(eventId);
+      return Promise.resolve();
+    });
+  const refreshSpy = vi.spyOn(Bookmarks.prototype, 'refresh').mockResolvedValue();
+  onTestFinished(() => {
+    writeText.mockRestore();
+    hasSpy.mockRestore();
+    setSpy.mockRestore();
+    refreshSpy.mockRestore();
+  });
+
+  const articles = await mountSelectable([
+    { ...item('a', 'First', { timestamp: 1 }), sender_name: 'Alice' },
+    { ...item('b', 'Second', { timestamp: 2, sender: '@bob:example.org' }), sender_name: 'Bob' },
+  ]);
+
+  const selectAll = async () => {
+    articles[1].focus();
+    await userEvent.keyboard(' ');
+    articles[0].focus();
+    await userEvent.keyboard(' ');
+    await flushed();
+  };
+
+  await selectAll();
+  await userEvent.click(screen.getByRole('button', { name: 'Copy 2 messages' }));
+  await flushed();
+  expect(writeText).toHaveBeenCalledWith('Alice: First\nBob: Second');
+  expect(toasts.items.at(-1)?.message).toBe('Copied 2 messages');
+
+  await selectAll();
+  await userEvent.click(screen.getByRole('button', { name: 'Bookmark 2 messages' }));
+  await flushed();
+  expect(refreshSpy).toHaveBeenCalledOnce();
+
+  await selectAll();
+  await userEvent.click(screen.getByRole('button', { name: 'Remove bookmark from 2 messages' }));
+  await flushed();
+  expect(setSpy).toHaveBeenNthCalledWith(4, '!room:example.org', '$b', false, { refresh: false });
+
+  await selectAll();
+  await userEvent.click(screen.getByRole('button', { name: 'Forward 2 messages' }));
+  await screen.findByRole('dialog', { name: 'Forward 2 messages to' });
+  await userEvent.click(screen.getByRole('checkbox', { name: /Target Room/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Forward' }));
+  await flushed();
+  expect(forward).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole('region', { name: 'Selected messages' })).toBeNull();
+});
+
+test('batch delete keeps only failed messages on partial failure and stops cleanly when cancelled', async () => {
+  const secondPending = Promise.withResolvers<null>();
+  const redact = vi
+    .fn()
+    .mockResolvedValueOnce(null)
+    .mockRejectedValueOnce(new Error('rate limited'))
+    .mockImplementationOnce(() => secondPending.promise);
+  Object.assign(core.rpc.messages, { redact });
+
+  const articles = await mountSelectable(
+    [
+      { ...item('a', 'First', { timestamp: 1 }), is_own: true },
+      { ...item('b', 'Second', { timestamp: 2 }), is_own: true },
+      { ...item('c', 'Other', { timestamp: 3 }), is_own: false },
+    ],
+    { canRedactOwn: true, canRedactOthers: false, callbacks: { onDelete: () => {} } }
+  );
+
+  articles[0].focus();
+  await userEvent.keyboard(' ');
+  await userEvent.keyboard('{Control>}a{/Control}');
+  await flushed();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Delete 2 messages' }));
+  const partialDialog = await screen.findByRole('dialog', { name: 'Delete 2 messages?' });
+  await userEvent.click(within(partialDialog).getByRole('button', { name: 'Delete 2 messages' }));
+  await flushed();
+  expect(screen.getByRole('region', { name: 'Selected messages' })).toHaveTextContent('1 selected');
+  expect(articles[1]).toHaveAttribute('data-multi-selected', 'true');
+  expect(toasts.items.at(-1)?.tone).toBe('error');
+
+  // Re-select both own messages and stop mid-batch after the first resolves.
+  articles[0].focus();
+  await userEvent.keyboard(' ');
+  await flushed();
+  await userEvent.click(screen.getByRole('button', { name: 'Delete 2 messages' }));
+  const cancelDialog = await screen.findByRole('dialog', { name: 'Delete 2 messages?' });
+  await userEvent.click(within(cancelDialog).getByRole('button', { name: 'Delete 2 messages' }));
+  await flushed();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Stop operation' }));
+  secondPending.resolve(null);
+  await vi.waitFor(() => {
+    expect(screen.getByRole('region', { name: 'Selected messages' })).toHaveTextContent(
+      '1 selected'
+    );
+  });
+  expect(redact).toHaveBeenCalledTimes(3);
+  expect(articles[1]).toHaveAttribute('data-multi-selected', 'true');
 });
