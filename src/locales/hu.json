@@ -362,8 +362,6 @@
     "settingsFailed": "A módosítást nem sikerült elmenteni.",
     "menuLabel": "Szobalehetőségek",
     "menuFavourite": "Kedvenc",
-    "menuHideUnread": "Olvasatlanságjelző pont elrejtése",
-    "menuShowUnread": "Olvasatlanságjelző pont megjelenítése",
     "menuUnreadHiddenBySpace": "Az olvasatlanságjelző pontot a tér elrejti",
     "menuNotifications": "Értesítések",
     "notifyDefault": "Alapértelmezett ({{mode}})",

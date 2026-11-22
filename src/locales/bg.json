@@ -333,8 +333,6 @@
     "settingsDirectResetName": "Нулиране на името",
     "settingsFailed": "Промяната не можа да бъде запазена.",
     "menuFavourite": "Любимо",
-    "menuHideUnread": "Скриване на точката за непрочетени",
-    "menuShowUnread": "Показване на точката за непрочетени",
     "menuUnreadHiddenBySpace": "Точката за непрочетени е скрита от пространството",
     "notifyDefault": "По подразбиране ({{mode}})",
     "notifyMentionsQuiet": "Само споменавания, без точка за непрочетени",
