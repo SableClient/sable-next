@@ -5,7 +5,9 @@ use matrix_sdk::ruma::events::call::member::{
     CallScope, Focus, FocusSelection, LivekitFocus as RumaLivekitFocus,
 };
 use matrix_sdk::ruma::events::rtc::notification::CallIntent as RumaCallIntent;
-use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedDeviceId, OwnedRoomId, OwnedUserId, UInt};
+use matrix_sdk::ruma::{
+    MilliSecondsSinceUnixEpoch, OwnedDeviceId, OwnedRoomId, OwnedServerName, OwnedUserId, UInt,
+};
 use serde::Serialize;
 
 use super::membership::{self, CallMember};
@@ -23,10 +25,30 @@ pub(super) fn content(
     deprecated,
     reason = "calls still get their token from the JWT service of the earlier MSC4195"
 )]
-fn service_focus(alias: String, service: String) -> Focus {
-    let mut focus = RumaLivekitFocus::with_service_url(service);
-    focus.alias = Some(alias);
+fn legacy_focus(alias: String, focus: String, server_name: Option<OwnedServerName>) -> Focus {
+    let focus = if membership::is_sfu_url(&focus) {
+        let mut livekit = RumaLivekitFocus::new(focus);
+        livekit.server_name = server_name;
+        livekit
+    } else {
+        let mut livekit = RumaLivekitFocus::with_service_url(focus);
+        livekit.alias = Some(alias);
+        livekit
+    };
     Focus::LegacyLivekit(focus)
+}
+
+fn matrix2_focus(own: &CallMember, focus: &str) -> LivekitFocus {
+    if membership::is_sfu_url(focus) {
+        LivekitFocus::Sfu {
+            url: focus.to_owned(),
+            server_name: own.focus_servers.get(focus).cloned(),
+        }
+    } else {
+        LivekitFocus::Service {
+            livekit_service_url: focus.to_owned(),
+        }
+    }
 }
 
 pub(super) fn content_at(
@@ -81,9 +103,7 @@ pub(super) fn content_at(
                 published: own
                     .foci
                     .iter()
-                    .map(|service| LivekitFocus::Livekit {
-                        livekit_service_url: service.clone(),
-                    })
+                    .map(|focus| matrix2_focus(own, focus))
                     .collect(),
                 can_subscribe: [TransportKind::Livekit],
             },
@@ -108,7 +128,13 @@ pub(super) fn content_at(
                 ActiveFocus::Livekit(focus_active),
                 own.foci
                     .iter()
-                    .map(|service| service_focus(room_id.to_string(), service.clone()))
+                    .map(|focus| {
+                        legacy_focus(
+                            room_id.to_string(),
+                            focus.clone(),
+                            own.focus_servers.get(focus).cloned(),
+                        )
+                    })
                     .collect(),
                 Some(MilliSecondsSinceUnixEpoch(
                     UInt::try_from(own.created_ts).unwrap_or(UInt::MAX),
@@ -119,7 +145,10 @@ pub(super) fn content_at(
                         .saturating_add(14_400_000),
                 )),
             ),
-            membership_id: own.identity.clone(),
+            membership_id: own
+                .member_id
+                .clone()
+                .unwrap_or_else(|| own.identity.clone()),
             screen_sharing,
         })
     }
@@ -145,7 +174,7 @@ struct StableFocus {
     kind: &'static str,
     url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    server_name: Option<ruma::OwnedServerName>,
+    server_name: Option<OwnedServerName>,
 }
 
 #[derive(Serialize)]
@@ -184,7 +213,13 @@ struct ScreenSharing {
 #[serde(tag = "type")]
 enum LivekitFocus {
     #[serde(rename = "livekit")]
-    Livekit { livekit_service_url: String },
+    Service { livekit_service_url: String },
+    #[serde(rename = "livekit")]
+    Sfu {
+        url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        server_name: Option<OwnedServerName>,
+    },
 }
 
 #[derive(Serialize)]

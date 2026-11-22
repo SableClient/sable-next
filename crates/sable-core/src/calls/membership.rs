@@ -6,7 +6,7 @@ use matrix_sdk::Room;
 use matrix_sdk::ruma::events::call::member::{
     ActiveFocus, Application, CallMemberEventContent, CallScope, Focus, MembershipData,
 };
-use matrix_sdk::ruma::{DeviceId, OwnedDeviceId, OwnedServerName, OwnedUserId, UserId};
+use matrix_sdk::ruma::{DeviceId, OwnedDeviceId, OwnedServerName, OwnedUserId, ServerName, UserId};
 use serde::Deserialize;
 use serde_with::{DefaultOnError, serde_as};
 use sha2::{Digest as _, Sha256};
@@ -136,16 +136,19 @@ pub(crate) fn sticky_member(raw: &str) -> Option<StickyMember> {
     let mut focus_servers = HashMap::new();
     for transport in event.content.transports.published {
         let url = match wire {
-            RtcWire::Deployed if transport.kind == "livekit" => transport.livekit_service_url,
-            RtcWire::Stable if transport.kind == "m.livekit" => transport.url,
+            RtcWire::Deployed if matches!(transport.kind.as_str(), "livekit" | "m.livekit") => {
+                transport
+                    .livekit_service_url
+                    .filter(|url| !url.is_empty())
+                    .or_else(|| transport.url.filter(|url| is_sfu_url(url)))
+            }
+            RtcWire::Stable if transport.kind == "m.livekit" => {
+                transport.url.filter(|url| is_sfu_url(url))
+            }
             _ => None,
         };
-        if let Some(url) = url.filter(|url| {
-            !url.is_empty()
-                && (wire != RtcWire::Stable
-                    || url::Url::parse(url).is_ok_and(|url| url.scheme() == "wss"))
-        }) {
-            if wire == RtcWire::Stable {
+        if let Some(url) = url {
+            if is_sfu_url(&url) {
                 focus_servers.insert(
                     url.clone(),
                     transport
@@ -158,8 +161,10 @@ pub(crate) fn sticky_member(raw: &str) -> Option<StickyMember> {
     }
     let device_id = member.device_id;
     let identity = match wire {
-        RtcWire::Deployed => sticky_identity(&event.sender, device_id.as_deref()?, &member.id),
-        RtcWire::Stable => stable_identity(&event.sender, &member.id),
+        RtcWire::Deployed if !foci.first().is_some_and(|focus| is_sfu_url(focus)) => {
+            sticky_identity(&event.sender, device_id.as_deref()?, &member.id)
+        }
+        RtcWire::Deployed | RtcWire::Stable => stable_identity(&event.sender, &member.id),
     };
     Some(StickyMember {
         user_id: event.sender,
@@ -171,6 +176,27 @@ pub(crate) fn sticky_member(raw: &str) -> Option<StickyMember> {
         wire,
         focus_servers,
     })
+}
+
+/// A focus is either an SFU's WebSocket URL (MSC4195) or a JWT service's HTTP URL.
+pub(crate) fn is_sfu_url(focus: &str) -> bool {
+    url::Url::parse(focus).is_ok_and(|url| url.scheme() == "wss")
+}
+
+pub(crate) fn backend_identity(
+    user_id: &UserId,
+    device_id: &DeviceId,
+    member_id: &str,
+    mode: CallMode,
+    focus: &str,
+) -> String {
+    if is_sfu_url(focus) {
+        stable_identity(user_id, member_id)
+    } else if mode == CallMode::Matrix2 {
+        sticky_identity(user_id, device_id, member_id)
+    } else {
+        super::sfu::livekit_identity(user_id, device_id)
+    }
 }
 
 pub(crate) fn stable_identity(user_id: &UserId, member_id: &str) -> String {
@@ -294,27 +320,37 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
                 .unwrap_or(origin_server_ts)
                 .get()
                 .into();
+            let user_id = event.state_key.user_id();
+            let member_id = match membership {
+                MembershipData::Legacy(data) => data.membership_id.clone(),
+                MembershipData::Session(_) => membership_id
+                    .clone()
+                    .unwrap_or_else(|| format!("{user_id}:{}", membership.device_id())),
+                _ => format!("{user_id}:{}", membership.device_id()),
+            };
+            let (foci, focus_servers) =
+                livekit_foci(membership.foci_preferred(), user_id.server_name());
             members.push(CallMember {
-                user_id: event.state_key.user_id().to_owned(),
+                user_id: user_id.to_owned(),
                 device_id: Some(membership.device_id().to_owned()),
-                member_id: Some(match membership {
-                    MembershipData::Legacy(data) => data.membership_id.clone(),
-                    MembershipData::Session(_) => membership_id.clone().unwrap_or_else(|| {
-                        format!("{}:{}", event.state_key.user_id(), membership.device_id())
-                    }),
-                    _ => format!("{}:{}", event.state_key.user_id(), membership.device_id()),
-                }),
-                identity: format!("{}:{}", event.state_key.user_id(), membership.device_id()),
+                identity: backend_identity(
+                    user_id,
+                    membership.device_id(),
+                    &member_id,
+                    mode,
+                    foci.first().map_or("", String::as_str),
+                ),
+                member_id: Some(member_id),
                 mode,
                 created_ts,
                 joined_ts: created_ts,
                 expires_at_ms: membership
                     .expires_ts(Some(origin_server_ts))
                     .map(|expires| expires.get().into()),
-                foci: livekit_urls(membership.foci_preferred()),
+                foci,
                 screen_sharing,
                 wire: RtcWire::Deployed,
-                focus_servers: HashMap::new(),
+                focus_servers,
             });
         }
     }
@@ -733,19 +769,40 @@ fn alias_foci(event: &mut serde_json::Value, room_id: &str) {
     deprecated,
     reason = "calls still get their token from the JWT service of the earlier MSC4195"
 )]
-fn livekit_urls(foci: &[Focus]) -> Vec<String> {
-    foci.iter()
-        .filter_map(|focus| match focus {
-            Focus::Livekit(livekit) | Focus::LegacyLivekit(livekit) => livekit.service_url.clone(),
-            _ => None,
-        })
-        .filter(|url| !url.is_empty())
-        .collect()
+fn livekit_foci(
+    foci: &[Focus],
+    sender_server: &ServerName,
+) -> (Vec<String>, HashMap<String, OwnedServerName>) {
+    let mut urls = Vec::new();
+    let mut servers = HashMap::new();
+    for focus in foci {
+        let (Focus::Livekit(livekit) | Focus::LegacyLivekit(livekit)) = focus else {
+            continue;
+        };
+        if let Some(service) = livekit.service_url.as_ref().filter(|url| !url.is_empty()) {
+            urls.push(service.clone());
+        } else if let Some(url) = livekit.url.as_ref().filter(|url| is_sfu_url(url)) {
+            servers.insert(
+                url.clone(),
+                livekit
+                    .server_name
+                    .clone()
+                    .unwrap_or_else(|| sender_server.to_owned()),
+            );
+            urls.push(url.clone());
+        }
+    }
+    (urls, servers)
 }
 
+/// SFU URLs are left out: we publish on our own homeserver's, found through discovery.
 pub(crate) fn advertised_service_urls(members: &[CallMember]) -> Vec<String> {
     let mut urls: Vec<String> = Vec::new();
-    for url in members.iter().flat_map(|member| &member.foci) {
+    for url in members
+        .iter()
+        .flat_map(|member| &member.foci)
+        .filter(|url| !is_sfu_url(url))
+    {
         if !urls.contains(url) {
             urls.push(url.clone());
         }
@@ -875,6 +932,42 @@ mod tests {
         assert_eq!(
             member.identity,
             "fy53C+VzB2i4DYEzQ2rL8RixeS0KyRA1qnFiggsxWhs"
+        );
+    }
+
+    #[test]
+    fn a_sticky_member_on_an_sfu_url_uses_the_msc4195_identity() {
+        let member = sticky_member(
+            r#"{
+                "sender":"@alice:example.com",
+                "content": {
+                    "slot_id":"m.call#ROOM",
+                    "application":{"type":"m.call"},
+                    "member":{"user_id":"@alice:example.com","device_id":"DEVICE","id":"memberABC"},
+                    "transports":{"published":[{"type":"livekit","url":"wss://sfu.example.com","server_name":"other.example"}]}
+                }
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(member.foci, ["wss://sfu.example.com"]);
+        assert_eq!(
+            member.focus_servers["wss://sfu.example.com"].as_str(),
+            "other.example"
+        );
+        assert_eq!(
+            member.identity,
+            "M3VnsLXrkbxIDINXO64u8PZzFyD9ZYFiQULR2dshWYs"
+        );
+    }
+
+    #[test]
+    fn an_sfu_url_is_not_a_service_to_publish_on() {
+        let members = [member("PHONE", 110, &["wss://sfu.one", "https://sfu.two"])];
+
+        assert_eq!(
+            advertised_service_urls(&members),
+            vec!["https://sfu.two".to_owned()]
         );
     }
 
@@ -1298,6 +1391,53 @@ mod tests {
         assert_eq!(members.len(), 1);
         assert_eq!(members[0].member_id.as_deref(), Some("custom-membership"));
         assert_eq!(members[0].identity, "@user:example.org:DEVICE");
+    }
+
+    #[tokio::test]
+    async fn a_state_membership_on_an_sfu_url_uses_the_msc4195_identity() {
+        use matrix_sdk::ruma::{events::AnySyncStateEvent, room_id, serde::Raw};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_test::JoinedRoomBuilder;
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!call:example.com");
+        let now = crate::now_ms();
+        let event = json!({
+            "type": "org.matrix.msc3401.call.member",
+            "state_key": "_@alice:example.com_DEVICE_m.call",
+            "sender": "@alice:example.com", "event_id": "$element",
+            "origin_server_ts": now,
+            "content": {
+                "application": "m.call", "call_id": "", "scope": "m.room",
+                "device_id": "DEVICE", "membershipID": "memberABC",
+                "created_ts": now, "expires": 14_400_000,
+                "focus_active": {"type":"livekit", "focus_selection":"multi_sfu"},
+                "foci_preferred": [{"type":"livekit", "url":"wss://sfu.example.com"}]
+            }
+        });
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_state_event(
+                    Raw::new(&event)
+                        .unwrap()
+                        .cast_unchecked::<AnySyncStateEvent>(),
+                ),
+            )
+            .await;
+
+        let members = super::active_members(&room).await;
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].foci, ["wss://sfu.example.com"]);
+        assert_eq!(
+            members[0].focus_servers["wss://sfu.example.com"].as_str(),
+            "example.com"
+        );
+        assert_eq!(
+            members[0].identity,
+            "M3VnsLXrkbxIDINXO64u8PZzFyD9ZYFiQULR2dshWYs"
+        );
     }
 
     fn tombstone(extra: &serde_json::Value) -> serde_json::Value {

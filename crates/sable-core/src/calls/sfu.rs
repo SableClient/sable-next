@@ -168,13 +168,14 @@ pub(crate) async fn provision_stable(
     room: &Room,
     url: &str,
     server_name: Option<&ServerName>,
+    slot_id: &str,
     member_id: &str,
 ) -> Result<Provisioned, ProvisionError> {
     use matrix_sdk::ruma::api::client::rtc::livekit::get_token;
     let mut request = get_token::v1::Request::new(
         url.to_owned(),
         room.room_id().to_owned(),
-        "m.call#room".to_owned(),
+        slot_id.to_owned(),
         member_id.to_owned(),
     );
     request.server_name = server_name.map(ToOwned::to_owned);
@@ -264,7 +265,11 @@ struct JwtVideo {
     can_publish: Option<bool>,
 }
 
-fn jwt_claims(jwt: &str) -> Result<(String, bool), ProvisionError> {
+pub(crate) fn jwt_room(jwt: &str) -> Option<String> {
+    jwt_payload(jwt).ok().map(|payload| payload.video.room)
+}
+
+fn jwt_payload(jwt: &str) -> Result<JwtPayload, ProvisionError> {
     let Some(payload) = jwt.split('.').nth(1) else {
         return Err(ProvisionError::MalformedResponse);
     };
@@ -272,8 +277,11 @@ fn jwt_claims(jwt: &str) -> Result<(String, bool), ProvisionError> {
         .decode(payload)
         .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(payload))
         .map_err(|_| ProvisionError::MalformedResponse)?;
-    let payload: JwtPayload =
-        serde_json::from_slice(&decoded).map_err(|_| ProvisionError::MalformedResponse)?;
+    serde_json::from_slice(&decoded).map_err(|_| ProvisionError::MalformedResponse)
+}
+
+fn jwt_claims(jwt: &str) -> Result<(String, bool), ProvisionError> {
+    let payload = jwt_payload(jwt)?;
     if payload.sub.is_empty() || payload.video.room.is_empty() {
         return Err(ProvisionError::MalformedResponse);
     }

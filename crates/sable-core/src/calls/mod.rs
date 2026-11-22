@@ -155,35 +155,40 @@ fn pick_focus(
     deprecated,
     reason = "calls still get their token from the JWT service of the earlier MSC4195"
 )]
-fn livekit_service_urls(transports: Vec<RtcTransport>) -> Vec<String> {
+fn livekit_foci(transports: Vec<RtcTransport>) -> Vec<String> {
     transports
         .into_iter()
-        .filter_map(|transport| match transport {
-            RtcTransport::LiveKit(livekit) => livekit.service_url,
-            RtcTransport::LegacyLiveKit(livekit) => livekit.service_url,
-            _ => None,
+        .filter_map(|transport| {
+            let (service_url, url) = match transport {
+                RtcTransport::LiveKit(livekit) => (livekit.service_url, Some(livekit.url)),
+                RtcTransport::LegacyLiveKit(livekit) => (livekit.service_url, livekit.url),
+                _ => return None,
+            };
+            service_url
+                .filter(|url| !url.trim().is_empty())
+                .or_else(|| url.filter(|url| membership::is_sfu_url(url)))
         })
-        .filter(|url| !url.trim().is_empty())
         .collect()
 }
 
-async fn discovered_service_urls(client: &Client) -> Vec<String> {
-    let endpoint = client
+async fn discovered_foci(client: &Client) -> Vec<String> {
+    let mut foci = client
         .discover_rtc_transports()
         .await
         .ok()
         .flatten()
-        .map(livekit_service_urls)
+        .map(livekit_foci)
         .unwrap_or_default();
-    if !endpoint.is_empty() {
-        return endpoint;
+    if foci.iter().all(|focus| membership::is_sfu_url(focus)) {
+        foci.extend(
+            client
+                .well_known_rtc_transports()
+                .await
+                .map(livekit_foci)
+                .unwrap_or_default(),
+        );
     }
-
-    client
-        .well_known_rtc_transports()
-        .await
-        .map(livekit_service_urls)
-        .unwrap_or_default()
+    foci
 }
 
 const SLOT_TYPES: [&str; 2] = [crate::view::RTC_SLOT_TYPE, "m.rtc.slot"];
@@ -571,13 +576,13 @@ impl Core {
                 .await
                 .ok()
                 .flatten()
-                .is_some_and(|transports| !livekit_service_urls(transports).is_empty());
+                .is_some_and(|transports| !livekit_foci(transports).is_empty());
         let rtc_transports = if endpoint {
             RtcTransportSource::Endpoint
         } else if client
             .well_known_rtc_transports()
             .await
-            .is_ok_and(|transports| !livekit_service_urls(transports).is_empty())
+            .is_ok_and(|transports| !livekit_foci(transports).is_empty())
         {
             RtcTransportSource::WellKnown
         } else {
@@ -661,15 +666,19 @@ impl Core {
             return Some(url);
         }
 
-        let discovered = discovered_service_urls(&room.client()).await;
-        pick_focus(&[], &discovered, configured)
+        let (sfu_urls, services): (Vec<_>, Vec<_>) = discovered_foci(&room.client())
+            .await
+            .into_iter()
+            .partition(|focus| membership::is_sfu_url(focus));
+        // Older clients can only follow a JWT service, so an SFU URL is the last resort.
+        pick_focus(&[], &services, configured).or_else(|| sfu_urls.into_iter().next())
     }
 
     pub(crate) fn watch_incoming_calls(self: &Arc<Self>, client: &Client, generation: u64) {
         invite_service::watch(self, client, generation);
     }
 
-    /// The well-known fallback in `discovered_service_urls` retries a server name that may serve
+    /// The well-known fallback in `discovered_foci` retries a server name that may serve
     /// nothing, so it is fetched here rather than on the first room header.
     pub(crate) fn prefetch_call_well_known(&self, client: &Client) {
         let client = client.clone();
@@ -1179,22 +1188,27 @@ mod tests {
     use matrix_sdk::ruma::{device_id, owned_user_id, user_id};
 
     use super::membership::CallMember;
-    use super::{
-        can_join_call, livekit_service_urls, member_views, membership_state_key, pick_focus,
-    };
+    use super::{can_join_call, livekit_foci, member_views, membership_state_key, pick_focus};
 
     #[test]
-    fn test_both_livekit_transport_types_name_their_jwt_service() {
+    fn test_a_transport_offers_its_jwt_service_before_its_sfu_url() {
         let transports = serde_json::from_value(serde_json::json!([
             {"type": "livekit", "livekit_service_url": "https://legacy.example"},
             {"type": "m.livekit", "url": "wss://sfu.example", "livekit_service_url": "https://current.example"},
             {"type": "m.livekit", "url": "wss://sfu-only.example"},
+            {"type": "livekit", "url": "wss://deployed-sfu-only.example"},
+            {"type": "livekit", "url": "https://not-a-websocket.example"},
         ]))
         .unwrap();
 
         assert_eq!(
-            livekit_service_urls(transports),
-            ["https://legacy.example", "https://current.example"]
+            livekit_foci(transports),
+            [
+                "https://legacy.example",
+                "https://current.example",
+                "wss://sfu-only.example",
+                "wss://deployed-sfu-only.example",
+            ]
         );
     }
 

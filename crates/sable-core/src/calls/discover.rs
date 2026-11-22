@@ -148,18 +148,14 @@ fn own_identity(
     user: &UserId,
     device: &DeviceId,
     mode: CallMode,
-    wire: membership::RtcWire,
+    service: &str,
 ) -> (String, String) {
-    if mode != CallMode::Matrix2 {
-        let identity = sfu::livekit_identity(user, device);
-        return (identity.clone(), identity);
-    }
-    let member_id = TransactionId::new().to_string();
-    let identity = if wire == membership::RtcWire::Stable {
-        membership::stable_identity(user, &member_id)
+    let member_id = if mode == CallMode::Matrix2 {
+        TransactionId::new().to_string()
     } else {
-        membership::sticky_identity(user, device, &member_id)
+        sfu::livekit_identity(user, device)
     };
+    let identity = membership::backend_identity(user, device, &member_id, mode, service);
     (identity, member_id)
 }
 
@@ -171,7 +167,7 @@ fn own_member(
     service: String,
     focus_server: Option<OwnedServerName>,
 ) -> CallMember {
-    let (identity, member_id) = own_identity(&user, &device, mode, wire);
+    let (identity, member_id) = own_identity(&user, &device, mode, &service);
     let now = crate::now_ms();
     CallMember {
         user_id: user,

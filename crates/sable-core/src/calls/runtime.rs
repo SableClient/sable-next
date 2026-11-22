@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
-use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD},
+};
 use matrix_sdk::event_handler::EventHandlerDropGuard;
 use matrix_sdk::executor::{JoinHandleExt as _, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::update_delayed_event::UpdateAction;
@@ -48,6 +51,8 @@ pub(crate) struct State {
     members: Vec<CallMember>,
     emitted_members: Option<Vec<CallMemberView>>,
     backends: BTreeMap<String, CallBackendView>,
+    /// Foci that lead to a room we are already in, by the backend connected to it.
+    backend_aliases: BTreeMap<String, String>,
     pending_keys: Vec<PendingKey>,
     latest_keys: HashMap<(String, u8), (u64, Vec<u8>)>,
     member_first_seen: HashMap<String, u64>,
@@ -104,6 +109,7 @@ impl State {
             distributor,
             emitted_members: None,
             backends: BTreeMap::new(),
+            backend_aliases: BTreeMap::new(),
             pending_keys: Vec::new(),
             latest_keys: HashMap::new(),
             member_first_seen: HashMap::new(),
@@ -118,30 +124,145 @@ impl State {
             publisher_attempt_ms: 0,
         }
     }
+
+    fn connected_backend_id(
+        &self,
+        room_id: &OwnedRoomId,
+        member: &CallMember,
+        focus: &str,
+    ) -> String {
+        let id = focus_backend_id(room_id, &self.own, member, focus);
+        self.backend_aliases.get(&id).cloned().unwrap_or(id)
+    }
+
+    fn members_on<'a>(
+        &'a self,
+        room_id: &'a OwnedRoomId,
+        id: &'a str,
+    ) -> impl Iterator<Item = (&'a CallMember, &'a str)> {
+        self.members.iter().filter_map(move |member| {
+            let focus = member_service(member, &self.members)?;
+            (focus_backend_id(room_id, &self.own, member, focus) == id).then_some((member, focus))
+        })
+    }
+
+    /// A focus can claim any URL and room, so only a token from the homeserver of all of a
+    /// service's users may replace that service.
+    fn can_stand_in(&self, room_id: &OwnedRoomId, sfu_id: &str, service_id: &str) -> bool {
+        let Some(issuer) = self
+            .members_on(room_id, sfu_id)
+            .find_map(|(member, focus)| member.focus_servers.get(focus))
+        else {
+            return false;
+        };
+        let mut users = self.members_on(room_id, service_id).peekable();
+        users.peek().is_some()
+            && users.all(|(member, focus)| {
+                !membership::is_sfu_url(focus) && member.user_id.server_name() == issuer
+            })
+    }
+
+    /// Joining a room twice would show us to ourselves as another participant.
+    fn add_backend(&mut self, room_id: &OwnedRoomId, publisher_id: &str, backend: CallBackendView) {
+        let granted = sfu::jwt_room(&backend.jwt);
+        let in_room: Vec<String> = self
+            .backends
+            .values()
+            .filter(|connected| {
+                same_service(&connected.url, &backend.url)
+                    && sfu::jwt_room(&connected.jwt) == granted
+            })
+            .map(|connected| connected.id.clone())
+            .collect();
+        if let Some(connected) = in_room
+            .iter()
+            .find(|id| *id == publisher_id || self.can_stand_in(room_id, id, &backend.id))
+        {
+            self.backend_aliases.insert(backend.id, connected.clone());
+            return;
+        }
+        for id in in_room {
+            if self.can_stand_in(room_id, &backend.id, &id) {
+                self.backends.remove(&id);
+                self.backend_aliases.insert(id, backend.id.clone());
+            }
+        }
+        self.backends.insert(backend.id.clone(), backend);
+    }
 }
 
 fn backend_id(room_id: &OwnedRoomId, service: &str) -> String {
-    STANDARD_NO_PAD.encode(Sha256::digest(
-        Value::from([
+    hashed_id(&[
+        room_id.as_str(),
+        "m.call#ROOM",
+        service.trim_end_matches('/'),
+    ])
+}
+
+/// The server name is part of the id, or a member could redirect another's token request.
+fn focus_backend_id(
+    room_id: &OwnedRoomId,
+    own: &CallMember,
+    member: &CallMember,
+    focus: &str,
+) -> String {
+    match member.focus_servers.get(focus) {
+        Some(server) if server != own.user_id.server_name() => hashed_id(&[
             room_id.as_str(),
             "m.call#ROOM",
-            service.trim_end_matches('/'),
-        ])
-        .to_string()
-        .as_bytes(),
-    ))
+            focus.trim_end_matches('/'),
+            server.as_str(),
+        ]),
+        _ => backend_id(room_id, focus),
+    }
+}
+
+fn publisher_backend_id(room_id: &OwnedRoomId, own: &CallMember) -> String {
+    let focus = own.foci.first().map_or("", String::as_str);
+    focus_backend_id(room_id, own, own, focus)
+}
+
+fn hashed_id(parts: &[&str]) -> String {
+    STANDARD_NO_PAD.encode(Sha256::digest(Value::from(parts).to_string().as_bytes()))
 }
 
 fn member_service<'a>(member: &'a CallMember, members: &'a [CallMember]) -> Option<&'a str> {
-    if member.mode != CallMode::Legacy {
+    // Only JWT services follow the oldest membership.
+    if member.mode != CallMode::Legacy
+        || member
+            .foci
+            .first()
+            .is_some_and(|focus| membership::is_sfu_url(focus))
+    {
         return member.foci.first().map(String::as_str);
     }
     let mut owners: Vec<&CallMember> = members.iter().collect();
     owners.sort_by_key(|entry| entry.created_ts);
     owners
         .iter()
-        .find_map(|entry| entry.foci.first())
+        .find_map(|entry| {
+            entry
+                .foci
+                .first()
+                .filter(|focus| !membership::is_sfu_url(focus))
+        })
         .map(String::as_str)
+}
+
+async fn provision_focus(
+    room: &Room,
+    own: &CallMember,
+    focus: &str,
+    server_name: Option<&ruma::ServerName>,
+) -> Result<sfu::Provisioned, sfu::ProvisionError> {
+    let member_id = own.member_id.as_deref().unwrap_or(&own.identity);
+    if membership::is_sfu_url(focus) {
+        sfu::provision_stable(room, focus, server_name, own.wire.slot(), member_id).await
+    } else if own.mode == CallMode::Matrix2 {
+        sfu::provision_matrix2(room, focus, own.own_device_id(), member_id).await
+    } else {
+        sfu::provision(room, focus, own.own_device_id()).await
+    }
 }
 
 fn state_key(room: &Room, own: &CallMember) -> ruma::events::call::member::CallMemberStateKey {
@@ -267,25 +388,13 @@ async fn publish(
             return Err(core.rpc_error("join_call", &error));
         }
     };
-    let provision = if own.mode == CallMode::Matrix2 && own.wire == membership::RtcWire::Stable {
-        sfu::provision_stable(
-            room,
-            service,
-            own.focus_servers.get(service).map(AsRef::as_ref),
-            own.member_id.as_deref().unwrap_or(&own.identity),
-        )
-        .await
-    } else if own.mode == CallMode::Matrix2 {
-        sfu::provision_matrix2(
-            room,
-            service,
-            own.own_device_id(),
-            own.member_id.as_deref().unwrap_or(&own.identity),
-        )
-        .await
-    } else {
-        sfu::provision(room, service, own.own_device_id()).await
-    };
+    let provision = provision_focus(
+        room,
+        own,
+        service,
+        own.focus_servers.get(service).map(AsRef::as_ref),
+    )
+    .await;
     let provision = match provision {
         Ok(provision) if provision.identity == own.identity => provision,
         Ok(_) => {
@@ -336,29 +445,17 @@ async fn publish_elsewhere(
             own.mode
         },
         foci: vec![service.clone()],
+        identity: if membership::is_sfu_url(&service) {
+            membership::stable_identity(
+                &own.user_id,
+                own.member_id.as_deref().unwrap_or(&own.identity),
+            )
+        } else {
+            own.identity.clone()
+        },
         ..own.clone()
     };
-    let provisioned =
-        if moved.mode == CallMode::Matrix2 && moved.wire == membership::RtcWire::Stable {
-            sfu::provision_stable(
-                room,
-                &service,
-                None,
-                moved.member_id.as_deref().unwrap_or(&moved.identity),
-            )
-            .await
-        } else if moved.mode == CallMode::Matrix2 {
-            sfu::provision_matrix2(
-                room,
-                &service,
-                moved.own_device_id(),
-                moved.member_id.as_deref().unwrap_or(&moved.identity),
-            )
-            .await
-        } else {
-            sfu::provision(room, &service, moved.own_device_id()).await
-        };
-    match provisioned {
+    match provision_focus(room, &moved, &service, None).await {
         Ok(provision) if provision.identity == moved.identity && provision.can_publish => {
             if let Err(error) = publish_membership(room, &moved, intent).await {
                 tracing::warn!(%error, "could not move the call membership to our own focus");
@@ -397,7 +494,14 @@ async fn publish_where_allowed(
     if !published.provision.can_publish {
         tracing::warn!("no focus lets this account publish, joining listen-only");
     }
-    state.lock().await.own = own.clone();
+    let distributor = {
+        let mut state = state.lock().await;
+        state.own = own.clone();
+        state.distributor.clone()
+    };
+    if let Some(distributor) = distributor {
+        distributor.lock().await.set_identity(own.identity.clone());
+    }
     Ok((own, published))
 }
 
@@ -442,7 +546,7 @@ async fn confirm_join(
     membership_event: &ruma::OwnedEventId,
 ) -> Option<(String, Vec<CallBackendView>)> {
     let own = state.lock().await.own.clone();
-    let publisher_id = backend_id(&room.room_id().to_owned(), own.foci.first()?);
+    let publisher_id = publisher_backend_id(&room.room_id().to_owned(), &own);
     state.lock().await.backends.insert(
         publisher_id.clone(),
         CallBackendView {
@@ -746,7 +850,7 @@ fn wanted_backends(
     for member in verified {
         if let Some(service) = member_service(member, verified) {
             wanted.insert(
-                backend_id(&room.room_id().to_owned(), service),
+                focus_backend_id(&room.room_id().to_owned(), own, member, service),
                 (
                     service.to_owned(),
                     member.focus_servers.get(service).cloned(),
@@ -755,7 +859,7 @@ fn wanted_backends(
         }
     }
     let own_service = own.foci.first().cloned().unwrap_or_default();
-    let publisher_id = backend_id(&room.room_id().to_owned(), &own_service);
+    let publisher_id = publisher_backend_id(&room.room_id().to_owned(), own);
     wanted.insert(
         publisher_id,
         (
@@ -797,8 +901,22 @@ async fn refresh(
     let wanted = wanted_backends(room, &verified, &own);
     let missing = {
         let mut state = shared.lock().await;
-        state.members.clone_from(&verified);
+        set_members(
+            core,
+            generation,
+            session,
+            &room.room_id().to_owned(),
+            &mut state,
+            verified.clone(),
+        );
         state.backends.retain(|id, _| wanted.contains_key(id));
+        let State {
+            backends,
+            backend_aliases,
+            ..
+        } = &mut *state;
+        backend_aliases
+            .retain(|id, target| wanted.contains_key(id) && backends.contains_key(target));
         emit_pending(
             core,
             generation,
@@ -808,13 +926,67 @@ async fn refresh(
         );
         wanted
             .into_iter()
-            .filter(|(id, _)| !state.backends.contains_key(id))
+            .filter(|(id, _)| {
+                !state.backends.contains_key(id) && !state.backend_aliases.contains_key(id)
+            })
             .map(|(id, (url, server))| (id, url, server))
             .collect::<Vec<_>>()
     };
     provision_missing(core, generation, session, room, shared, &own, missing).await;
     publish_update(core, generation, session, room, shared).await;
     Refreshed::Current
+}
+
+fn set_members(
+    core: &Core,
+    generation: u64,
+    session: CallSessionId,
+    room_id: &OwnedRoomId,
+    state: &mut State,
+    members: Vec<CallMember>,
+) {
+    let previous = std::mem::replace(&mut state.members, members);
+    // Moving to an SFU URL changes a member's identity, and its key can arrive before the move.
+    for member in &state.members {
+        if member.is_own(&state.own.user_id, state.own.own_device_id()) {
+            continue;
+        }
+        let Some(before) = previous.iter().find(|before| {
+            before.user_id == member.user_id
+                && before.device_id == member.device_id
+                && before.member_id == member.member_id
+                && before.identity != member.identity
+        }) else {
+            continue;
+        };
+        let Some(service) = member_service(member, &state.members) else {
+            continue;
+        };
+        let backend_id = state.connected_backend_id(room_id, member, service);
+        let keys: Vec<_> = state
+            .latest_keys
+            .iter()
+            .filter(|((identity, _), _)| *identity == before.identity)
+            .map(|((_, index), key)| (*index, key.clone()))
+            .collect();
+        for (index, (sent_ts, key)) in keys {
+            let encoded = STANDARD.encode(&key);
+            state
+                .latest_keys
+                .insert((member.identity.clone(), index), (sent_ts, key));
+            core.emit_if_current(
+                generation,
+                CoreEvent::CallEncryptionKey {
+                    session,
+                    identity: member.identity.clone(),
+                    backend_id: Some(backend_id.clone()),
+                    key_index: index,
+                    key: encoded,
+                    own: false,
+                },
+            );
+        }
+    }
 }
 
 async fn recheck_slot(room: &Room, shared: &Mutex<State>) {
@@ -849,14 +1021,23 @@ async fn provision_missing(
     own: &CallMember,
     missing: Vec<(String, String, Option<OwnedServerName>)>,
 ) {
+    let member_id = own.member_id.as_deref().unwrap_or(&own.identity);
+    let publisher_id = publisher_backend_id(&room.room_id().to_owned(), own);
     for (id, service, server_name) in missing {
-        let provision = if own.mode == CallMode::Matrix2 && own.wire == membership::RtcWire::Stable
-        {
+        let identity = membership::backend_identity(
+            &own.user_id,
+            own.own_device_id(),
+            member_id,
+            own.mode,
+            &service,
+        );
+        let provision = if membership::is_sfu_url(&service) {
             sfu::provision_stable(
                 room,
                 &service,
                 server_name.as_deref(),
-                own.member_id.as_deref().unwrap_or(&own.identity),
+                own.wire.slot(),
+                member_id,
             )
             .await
         } else {
@@ -864,15 +1045,16 @@ async fn provision_missing(
                 room,
                 &service,
                 own.own_device_id(),
-                own.member_id.as_deref().unwrap_or(&own.identity),
+                member_id,
                 own.mode == CallMode::Matrix2,
             )
             .await
         };
         match provision {
-            Ok(provision) if provision.identity == own.identity => {
-                shared.lock().await.backends.insert(
-                    id.clone(),
+            Ok(provision) if provision.identity == identity => {
+                shared.lock().await.add_backend(
+                    &room.room_id().to_owned(),
+                    &publisher_id,
                     CallBackendView {
                         id,
                         url: provision.url,
@@ -989,7 +1171,7 @@ async fn emit_roster(
     let mut views = super::member_views(&state.members);
     for (view, member) in views.iter_mut().zip(&state.members) {
         view.backend_id = member_service(member, &state.members)
-            .map(|service| backend_id(&room.room_id().to_owned(), service));
+            .map(|service| state.connected_backend_id(&room.room_id().to_owned(), member, service));
     }
     if state.emitted_members.as_ref() != Some(&views) {
         state.emitted_members = Some(views.clone());
@@ -1001,10 +1183,7 @@ async fn emit_roster(
             },
         );
     }
-    let publisher_id = backend_id(
-        &room.room_id().to_owned(),
-        state.own.foci.first().map_or("", String::as_str),
-    );
+    let publisher_id = publisher_backend_id(&room.room_id().to_owned(), &state.own);
     report_silent_members(&mut state, crate::now_ms());
     state.revision = state.revision.saturating_add(1);
     core.emit_if_current(
@@ -1170,7 +1349,7 @@ fn emit_pending(
                 CoreEvent::CallEncryptionKey {
                     session,
                     identity: member.identity.clone(),
-                    backend_id: Some(backend_id(room_id, service)),
+                    backend_id: Some(state.connected_backend_id(room_id, member, service)),
                     key_index: payload.index,
                     key: payload.key.clone(),
                     own: false,

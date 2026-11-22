@@ -34,6 +34,26 @@ pub(in crate::calls) fn member(mode: CallMode, created_ts: u64, foci: &[&str]) -
     }
 }
 
+const GET_TOKEN: &str = "/_matrix/client/unstable/io.element.msc4195/rtc/livekit/get_token";
+
+fn token(sub: &str, room: &str) -> String {
+    let claims = serde_json::json!({"sub": sub, "video": {"room": room}});
+    format!(
+        "x.{}.x",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(claims.to_string())
+    )
+}
+
+async fn provision_backend(
+    room: &matrix_sdk::Room,
+    state: &Mutex<State>,
+    own: &CallMember,
+    backend: (String, String, Option<ruma::OwnedServerName>),
+) {
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    super::provision_missing(&core, 1, CallSessionId(1), room, state, own, vec![backend]).await;
+}
+
 #[tokio::test]
 async fn encrypted_media_key_reaches_another_sable_call_member() {
     let server = MatrixMockServer::new().await;
@@ -372,6 +392,7 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
         members,
         emitted_members: None,
         backends: BTreeMap::new(),
+        backend_aliases: BTreeMap::new(),
         latest_keys: HashMap::new(),
         member_first_seen: HashMap::new(),
         silent_reported: HashSet::new(),
@@ -562,6 +583,7 @@ async fn refresh_fixture(
             members: Vec::new(),
             emitted_members: None,
             backends,
+            backend_aliases: BTreeMap::new(),
             pending_keys: Vec::new(),
             latest_keys: HashMap::new(),
             member_first_seen: HashMap::new(),
@@ -1035,6 +1057,113 @@ async fn rejoining_a_call_resumes_sync_after_a_background_leave() {
     assert!(matches!(sync_service.state().get(), SyncState::Idle));
 }
 
+async fn join_on_an_sfu_url_only_homeserver(
+    subject: impl Fn(&ruma::UserId, &str) -> String,
+) -> (
+    MatrixMockServer,
+    Arc<Core>,
+    String,
+    Result<crate::api::calls::JoinOk, crate::protocol::RpcError>,
+) {
+    use std::time::Duration;
+    use wiremock::matchers::{body_partial_json, method, path, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let (server, _sfu, room, _, _, _) = legacy_move_fixture(true).await;
+    server
+        .mock_sliding_sync()
+        .with_delay(Duration::from_secs(1))
+        .ok_json(serde_json::json!({"pos": "p", "lists": {}, "rooms": {}}))
+        .mount()
+        .await;
+    server
+        .mock_room_send()
+        .ok(event_id!("$invite"))
+        .mount()
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"/rtc/transports$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "rtc_transports": [{"type": "livekit", "url": "wss://sfu.example.org"}],
+        })))
+        .mount(server.server())
+        .await;
+    let client = room.client();
+    let user_id = client.user_id().unwrap().to_owned();
+    let member_id = format!("{user_id}:{}", client.device_id().unwrap());
+    let jwt = token(&subject(&user_id, &member_id), "r");
+    Mock::given(method("POST"))
+        .and(path(GET_TOKEN))
+        .and(body_partial_json(serde_json::json!({
+            "url": "wss://sfu.example.org", "room_id": room.room_id(),
+            "slot_id": "m.call#ROOM", "member_id": member_id,
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"jwt": jwt})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    let joined = core
+        .join_call(
+            room.room_id().to_owned(),
+            None,
+            Some(CallMode::Compatibility),
+            None,
+        )
+        .await;
+    (server, core, member_id, joined)
+}
+
+#[tokio::test]
+async fn a_homeserver_with_only_an_sfu_url_is_joined_through_get_token() {
+    let (server, core, member_id, joined) =
+        join_on_an_sfu_url_only_homeserver(super::membership::stable_identity).await;
+    let joined = joined.unwrap();
+    assert_eq!(joined.url, "wss://sfu.example.org");
+
+    let membership = server
+        .server()
+        .received_requests()
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|request| {
+            request.method.as_str() == "PUT"
+                && request
+                    .url
+                    .path()
+                    .contains("/state/org.matrix.msc3401.call.member/")
+        })
+        .map(|request| serde_json::from_slice::<serde_json::Value>(&request.body).unwrap())
+        .find(|body| body.get("foci_preferred").is_some())
+        .unwrap();
+    assert_eq!(
+        membership["foci_preferred"],
+        serde_json::json!([{"type": "livekit", "url": "wss://sfu.example.org"}])
+    );
+    assert_eq!(membership["membershipID"], member_id.as_str());
+    core.leave_call(joined.session).await.unwrap();
+}
+
+#[tokio::test]
+async fn an_sfu_token_for_another_identity_aborts_the_join() {
+    let (_server, _core, _member_id, joined) =
+        join_on_an_sfu_url_only_homeserver(|_, _| "someone-else".to_owned()).await;
+    let error = joined.unwrap_err();
+    assert!(
+        format!("{error:?}").contains("identity mismatch"),
+        "{error:?}"
+    );
+}
+
 #[tokio::test]
 async fn a_legacy_publisher_follows_the_oldest_members_focus() {
     let (_homeserver, sfu, room, own, oldest, state) = legacy_move_fixture(true).await;
@@ -1161,6 +1290,7 @@ async fn a_stable_focus_token_is_requested_from_the_homeserver() {
         &room,
         "wss://focus.example.org",
         Some(matrix_sdk::ruma::server_name!("remote.example.org")),
+        "m.call#room",
         "member",
     )
     .await
@@ -1246,6 +1376,306 @@ async fn a_remote_focus_cannot_change_the_participant_identity() {
     assert!(!state.lock().await.backends.contains_key("remote"));
 }
 
+#[test]
+fn legacy_mode_follows_only_jwt_services() {
+    let first = member(CallMode::Legacy, 1, &["wss://sfu.example.org"]);
+    let second = member(CallMode::Legacy, 2, &["wss://other.example.org"]);
+    let third = member(CallMode::Legacy, 3, &["https://focus.example.org"]);
+    let members = [first, second, third];
+    for member in &members {
+        assert_eq!(
+            member_service(member, &members),
+            member.foci.first().map(String::as_str)
+        );
+    }
+}
+
+#[tokio::test]
+async fn an_sfu_focus_token_comes_from_the_homeserver_and_a_shared_room_is_not_joined_twice() {
+    use wiremock::matchers::{body_partial_json, method, path};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let (homeserver, _sfu, room, mut own, _oldest, state) = legacy_move_fixture(true).await;
+    own.mode = CallMode::Compatibility;
+    let member_id = own.member_id.clone().unwrap();
+    let hashed = super::membership::stable_identity(&own.user_id, &member_id);
+    Mock::given(method("POST"))
+        .and(path(GET_TOKEN))
+        .and(body_partial_json(serde_json::json!({
+            "url": "wss://sfu.example.org", "server_name": "example.org",
+            "room_id": room.room_id(), "slot_id": "m.call#ROOM", "member_id": member_id,
+        })))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"jwt": token(&hashed, "shared")})),
+        )
+        .expect(2)
+        .mount(homeserver.server())
+        .await;
+    let publisher = backend_id(&room.room_id().to_owned(), "https://old.example.org");
+    state.lock().await.backends.insert(
+        publisher.clone(),
+        CallBackendView {
+            id: publisher.clone(),
+            url: "wss://sfu.example.org/".to_owned(),
+            jwt: token(&own.identity, "shared"),
+            identity: own.identity.clone(),
+        },
+    );
+    let missing = |id: &str| {
+        (
+            id.to_owned(),
+            "wss://sfu.example.org".to_owned(),
+            Some(matrix_sdk::ruma::server_name!("example.org").to_owned()),
+        )
+    };
+
+    provision_backend(&room, &state, &own, missing("element")).await;
+    {
+        let state = state.lock().await;
+        assert!(!state.backends.contains_key("element"));
+        assert_eq!(state.backend_aliases["element"], publisher);
+    }
+
+    state.lock().await.backends.get_mut(&publisher).unwrap().jwt =
+        token(&own.identity, "elsewhere");
+    provision_backend(&room, &state, &own, missing("other")).await;
+    assert_eq!(state.lock().await.backends["other"].identity, hashed);
+}
+
+#[tokio::test]
+async fn a_member_cannot_redirect_the_token_request_for_another_members_sfu() {
+    let (_homeserver, _sfu, room, own, _oldest, _state) = legacy_move_fixture(true).await;
+    let url = "wss://sfu.remote.example";
+    let on_server = |user: ruma::OwnedUserId, server: ruma::OwnedServerName| CallMember {
+        user_id: user,
+        focus_servers: [(url.to_owned(), server)].into(),
+        ..member(CallMode::Compatibility, 1, &[url])
+    };
+    let honest = on_server(
+        owned_user_id!("@honest:remote.example"),
+        ruma::server_name!("remote.example").to_owned(),
+    );
+    let other = on_server(
+        owned_user_id!("@other:other.example"),
+        ruma::server_name!("other.example").to_owned(),
+    );
+
+    let wanted = super::wanted_backends(&room, &[honest, other], &own);
+
+    let servers: HashSet<_> = wanted
+        .values()
+        .filter(|(service, _)| service == url)
+        .filter_map(|(_, server)| server.as_ref().map(ToString::to_string))
+        .collect();
+    assert_eq!(
+        servers,
+        HashSet::from(["remote.example".to_owned(), "other.example".to_owned()])
+    );
+}
+
+#[tokio::test]
+async fn a_focus_cannot_capture_another_members_backend() {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let (_homeserver, _sfu, room, own, _oldest, state) = legacy_move_fixture(true).await;
+    let jwt = token(&own.identity, "r");
+    let focus = wiremock::MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/sfu/get"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"url": "wss://remote.example", "jwt": jwt})),
+        )
+        .mount(&focus)
+        .await;
+    state.lock().await.backends.insert(
+        "another-member".to_owned(),
+        CallBackendView {
+            id: "another-member".to_owned(),
+            url: "wss://remote.example".to_owned(),
+            jwt: jwt.clone(),
+            identity: own.identity.clone(),
+        },
+    );
+
+    provision_backend(
+        &room,
+        &state,
+        &own,
+        ("honest".to_owned(), focus.uri(), None),
+    )
+    .await;
+
+    let state = state.lock().await;
+    assert!(state.backends.contains_key("honest"));
+    assert!(state.backend_aliases.is_empty());
+}
+
+#[tokio::test]
+async fn a_remote_sfu_is_joined_once_for_its_homeservers_url_and_service_members() {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+
+    for (service_first, service_user, joined) in [
+        (true, "@service:remote.example", 1),
+        (false, "@service:remote.example", 1),
+        (true, "@service:stranger.example", 2),
+        (false, "@service:stranger.example", 2),
+    ] {
+        let (homeserver, _sfu, room, mut own, _oldest, state) = legacy_move_fixture(true).await;
+        own.mode = CallMode::Compatibility;
+        let url = "wss://sfu.remote.example";
+        let hashed =
+            super::membership::stable_identity(&own.user_id, own.member_id.as_deref().unwrap());
+        Mock::given(method("POST"))
+            .and(path(GET_TOKEN))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({"jwt": token(&hashed, "shared")})),
+            )
+            .mount(homeserver.server())
+            .await;
+        let service = wiremock::MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/sfu/get"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                serde_json::json!({"url": url, "jwt": token(&own.identity, "shared")}),
+            ))
+            .mount(&service)
+            .await;
+
+        let remote = ruma::server_name!("remote.example").to_owned();
+        let by_url = CallMember {
+            user_id: owned_user_id!("@url:remote.example"),
+            focus_servers: [(url.to_owned(), remote.clone())].into(),
+            ..member(CallMode::Compatibility, 1, &[url])
+        };
+        let by_service = CallMember {
+            user_id: service_user.try_into().unwrap(),
+            ..member(CallMode::Compatibility, 2, &[&service.uri()])
+        };
+        let room_id = room.room_id().to_owned();
+        let url_id = super::focus_backend_id(&room_id, &own, &by_url, url);
+        let service_id = backend_id(&room_id, &service.uri());
+        state.lock().await.members = vec![by_url, by_service];
+        let mut missing = vec![
+            (service_id, service.uri(), None),
+            (url_id.clone(), url.to_owned(), Some(remote)),
+        ];
+        if !service_first {
+            missing.reverse();
+        }
+        for backend in missing {
+            provision_backend(&room, &state, &own, backend).await;
+        }
+
+        let state = state.lock().await;
+        assert_eq!(
+            state.backends.len(),
+            joined,
+            "{service_user} {service_first}"
+        );
+        assert!(state.backends.contains_key(&url_id));
+    }
+}
+
+#[tokio::test]
+async fn a_publisher_refused_on_the_calls_focus_moves_to_its_homeservers_sfu_url() {
+    use wiremock::matchers::{method, path, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let (homeserver, refusing, room, mut own, _oldest, _state) = legacy_move_fixture(false).await;
+    own.mode = CallMode::Compatibility;
+    own.foci = vec![refusing.uri()];
+    let hashed =
+        super::membership::stable_identity(&own.user_id, own.member_id.as_deref().unwrap());
+    let jwt = token(&hashed, "r");
+    Mock::given(method("GET"))
+        .and(path_regex(r"/rtc/transports$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "rtc_transports": [{"type": "livekit", "url": "wss://own.example.org"}],
+        })))
+        .mount(homeserver.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path(GET_TOKEN))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"jwt": jwt})))
+        .mount(homeserver.server())
+        .await;
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let state = Mutex::new(State::new(
+        own,
+        Vec::new(),
+        super::StickyMemberships::default(),
+        &room.room_id().to_owned(),
+        true,
+        None,
+        false,
+    ));
+
+    let (moved, published) = super::publish_where_allowed(&core, &room, &state, false, None)
+        .await
+        .unwrap();
+
+    assert_eq!(moved.foci, ["wss://own.example.org"]);
+    assert_eq!(moved.identity, hashed);
+    assert!(published.provision.can_publish);
+    let distributor = state.lock().await.distributor.clone().unwrap();
+    assert_eq!(distributor.lock().await.identity(), hashed);
+}
+
+#[tokio::test]
+async fn a_key_from_a_member_on_an_aliased_focus_names_the_connected_backend() {
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let room_id = owned_room_id!("!call:example.org");
+    let mut element = member(CallMode::Compatibility, 1, &["wss://sfu.example.org"]);
+    element.user_id = owned_user_id!("@element:example.org");
+    element.member_id = Some("@element:example.org:DEVICE".to_owned());
+    element.identity = "hashed".to_owned();
+    let mut state = State::new(
+        member(CallMode::Compatibility, 1, &["https://focus.example.org"]),
+        vec![element],
+        super::StickyMemberships::default(),
+        &room_id,
+        false,
+        None,
+        false,
+    );
+    let publisher = backend_id(&room_id, "https://focus.example.org");
+    state.backend_aliases.insert(
+        backend_id(&room_id, "wss://sfu.example.org"),
+        publisher.clone(),
+    );
+    state.pending_keys.push(super::PendingKey {
+        sender: owned_user_id!("@element:example.org"),
+        device: owned_device_id!("DEVICE"),
+        content: super::keys::ToDeviceCallEncryptionKeysEventContent {
+            media_key: None,
+            keys: Some(super::keys::KeyPayload {
+                index: 0,
+                key: base64::engine::general_purpose::STANDARD.encode([1; 16]),
+            }),
+            room_id: room_id.clone(),
+            member_id: None,
+            member: None,
+            session: super::keys::SessionRef::default(),
+            sent_ts: Some(1),
+        },
+        received: crate::now_ms(),
+        reported: false,
+    });
+
+    super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
+
+    assert!(matches!(
+        events.try_recv(),
+        Ok(crate::protocol::CoreEvent::CallEncryptionKey { identity, backend_id: Some(id), .. })
+            if identity == "hashed" && id == publisher
+    ));
+}
+
 #[tokio::test]
 async fn a_key_without_a_sent_timestamp_is_accepted() {
     let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
@@ -1318,6 +1748,49 @@ fn a_member_that_sends_no_key_is_reported_once_after_a_wait() {
         .insert((peer.identity, 0), (1, vec![0; 16]));
     super::report_silent_members(&mut state, 1_000 + 2 * super::SILENT_MEMBER_REPORT_MS);
     assert!(state.silent_reported.is_empty(), "its key arrived");
+}
+
+#[tokio::test]
+async fn a_key_follows_a_member_that_moves_to_an_sfu_url() {
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let room_id = owned_room_id!("!call:example.org");
+    let mut before = member(CallMode::Compatibility, 1, &["https://focus.example.org"]);
+    before.user_id = owned_user_id!("@peer:example.org");
+    before.identity = "@peer:example.org:DEVICE".to_owned();
+    before.member_id = Some(before.identity.clone());
+    let mut state = State::new(
+        member(CallMode::Compatibility, 1, &[]),
+        vec![before.clone()],
+        super::StickyMemberships::default(),
+        &room_id,
+        false,
+        None,
+        false,
+    );
+    state
+        .latest_keys
+        .insert((before.identity.clone(), 2), (100, vec![7; 16]));
+    let moved = CallMember {
+        identity: "hashed".to_owned(),
+        foci: vec!["wss://sfu.example.org".to_owned()],
+        ..before
+    };
+
+    super::set_members(
+        &core,
+        1,
+        CallSessionId(1),
+        &room_id,
+        &mut state,
+        vec![moved],
+    );
+
+    assert!(matches!(
+        events.try_recv(),
+        Ok(crate::protocol::CoreEvent::CallEncryptionKey { identity, key_index: 2, key, own: false, .. })
+            if identity == "hashed"
+                && key == base64::engine::general_purpose::STANDARD.encode([7; 16])
+    ));
 }
 
 #[tokio::test]
@@ -1443,6 +1916,79 @@ async fn a_key_older_than_one_already_emitted_for_the_same_index_is_dropped() {
         events.try_recv(),
         Ok(crate::protocol::CoreEvent::CallEncryptionKey { .. })
     ));
+}
+
+#[tokio::test]
+async fn a_jwt_service_from_any_source_is_preferred_to_an_sfu_url() {
+    use serde_json::json;
+    use wiremock::matchers::{method, path, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let sfu = "wss://sfu.example.org";
+    let listed = "https://listed.example.org";
+    let well_known = "https://well-known.example.org";
+    let configured = "https://configured.example.org";
+    let url_only = json!({"type": "livekit", "url": sfu});
+    let cases = [
+        (
+            "a later transport of the endpoint",
+            json!([
+                {"type": "m.livekit", "url": sfu},
+                {"type": "livekit", "url": sfu, "livekit_service_url": listed},
+            ]),
+            Some(well_known),
+            Some(configured),
+            listed,
+        ),
+        (
+            "the well-known",
+            json!([url_only]),
+            Some(well_known),
+            Some(configured),
+            well_known,
+        ),
+        (
+            "the settings",
+            json!([url_only]),
+            None,
+            Some(configured),
+            configured,
+        ),
+        ("no JWT service", json!([url_only]), None, None, sfu),
+    ];
+    for (source, transports, announced, fallback, expected) in cases {
+        let server = MatrixMockServer::new().await;
+        Mock::given(method("GET"))
+            .and(path_regex(r"/rtc/transports$"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"rtc_transports": transports})),
+            )
+            .mount(server.server())
+            .await;
+        let foci: Vec<_> = announced
+            .iter()
+            .map(|service| json!({"type": "livekit", "livekit_service_url": service}))
+            .collect();
+        Mock::given(method("GET"))
+            .and(path("/.well-known/matrix/client"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "m.homeserver": {"base_url": server.server().uri()},
+                "org.matrix.msc4143.rtc_foci": foci,
+            })))
+            .mount(server.server())
+            .await;
+        let client = server.client_builder().build().await;
+        let room_id = owned_room_id!("!call:example.org");
+        server.sync_joined_room(&client, &room_id).await;
+        let room = client.get_room(&room_id).unwrap();
+        let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+
+        let focus = core
+            .resolve_focus(&[], fallback.map(str::to_owned), &room)
+            .await;
+
+        assert_eq!(focus.as_deref(), Some(expected), "{source}");
+    }
 }
 
 #[tokio::test]

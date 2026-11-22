@@ -270,6 +270,15 @@ impl KeyDistributor {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn identity(&self) -> &str {
+        &self.identity
+    }
+
+    pub(crate) fn set_identity(&mut self, identity: String) {
+        self.identity = identity;
+    }
+
     pub(crate) const fn set_wire(&mut self, wire: super::membership::RtcWire) {
         self.wire = wire;
     }
