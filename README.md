@@ -125,6 +125,16 @@ sudo dnf config-manager addrepo --from-repofile=https://git.sable.moe/api/packag
 sudo dnf install sable
 ```
 
+### FreeBSD
+
+Stable releases ship `sable-<version>-freebsd-x64.tar.gz`, which runs on the system Electron. It does not update itself, and screen sharing cannot capture a single app's audio.
+
+```sh
+sudo pkg install electron45
+tar -xzf sable-<version>-freebsd-x64.tar.gz
+./sable-<version>/sable
+```
+
 ### MacOS (Homebrew)
 
 <a href="https://git.sable.moe/SableClient/homebrew-sable"><img alt="Homebrew" src="https://img.shields.io/badge/Homebrew-FBB040?style=for-the-badge&logo=homebrew&logoColor=black"></a>
@@ -251,9 +261,11 @@ mise run tauri:setup:ios      # iOS: Xcode project + CocoaPods (macOS)
 
 Every push to `main` publishes bundles for all targets as a distinct
 [nightly prerelease](https://git.sable.moe/SableClient/sable-next/releases).
-Linux x86_64, macOS, Android and iOS build here; Windows and Linux aarch64
-build on the GitHub mirror and attach their bundles, with attestations, to the
-same release. Pushing a `v*` tag publishes a stable release the same way.
+Linux x86_64, macOS arm64, Android and iOS build here; Windows, Linux aarch64
+and, for stable releases only, macOS x86_64 build on the GitHub mirror and
+attach their bundles, with attestations, to the same release. Pushing a `v*`
+tag publishes a stable release the same way. Stable releases also get a
+FreeBSD bundle from the GitHub mirror.
 
 The web build ships with every release as `sable-<version>-web.tar.gz`.
 Extract it into your web root to serve the app yourself; see

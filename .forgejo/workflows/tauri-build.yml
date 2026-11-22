@@ -1062,9 +1062,38 @@ jobs:
           protect="$protect,$(cat channel/* | grep -oE 'download/nightly-[^/]+' \
             | cut -d/ -f2 | sort -u | tr '\n' ',')"
           node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP" --protect "$protect"
+  mac-update-manifest:
+    name: Merge the macOS update manifests
+    needs: [setup-release, github-bundles, electron-macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    # Skipping the job instead would skip sign-release too.
+    steps:
+      - name: Check out repository
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Set up app
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        uses: ./.forgejo/actions/setup
+        with:
+          install-mise-tools: 'false'
+      - name: Merge and publish the manifests
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: |
+          mkdir manifests
+          node scripts/ci/forgejo-release.mjs download --pattern 'latest-mac*.yml' --dir manifests
+          node electron/merge-mac-manifests.mjs manifests/latest-mac.yml manifests/latest-mac-x64.yml
+          node scripts/ci/forgejo-release.mjs upload manifests/latest-mac.yml
+          node scripts/ci/forgejo-release.mjs upload --tag latest manifests/latest-mac.yml
   sign-release:
     name: Sign release checksums
-    needs: [setup-release, github-bundles, electron-macos, obtainium, altstore]
+    needs: [setup-release, github-bundles, electron-macos, mac-update-manifest, obtainium, altstore]
     if: ${{ needs.setup-release.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1173,7 +1202,7 @@ jobs:
           retry git push
   distribute-homebrew:
     name: Publish the Homebrew cask
-    needs: [setup-release, electron-macos]
+    needs: [setup-release, github-bundles, electron-macos]
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1186,16 +1215,17 @@ jobs:
         with:
           ref: ${{ needs.setup-release.outputs.ref }}
           persist-credentials: false
-      - name: Download the DMG
+      - name: Download the DMGs
         run: |
           mkdir dmg
           node scripts/ci/forgejo-release.mjs download \
-            --pattern "sable-${VERSION}-arm64.dmg" --dir dmg
+            --pattern "sable-${VERSION}-{arm64,x64}.dmg" --dir dmg
       - name: Push the cask to the Forgejo tap
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          sha="$(sha256sum "dmg/sable-${VERSION}-arm64.dmg" | awk '{print $1}')"
+          arm="$(sha256sum "dmg/sable-${VERSION}-arm64.dmg" | awk '{print $1}')"
+          intel="$(sha256sum "dmg/sable-${VERSION}-x64.dmg" | awk '{print $1}')"
           export GIT_TERMINAL_PROMPT=0
 
           push_tap() (
@@ -1218,7 +1248,8 @@ jobs:
             mkdir -p tap/Casks
             sed \
               -e "s/^  version .*/  version '${VERSION}'/" \
-              -e "s/^  sha256 .*/  sha256 '${sha}'/" \
+              -e "s/^  sha256 arm: .*/  sha256 arm:   '${arm}',/" \
+              -e "s/^         intel: .*/         intel: '${intel}'/" \
               packaging/homebrew/sable.rb > tap/Casks/sable.rb
             cd tap
             git config user.name 'Sable release'

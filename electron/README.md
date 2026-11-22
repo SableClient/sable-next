@@ -1,7 +1,8 @@
 # Electron packaging and update metadata
 
 Build the web assets with `pnpm build`, then run
-`pnpm --dir electron package --linux`, `--mac` or `--win`.
+`pnpm --dir electron package --linux`, `--mac` or `--win`. On FreeBSD, `--linux dir -c.electronDist=/usr/local/share/electron45` packages
+against the system Electron.
 Set `VERSION` to override the root package version. macOS builds include a DMG and an update ZIP.
 For a stable package, build the web assets and package with `SABLE_BUILD_FLAVOR=stable`.
 
@@ -37,7 +38,8 @@ Update feeds:
 - Nightly: `https://git.sable.moe/SableClient/sable-next/releases/download/nightly/`
 
 Packaging generates `latest-mac.yml`, `latest-linux.yml`, `latest-linux-arm64.yml` and `latest.yml` (Windows); versions containing
-`-nightly.` use `nightly` instead of `latest`. `--publish never` disables
+`-nightly.` use `nightly` instead of `latest`. The Intel macOS build, made on GitHub for stable releases only, uploads its manifest as
+`latest-mac-x64.yml`, and `electron/merge-mac-manifests.mjs` folds it into the arm64 `latest-mac.yml`. `--publish never` disables
 electron-builder uploads but still generates these manifests.
 
 CI runs `node electron/publish-updates.mjs` with `TAG`, `VERSION`, `SHA` and

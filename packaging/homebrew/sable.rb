@@ -1,8 +1,11 @@
 cask 'sable' do
-  version '2.0.0'
-  sha256 '0000000000000000000000000000000000000000000000000000000000000000'
+  arch arm: 'arm64', intel: 'x64'
 
-  url "https://git.sable.moe/SableClient/sable-next/releases/download/v#{version}/sable-#{version}-arm64.dmg"
+  version '2.0.0'
+  sha256 arm:   '0000000000000000000000000000000000000000000000000000000000000000',
+         intel: '0000000000000000000000000000000000000000000000000000000000000000'
+
+  url "https://git.sable.moe/SableClient/sable-next/releases/download/v#{version}/sable-#{version}-#{arch}.dmg"
   name 'Sable'
   desc 'Client for the Matrix chat network'
   homepage 'https://sable.moe/'
@@ -13,7 +16,6 @@ cask 'sable' do
   end
 
   auto_updates true
-  depends_on arch: :arm64
   depends_on :macos
 
   app 'Sable.app'

@@ -1,15 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { repository, server } from '../scripts/lib/forgejo.mjs';
-
-// Use electron-builder's YAML parser.
-const require = createRequire(import.meta.url);
-const builderRequire = createRequire(require.resolve('electron-builder/package.json'));
-const { load, dump } = createRequire(builderRequire.resolve('app-builder-lib/package.json'))(
-  'js-yaml'
-);
+import { dump, load } from './yaml.mjs';
 
 const tag = process.env.TAG;
 const version = process.env.VERSION;
@@ -25,7 +18,7 @@ const artifacts = files.filter((name) =>
   /\.(deb|rpm|AppImage|tar\.gz|dmg|zip|exe|msi|blockmap)$/.test(name)
 );
 const manifests = files.filter((name) =>
-  new RegExp(`^${channel}(-(mac|linux|linux-arm64))?\\.yml$`).test(name)
+  new RegExp(`^${channel}(-(mac|mac-x64|linux|linux-arm64))?\\.yml$`).test(name)
 );
 if (manifests.length === 0) throw new Error(`No ${channel} Electron update manifests found`);
 

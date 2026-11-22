@@ -1,4 +1,4 @@
-name: Build Windows and Linux aarch64 Electron apps
+name: Build Windows, Linux aarch64, macOS x86_64 and FreeBSD Electron apps
 on:
   push:
     tags: ['v*']
@@ -39,6 +39,7 @@ jobs:
       ref: ${{ steps.meta.outputs.ref }}
       nightly: ${{ steps.meta.outputs.nightly }}
       sha: ${{ steps.meta.outputs.sha }}
+      electron-targets: ${{ steps.targets.outputs.electron }}
     steps:
       # The push mirror from Forgejo can trail the dispatch.
       - name: Wait for the commit to reach GitHub
@@ -64,6 +65,20 @@ jobs:
         with:
           input-tag: ${{ inputs.tag }}
           git-sha: ${{ inputs.sha }}
+      - name: Pick the Electron targets
+        id: targets
+        env:
+          NIGHTLY: ${{ steps.meta.outputs.nightly }}
+        run: |
+          targets='[
+            {"name": "Windows x86_64", "runner": "windows-latest", "platform": "--win"},
+            {"name": "Linux x86_64", "runner": "ubuntu-24.04", "platform": "--linux"},
+            {"name": "Linux aarch64", "runner": "ubuntu-24.04-arm", "platform": "--linux"}
+          ]'
+          if [ "$NIGHTLY" != 'true' ]; then
+            targets="$(jq '. + [{"name": "macOS x86_64", "runner": "macos-26-intel", "platform": "--mac"}]' <<< "$targets")"
+          fi
+          echo "electron=$(jq -c . <<< "$targets")" >> "$GITHUB_OUTPUT"
       - name: Wait for release to exist
         if: ${{ steps.meta.outputs.nightly != 'true' }}
         env:
@@ -130,16 +145,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Windows x86_64
-            runner: windows-latest
-            platform: --win
-          - name: Linux x86_64
-            runner: ubuntu-24.04
-            platform: --linux
-          - name: Linux aarch64
-            runner: ubuntu-24.04-arm
-            platform: --linux
+        include: ${{ fromJSON(needs.setup-release.outputs.electron-targets) }}
     env:
       VERSION: ${{ needs.setup-release.outputs.version }}
       TAG: ${{ needs.setup-release.outputs.tag }}
@@ -152,6 +158,9 @@ jobs:
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
       SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_API_ISSUER: ${{ secrets.APP_STORE_API_ISSUER_ID }}
+      APPLE_API_KEY_ID: ${{ secrets.APP_STORE_API_KEY_ID }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -162,6 +171,18 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: web-assets
+      - name: Write the App Store Connect API key
+        if: ${{ runner.os == 'macOS' }}
+        uses: ./.forgejo/actions/app-store-connect-key
+        with:
+          key-id: ${{ secrets.APP_STORE_API_KEY_ID }}
+          key: ${{ secrets.APP_STORE_API_KEY_BASE64 }}
+      - name: Import the signing identity
+        if: ${{ runner.os == 'macOS' && env.APPLE_CERTIFICATE != '' }}
+        uses: ./.forgejo/actions/apple-signing-keychain
+        with:
+          certificate: ${{ secrets.APPLE_CERTIFICATE }}
+          password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       - name: Install Linux build dependencies
         if: ${{ runner.os == 'Linux' }}
         run: |
@@ -179,15 +200,33 @@ jobs:
         shell: bash
         env:
           PLATFORM: ${{ matrix.platform }}
-        run: pnpm --dir electron package "$PLATFORM"
+        run: |
+          sign_args=()
+          if [ "$RUNNER_OS" = macOS ]; then
+            if [ -n "${APPLE_CERTIFICATE:-}" ]; then
+              # electron-builder takes the key's path, not its ID, from APPLE_API_KEY.
+              export APPLE_API_KEY="$APPLE_API_KEY_PATH"
+              export CSC_KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+              sign_args=(-c.mac.identity=NXLJ6G3CP7 -c.mac.hardenedRuntime=true -c.forceCodeSigning=true)
+            else
+              case "$VERSION" in
+                *-nightly.*) unset APPLE_API_ISSUER APPLE_API_KEY_ID ;;
+                *) echo 'APPLE_CERTIFICATE is required to build a stable macOS release.' >&2; exit 1 ;;
+              esac
+            fi
+          fi
+          pnpm --dir electron package "$PLATFORM" "${sign_args[@]}"
+      - name: Remove the signing keychain
+        if: ${{ always() && runner.os == 'macOS' && env.APPLE_CERTIFICATE != '' }}
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
       - name: Upload native addon symbols
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os != 'Windows' }}
         run: node scripts/ci/upload-sentry-symbols.mjs electron/dist
       - name: Verify native core shutdown
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os != 'Windows' }}
         run: SABLE_NODE_ADDON="$PWD/electron/dist/sable_node.node" node --test crates/sable-node/tests/native-lifecycle.mjs
       - name: Verify native core shutdown in Electron
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os != 'Windows' }}
         run: ELECTRON_RUN_AS_NODE=1 SABLE_NODE_ADDON="$PWD/electron/dist/sable_node.node" pnpm --dir electron exec electron --test "$PWD/crates/sable-node/tests/native-lifecycle.mjs"
       - name: Attest bundles
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -199,6 +238,12 @@ jobs:
             electron/release/*.rpm
             electron/release/*.AppImage
             electron/release/*.tar.gz
+            electron/release/*.dmg
+            electron/release/*.zip
+      # Forgejo's mac-update-manifest merges it into latest-mac.yml.
+      - name: Rename the Intel update manifest
+        if: ${{ runner.os == 'macOS' }}
+        run: mv electron/release/latest-mac.yml electron/release/latest-mac-x64.yml
       - name: Publish Electron bundles and update metadata
         shell: bash
         run: node electron/publish-updates.mjs
@@ -224,6 +269,60 @@ jobs:
           for rpm in electron/release/*.rpm; do
             upload "$rpm" "$api/rpm/$channel/upload?sign=true"
           done
+  freebsd:
+    name: FreeBSD x86_64 (Electron)
+    needs: [setup-release, build-web]
+    if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: stable
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download web assets
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-assets
+      - name: Build, bundle and upload
+        uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
+        with:
+          release: '15'
+          mem: 12288
+          cpu: 4
+          copyback: false
+          envs: 'VERSION TAG VITE_APP_VERSION SABLE_BUILD_FLAVOR ELECTRON_SKIP_BINARY_DOWNLOAD FORGEJO_URL FORGEJO_REPOSITORY FORGEJO_TOKEN CARGO_INCREMENTAL CARGO_TERM_COLOR'
+          prepare: |
+            pkg install -y electron45 node24 npm-node24 rustup-init
+            rustup-init -y --profile minimal --default-toolchain none
+          run: |
+            set -e
+            . "$HOME/.cargo/env"
+            npm install -g "$(node -p "require('./package.json').packageManager")"
+            pnpm install --frozen-lockfile --ignore-scripts
+            electron_version="$(pkg query %v electron45 | sed 's/_.*//')"
+            node electron/package.mjs --linux dir \
+              -c.electronDist=/usr/local/share/electron45 \
+              -c.electronVersion="$electron_version"
+            out="electron/release/sable-$VERSION"
+            mkdir "$out"
+            cp -R electron/release/linux*-unpacked/resources "$out/resources"
+            rm -f "$out/resources/default_app.asar"
+            # installMethod() reads this as a distribution package, which owns the desktop entry.
+            echo freebsd > "$out/resources/package-type"
+            install -m 755 packaging/freebsd/sable.sh "$out/sable"
+            tarball="electron/release/sable-$VERSION-freebsd-x64.tar.gz"
+            tar -czf "$tarball" -C electron/release "sable-$VERSION"
+            node scripts/ci/forgejo-release.mjs upload "$tarball"
   flatpak-manifest:
     name: Render the nightly Flatpak manifest
     needs: [setup-release, electron]
@@ -350,7 +449,9 @@ jobs:
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
   handoff:
     name: Publish handoff manifest
-    needs: [setup-release, electron]
+    needs: [setup-release, electron, freebsd]
+    # Waits for the FreeBSD bundle so the checksums cover it, without failing on it.
+    if: ${{ !cancelled() && needs.electron.result == 'success' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
