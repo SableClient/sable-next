@@ -1141,6 +1141,11 @@
     padding: var(--space-100);
   }
 
+  .folder-preview :global(.avatar-root) {
+    aspect-ratio: 1;
+    height: auto;
+  }
+
   .folder-open {
     position: relative;
     width: var(--avatar-size-400);

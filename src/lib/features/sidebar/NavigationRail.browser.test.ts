@@ -1,0 +1,81 @@
+import { expect, test, vi } from 'vitest';
+import { page } from 'vitest/browser';
+import { render } from 'vitest-browser-svelte';
+
+import type { RoomListItemView } from '#src/generated/protocol';
+import { withCounts } from '#lib/rooms/summary-fixtures.js';
+
+vi.mock('#lib/core/context.js', async () => {
+  const mock = await import('#lib/core/__mocks__/context.js');
+  return { useCoreClient: () => mock.core, provideCoreClient: vi.fn() };
+});
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
+  useRoomList: () => ({
+    rooms: [],
+    quietRoomIds: new Set(),
+    section: () => undefined,
+    byId: () => undefined,
+  }),
+}));
+
+import { core } from '#lib/core/__mocks__/context.js';
+import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+
+import NavigationRail from './NavigationRail.svelte';
+
+function space(roomId: string, name: string): RoomListItemView {
+  return withCounts({
+    room_id: roomId,
+    canonical_alias: null,
+    name,
+    topic: null,
+    topic_html: null,
+    avatar_url: null,
+    is_direct: false,
+    direct_targets: [],
+    join_rule: 'invite',
+    tags: [],
+    state: 'joined',
+    encrypted: null,
+    room_kind: 'space',
+    is_tombstoned: false,
+    call_participants: [],
+    screen_sharers: [],
+    supports_knock: true,
+    supports_restricted: true,
+    supports_knock_restricted: true,
+  } as unknown as RoomListItemView);
+}
+
+test('a closed folder shows its icon', async () => {
+  const canvas = new OffscreenCanvas(96, 96);
+  canvas.getContext('2d')?.fillRect(0, 0, 96, 96);
+  const png = new Uint8Array(await (await canvas.convertToBlob()).arrayBuffer());
+  vi.spyOn(core.media, 'fetchMedia').mockResolvedValue(png);
+
+  await render(
+    NavigationRail,
+    {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      layout: [
+        {
+          kind: 'folder',
+          id: 'f',
+          name: 'Work',
+          icon: 'mxc://example.org/folder',
+          content: ['!a:example.org', '!b:example.org'],
+        },
+      ],
+    },
+    { wrapper: TooltipProvider }
+  );
+
+  const folder = page.getByRole('treeitem', { name: 'Folder Work' });
+  await expect.element(folder).toBeInTheDocument();
+  await expect
+    .poll(() => folder.element().querySelector('img')?.getBoundingClientRect().height ?? 0)
+    .toBeGreaterThan(0);
+});
