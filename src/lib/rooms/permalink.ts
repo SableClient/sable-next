@@ -14,6 +14,8 @@ import { matrixLinkAction, matrixLinkParameters, parseMatrixLink } from '#lib/ro
 
 import { findRoomByPathId, roomPathParam, roomPathParamFromId } from './room-list.svelte';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 let sidebarOrder: readonly string[] = [];
 
 export function setSidebarSpaceOrder(order: readonly string[]): void {
@@ -132,6 +134,12 @@ export function matrixToUrl(
   via: readonly string[],
   eventId?: string | null
 ): string {
+  const matrixLinkProvider =
+    preferences.matrixLinkSelector === 'sable'
+      ? 'link.sable.moe'
+      : preferences.matrixLinkSelector === 'custom' && preferences.matrixLinkCustom.length > 0
+        ? preferences.matrixLinkCustom
+        : 'matrix.to';
   const path = eventId
     ? `${encodeURIComponent(address)}/${encodeURIComponent(eventId)}`
     : encodeURIComponent(address);
@@ -140,7 +148,7 @@ export function matrixToUrl(
   const query = new URLSearchParams(
     viaFor(address, via).map((server) => ['via', server])
   ).toString();
-  return `https://link.sable.moe/#/${path}${query === '' ? '' : `?${query}`}`;
+  return `https://${matrixLinkProvider}/#/${path}${query === '' ? '' : `?${query}`}`;
 }
 
 export function matrixEventUri(roomId: string, eventId: string, via: readonly string[]): string {

@@ -13,6 +13,7 @@ import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
+import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import { preferences } from '../preferences.svelte';
 import type { EnterKey } from '../definitions';
 import type { SettingsCategory } from '../registry';
@@ -99,6 +100,29 @@ export const composerCategory: SettingsCategory = {
       name: 'settings.sedEdits',
       description: 'settings.sedEditsHint',
       type: 'boolean',
+    },
+    {
+      key: 'matrixLinkSelector',
+      section: 'writing',
+      icon: LinkIcon,
+      name: 'settings.matrixLinkSelector',
+      description: 'settings.matrixLinkSelectorHint',
+      type: 'select',
+      options: [
+        { value: 'sable', label: 'settings.matrixLinkSelectorSable' },
+        { value: 'matrix', label: 'settings.matrixLinkSelectorMatrix' },
+        { value: 'custom', label: 'settings.matrixLinkSelectorCustom' },
+      ],
+    },
+    {
+      key: 'matrixLinkCustom',
+      section: 'writing',
+      icon: LinkIcon,
+      name: 'settings.matrixLinkCustom',
+      type: 'text',
+      placeholder: 'settings.matrixLinkCustomPlaceholder',
+      require: 'matrixLinkSelector',
+      toBe: 'custom',
     },
     {
       key: 'linkMscReferences',

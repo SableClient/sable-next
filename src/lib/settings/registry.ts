@@ -71,6 +71,9 @@ interface BaseSetting extends SettingsTargetDefinition {
   section: string;
   /** Rendered disabled until this preference is on. */
   gatedBy?: BooleanPreference;
+  /** for non-boolean matching*/
+  require?: FreeTextPreference | SelectPreference;
+  toBe?: string;
   /** The feature behind this setting does not exist yet; shown disabled. */
   unavailable?: true;
   /** Rendered disabled unless the homeserver advertises this unstable feature. */
@@ -102,7 +105,13 @@ export interface RangeSetting extends BaseSetting {
   onChange?: (value: number) => void;
 }
 
-export type SettingDefinition = BooleanSetting | SelectSetting | RangeSetting;
+export interface TextSetting extends BaseSetting {
+  type: 'text';
+  key: FreeTextPreference;
+  placeholder?: string;
+  onChange?: (value: number) => void;
+}
+export type SettingDefinition = BooleanSetting | SelectSetting | RangeSetting | TextSetting;
 export type SettingType = SettingDefinition['type'];
 
 export interface SettingsSectionDefinition {

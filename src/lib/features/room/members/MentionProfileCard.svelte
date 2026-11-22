@@ -253,7 +253,13 @@
         : ownPowerLevel > (roomMember?.power_level ?? 0))
   );
   let powerConfirm = $state<number | null>(null);
-  let profileLink = $derived(`https://link.sable.moe/#/${userId}`);
+  const matrixLinkProvider =
+    preferences.matrixLinkSelector === 'sable'
+      ? 'link.sable.moe'
+      : preferences.matrixLinkSelector === 'custom' && preferences.matrixLinkCustom.length > 0
+        ? preferences.matrixLinkCustom
+        : 'matrix.to';
+  let profileLink = $derived(`https://${matrixLinkProvider}/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
   const relations = new MemberProfileRelations(core);
   const profileActions = new MemberProfileActions(core);

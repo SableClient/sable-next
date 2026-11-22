@@ -1062,6 +1062,20 @@
           ],
           "default": "location"
         },
+        "matrixLinkSelector": {
+          "title": "External Matrix links",
+          "enum": [
+            "sable",
+            "matrix",
+            "custom"
+          ],
+          "default": "sable"
+        },
+        "matrixLinkCustom": {
+          "title": "Input custom Matrix link",
+          "type": "string",
+          "default": "mtarix.to"
+        },
         "personaPicker": {
           "title": "Show profile picker in the composer",
           "type": "boolean",
@@ -2581,6 +2595,20 @@
             "keep"
           ],
           "default": "location"
+        },
+        "matrixLinkSelector": {
+          "title": "External Matrix links",
+          "enum": [
+            "sable",
+            "matrix",
+            "custom"
+          ],
+          "default": "sable"
+        },
+        "matrixLinkCustom": {
+          "title": "Input custom Matrix link",
+          "type": "string",
+          "default": "mtarix.to"
         },
         "personaPicker": {
           "title": "Show profile picker in the composer",
