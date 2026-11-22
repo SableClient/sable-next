@@ -149,6 +149,7 @@ targets:
           bisexual: AppIconBisexual
           trans: AppIconTrans
           transgradient: AppIconTransgradient
+          pluraljourneygradient: AppIconPluraljourneygradient
           intersex: AppIconIntersex
           lesbian: AppIconLesbian
           mlm: AppIconMlm
@@ -236,7 +237,7 @@ targets:
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconPropeller AppIconAgender AppIconBisexual AppIconTrans AppIconTransgradient AppIconIntersex AppIconLesbian AppIconMlm AppIconPride AppIconUkraine AppIconPalestine AppIconCuba
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconPropeller AppIconAgender AppIconBisexual AppIconTrans AppIconTransgradient AppIconPluraljourneygradient AppIconIntersex AppIconLesbian AppIconMlm AppIconPride AppIconUkraine AppIconPalestine AppIconCuba
       groups: [app]
     dependencies:
       - target: SableNotificationService

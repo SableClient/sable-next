@@ -4,7 +4,6 @@ import agender from '#lib/supporter/app-icons/agender.svg?raw';
 import bisexual from '#lib/supporter/app-icons/bisexual.svg?raw';
 import pansexual from '#lib/supporter/app-icons/pansexual.svg?raw';
 import transgradient from '#lib/supporter/app-icons/transgradient.svg?raw';
-import pluraljourneygradient from '#lib/supporter/app-icons/pluraljourneygradient.svg?raw';
 import intersex from '#lib/supporter/app-icons/intersex.svg?raw';
 import lesbian from '#lib/supporter/app-icons/lesbian.svg?raw';
 import mlm from '#lib/supporter/app-icons/mlm.svg?raw';
@@ -40,7 +39,6 @@ const APP_ICON_SVGS = {
   bisexual,
   pansexual,
   transgradient,
-  pluraljourneygradient,
   intersex,
   lesbian,
   mlm,
@@ -88,12 +86,6 @@ const APP_ICON_PALETTE_COLORS: Record<keyof typeof APP_ICON_SVGS, string[]> = {
     'var(--supporter-trans-gradient-light-pink)',
     'var(--supporter-white)',
   ],
-  pluraljourneygradient: [
-    'var(--supporter-pluraljourney-green)',
-    'var(--supporter-pluraljourney-blue)',
-    'var(--supporter-pluraljourney-purple)',
-    'var(--supporter-black)',
-    ]
   intersex: [
     'var(--supporter-intersex-gradient-yellow)',
     'var(--supporter-intersex-gradient-pink)',

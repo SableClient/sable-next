@@ -121,6 +121,7 @@ test('uses the current native icon on iOS', async () => {
 });
 
 test.each([
+  ['pluraljourneygradient', 'Plural (Gradient)'],
   ['ukraine', 'Ukraine'],
   ['palestine', 'Palestine'],
   ['cuba', 'Cuba'],
@@ -131,6 +132,7 @@ test.each([
   const trigger = await setup();
   await user.click(trigger);
   const choice = await screen.findByRole('option', { name: label });
+  expect(choice.querySelector('img')).toHaveAttribute('src');
   await user.click(choice);
   await vi.waitFor(() => {
     expect(invoke).toHaveBeenCalledWith('plugin:app-icon|set_icon', {

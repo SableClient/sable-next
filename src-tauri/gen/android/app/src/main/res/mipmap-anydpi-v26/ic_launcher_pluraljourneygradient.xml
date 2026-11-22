@@ -4,6 +4,6 @@
     <inset android:drawable="@mipmap/ic_launcher_pluraljourneygradient_foreground" android:inset="16.5%" />
   </foreground>
   <background>
-    <color android:color="#e4e4e7"/>
+    <color android:color="#E4E4E7"/>
   </background>
 </adaptive-icon>
