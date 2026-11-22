@@ -5142,3 +5142,64 @@ async fn only_a_space_we_manage_routes_a_child_we_are_not_in() {
         assert_eq!(added.run(&core).await.is_ok(), power == 50);
     }
 }
+
+#[tokio::test]
+async fn a_room_created_in_a_space_names_it_as_its_canonical_parent() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let space_id = room_id!("!space:example.org");
+    server.sync_joined_room(&client, space_id).await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/createRoom"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "room_id": "!new:example.org" })),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex("/state/m.space.child/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$child" })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    core.run(crate::api::rooms::CreateParams {
+        name: Some("General".to_owned()),
+        topic: None,
+        kind: RoomKind::Text,
+        public: false,
+        encrypted: false,
+        invite: Vec::new(),
+        parent_space: Some(space_id.to_owned()),
+        alias: None,
+        room_version: None,
+        join_rule: None,
+        federate: true,
+        predecessor: None,
+    })
+    .await
+    .unwrap();
+
+    let requests = server.server().received_requests().await.unwrap();
+    let create = requests
+        .iter()
+        .find(|request| request.url.path().ends_with("/createRoom"))
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&create.body).unwrap();
+    let parent = body["initial_state"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|event| event["type"] == "m.space.parent")
+        .unwrap();
+    assert_eq!(
+        parent,
+        &json!({
+            "type": "m.space.parent",
+            "state_key": "!space:example.org",
+            "content": { "via": ["localhost"], "canonical": true }
+        })
+    );
+}
