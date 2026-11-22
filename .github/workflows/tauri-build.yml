@@ -273,7 +273,7 @@ jobs:
     name: FreeBSD x86_64 (Electron)
     needs: [setup-release, build-web]
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 180
     permissions:
       contents: read
@@ -327,7 +327,7 @@ jobs:
     name: Render the nightly Flatpak manifest
     needs: [setup-release, electron]
     if: ${{ needs.setup-release.outputs.nightly == 'true' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -364,7 +364,7 @@ jobs:
   flatpak:
     name: Build the nightly Flatpak repo
     needs: [setup-release, flatpak-manifest]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -431,7 +431,7 @@ jobs:
   flatpak-deploy:
     name: Deploy the nightly Flatpak repo
     needs: flatpak
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     # Queue rather than cancel so the newest nightly is always deployed last.
     concurrency:
