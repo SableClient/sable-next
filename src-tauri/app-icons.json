@@ -41,6 +41,11 @@
       "backgroundColor": "#1A1C28"
     },
     {
+      "id": "pluraljourneygradient",
+      "source": "icons/app-icons/pluraljourneygradient.svg",
+      "backgroundColor": "#E4E4E7"
+    },
+    {
       "id": "intersex",
       "source": "icons/app-icons/intersex.svg",
       "backgroundColor": "#1A1C28"
