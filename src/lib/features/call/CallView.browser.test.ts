@@ -55,17 +55,21 @@ async function renderCall() {
   return container;
 }
 
-test('a remote camera stays clear of the controls when they wrap on a phone', async () => {
+test('the wrapped controls dock floats inside the stage without reserving space below the video', async () => {
   await page.viewport(402, 874);
   const container = await renderCall();
+  const stage = container.querySelector<HTMLElement>('.stage');
   const controls = container.querySelector<HTMLElement>('.dock .controls');
   const video = container.querySelector<HTMLElement>('.tile .video');
-  if (!controls || !video) throw new Error('call not rendered');
+  if (!stage || !controls || !video) throw new Error('call not rendered');
 
   await expect.poll(() => video.getBoundingClientRect().height).toBeGreaterThan(0);
-  await expect
-    .poll(() => controls.getBoundingClientRect().top - video.getBoundingClientRect().bottom)
-    .toBeGreaterThanOrEqual(0);
+  const stageBox = stage.getBoundingClientRect();
+  const controlsBox = controls.getBoundingClientRect();
+  expect(controlsBox.left).toBeGreaterThanOrEqual(stageBox.left);
+  expect(controlsBox.right).toBeLessThanOrEqual(stageBox.right);
+  expect(controlsBox.bottom).toBeLessThanOrEqual(stageBox.bottom);
+  expect(video.getBoundingClientRect().bottom).toBeGreaterThan(controlsBox.top);
 });
 
 test('resting controls give their space back to the video', async () => {

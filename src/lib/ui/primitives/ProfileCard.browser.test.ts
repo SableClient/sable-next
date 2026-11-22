@@ -55,12 +55,13 @@ for (const heroColor of [null, '#430039']) {
       if (!avatar || !cover) throw new Error('The profile card is not rendered');
       await vi.waitFor(() => {
         const image = cover.querySelector('img');
+        const avatarImage = avatar.querySelector('img');
         expect(image?.complete && image.naturalWidth > 0).toBe(true);
-        expect(avatar.querySelector('img')).not.toBeNull();
+        expect(avatarImage?.complete && avatarImage.naturalWidth > 0).toBe(true);
+        expect(avatar.querySelector('.media-image')?.getAttribute('style') ?? '').not.toMatch(
+          /background/
+        );
       });
-      expect(avatar.querySelector('.media-image')?.getAttribute('style') ?? '').not.toMatch(
-        /background/
-      );
 
       const withBanner = await page
         .elementLocator(avatar)

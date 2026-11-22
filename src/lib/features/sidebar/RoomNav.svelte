@@ -477,6 +477,7 @@
     {onNavigate}
     titleIcon={TitleIcon}
     {collapsed}
+    actions={activeSpace ? undefined : roomSortControl}
     menuItems={listMenuItems}
   />
 
@@ -827,7 +828,6 @@
           onToggle={() => {
             roomsClosed = !roomsClosed;
           }}
-          trailing={activeSpace ? undefined : roomSortControl}
         />
       {/if}
 

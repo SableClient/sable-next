@@ -22,6 +22,7 @@
     onNavigate?: (href: string) => void;
     titleIcon: Component;
     collapsed: boolean;
+    actions?: Snippet;
     menuItems: Snippet;
   }
 
@@ -33,6 +34,7 @@
     onNavigate,
     titleIcon: TitleIcon,
     collapsed,
+    actions,
     menuItems,
   }: Props = $props();
 
@@ -145,6 +147,7 @@
             <LockSimpleIcon />
           </span>
         {/if}
+        {@render actions?.()}
         <ActionMenu label={i18n.t('nav.listOptions')}>
           {#snippet trigger({ props })}
             <button
@@ -214,12 +217,15 @@
     top: 0;
   }
 
-  .room-nav-header.on-banner :global(.room-nav-menu) {
+  .room-nav-header.on-banner :global(.room-nav-menu),
+  .room-nav-header.on-banner :global(.room-sort-button) {
     color: inherit;
   }
 
   .room-nav-header.on-banner :global(.room-nav-menu:hover),
-  .room-nav-header.on-banner :global(.room-nav-menu[data-state='open']) {
+  .room-nav-header.on-banner :global(.room-nav-menu[data-state='open']),
+  .room-nav-header.on-banner :global(.room-sort-button:hover),
+  .room-nav-header.on-banner :global(.room-sort-button[data-state='open']) {
     background: var(--media-scrim-hover);
     color: inherit;
   }

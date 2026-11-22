@@ -214,14 +214,13 @@ test('a query with no matches says so instead of staying blank', async ({ page }
 });
 
 test('sorting by newest reorders the results', async ({ page }) => {
-  await page.goto('/search');
-  await searchField(page).fill('message');
+  await page.goto('/search?q=message&order=oldest');
 
   await expect(page.locator('.hit-row').first()).toBeVisible(INDEXED);
   const firstBefore = await page.locator('.hit-row').first().innerText();
 
   await chooseOrder(page, en.search.orderRecent);
-  await expect(page).toHaveURL(/order=recent/);
+  await expect(page).not.toHaveURL(/order=/);
 
   await expect.poll(async () => page.locator('.hit-row').first().innerText()).not.toBe(firstBefore);
 });
@@ -304,12 +303,12 @@ test('the sort order rides in the url and survives a reload', async ({ page }) =
   await page.goto('/search');
   await searchField(page).fill('message');
 
-  await chooseOrder(page, en.search.orderRecent);
-  await expect(page).toHaveURL(/order=recent/);
+  await chooseOrder(page, en.search.orderOldest);
+  await expect(page).toHaveURL(/order=oldest/);
 
   await page.reload();
 
-  await expect(page).toHaveURL(/order=recent/);
+  await expect(page).toHaveURL(/order=oldest/);
   await expect(orderControl(page)).toBeVisible();
 });
 
@@ -371,9 +370,9 @@ test('the sort controls are not covered by the suggestions', async ({ page }) =>
   await searchField(page).fill('has:');
   await expect(page.getByRole('listbox')).toBeVisible();
 
-  await chooseOrder(page, en.search.orderRecent);
+  await chooseOrder(page, en.search.orderOldest);
 
-  await expect(orderControl(page)).toBeVisible();
+  await expect(page).toHaveURL(/order=oldest/);
 });
 
 test('a negated room filter drops that room instead of matching its text', async ({ page }) => {

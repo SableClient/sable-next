@@ -338,7 +338,7 @@ test('copies a message link when it is right-clicked', async () => {
   await tick();
 
   await openMenu(screen.getByRole('link', { name: 'Link' }));
-  await press(menuItem('Copy link'));
+  await press(menuItem('Copy URL'));
 
   expect(writeText).toHaveBeenCalledWith('https://example.org/');
 });

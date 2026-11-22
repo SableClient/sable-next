@@ -23,6 +23,7 @@ vi.mock('node:module', () => ({ createRequire: () => native.load }));
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  vi.stubGlobal('process', { ...process, platform: 'linux' });
   vi.stubGlobal('__dirname', '/native');
   native.link.mockReturnValue(true);
   fox.available = true;

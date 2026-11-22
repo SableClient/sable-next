@@ -693,7 +693,8 @@
     display: flex;
     flex: 1;
     min-height: 0;
-    padding: var(--space-300);
+    padding: calc(var(--space-200) + var(--control-height-300) + var(--space-200)) var(--space-300)
+      var(--space-300);
   }
 
   .media.with-notice {

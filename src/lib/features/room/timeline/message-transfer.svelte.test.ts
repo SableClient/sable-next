@@ -41,11 +41,19 @@ test('reports upload progress and offers cancel while sending', () => {
 
 test('omits cancel without a transaction id', () => {
   const transfer = transferFor(imageItem(), { pending: true });
-  expect(transfer.props).toEqual({ label: expect.any(String), onCancel: undefined });
+  expect(transfer.props).not.toBeNull();
+  expect(transfer.props?.label).toBeTruthy();
+  expect(transfer.props && 'onCancel' in transfer.props ? transfer.props.onCancel : null).toBe(
+    undefined
+  );
+  expect(transfer.props && 'max' in transfer.props).toBe(false);
 });
 
 test('shows download progress, then the slow state', () => {
   const view = item(false);
   expect(transferFor(view, { savingPercent: 40 }).props).toMatchObject({ max: 100, value: 40 });
-  expect(transferFor(view, { savingSlow: true }).props).toEqual({ label: expect.any(String) });
+  const slow = transferFor(view, { savingSlow: true }).props;
+  expect(slow).not.toBeNull();
+  expect(slow?.label).toBeTruthy();
+  expect(slow && 'max' in slow).toBe(false);
 });

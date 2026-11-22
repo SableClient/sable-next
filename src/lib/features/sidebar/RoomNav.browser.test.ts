@@ -69,7 +69,16 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,
-    latest_event: { sender: null, body: 'hi', timestamp: 1, sending: false, event_id: null },
+    latest_event: {
+      sender: null,
+      own: false,
+      sender_label: null,
+      kind: 'text',
+      body: 'hi',
+      timestamp: 1,
+      sending: false,
+      event_id: null,
+    },
     ...overrides,
   });
 }

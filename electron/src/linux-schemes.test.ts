@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +31,7 @@ test('Linux registers the renamed AppImage with the nightly callback scheme', as
   await claimSchemes('/data/applications', 'moe.sable.next.nightly', ['moe.sable.next']);
 
   expect(mocks.writeFile).toHaveBeenCalledWith(
-    '/data/applications/moe.sable.next.nightly-handler.desktop',
+    join('/data/applications', 'moe.sable.next.nightly-handler.desktop'),
     expect.stringContaining('Name=Sable Nightly\nExec="/home/user/Sable Nightly.AppImage" %u\n')
   );
   expect(mocks.writeFile.mock.calls[0][1]).toContain('MimeType=x-scheme-handler/moe.sable.next;');

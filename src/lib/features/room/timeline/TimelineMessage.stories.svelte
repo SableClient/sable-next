@@ -288,7 +288,7 @@
   })}
 </Story>
 
-<Story name="Read reciepts">
+<Story name="Read receipts">
   {@render message({
     read_by: ['foo'],
   })}

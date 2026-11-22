@@ -31,6 +31,7 @@ const timeline = Object.assign(baseCore.rpc.timeline, {
 import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { markdownToContent } from '#lib/model/model.js';
+import { formatMessageTimestamp } from '#lib/ui/date-time.js';
 
 import FormattedBody from './FormattedBody.svelte';
 import FormattedBodyHarness from './FormattedBodyHarness.test.svelte';
@@ -787,7 +788,7 @@ test('the sender zone reaches a time chip without rebuilding the body', async ()
 
   expect(document.querySelector('.time-chip')).toBe(chip);
   expect(spoiler.ariaPressed).toBe('false');
-  expect(chip.ariaLabel).toContain('January 1, 1970 01:00 AM');
+  expect(chip.ariaLabel).toBe(formatMessageTimestamp(0));
   expect(document.querySelector('.tooltip')?.textContent).toContain('Asia/Tokyo');
 });
 
