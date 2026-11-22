@@ -1719,7 +1719,6 @@
     "syncChecking": "Prüfe dein Konto …",
     "syncDescription": "Synchronisiere Farbschemata, Emoji und die Seitenleiste über Geräte hinweg. Diese Daten werden verschlüsselt, sobald die Wiederherstellung eingerichtet ist. Bis dahin kann dein Homeserver sie lesen.",
     "syncFound": "Es wurden synchronisierte Einstellungen gefunden. Wenn du sie verwendest, werden die jetzigen Einstellungen dieses Geräts ersetzt.",
-    "syncNotNow": "Nicht jetzt",
     "appearanceSystem": "Folgt deiner Systemeinstellung.",
     "browseThemes": "Nach weiteren Farbschemata stöbern",
     "finishCurrentStep": "Diesen Schritt abschließen oder überspringen, um fortzufahren",

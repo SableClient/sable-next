@@ -2718,7 +2718,6 @@
     "syncFound": "找到已同步的设置，使用它们将替换此设备的设置。",
     "syncAdopt": "使用已同步的设置",
     "syncTurnOn": "开启同步",
-    "syncNotNow": "暂时不要",
     "appearanceSystem": "跟随你的设备。",
     "appearancePinned": "正在使用{{mode}}模式。",
     "browseThemes": "浏览更多主题",
