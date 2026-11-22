@@ -14,6 +14,7 @@
   };
 
   let { open = $bindable(false), preview = null, roomId, ...actions }: Props = $props();
+  let rows = $derived(messageMenuRows(actions));
 
   function run(action: () => void): void {
     open = false;
@@ -23,6 +24,11 @@
   function react(emoji: string): void {
     open = false;
     actions.onReact?.(emoji);
+  }
+
+  function addReaction(): void {
+    open = false;
+    actions.onAddReaction?.();
   }
 </script>
 
@@ -37,10 +43,17 @@
   {/if}
   <IconContext values={{ 'aria-hidden': 'true' }}>
     {#if actions.onReact}
-      <MessageQuickReactions count={8} onReact={react} {roomId} roomy />
+      <MessageQuickReactions
+        count={8}
+        onReact={react}
+        onAdd={actions.onAddReaction ? addReaction : undefined}
+        divider={rows.length > 0}
+        {roomId}
+        roomy
+      />
     {/if}
     <div class="sheet-list">
-      {#each messageMenuRows(actions) as row (row.key)}
+      {#each rows as row (row.key)}
         {@const RowIcon = row.icon}
         {#if row.separated}<div class="sheet-line"></div>{/if}
         <button

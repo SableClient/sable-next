@@ -33,6 +33,7 @@
 >
   {#if open && menu.actions}
     {@const actions = menu.actions()}
+    {@const rows = messageMenuRows(actions)}
     <ContextMenu.Portal>
       <ContextMenu.Content
         dir={currentDirection()}
@@ -53,10 +54,17 @@
                   react(emoji);
                   menu.close();
                 }}
+                onAdd={actions.onAddReaction
+                  ? () => {
+                      menu.close();
+                      actions.onAddReaction?.();
+                    }
+                  : undefined}
+                divider={rows.length > 0}
                 roomId={actions.roomId}
               />
             {/if}
-            {#each messageMenuRows(actions) as row (row.key)}
+            {#each rows as row (row.key)}
               {@const RowIcon = row.icon}
               {#if row.separated}
                 <ContextMenu.Separator class="menu-separator" />

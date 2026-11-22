@@ -17,7 +17,7 @@ async function history(account: MatrixAdmin): Promise<Entry[]> {
 
 async function openPicker(page: Page, row: Locator): Promise<Locator> {
   await row.locator('article.message').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Add reaction', exact: true }).click();
+  await page.getByRole('menu').getByRole('button', { name: 'Add reaction', exact: true }).click();
   const picker = page.locator('.reaction-picker');
   await expect(picker).toBeVisible();
   return picker;

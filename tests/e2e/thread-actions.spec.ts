@@ -132,7 +132,7 @@ for (const surface of ['room', 'forum'] as const) {
 
       await openActions(reply);
       await expect(
-        actions.getByRole(actionRole, { name: en.timeline.addReaction, exact: true })
+        actions.getByRole('button', { name: en.timeline.addReaction, exact: true })
       ).toBeVisible();
       await expect(
         actions.getByRole(actionRole, { name: en.timeline.copyMessageLink, exact: true })

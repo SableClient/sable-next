@@ -79,14 +79,6 @@ export type MessageMenuRow = {
 export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
   const rows: MessageMenuRow[] = [];
 
-  if (actions.onAddReaction) {
-    rows.push({
-      key: 'add-reaction',
-      label: 'timeline.addReaction',
-      icon: EmojiIcon,
-      run: actions.onAddReaction,
-    });
-  }
   if (actions.onReply) {
     rows.push({
       key: 'reply',

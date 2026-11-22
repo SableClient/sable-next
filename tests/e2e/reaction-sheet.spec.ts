@@ -70,7 +70,7 @@ test('the context menu opens the reaction board as a popover, not a sheet', asyn
   const point = { x: rowBox.x + offset.x, y: rowBox.y + offset.y };
   await row.click({ button: 'right', position: offset });
 
-  await page.getByRole('menuitem', { name: 'Add reaction' }).click();
+  await page.getByRole('menu').getByRole('button', { name: 'Add reaction', exact: true }).click();
 
   const picker = page.locator('.reaction-picker');
   await expect(picker).toBeVisible();

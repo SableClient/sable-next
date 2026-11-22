@@ -1,4 +1,6 @@
 <script lang="ts">
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+
   import { useCoreClient } from '#lib/core/context.js';
   import { RoomPacks } from '#lib/emoji/room-packs.svelte.js';
   import { i18n } from '#lib/i18n.js';
@@ -12,18 +14,20 @@
   interface Props {
     count: number;
     onReact: (emoji: string) => void;
+    onAdd?: () => void;
     roomId?: string;
     roomy?: boolean;
+    divider?: boolean;
   }
 
-  let { count, onReact, roomId, roomy = false }: Props = $props();
+  let { count, onReact, onAdd, roomId, roomy = false, divider = true }: Props = $props();
   const core = useCoreClient();
   const history = useRecentReactions(core);
   const packs = new RoomPacks(core, () => roomId);
   let recents = $derived(quickReactions(history.current, count));
 </script>
 
-{#if recents.length > 0}
+{#if recents.length > 0 || onAdd}
   <div class={['quick-strip', { roomy }]} role="group" aria-label={i18n.t('timeline.addReaction')}>
     {#each recents as emoji (emoji)}
       {@const label = reactionEmoteLabel(emoji, packs.current, i18n.t('timeline.customEmote'))}
@@ -50,8 +54,20 @@
         {/if}
       </button>
     {/each}
+    {#if onAdd}
+      <button
+        type="button"
+        class="quick-reaction quick-add"
+        aria-label={i18n.t('timeline.addReaction')}
+        onclick={onAdd}
+      >
+        <PlusIcon aria-hidden="true" />
+      </button>
+    {/if}
   </div>
-  <div class="quick-line"></div>
+  {#if divider}
+    <div class="quick-line"></div>
+  {/if}
 {/if}
 
 <style>
@@ -87,6 +103,20 @@
 
   .quick-reaction:hover {
     background: var(--surface-var-container-hover);
+  }
+
+  .quick-add {
+    display: inline-flex;
+  }
+
+  .quick-add :global(svg) {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+
+  .quick-strip.roomy .quick-add :global(svg) {
+    height: 1.5rem;
+    width: 1.5rem;
   }
 
   .quick-reaction :global(.quick-reaction-image) {
