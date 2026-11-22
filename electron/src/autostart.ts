@@ -14,7 +14,7 @@ export async function setLaunchAtLogin(
   identifier: string,
   autostartDir: string
 ): Promise<void> {
-  if (process.platform !== 'linux') {
+  if (process.platform !== 'linux' && process.platform !== 'freebsd') {
     app.setLoginItemSettings({ openAtLogin: enabled });
     return;
   }

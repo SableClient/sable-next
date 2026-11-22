@@ -1,10 +1,9 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{
         Arc, Mutex, PoisonError,
         atomic::{AtomicBool, Ordering},
     },
-    time::Duration,
 };
 
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState, hotkey::HotKey};
@@ -150,10 +149,23 @@ impl Drop for NativeCallShortcuts {
     }
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
+fn passive_shortcuts(
+    _bindings: &[CallShortcutBinding],
+    _notify: Callback,
+) -> napi::Result<Arc<AtomicBool>> {
+    Err(napi::Error::from_reason(
+        "Passive call shortcuts are not supported on this system",
+    ))
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 fn passive_shortcuts(
     bindings: &[CallShortcutBinding],
     notify: Callback,
 ) -> napi::Result<Arc<AtomicBool>> {
+    use std::{collections::HashSet, time::Duration};
+
     let reason = |error: handy_keys::Error| napi::Error::from_reason(error.to_string());
     let hotkeys = bindings
         .iter()
@@ -275,7 +287,7 @@ async fn portal_shortcuts(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(target_os = "linux", target_os = "macos", windows)))]
 mod tests {
     #[test]
     fn passive_bindings_from_electron_parse() {

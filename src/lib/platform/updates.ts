@@ -27,7 +27,8 @@ export function supportsAutoUpdate(): boolean {
 }
 
 export function supportsDesktopUpdateChecks(): boolean {
-  return supportsAutoUpdate() || electronBridge()?.platform === 'linux';
+  const platform = electronBridge()?.platform;
+  return supportsAutoUpdate() || platform === 'linux' || platform === 'freebsd';
 }
 
 export function updatePlatform(): 'desktop' | 'mobile' | 'web' {

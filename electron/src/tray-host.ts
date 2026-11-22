@@ -38,7 +38,7 @@ export async function waitForTrayHost(
   attempts = 30,
   delayMs = 1000
 ): Promise<void> {
-  if (platform !== 'linux') return;
+  if (platform !== 'linux' && platform !== 'freebsd') return;
   for (let attempt = 0; attempt < attempts; attempt++) {
     if ((await check()) !== false) return;
     await new Promise((resolve) => setTimeout(resolve, delayMs));

@@ -26,7 +26,7 @@ function desktopOs(): 'macos' | 'windows' | 'linux' | null {
 
 export function supportsTray(): boolean {
   const platform = electronBridge()?.platform;
-  return platform === 'linux' || platform === 'win32';
+  return platform === 'linux' || platform === 'freebsd' || platform === 'win32';
 }
 
 export function supportsSmoothScrollingToggle(): boolean {

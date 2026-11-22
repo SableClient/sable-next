@@ -103,16 +103,16 @@ const bundleVersionFile = join(distDir, '_app', 'version.json');
 const startedBundle = readBundleVersion();
 // Not process.resourcesPath: Nix runs app.asar with the shared nixpkgs Electron.
 const resourcesDir = dirname(app.getAppPath());
-const isLinux = process.platform === 'linux';
+const isFreedesktop = process.platform === 'linux' || process.platform === 'freebsd';
 const isWayland =
-  isLinux && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
+  isFreedesktop && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
 
 function xdgDataHome(): string {
   const xdg = process.env.XDG_DATA_HOME;
   return xdg && isAbsolute(xdg) ? xdg : join(homedir(), '.local', 'share');
 }
 
-const dataDir = join(isLinux ? xdgDataHome() : app.getPath('appData'), IDENTIFIER);
+const dataDir = join(isFreedesktop ? xdgDataHome() : app.getPath('appData'), IDENTIFIER);
 app.setPath('userData', join(app.getPath('appData'), `${IDENTIFIER}.electron`));
 if (!process.mas) {
   importTauriConfig(
@@ -153,20 +153,20 @@ function setFeatures(enable: string[], disable: string[]): void {
 
 if (!settings.hardwareAcceleration) app.disableHardwareAcceleration();
 // In Flatpak a denied camera portal request leaves enumerateDevices() pending forever.
-const enabledFeatures = isLinux && !process.env.FLATPAK_ID ? ['WebRtcPipeWireCamera'] : [];
+const enabledFeatures = isFreedesktop && !process.env.FLATPAK_ID ? ['WebRtcPipeWireCamera'] : [];
 if (settings.hardwareAcceleration && settings.hardwareVideoEncode) {
   enabledFeatures.push('AcceleratedVideoEncoder');
 }
 if (settings.hardwareAcceleration && settings.hardwareVideoDecode) {
   enabledFeatures.push('AcceleratedVideoDecoder');
-  if (isLinux) {
+  if (isFreedesktop) {
     enabledFeatures.push('AcceleratedVideoDecodeLinuxGL', 'AcceleratedVideoDecodeLinuxZeroCopyGL');
   }
 }
 setFeatures(enabledFeatures, [
   'HardwareMediaKeyHandling',
   'MediaSessionService',
-  ...(isLinux ? ['WaylandWpColorManagerV1'] : []),
+  ...(isFreedesktop ? ['WaylandWpColorManagerV1'] : []),
 ]);
 if (!settings.smoothScrolling) app.commandLine.appendSwitch('disable-smooth-scrolling');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -914,7 +914,7 @@ function registerScreenShare(): void {
 }
 
 function registerDeepLinks(): void {
-  if (isLinux) {
+  if (isFreedesktop) {
     // Flatpak, deb, rpm and Nix install a desktop entry that declares the schemes.
     const method = installMethod();
     if (method !== 'appimage' && method !== 'unpacked') return;

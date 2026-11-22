@@ -67,7 +67,10 @@ export class DesktopTray {
   }
 
   update(show: boolean): boolean {
-    if (!show || (this.platform !== 'win32' && this.platform !== 'linux')) {
+    if (
+      !show ||
+      (this.platform !== 'win32' && this.platform !== 'linux' && this.platform !== 'freebsd')
+    ) {
       const wasAvailable = this.available;
       this.destroy();
       const window = this.getWindow();

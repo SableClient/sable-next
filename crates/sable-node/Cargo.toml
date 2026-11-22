@@ -11,7 +11,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 global-hotkey = "0.10.0"
-handy-keys = "0.3.4"
 sable-core = { path = "../sable-core", version = "0.1.0" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "tokio_rt"] }
 napi-derive = "3.6.12"
@@ -19,6 +18,9 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos", windows))'.dependencies]
+handy-keys = "0.3.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd = { version = "0.14.0", default-features = false, features = [

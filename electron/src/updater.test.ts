@@ -56,6 +56,11 @@ test('AppImages install their own updates', () => {
   expect(supportsAutoUpdate()).toBe(true);
 });
 
+test('FreeBSD does not offer self updates', () => {
+  vi.stubGlobal('process', { ...process, platform: 'freebsd' });
+  expect(supportsAutoUpdate()).toBe(false);
+});
+
 test('Flatpak and development builds do not offer self updates', () => {
   vi.stubEnv('FLATPAK_ID', 'moe.sable.client');
   expect(supportsAutoUpdate()).toBe(false);
