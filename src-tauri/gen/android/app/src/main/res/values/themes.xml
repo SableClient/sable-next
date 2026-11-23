@@ -3,5 +3,6 @@
     <style name="Theme.app" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowSplashScreenBackground">#1A1C28</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="colorControlActivated">#6E56CF</item>
     </style>
 </resources>
