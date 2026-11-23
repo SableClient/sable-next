@@ -1870,7 +1870,8 @@ async fn a_notification_reply_sends_the_text_then_reads_the_main_timeline() {
                 ),
                 (
                     "fi.mau.msc4461.per_message_profiles.v3",
-                    json!({"profiles": [{"id": "kris", "displayname": "Kris"}]}),
+                    json!({"profiles": [{"id": "kris", "displayname": "Kris",
+                        "avatar_url": "mxc://example.org/face"}]}),
                 ),
             ] {
                 wiremock::Mock::given(wiremock::matchers::method("GET"))
@@ -1885,6 +1886,7 @@ async fn a_notification_reply_sends_the_text_then_reads_the_main_timeline() {
             expected[crate::personas::PER_MESSAGE_PROFILE] =
                 json!({"id": "kris", "displayname": "Kris"});
         }
+        let thumbnails = mount_thumbnails(&fixture, 0..=1).await;
         mount_notified_event(&fixture, None).await;
         fixture
             .server
@@ -1924,15 +1926,22 @@ async fn a_notification_reply_sends_the_text_then_reads_the_main_timeline() {
             .mount()
             .await;
 
-        assert_eq!(
-            session(&fixture)
-                .await
-                .reply("on my way", "reply-1", "$notified", false)
-                .await
-                .as_deref(),
-            Some("on my way"),
-            "selected={selected}"
+        let sent = session(&fixture)
+            .await
+            .reply("on my way", "reply-1", "$notified", false)
+            .await
+            .unwrap();
+        assert_eq!(sent.text, "on my way", "selected={selected}");
+        let profile = sent.profile.map(|profile| {
+            let avatar = std::fs::read(profile.avatar.unwrap()).unwrap();
+            (profile.id, profile.name, avatar)
+        });
+        let expected = (
+            "kris".to_owned(),
+            "Kris".to_owned(),
+            thumbnails["face"].clone(),
         );
+        assert_eq!(profile, selected.then_some(expected), "selected={selected}");
 
         remove_data_dir(&fixture.data_dir).await;
     }

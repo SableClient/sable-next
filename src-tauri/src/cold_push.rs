@@ -372,7 +372,8 @@ pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeRep
                 .reply(&text, &transaction_id, &event_id, private_receipt)
                 .await
         });
-        sent.map_or_else(|| Ok(JString::null()), |sent| JString::from_str(env, sent))
+        sent.and_then(|sent| serde_json::to_string(&sent).ok())
+            .map_or_else(|| Ok(JString::null()), |sent| JString::from_str(env, sent))
     });
     result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
 }

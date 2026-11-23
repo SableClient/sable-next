@@ -103,7 +103,8 @@ class ConversationActionWorker(context: Context, parameters: WorkerParameters) :
         }
         // The reply's spinner shows until the notification is re-posted, so only receipts retry.
         if (!done && action.kind == PushActions.MARK_READ && runAttemptCount < MAX_RETRIES) return Result.retry()
-        (sent ?: action.text)?.let { PushNotifier.showReply(applicationContext, action.notificationId, it, done) }
+        val sender = sent?.profile?.let { PushNotifier.profilePerson(action.userId, it) }
+        (sent?.text ?: action.text)?.let { PushNotifier.showReply(applicationContext, action.notificationId, it, done, sender) }
         file.delete()
         return if (done) Result.success() else Result.failure()
     }

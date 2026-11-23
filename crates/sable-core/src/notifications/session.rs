@@ -54,6 +54,22 @@ pub struct PushSession {
     pub(super) room_id: ruma::OwnedRoomId,
 }
 
+/// A notification reply as it was sent: `text` drops a profile shorthand, and `profile` is
+/// set when it went out as a per-message profile.
+#[derive(Debug, serde::Serialize)]
+pub struct SentReply {
+    pub text: String,
+    pub profile: Option<SentProfile>,
+}
+
+/// `avatar` is a cached file path.
+#[derive(Debug, serde::Serialize)]
+pub struct SentProfile {
+    pub id: String,
+    pub name: String,
+    pub avatar: Option<String>,
+}
+
 const READ_ROOMS_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_ROOMS_CONNECTION: &str = "read-rooms";
 const READ_ROOMS_TIMELINE: u32 = 1;
@@ -450,16 +466,15 @@ impl PushSession {
         }
     }
 
-    /// Sends `text` to the room, then marks `event_id` read, and returns the body that was
-    /// sent, which drops a profile shorthand. Retrying with the same `transaction_id` never
-    /// sends it twice.
+    /// Sends `text` to the room, then marks `event_id` read, and returns what was sent.
+    /// Retrying with the same `transaction_id` never sends it twice.
     pub async fn reply(
         &self,
         text: &str,
         transaction_id: &str,
         event_id: &str,
         private_receipt: bool,
-    ) -> Option<String> {
+    ) -> Option<SentReply> {
         let room = self.host.client().get_room(&self.room_id)?;
         let (text, profile) = match self
             .host
@@ -484,20 +499,58 @@ impl PushSession {
             crate::personas::stamp_profile(&mut content, profile);
         }
         let transaction = ruma::OwnedTransactionId::from(transaction_id);
-        let sent = self
-            .host
-            .retry(|| {
-                room.send_raw("m.room.message", content.clone())
-                    .with_transaction_id(&transaction)
-                    .into_future()
-            })
-            .await;
+        let message = self.host.retry(|| {
+            room.send_raw("m.room.message", content.clone())
+                .with_transaction_id(&transaction)
+                .into_future()
+        });
+        let (sent, profile) = futures_util::join!(message, self.sent_profile(&room, profile));
         if let Err(error) = sent {
             tracing::warn!("notification reply not sent: {error}");
             return None;
         }
         self.mark_read(event_id, private_receipt).await;
-        Some(text)
+        Some(SentReply { text, profile })
+    }
+
+    async fn sent_profile(
+        &self,
+        room: &matrix_sdk::Room,
+        profile: Option<crate::protocol::PerMessageProfileView>,
+    ) -> Option<SentProfile> {
+        let profile = profile?;
+        let name = match profile.display_name {
+            Some(name) => name,
+            None => room
+                .get_member_no_sync(room.own_user_id())
+                .await
+                .ok()
+                .flatten()
+                .and_then(|member| {
+                    member
+                        .display_name()
+                        .and_then(visible_name)
+                        .map(ToOwned::to_owned)
+                })
+                .unwrap_or_else(|| room.own_user_id().to_string()),
+        };
+        let source = profile
+            .avatar_url
+            .as_deref()
+            .and_then(crate::media::mxc_only)
+            .map(|url| ruma::events::room::MediaSource::Plain(url.into()));
+        let avatar = cached_push_media(
+            self.host.client(),
+            &self.store_dir.join(PUSH_MEDIA_DIRECTORY),
+            source,
+            Some((PUSH_AVATAR_SIZE, PUSH_AVATAR_SIZE)),
+        )
+        .await;
+        Some(SentProfile {
+            id: profile.id.unwrap_or_else(|| name.clone()),
+            name,
+            avatar: avatar.map(|(path, _)| path),
+        })
     }
 
     /// In the event's thread, or the main timeline, as the app's timelines would.

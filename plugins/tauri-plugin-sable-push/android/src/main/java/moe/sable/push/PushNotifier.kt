@@ -737,8 +737,17 @@ object PushNotifier {
         }
     }
 
-    /** Re-posting the conversation is also what ends the reply's progress spinner. */
-    internal fun showReply(context: Context, notificationId: Int, text: String, sent: Boolean) {
+    /** Keyed like an incoming message from [userId] as that profile. */
+    internal fun profilePerson(userId: String, profile: SentProfile): Person =
+        Person.Builder().setName(profile.name).setKey("$userId|${profile.id}").apply {
+            profile.avatar?.let { BitmapFactory.decodeFile(it) }?.let { setIcon(IconCompat.createWithBitmap(it)) }
+        }.build()
+
+    /**
+     * Re-posting the conversation is also what ends the reply's progress spinner. [sender] is the
+     * profile the reply was sent as; null shows it as the account.
+     */
+    internal fun showReply(context: Context, notificationId: Int, text: String, sent: Boolean, sender: Person? = null) {
         val active = context.getSystemService(NotificationManager::class.java)
             .activeNotifications.firstOrNull { it.id == notificationId && it.tag == null } ?: return
         val shown = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active.notification) ?: return
@@ -746,13 +755,16 @@ object PushNotifier {
         val encrypted = messages.lastOrNull()?.extras?.getBoolean(ENCRYPTED_KEY, true) ?: true
         val body = if (ConversationHistory.hides(PushPolicy(context), encrypted)) "New message" else text
         val reply = NotificationCompat.MessagingStyle.Message(
-            if (sent) body else "Not sent: $body", System.currentTimeMillis(), null as Person?,
+            if (sent) body else "Not sent: $body", System.currentTimeMillis(), sender,
         ).also {
             it.extras.putBoolean(ENCRYPTED_KEY, encrypted)
             it.extras.putBoolean(ConversationHistory.FAILED_KEY, !sent)
         }
+        // An untitled 1:1 chat is named after its latest sender other than the user, which the profile would be.
+        val title = shown.conversationTitle
+            ?: active.notification.extras.getCharSequence(NotificationCompat.EXTRA_TITLE)?.takeIf { sender != null }
         val style = NotificationCompat.MessagingStyle(shown.user)
-            .setConversationTitle(shown.conversationTitle)
+            .setConversationTitle(title)
             .setGroupConversation(shown.isGroupConversation)
         (messages + reply).takeLast(ConversationHistory.LIMIT).forEach { style.addMessage(it) }
         val notification = NotificationCompat.Builder(context, active.notification)

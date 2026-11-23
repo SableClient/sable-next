@@ -22,6 +22,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -68,11 +69,11 @@ class ConversationActionsTest {
     @After
     fun teardown() = unmockkAll()
 
-    private fun post(body: String = "hello", eventId: String = "\$notified") {
+    private fun post(body: String = "hello", eventId: String = "\$notified", roomName: String = "Room 1") {
         val notification = JSONObject()
             .put("room_id", room)
             .put("event_id", eventId)
-            .put("room_name", "Room 1")
+            .put("room_name", roomName)
             .put("sender", "@bob:example.org")
             .put("sender_display_name", "Bob")
             .put("type", "m.room.message")
@@ -133,7 +134,7 @@ class ConversationActionsTest {
         PushPolicy(context).privateReceipts = true
         mockkObject(PushPayloadDecryptor)
         val sent = slot<ConversationAction>()
-        every { PushPayloadDecryptor.reply(any(), capture(sent), "A", true) } returns "on my way"
+        every { PushPayloadDecryptor.reply(any(), capture(sent), "A", true) } returns SentReply("on my way", null)
 
         ConversationActionReceiver().onReceive(context, actionIntent(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, "k: on my way"))
 
@@ -145,6 +146,57 @@ class ConversationActionsTest {
         assertNull(style.messages.last().person)
         assertEquals(2, NotificationCompat.getActionCount(posted()))
         assertEquals(ConversationShortcuts.id(user, room), NotificationCompat.getShortcutId(posted()))
+    }
+
+    @Test
+    fun aReplySentAsAProfileShowsItsNameAndAvatar() {
+        post()
+        PushPolicy(context).accounts = mapOf(user to "A")
+        val avatar = java.io.File(context.cacheDir, "kris.png").apply {
+            outputStream().use {
+                android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)
+                    .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }
+        mockkObject(PushPayloadDecryptor)
+        every { PushPayloadDecryptor.reply(any(), any(), "A", any()) } returns
+            SentReply("on my way", SentProfile("kris", "Kris", avatar.path))
+
+        ConversationActionReceiver().onReceive(context, actionIntent(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, "k: on my way"))
+
+        assertEquals(Result.success(), runQueued())
+        assertEquals(listOf("hello", "on my way"), texts())
+        val sender = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted())!!
+            .messages.last().person!!
+        assertEquals("Kris", sender.name.toString())
+        assertEquals("$user|kris", sender.key)
+        assertNotNull(sender.icon)
+    }
+
+    @Test
+    fun aSentReplyIsReadFromTheNativeResult() {
+        assertEquals(
+            SentReply("on my way", SentProfile("kris", "Kris", null)),
+            PushPayloadDecryptor.sentReply("""{"text":"on my way","profile":{"id":"kris","name":"Kris","avatar":null}}"""),
+        )
+        assertEquals(SentReply("hi", null), PushPayloadDecryptor.sentReply("""{"text":"hi","profile":null}"""))
+    }
+
+    @Test
+    fun aProfileReplyLeavesADirectChatNamedForTheOtherPerson() {
+        post(roomName = "")
+        val title = posted().extras.getCharSequence(NotificationCompat.EXTRA_TITLE).toString()
+        PushPolicy(context).accounts = mapOf(user to "A")
+        mockkObject(PushPayloadDecryptor)
+        every { PushPayloadDecryptor.reply(any(), any(), "A", any()) } returns
+            SentReply("on my way", SentProfile("kris", "Kris", null))
+
+        ConversationActionReceiver().onReceive(context, actionIntent(NotificationCompat.Action.SEMANTIC_ACTION_REPLY, "on my way"))
+
+        assertEquals(Result.success(), runQueued())
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted())!!
+        assertFalse(style.isGroupConversation)
+        assertEquals(title, style.conversationTitle.toString())
     }
 
     @Test

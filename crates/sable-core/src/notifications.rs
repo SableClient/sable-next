@@ -29,8 +29,8 @@ pub(crate) use pusher::{gateway, pusher_display_name};
 pub use pusher::{remove_pusher, set_pusher};
 #[cfg(not(target_family = "wasm"))]
 pub use session::{
-    PushSession, cold_push_active_elsewhere, cold_push_media, cold_push_session,
-    fetch_cold_push_event,
+    PushSession, SentProfile, SentReply, cold_push_active_elsewhere, cold_push_media,
+    cold_push_session, fetch_cold_push_event,
 };
 pub use view::{
     NOISY_KEY, every_encrypted_event_pushed, fetch_push_event, is_backfill, is_read, notification,
