@@ -16,7 +16,7 @@
     tabKey: (tab: T) => string;
     userIds: (tab: T) => readonly string[];
     members: readonly MemberView[];
-    active?: number;
+    active?: string;
     onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
     tab: Snippet<[T]>;
     memberAction?: Snippet<[T, string]>;
@@ -29,12 +29,12 @@
     tabKey,
     userIds,
     members,
-    active = $bindable(0),
+    active = $bindable(),
     onMemberProfile,
     tab,
     memberAction,
   }: Props = $props();
-  let selected = $derived<T | undefined>(tabs[Math.min(active, tabs.length - 1)]);
+  let selected = $derived<T | undefined>(tabs.find((item) => tabKey(item) === active) ?? tabs[0]);
 </script>
 
 <ResponsiveDialog bind:open label={title} closeLabel={i18n.t('timeline.closeMemberList')}>
@@ -42,7 +42,7 @@
     <div class={['member-list-dialog', { sheet: !desktop }]}>
       <h2>{title}</h2>
       <div class="tabs" role="tablist" aria-label={title}>
-        {#each tabs as item, index (tabKey(item))}
+        {#each tabs as item (tabKey(item))}
           <Button
             size="small"
             variant="ghost"
@@ -50,7 +50,7 @@
             role="tab"
             aria-selected={selected !== undefined && tabKey(item) === tabKey(selected)}
             onclick={() => {
-              active = index;
+              active = tabKey(item);
             }}
           >
             {@render tab(item)}

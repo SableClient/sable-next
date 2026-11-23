@@ -81,7 +81,7 @@ test.each(['touch', 'pen', ''])(
       await fireEvent.pointerUp(reaction, { pointerType: 'touch', isPrimary: true });
       await fireEvent.click(reaction);
 
-      expect(onViewReactions).toHaveBeenCalledExactlyOnceWith(0);
+      expect(onViewReactions).toHaveBeenCalledExactlyOnceWith('👍');
       expect(menu.defaultPrevented).toBe(true);
       expect(onMessageMenu).not.toHaveBeenCalled();
       expect(onToggleReaction).not.toHaveBeenCalled();
@@ -115,7 +115,7 @@ test.each(['mouse', 'keyboard'])('reaction contextmenu opens only details (%s)',
 
   await fireEvent(screen.getByRole('button', { name: /👍/ }), menu);
 
-  expect(onViewReactions).toHaveBeenCalledExactlyOnceWith(0);
+  expect(onViewReactions).toHaveBeenCalledExactlyOnceWith('👍');
   expect(menu.defaultPrevented).toBe(true);
   expect(onMessageMenu).not.toHaveBeenCalled();
 });

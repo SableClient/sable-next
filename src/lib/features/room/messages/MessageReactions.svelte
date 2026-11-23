@@ -46,7 +46,7 @@
       key: string,
       sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
     ) => void;
-    onViewReactions?: (index: number) => void;
+    onViewReactions?: (key: string) => void;
   }
 
   let {
@@ -61,7 +61,7 @@
     onViewReactions,
   }: Props = $props();
 
-  let pressIndex = 0;
+  let pressKey = '';
   let tapAnimation: Animation | undefined;
   const core = useCoreClient();
   const packs = new RoomPacks(core, () => (customKeys.length > 0 ? roomId : undefined));
@@ -78,13 +78,13 @@
   const failedImages = new SvelteSet<string>();
   const press = new LongPress({
     stopPropagation: true,
-    onPress: () => onViewReactions?.(pressIndex),
+    onPress: () => onViewReactions?.(pressKey),
   });
 
-  function openDetails(event: MouseEvent, index: number): void {
+  function openDetails(event: MouseEvent, key: string): void {
     event.preventDefault();
     event.stopPropagation();
-    if (!touchContextMenu(event)) onViewReactions?.(index);
+    if (!touchContextMenu(event)) onViewReactions?.(key);
   }
 
   onDestroy(() => {
@@ -116,7 +116,7 @@
 </script>
 
 <div class="reactions" aria-label={i18n.t('timeline.reactions')}>
-  {#each reactions as reaction, index (reaction.key)}
+  {#each reactions as reaction (reaction.key)}
     {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
     {@const label = reactionEmoteLabel(
       reaction.key,
@@ -151,9 +151,9 @@
           }
           onToggleReaction(eventId, reaction.key);
         }}
-        oncontextmenu={(event) => openDetails(event, index)}
+        oncontextmenu={(event) => openDetails(event, reaction.key)}
         onpointerdown={(event) => {
-          pressIndex = index;
+          pressKey = reaction.key;
           press.start(event);
         }}
         onpointermove={press.move}

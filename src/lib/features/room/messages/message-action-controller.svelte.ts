@@ -346,7 +346,7 @@ export class MessageActionExecutor {
         : undefined,
       onViewReactions: policy.viewReactions
         ? () => {
-            dialogs.open(item, { kind: 'reactions', active: 0 });
+            dialogs.open(item, { kind: 'reactions' });
           }
         : undefined,
       onReadReceipts: policy.readReceipts

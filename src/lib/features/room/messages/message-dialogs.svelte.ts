@@ -15,7 +15,7 @@ export type MessageDialog =
     }
   | { kind: 'edit-history'; versions: readonly EditVersionView[]; senderTimezone: string | null }
   | { kind: 'delete'; target: string }
-  | { kind: 'reactions'; active: number }
+  | { kind: 'reactions'; active?: string }
   | { kind: 'react'; anchor: HTMLElement | CursorAnchor | null }
   | { kind: 'sheet'; actions: () => MessageActions }
   | { kind: 'report' | 'meowlnir-ban' | 'forward' | 'steal' | 'reproxy' | 'receipts' };

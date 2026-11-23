@@ -24,7 +24,7 @@
     currentUserId?: string | null;
     canRedactOwn?: boolean;
     canRedactOthers?: boolean;
-    active?: number;
+    active?: string;
     onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
     onReply?: MessageCallbacks['onReply'];
   }
@@ -38,7 +38,7 @@
     currentUserId = null,
     canRedactOwn = false,
     canRedactOthers = false,
-    active = $bindable(0),
+    active = $bindable(),
     onMemberProfile,
     onReply,
   }: Props = $props();

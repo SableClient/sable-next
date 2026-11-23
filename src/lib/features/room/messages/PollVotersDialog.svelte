@@ -9,7 +9,7 @@
     open?: boolean;
     answers: readonly PollAnswerView[];
     members: readonly MemberView[];
-    active?: number;
+    active?: string;
     onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
@@ -17,7 +17,7 @@
     open = $bindable(false),
     answers,
     members,
-    active = $bindable(0),
+    active = $bindable(),
     onMemberProfile,
   }: Props = $props();
 </script>

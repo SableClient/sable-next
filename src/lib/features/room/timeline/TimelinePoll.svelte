@@ -28,12 +28,10 @@
   let maxValue = $derived(Math.max(...poll.answers.map((answer) => answer.votes ?? 0)));
   let votersAnswers = $derived(poll.answers.filter((answer) => answer.voters !== null));
   let votersOpen = $state(false);
-  let votersActive = $state(0);
+  let votersActive = $state<string>();
 
   function viewVoters(answerId: string) {
-    const index = votersAnswers.findIndex((answer) => answer.id === answerId);
-    if (index === -1) return;
-    votersActive = index;
+    votersActive = answerId;
     votersOpen = true;
   }
 

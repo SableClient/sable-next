@@ -142,8 +142,8 @@
         actionable={row.actionable}
         onReact={row.actions.onReact}
         {onToggleReaction}
-        onViewReactions={(index: number) => {
-          row.dialogs.open(item, { kind: 'reactions', active: index });
+        onViewReactions={(key: string) => {
+          row.dialogs.open(item, { kind: 'reactions', active: key });
         }}
       />
     </div>
