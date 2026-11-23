@@ -110,6 +110,9 @@ async function main() {
       if (file.endsWith('.exe')) {
         debugFile = join(dirname(file), 'app.pdb');
         await access(debugFile);
+      } else if (process.platform === 'win32' && addons.includes(basename(file))) {
+        debugFile = join(dirname(file), basename(file).replace(/\.node$/, '.pdb'));
+        await access(debugFile);
       } else if (
         process.platform === 'darwin' &&
         [...binaries, ...addons].includes(basename(file))
@@ -137,14 +140,14 @@ async function main() {
   }
   if (values['dry-run']) {
     console.info(`Validated ${ids.size} debug identifiers in ${symbols.size} native symbol files`);
-  } else {
-    uploadDebugFiles(ids, symbols);
+    return;
   }
+  uploadDebugFiles(ids, symbols);
   // The mirror depends on symbols.electronjs.org, so a failure there must not
   // block the release; it only leaves Electron's own frames unsymbolicated.
   if (values.electron) {
     try {
-      await mirrorElectronSymbols(values.electron, values['dry-run']);
+      await mirrorElectronSymbols(values.electron);
     } catch (error) {
       console.warn(`::warning::Electron symbols were not mirrored: ${error.message}`);
     }
@@ -160,12 +163,11 @@ function uploadDebugFiles(ids, files) {
 
 // Linux ships the Electron binary renamed, and Sentry's built-in Electron
 // source looks symbols up by file name, so they are mirrored by debug ID.
-async function mirrorElectronSymbols(executable, dryRun) {
+async function mirrorElectronSymbols(executable) {
   const [id] = inspectFile(executable).variants.map((variant) => variant.debug_id);
   const url = electronSymbolUrl(id);
-  const response = await fetch(url, { method: dryRun ? 'HEAD' : 'GET' });
+  const response = await fetch(url);
   if (!response.ok) throw new Error(`Electron symbols unavailable (${response.status}): ${url}`);
-  if (dryRun) return;
   const file = join(await mkdtemp(join(tmpdir(), 'electron-symbols-')), 'electron.sym');
   await pipeline(Readable.fromWeb(response.body), createWriteStream(file));
   if (!(await debugIds(file)).includes(id)) {

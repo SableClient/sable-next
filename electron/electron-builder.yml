@@ -8,6 +8,7 @@ directories:
 files:
   - dist/**/*
   - '!dist/**/*.map'
+  - '!dist/**/*.pdb'
   - package.json
   - '!node_modules/**/*'
 asarUnpack:

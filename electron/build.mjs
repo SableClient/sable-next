@@ -36,7 +36,10 @@ for (const name of addons) {
     linux: `lib${name}.so`,
     win32: `${name}.dll`,
   }[process.platform];
-  copyFileSync(join(target, release ? 'release' : 'debug', library), join(out, `${name}.node`));
+  const built = join(target, release ? 'release' : 'debug');
+  copyFileSync(join(built, library), join(out, `${name}.node`));
+  const pdb = join(built, `${name}.pdb`);
+  if (process.platform === 'win32' && existsSync(pdb)) copyFileSync(pdb, join(out, `${name}.pdb`));
 }
 
 if (process.platform === 'linux') {
