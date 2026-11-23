@@ -417,28 +417,11 @@ impl Core {
         let response = self
             .client()
             .await?
-            .send(request)
+            .send(lenient_user_directory::Request::new(request))
             .await
             .or_failed(self, "search_user_directory")?;
 
-        Ok((
-            response.limited,
-            response
-                .results
-                .into_iter()
-                .map(|user| {
-                    let real_name = user.display_name.and_then(visible_name);
-                    let real_avatar_url = user.avatar_url.map(|url| url.to_string());
-                    UserDirectoryEntryView {
-                        user_id: user.user_id.to_string(),
-                        display_name: real_name.clone(),
-                        avatar_url: real_avatar_url.clone(),
-                        real_name,
-                        real_avatar_url,
-                    }
-                })
-                .collect(),
-        ))
+        Ok((response.limited, directory_entries(&response.results)))
     }
 
     pub(crate) async fn widget_send_delayed_event(
@@ -1086,6 +1069,38 @@ impl Core {
     }
 }
 
+fn directory_entries(results: &[Raw<search_users::v3::User>]) -> Vec<UserDirectoryEntryView> {
+    results
+        .iter()
+        .filter_map(|raw| crate::lenient::parse_or_skip(raw, "user directory result"))
+        .map(|user| {
+            let real_name = user.display_name.and_then(visible_name);
+            let real_avatar_url = user.avatar_url.map(|url| url.to_string());
+            UserDirectoryEntryView {
+                user_id: user.user_id.to_string(),
+                display_name: real_name.clone(),
+                avatar_url: real_avatar_url.clone(),
+                real_name,
+                real_avatar_url,
+            }
+        })
+        .collect()
+}
+
+mod lenient_user_directory {
+    use ruma::api::client::user_directory::search_users;
+    use ruma::api::response;
+    use ruma::serde::Raw;
+
+    pub(crate) type Request = crate::lenient::Request<search_users::v3::Request, Response>;
+
+    #[response]
+    pub(crate) struct Response {
+        pub results: Vec<Raw<search_users::v3::User>>,
+        pub limited: bool,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{RelationsFilter, managers_from_account_data, managers_from_well_known};
@@ -1106,6 +1121,33 @@ mod tests {
         Mock, ResponseTemplate,
         matchers::{body_json, header, method, path, path_regex, query_param},
     };
+
+    #[test]
+    fn an_invalid_directory_user_does_not_fail_the_search() {
+        use ruma::api::IncomingResponseExt as _;
+
+        let body = json!({
+            "results": [
+                {"user_id": "@first:example.org", "display_name": "First"},
+                {"user_id": "@broken:not a server"},
+                {"user_id": "@fine:example.org"},
+            ],
+            "limited": true,
+        })
+        .to_string();
+
+        let response = super::lenient_user_directory::Response::try_from_http_response(
+            http::Response::new(body.as_bytes()),
+        )
+        .expect("the search parses");
+        let users: Vec<_> = super::directory_entries(&response.results)
+            .into_iter()
+            .map(|user| user.user_id)
+            .collect();
+
+        assert_eq!(users, ["@first:example.org", "@fine:example.org"]);
+        assert!(response.limited);
+    }
 
     #[tokio::test]
     async fn widget_sends_return_the_created_event_id() {
