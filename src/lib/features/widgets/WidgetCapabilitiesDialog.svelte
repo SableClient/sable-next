@@ -10,6 +10,7 @@
     isSensitiveCapability,
   } from './capabilities.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     open?: boolean;
@@ -43,7 +44,7 @@
   variant="verification"
   label={i18n.t('widgets.capabilitiesTitle', { name: widgetName })}
 >
-  <div class="capabilities">
+  <div class="dialog-body capabilities">
     <h2>{i18n.t('widgets.capabilitiesTitle', { name: widgetName })}</h2>
     <p class="explain">{i18n.t('widgets.capabilitiesExplain')}</p>
 
@@ -97,10 +98,7 @@
 
 <style>
   .capabilities {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-300);
-    min-height: 0;
     width: min(26rem, calc(100vw - 2rem));
   }
 

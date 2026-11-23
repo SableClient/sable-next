@@ -93,6 +93,7 @@
   import { SpaceHierarchyLoader } from './space-hierarchy-loader.svelte';
   import { JoinQueue } from './join-queue.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     space: RoomListItemView | null;
@@ -950,7 +951,7 @@
 </section>
 
 <DialogFrame bind:open={topicOpen} variant="verification" label={i18n.t('room.lobbyTopicTitle')}>
-  <div class="topic-dialog">
+  <div class="dialog-body topic-dialog">
     {#if topicRoom}
       <div class="topic-room">
         <Avatar id={topicRoom.room_id} src={topicRoom.avatar_url} name={label(topicRoom)} />
@@ -1126,10 +1127,7 @@
   }
 
   .topic-dialog {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-300);
-    min-height: 0;
     width: min(32rem, calc(100vw - 2rem));
   }
 

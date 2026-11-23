@@ -12,6 +12,7 @@
   import { fuzzyMatchParts } from './fuzzy.js';
   import { filterRoomsByQuery, parentSpaceNames, parseJumpQuery } from './room-jump.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     onSelect: (room: RoomListItemView) => void;
@@ -63,7 +64,7 @@
   }
 </script>
 
-<div class="jump-list">
+<div class="dialog-body jump-list">
   <TextInput
     id={inputId}
     bind:value={query}
@@ -151,10 +152,7 @@
 
 <style>
   .jump-list {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-200);
-    min-height: 0;
   }
 
   ul {

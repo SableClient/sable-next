@@ -1,0 +1,6 @@
+/* A dialog body that shrinks to its frame, so its list scrolls instead of the frame. */
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}

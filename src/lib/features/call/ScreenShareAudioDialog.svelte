@@ -25,6 +25,7 @@
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   type Kind = ScreenAudioChoice['kind'];
 
@@ -132,7 +133,7 @@
   label={i18n.t('call.screenAudioTitle')}
   onConfirm={share}
 >
-  <div class="screen-audio">
+  <div class="dialog-body screen-audio">
     <h2>{i18n.t('call.screenAudioTitle')}</h2>
     <Dialog.Description>
       {#snippet child({ props })}
@@ -233,7 +234,6 @@
 
 <style>
   .screen-audio {
-    display: grid;
     gap: var(--space-300);
     width: min(28rem, calc(100vw - 2rem));
   }
@@ -251,8 +251,10 @@
   }
 
   .apps {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-200);
+    min-height: 0;
   }
 
   header {

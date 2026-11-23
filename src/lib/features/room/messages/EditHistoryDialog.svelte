@@ -13,6 +13,7 @@
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     open?: boolean;
@@ -41,7 +42,7 @@
 </script>
 
 {#snippet content(desktop: boolean)}
-  <div class={['edit-history', { sheet: !desktop }]}>
+  <div class={['dialog-body', 'edit-history', { sheet: !desktop }]}>
     <h2>{i18n.t('timeline.editHistoryTitle')}</h2>
     <ol class="edit-history-versions" {@attach scrollHint}>
       {#each versions as version, index (version.event_id)}
@@ -111,10 +112,7 @@
 
 <style>
   .edit-history {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-300);
-    min-height: 0;
     width: min(32rem, calc(100vw - 2rem));
   }
 

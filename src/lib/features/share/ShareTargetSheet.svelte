@@ -19,6 +19,7 @@
 
   import { appendPlainText } from './share-content.js';
   import type { ShareInbox } from './share-inbox.svelte.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     inbox: ShareInbox;
@@ -108,7 +109,7 @@
   variant="verification"
   label={i18n.t('share.title')}
 >
-  <div class="share">
+  <div class="dialog-body share">
     <h2>{i18n.t('share.title')}</h2>
 
     {#if inbox.text !== ''}
@@ -140,10 +141,7 @@
 
 <style>
   .share {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-400);
-    min-height: 0;
     width: min(28rem, calc(100vw - 2rem));
   }
 

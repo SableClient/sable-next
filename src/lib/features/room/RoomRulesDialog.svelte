@@ -10,6 +10,7 @@
 
   import FormattedBody from './messages/FormattedBody.svelte';
   import type { RoomRules } from './room-rules.svelte.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     rules: RoomRules;
@@ -42,7 +43,7 @@
   variant="verification"
   label={heading}
 >
-  <div class="rules-dialog">
+  <div class="dialog-body rules-dialog">
     <h2>{heading}</h2>
     {#if sourceName !== null}
       <p class="rules-hint">{i18n.t('room.rulesDelegatedFrom', { room: roomName })}</p>
@@ -102,10 +103,7 @@
 
 <style>
   .rules-dialog {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-400);
-    min-height: 0;
   }
 
   h2 {

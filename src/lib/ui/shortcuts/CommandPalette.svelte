@@ -12,6 +12,7 @@
 
   import RoomJumpList from './RoomJumpList.svelte';
   import { shortcutsHelpState } from './palette-state.svelte.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     open?: boolean;
@@ -40,7 +41,7 @@
 </script>
 
 <DialogFrame bind:open variant="verification" label={i18n.t('shortcuts.paletteTitle')}>
-  <div class="palette">
+  <div class="dialog-body palette">
     <RoomJumpList onSelect={select} onClose={() => (open = false)} onFindOrJoin={findOrJoin} />
     <footer>
       <Button variant="ghost" size="small" onclick={openShortcutsHelp}>
@@ -52,10 +53,7 @@
 
 <style>
   .palette {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-300);
-    min-height: 0;
     width: min(34rem, calc(100vw - 2rem));
   }
 

@@ -26,6 +26,7 @@
   import { scrollHint } from '#lib/ui/scroll-hint.js';
 
   import { UserDirectoryLookup } from '../members/user-directory-lookup.svelte.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -163,7 +164,7 @@
   closeLabel={i18n.t('common.close')}
 >
   {#snippet children(desktop)}
-    <div class={['find-or-join', { sheet: !desktop }]}>
+    <div class={['dialog-body', 'find-or-join', { sheet: !desktop }]}>
       <h2>{i18n.t('nav.findOrJoin')}</h2>
 
       <TextInput
@@ -260,10 +261,7 @@
 
 <style>
   .find-or-join {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-400);
-    min-height: 0;
     width: min(26rem, calc(100vw - 2rem));
   }
 

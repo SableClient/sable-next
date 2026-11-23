@@ -12,6 +12,7 @@
   import { normalizeShortcode } from './pack-content.js';
   import { uploadCandidates, type EmoteCandidate } from './steal-emotes.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     open?: boolean;
@@ -62,7 +63,7 @@
     void add();
   }}
 >
-  <div class="steal">
+  <div class="dialog-body steal">
     <h2>{i18n.t('emotes.stealTitle')}</h2>
     <p class="explain">{i18n.t('emotes.stealExplain')}</p>
     {#if failed}
@@ -105,10 +106,7 @@
 
 <style>
   .steal {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-300);
-    min-height: 0;
     width: min(27rem, calc(100vw - 2rem));
   }
 

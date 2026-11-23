@@ -8,6 +8,7 @@
   import type { MatrixLink } from '../../rooms/matrix-link';
   import { topicToHtml } from '#lib/model/model.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
     open: boolean;
@@ -22,7 +23,7 @@
 </script>
 
 <DialogFrame {open} {onOpenChange} variant="verification" label={i18n.t('room.topicTitle')}>
-  <div class="topic-dialog">
+  <div class="dialog-body topic-dialog">
     <h2>{roomName}</h2>
     <div class="topic-full" {@attach scrollHint}>
       <FormattedBody html={topicHtml ?? topicToHtml(topic)} {onMatrixLink} />
@@ -40,10 +41,7 @@
 
 <style>
   .topic-dialog {
-    display: flex;
-    flex-direction: column;
     gap: var(--space-400);
-    min-height: 0;
   }
 
   h2 {
