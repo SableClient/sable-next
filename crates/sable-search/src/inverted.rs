@@ -2,13 +2,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Bound;
 
-use super::tokenize;
+use crate::tokenize;
 
 const BM25_K1: f64 = 1.2;
 const BM25_B: f64 = 0.75;
 const MAX_TYPO_EXPANSIONS: usize = 50;
 
-pub(super) struct InvertedIndex<K> {
+pub struct InvertedIndex<K> {
     postings: BTreeMap<Box<str>, Vec<(K, u32)>>,
     lengths: HashMap<K, u32>,
     total_length: u64,
@@ -17,7 +17,8 @@ pub(super) struct InvertedIndex<K> {
 }
 
 impl<K: Copy + Eq + Hash> InvertedIndex<K> {
-    pub(super) fn with_capacity(documents: usize) -> Self {
+    #[must_use]
+    pub fn with_capacity(documents: usize) -> Self {
         Self {
             postings: BTreeMap::new(),
             lengths: HashMap::with_capacity(documents),
@@ -27,15 +28,16 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         }
     }
 
-    pub(super) const fn defer(&mut self, deferred: bool) {
+    pub const fn defer(&mut self, deferred: bool) {
         self.deferred = deferred;
     }
 
-    pub(super) const fn is_deferred(&self) -> bool {
+    #[must_use]
+    pub const fn is_deferred(&self) -> bool {
         self.deferred
     }
 
-    pub(super) fn add_document(&mut self, key: K, text: &str) {
+    pub fn add_document(&mut self, key: K, text: &str) {
         if self.deferred {
             return;
         }
@@ -58,14 +60,14 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
     }
 
     /// Postings stay until [`Self::vacuum`], so readers must skip keys missing from `lengths`.
-    pub(super) fn remove_document(&mut self, key: K) {
+    pub fn remove_document(&mut self, key: K) {
         if let Some(length) = self.lengths.remove(&key) {
             self.total_length -= u64::from(length);
             self.removed.insert(key);
         }
     }
 
-    pub(super) fn vacuum(&mut self) {
+    pub fn vacuum(&mut self) {
         if self.removed.is_empty() {
             return;
         }
@@ -80,7 +82,8 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         clippy::cast_precision_loss,
         reason = "counts stay far below 2^52 and only feed a ranking score"
     )]
-    pub(super) fn query(&self, query: &str, expand: bool) -> Vec<(K, f64)> {
+    #[must_use]
+    pub fn query(&self, query: &str, expand: bool) -> Vec<(K, f64)> {
         if self.lengths.is_empty() {
             return Vec::new();
         }
@@ -233,21 +236,21 @@ mod tests {
 
     #[test]
     fn test_a_japanese_word_does_not_match_words_sharing_one_character() {
-        crate::search::tokenize::load_bundled_chinese();
+        crate::tokenize::load_bundled_chinese();
         let index = index(&["検索を使う", "検討します", "索引です"]);
         assert_eq!(ranked(&index, "検索"), [0]);
     }
 
     #[test]
     fn test_a_japanese_word_is_found_across_a_chinese_dictionary_word() {
-        crate::search::tokenize::load_bundled_chinese();
+        crate::tokenize::load_bundled_chinese();
         let index = index(&["東京都庁に行く", "京都に行く"]);
         assert_eq!(ranked(&index, "東京"), [0]);
     }
 
     #[test]
     fn test_a_japanese_word_does_not_match_text_sharing_only_some_of_its_pairs() {
-        crate::search::tokenize::load_bundled_chinese();
+        crate::tokenize::load_bundled_chinese();
         let hiragana = index(&[
             "ありがとうございます",
             "ありとあらゆる手段",
@@ -261,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_a_japanese_compound_split_by_the_chinese_dictionary_stays_whole() {
-        crate::search::tokenize::load_bundled_chinese();
+        crate::tokenize::load_bundled_chinese();
         let japanese = index(&["日本語を勉強する", "日本と英語", "英語を話す"]);
         assert_eq!(ranked(&japanese, "日本語"), [0]);
 
@@ -271,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_an_unvoiced_kana_does_not_match_its_voiced_form() {
-        crate::search::tokenize::load_bundled_chinese();
+        crate::tokenize::load_bundled_chinese();
         let index = index(&["か", "が"]);
         assert_eq!(ranked(&index, "か"), [0]);
         assert_eq!(ranked(&index, "が"), [1]);
@@ -279,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_separate_chinese_words_in_one_query_each_add_to_the_score() {
-        crate::search::tokenize::load_bundled_chinese();
+        crate::tokenize::load_bundled_chinese();
         let index = index(&["中文搜索功能", "中文消息", "天气"]);
         assert_eq!(ranked(&index, "中文功能"), [0, 1]);
     }
@@ -355,7 +358,7 @@ mod tests {
 
     #[test]
     fn test_an_unexpanded_query_still_finds_text_written_without_spaces() {
-        crate::search::tokenize::load_bundled_chinese();
+        crate::tokenize::load_bundled_chinese();
         let index = index(&["黒い猫", "検索を使う", "今天我们一起讨论中文搜索功能"]);
         let found = |query: &str| {
             let mut hits: Vec<u32> = index

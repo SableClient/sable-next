@@ -30,6 +30,7 @@ harness = false
 [dependencies]
 sable-frostbite = { path = "../sable-frostbite", version = "0.1.0" }
 sable-model = { path = "../sable-model", version = "0.1.0" }
+sable-search = { path = "../sable-search", version = "0.1.0" }
 sable-link-preview = { workspace = true, features = ["tunnel"] }
 matrix-sdk = { workspace = true, features = ["qrcode", "unstable-msc4388"] }
 qrcode = { version = "0.14.1", default-features = false }
@@ -64,18 +65,7 @@ parking_lot = { workspace = true }
 reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 ammonia = "4.2.5"
 async-trait = "0.1"
-strsim = "0.11"
-charabia = { version = "0.10", default-features = false, features = [
-  "greek",
-  "hebrew",
-  "vietnamese",
-  "turkish",
-  "swedish-recomposition",
-  "chinese-normalization",
-] }
 jieba-rs = { version = "=0.11.0", default-features = false }
-rust-stemmers = "1.2"
-unicode-normalization = "0.1.26"
 html-escape = { workspace = true }
 html5ever = { workspace = true }
 linkify = { workspace = true }

@@ -6,7 +6,7 @@ use jieba_rs::Jieba;
 use rust_stemmers::{Algorithm, Stemmer};
 use unicode_normalization::UnicodeNormalization;
 
-pub(super) static CHINESE: std::sync::OnceLock<Jieba> = std::sync::OnceLock::new();
+pub static CHINESE: std::sync::OnceLock<Jieba> = std::sync::OnceLock::new();
 
 static ENGLISH: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::English));
 static RUSSIAN: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Russian));
@@ -19,7 +19,8 @@ const MAX_TERM_CHARS: usize = 256;
 /// Chinese and Japanese are indexed as overlapping pairs of characters, plus
 /// the last character of each run, so a one character query still finds it.
 /// The pairs depend only on the text, never on how a dictionary would cut it.
-pub(crate) fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
+#[must_use]
+pub fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
     let mut terms = Vec::new();
     for token in text
         .tokenize()
@@ -38,11 +39,13 @@ pub(crate) fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
 
 /// A query is a list of words, and a document matches a word only when it
 /// holds every term of it.
-pub(crate) fn tokenize_query(text: &str) -> Vec<Vec<Cow<'static, str>>> {
+#[must_use]
+pub fn tokenize_query(text: &str) -> Vec<Vec<Cow<'static, str>>> {
     tokenize_query_with(text, CHINESE.get())
 }
 
-pub(crate) fn matches(query: &str, body: &str) -> bool {
+#[must_use]
+pub fn matches(query: &str, body: &str) -> bool {
     let terms = tokenize(body);
     tokenize_query(query)
         .iter()
@@ -50,16 +53,18 @@ pub(crate) fn matches(query: &str, body: &str) -> bool {
         .all(|wanted| terms.iter().any(|term| term.starts_with(wanted.as_ref())))
 }
 
-pub(super) fn chinese_ready() -> bool {
+#[must_use]
+pub fn chinese_ready() -> bool {
     CHINESE.get().is_some()
 }
 
 #[cfg(test)]
-pub(super) fn load_bundled_chinese() {
+pub(crate) fn load_bundled_chinese() {
     CHINESE.get_or_init(Jieba::new);
 }
 
-pub(super) fn contains_chinese(text: &str) -> bool {
+#[must_use]
+pub fn contains_chinese(text: &str) -> bool {
     text.chars()
         .any(|character| Script::from(character) == Script::Cj)
 }

@@ -35,7 +35,7 @@ function sharesStem(word: string, term: string): boolean {
   );
 }
 
-// Keep in sync with allowed_typos in crates/sable-core/src/search/inverted.rs.
+// Keep in sync with allowed_typos in crates/sable-search/src/inverted.rs.
 function allowedTypos(term: readonly string[]): number {
   if (term.some((character) => /\p{N}/u.test(character)) || term.length < 5) return 0;
   return term.length < 9 ? 1 : 2;

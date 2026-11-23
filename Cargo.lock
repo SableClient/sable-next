@@ -8190,7 +8190,6 @@ dependencies = [
  "backon",
  "base64 0.23.1",
  "bs58",
- "charabia",
  "criterion",
  "ctr",
  "error-stack",
@@ -8227,11 +8226,11 @@ dependencies = [
  "rmp-serde",
  "ruma",
  "rusqlite",
- "rust-stemmers",
  "rustls",
  "sable-frostbite",
  "sable-link-preview",
  "sable-model",
+ "sable-search",
  "secret-service",
  "serde",
  "serde_bytes",
@@ -8241,7 +8240,6 @@ dependencies = [
  "specta",
  "specta-serde",
  "specta-typescript",
- "strsim",
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
@@ -8249,7 +8247,6 @@ dependencies = [
  "tracing",
  "tracing-error",
  "tracing-subscriber",
- "unicode-normalization",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -8378,6 +8375,17 @@ dependencies = [
  "serde_json",
  "serde_with",
  "tokio",
+]
+
+[[package]]
+name = "sable-search"
+version = "0.1.0"
+dependencies = [
+ "charabia",
+ "jieba-rs",
+ "rust-stemmers",
+ "strsim",
+ "unicode-normalization",
 ]
 
 [[package]]

@@ -3,7 +3,6 @@ mod core_api;
 mod crawl;
 mod document;
 mod index;
-mod inverted;
 mod network;
 mod sharing;
 pub(crate) use network::CrawlNetwork;
@@ -13,7 +12,6 @@ mod filter;
 mod idb;
 mod persist;
 mod server;
-mod tokenize;
 
 pub(crate) const MAX_SEARCH_RESULTS: usize = 200;
 
@@ -26,6 +24,7 @@ pub(crate) use server::ServerSearch;
 pub(crate) use sharing::SearchSharing;
 
 use crate::now_ms;
+use sable_search::{inverted, tokenize};
 use std::time::Duration;
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
