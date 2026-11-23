@@ -334,6 +334,8 @@ test(
       assert.throws(() => validate('--ios', release), /Missing iOS app dSYM/);
       execFileSync('strip', ['--strip-debug', binary]);
       assert.throws(() => validate(release), /Missing usable debug information/);
+      execFileSync('cc', ['-g', '-Wl,--build-id=none', source, '-o', binary]);
+      assert.throws(() => validate(release), /Missing build ID/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -58,6 +58,10 @@ async function debugIds(path) {
     if (!report.is_usable || !report.features?.split(', ').includes('debug')) {
       throw new Error(`Missing usable debug information: ${file}`);
     }
+    // In-process SDKs such as sentry-rust leave ELF images without a build ID out of events.
+    if (report.type === 'elf' && report.variants.some((variant) => !variant.code_id)) {
+      throw new Error(`Missing build ID: ${file}`);
+    }
     ids.push(...report.variants.map((variant) => variant.debug_id).filter(Boolean));
   }
   if (ids.length === 0) throw new Error(`Missing debug identifiers: ${path}`);
