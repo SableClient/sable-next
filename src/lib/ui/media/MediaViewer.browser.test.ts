@@ -288,6 +288,25 @@ test('viewer backdrop clicks on mobile', async () => {
   expect(onClose).not.toHaveBeenCalled();
 });
 
+test('hiding the chrome hides the navigation arrows', async () => {
+  await page.viewport(1280, 900);
+  mediaViewerState.items = [item, { ...item, eventId: '$second' }];
+  mediaViewerState.eventId = '$second';
+  const screen = await render(MediaViewer);
+  const viewer = screen.getByRole('dialog', { name: 'Media viewer', exact: true });
+  await expect.poll(() => viewer.element().querySelector('.stage img')).not.toBeNull();
+  const nav = viewer.element().querySelector('.viewer-nav');
+  if (!nav) throw new Error('the previous button is missing');
+  expect(getComputedStyle(nav).visibility).toBe('visible');
+
+  const image = viewer.element().querySelector('.stage img');
+  if (!image) throw new Error('the viewer image is missing');
+  const tap = { pointerId: 9, pointerType: 'touch', clientX: 640, clientY: 450 };
+  pointer('pointerdown', image, tap);
+  pointer('pointerup', image, tap);
+  await expect.poll(() => getComputedStyle(nav).visibility, { timeout: 3_000 }).toBe('hidden');
+});
+
 test('viewer refits a fitted image when the stage resizes', async () => {
   const { viewer } = await openViewer(1280, 900);
   const scale = () =>

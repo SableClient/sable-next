@@ -1148,7 +1148,7 @@
 
   .toolbar.chrome-hidden,
   .bottom-bar.chrome-hidden,
-  .stage.chrome-hidden :global(.nav) {
+  .stage.chrome-hidden :global(.viewer-nav) {
     opacity: 0;
     visibility: hidden;
   }
