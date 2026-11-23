@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 use serde::Deserialize;
+use serde_with::{InspectError, MapSkipError, serde_as};
 
 use crate::ResultExt;
 use crate::protocol::{
@@ -22,11 +23,22 @@ const MAX_SPACE_CHAIN: usize = 4;
 const STATE_FETCH_CONCURRENCY: usize = 4;
 const MAX_CACHED_ROOMS: usize = 256;
 
+/// An image with an invalid field is dropped instead of hiding the whole pack.
+#[serde_as]
 #[derive(Debug, Clone, Deserialize)]
 pub struct PackContent {
     #[serde(default)]
+    #[serde_as(as = "MapSkipError<_, _, LogSkippedImage>")]
     pub images: BTreeMap<String, PackImage>,
     pub pack: Option<PackMeta>,
+}
+
+struct LogSkippedImage;
+
+impl InspectError for LogSkippedImage {
+    fn inspect_error(error: impl serde::de::Error) {
+        tracing::warn!("skipping an invalid pack image: {error}");
+    }
 }
 
 impl PackContent {
@@ -872,6 +884,15 @@ mod tests {
 
     fn parse(json: &str) -> PackContent {
         serde_json::from_str(json).expect("pack content")
+    }
+
+    #[test]
+    fn an_invalid_image_does_not_hide_the_pack() {
+        let content = parse(
+            r#"{"images":{"broken":{"url":"mxc://a/b","info":{"w":12.5}},"fine":{"url":"mxc://a/c"},"bare":{}}}"#,
+        );
+
+        assert_eq!(content.images.keys().collect::<Vec<_>>(), ["fine"]);
     }
 
     #[test]
