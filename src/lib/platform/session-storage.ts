@@ -231,7 +231,11 @@ async function clearHttpCaches(): Promise<void> {
   if (!storage) return;
 
   const names = await storage.keys();
-  await Promise.all(names.map((name) => storage.delete(name)));
+  // The service worker reads its model from there until its replacement activates,
+  // by when the deploy that built it may have removed the file it came from.
+  await Promise.all(
+    names.filter((name) => !name.startsWith('sable-model-')).map((name) => storage.delete(name))
+  );
 }
 
 async function clearStateCache(name: string): Promise<void> {

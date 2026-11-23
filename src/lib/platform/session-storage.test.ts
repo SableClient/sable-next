@@ -153,6 +153,22 @@ test('clears the HTTP caches too', async () => {
   expect(cleared).toEqual(['sable-media', 'workbox-precache']);
 });
 
+test('keeps the model the service worker cached for its own build', async () => {
+  stubIndexedDB([]);
+  const cleared: string[] = [];
+  vi.stubGlobal('caches', {
+    keys: () => Promise.resolve(['sable-media', 'sable-model-2.3.8']),
+    delete: (name: string) => {
+      cleared.push(name);
+      return Promise.resolve(true);
+    },
+  });
+
+  await resetWebStorage();
+
+  expect(cleared).toEqual(['sable-media']);
+});
+
 test('derives every account store when database listing is unavailable', async () => {
   const { deleted } = stubIndexedDB(null);
 
