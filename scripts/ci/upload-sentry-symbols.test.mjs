@@ -6,7 +6,14 @@ import { join, relative } from 'node:path';
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { promisify } from 'node:util';
-import { collectSymbols } from './upload-sentry-symbols.mjs';
+import { collectSymbols, electronSymbolUrl } from './upload-sentry-symbols.mjs';
+
+test('looks Electron symbols up under the original executable name', () => {
+  assert.equal(
+    electronSymbolUrl('a04856d0-a35c-543a-38fc-35b405ef0f4a'),
+    'https://symbols.electronjs.org/electron/A04856D0A35C543A38FC35B405EF0F4A0/electron.sym'
+  );
+});
 
 test('finds app symbols and excludes dependencies and bundles', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sable-symbols-'));

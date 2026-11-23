@@ -221,7 +221,15 @@ jobs:
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
       - name: Upload native addon symbols
         if: ${{ runner.os != 'Windows' }}
-        run: node scripts/ci/upload-sentry-symbols.mjs electron/dist
+        run: |
+          args=()
+          if [ "$RUNNER_OS" = Linux ]; then
+            shopt -s nullglob
+            executables=(electron/release/linux*-unpacked/sable{,-nightly})
+            [ "${#executables[@]}" -eq 1 ] || { echo "Expected one Electron executable, found ${#executables[@]}" >&2; exit 1; }
+            args=(--electron "${executables[0]}")
+          fi
+          node scripts/ci/upload-sentry-symbols.mjs "${args[@]}" electron/dist
       - name: Verify native core shutdown
         if: ${{ runner.os != 'Windows' }}
         run: SABLE_NODE_ADDON="$PWD/electron/dist/sable_node.node" node --test crates/sable-node/tests/native-lifecycle.mjs

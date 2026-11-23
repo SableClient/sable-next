@@ -1,11 +1,21 @@
-import { readdir, access } from 'node:fs/promises';
+import { readdir, access, mkdtemp } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { parseArgs } from 'node:util';
 import { SentryCli } from '@sentry/cli';
 
 const binaries = ['app', 'sable'];
 const addons = ['sable_node.node', 'sable_audiofox.node'];
+
+// The symbol server's breakpad ID is the ELF debug ID without dashes plus a zero age.
+export function electronSymbolUrl(debugId) {
+  const id = `${debugId.replaceAll('-', '').toUpperCase()}0`;
+  return `https://symbols.electronjs.org/electron/${id}/electron.sym`;
+}
 
 export async function collectSymbols(root) {
   const symbols = [];
@@ -70,7 +80,11 @@ async function debugIds(path) {
 
 async function main() {
   const { values, positionals } = parseArgs({
-    options: { ios: { type: 'boolean' }, 'dry-run': { type: 'boolean' } },
+    options: {
+      ios: { type: 'boolean' },
+      electron: { type: 'string' },
+      'dry-run': { type: 'boolean' },
+    },
     allowPositionals: true,
   });
   if (!process.env.VITE_SENTRY_DSN && !values['dry-run']) return;
@@ -123,12 +137,41 @@ async function main() {
   }
   if (values['dry-run']) {
     console.info(`Validated ${ids.size} debug identifiers in ${symbols.size} native symbol files`);
-    return;
+  } else {
+    uploadDebugFiles(ids, symbols);
   }
+  // The mirror depends on symbols.electronjs.org, so a failure there must not
+  // block the release; it only leaves Electron's own frames unsymbolicated.
+  if (values.electron) {
+    try {
+      await mirrorElectronSymbols(values.electron, values['dry-run']);
+    } catch (error) {
+      console.warn(`::warning::Electron symbols were not mirrored: ${error.message}`);
+    }
+  }
+}
+
+function uploadDebugFiles(ids, files) {
   const args = ['debug-files', 'upload', '--include-sources', '--wait'];
   for (const id of ids) args.push('--id', id);
-  args.push(...symbols);
+  args.push(...files);
   execFileSync(SentryCli.getPath(), args, { stdio: 'inherit' });
+}
+
+// Linux ships the Electron binary renamed, and Sentry's built-in Electron
+// source looks symbols up by file name, so they are mirrored by debug ID.
+async function mirrorElectronSymbols(executable, dryRun) {
+  const [id] = inspectFile(executable).variants.map((variant) => variant.debug_id);
+  const url = electronSymbolUrl(id);
+  const response = await fetch(url, { method: dryRun ? 'HEAD' : 'GET' });
+  if (!response.ok) throw new Error(`Electron symbols unavailable (${response.status}): ${url}`);
+  if (dryRun) return;
+  const file = join(await mkdtemp(join(tmpdir(), 'electron-symbols-')), 'electron.sym');
+  await pipeline(Readable.fromWeb(response.body), createWriteStream(file));
+  if (!(await debugIds(file)).includes(id)) {
+    throw new Error(`Debug identifiers do not match: ${executable} and ${url}`);
+  }
+  uploadDebugFiles([id], [file]);
 }
 
 if (import.meta.main) await main();
