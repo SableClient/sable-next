@@ -320,7 +320,7 @@ fn hit_from(
     };
     if edited
         .as_ref()
-        .is_some_and(|body| inverted::matched_words(query, words, body, expand).is_none())
+        .is_some_and(|body| !inverted::matches_every_word(query, words, body, expand))
     {
         return None;
     }
@@ -480,6 +480,21 @@ mod tests {
 
         assert!(candidate_from(&result, &plain_room(), "dep", &[], true).is_some());
         assert!(candidate_from(&result, &plain_room(), "dep", &[], false).is_none());
+    }
+
+    #[test]
+    fn test_an_edited_original_must_still_hold_every_query_word() {
+        let result = edited_original("deploy monday");
+
+        assert!(hit_from(&result, "deploy friday").is_none());
+        assert!(hit_from(&result, "deploy monday").is_some());
+    }
+
+    #[test]
+    fn test_an_edited_original_matches_a_query_without_words() {
+        let result = edited_original("omg mea is doing great work");
+
+        assert!(hit_from(&result, "!!!").is_some());
     }
 
     #[test]

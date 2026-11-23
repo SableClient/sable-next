@@ -255,6 +255,20 @@ pub fn matched_words(
     found.then_some(matched)
 }
 
+/// Whether `body` holds every word of `query` as the index would find each one.
+#[must_use]
+pub fn matches_every_word(query: &str, words: &[String], body: &str, expand: bool) -> bool {
+    let mut index = InvertedIndex::with_capacity(1);
+    index.add_document((), body);
+    tokenize::tokenize_query(query, words)
+        .iter()
+        .all(|(_, group)| {
+            group
+                .iter()
+                .all(|term| !index.expand(term, expand).is_empty())
+        })
+}
+
 /// Words with digits stay exact so ticket1420 never matches ticket1402.
 fn allowed_typos(term: &str) -> usize {
     if term.chars().any(char::is_numeric) {
