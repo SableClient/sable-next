@@ -475,6 +475,11 @@ fn setup(app: &mut tauri::App<tauri::Wry>) -> Result<(), Box<dyn std::error::Err
         let builder = builder.on_navigation(|url| url.as_str().parse::<tauri::http::Uri>().is_ok());
         builder.build()?;
     }
+    // GeolocationPlugin.onPause reads state that only its load() sets, and tauri loads a plugin
+    // registered before the webview exists only once the webview is created. Registered after
+    // the windows, it is loaded before any pause.
+    #[cfg(all(target_os = "android", feature = "geolocation"))]
+    app.handle().plugin(tauri_plugin_geolocation::init())?;
 
     let data_dir = app.path().app_data_dir()?;
     // Android resolves that to the app data root, which the app
@@ -762,7 +767,7 @@ fn with_platform_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
     #[cfg(target_os = "android")]
     let builder = builder.plugin(tauri_plugin_sable_push::init());
 
-    #[cfg(feature = "geolocation")]
+    #[cfg(all(target_os = "ios", feature = "geolocation"))]
     let builder = builder.plugin(tauri_plugin_geolocation::init());
 
     let builder = builder
