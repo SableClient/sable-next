@@ -69,8 +69,6 @@
     "settingsSaved": "Збережено.",
     "settingsFailed": "Не вдалося зберегти зміни.",
     "menuLabel": "Параметри кімнати",
-    "menuHideUnread": "Приховати позначку непрочитаного",
-    "menuShowUnread": "Показувати позначку непрочитаного",
     "menuUnreadHiddenBySpace": "Позначку непрочитаного приховано простором",
     "menuNotifications": "Сповіщення",
     "notifyDefault": "За замовчуванням ({{mode}})",

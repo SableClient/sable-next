@@ -791,7 +791,6 @@
     "attachmentsFilesEmpty": "Aucun fichier indexé sur cet appareil pour l'instant.",
     "attachmentsLinksEmpty": "Aucun lien indexé sur cet appareil pour l'instant.",
     "attachmentsFailed": "Impossible de lire l'index de recherche de cet appareil.",
-    "attachmentsIndexed": "Voici ce que cet appareil a indexé. L'historique le plus ancien peut manquer.",
     "attachmentsSpoiler": "Spoiler",
     "attachmentsSpoilerReason": "Spoiler : {{reason}}",
     "attachmentsVideo": "Vidéo",
