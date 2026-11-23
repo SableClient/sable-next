@@ -27,5 +27,9 @@ export function scrubSentryEvent<T extends Event>(event: T): T {
   if (event.tags) event.tags = sanitizePayload(event.tags) as typeof event.tags;
   if (event.fingerprint) event.fingerprint = event.fingerprint.map(scrubMatrixIds);
   if (event.request?.url) event.request.url = scrubMatrixIds(scrubMatrixUrl(event.request.url));
+  // The Referer names the page the app was opened from, a room route included.
+  if (event.request?.headers) {
+    event.request.headers = sanitizePayload(event.request.headers) as typeof event.request.headers;
+  }
   return event;
 }

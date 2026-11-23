@@ -83,3 +83,20 @@ test('redacts the breadcrumbs already on the event', () => {
     { category: 'fetch', data: { url: 'https://[HOMESERVER]/_matrix/client/v3/sync' } },
   ]);
 });
+
+test('redacts the room the page was opened from', () => {
+  const event = scrubSentryEvent({
+    request: {
+      url: 'https://app.sable.test/home',
+      headers: {
+        Referer: 'https://app.sable.test/rooms/!abc:example.org?code=secret',
+        'User-Agent': 'Mozilla/5.0',
+      },
+    },
+  });
+
+  expect(event.request.headers).toEqual({
+    Referer: 'https://app.sable.test/rooms/![ROOM_ID]?code=[REDACTED]',
+    'User-Agent': 'Mozilla/5.0',
+  });
+});
