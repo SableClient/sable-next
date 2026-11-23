@@ -192,15 +192,16 @@
   }
 
   async function manageableSpaces(): Promise<string[]> {
+    const spaces = parentSpaces;
     const checks = await Promise.all(
-      parentSpaces.map((spaceId) =>
+      spaces.map((spaceId) =>
         core.rpc.members
           .permissions({ room_id: spaceId })
           .then((permissions) => permissions.can_manage_children)
           .catch(() => false)
       )
     );
-    return parentSpaces.filter((_, index) => checks[index]);
+    return spaces.filter((_, index) => checks[index]);
   }
 
   async function replaceWithNewRoom(id: string): Promise<string> {
