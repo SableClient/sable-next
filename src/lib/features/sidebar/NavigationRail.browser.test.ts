@@ -3,7 +3,6 @@ import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
 import type { RoomListItemView } from '#src/generated/protocol';
-import { withCounts } from '#lib/rooms/summary-fixtures.js';
 
 vi.mock('#lib/core/context.js', async () => {
   const mock = await import('#lib/core/__mocks__/context.js');
@@ -22,32 +21,13 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { roomView } from '#lib/test-support/room-views.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
 import NavigationRail from './NavigationRail.svelte';
 
 function space(roomId: string, name: string): RoomListItemView {
-  return withCounts({
-    room_id: roomId,
-    canonical_alias: null,
-    name,
-    topic: null,
-    topic_html: null,
-    avatar_url: null,
-    is_direct: false,
-    direct_targets: [],
-    join_rule: 'invite',
-    tags: [],
-    state: 'joined',
-    encrypted: null,
-    room_kind: 'space',
-    is_tombstoned: false,
-    call_participants: [],
-    screen_sharers: [],
-    supports_knock: true,
-    supports_restricted: true,
-    supports_knock_restricted: true,
-  } as unknown as RoomListItemView);
+  return roomView({ room_id: roomId, name, room_kind: 'space' });
 }
 
 test('a closed folder shows its icon', async () => {
