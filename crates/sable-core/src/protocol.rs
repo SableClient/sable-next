@@ -2805,6 +2805,7 @@ pub struct NotificationView {
     pub sender_name: Option<String>,
     pub sender_avatar_url: Option<String>,
     pub body: String,
+    pub emotes: Vec<PreviewEmote>,
     pub mention: bool,
     pub noisy: Option<bool>,
 }
@@ -3346,6 +3347,7 @@ pub struct InboxItemView {
     pub sender: String,
     pub sender_name: Option<String>,
     pub body: Option<String>,
+    pub emotes: Vec<PreviewEmote>,
     pub highlight: bool,
     pub is_direct: bool,
     pub encrypted: bool,

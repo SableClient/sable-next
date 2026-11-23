@@ -1,4 +1,4 @@
-import type { NotificationView } from '#src/generated/protocol';
+import type { NotificationView, PreviewEmote } from '#src/generated/protocol';
 
 import {
   alertsNatively,
@@ -8,6 +8,7 @@ import {
 } from '#lib/platform/native-notifications.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { previewSegments } from '#lib/features/room/messages/reply-preview.js';
 
 export function enabled(): boolean {
   return presentsInApp() && preferences.systemNotifications && permission() === 'granted';
@@ -68,6 +69,13 @@ export function body(view: NotificationView): string {
     return view.is_direct ? 'New message' : `New message from ${sender(view)}`;
   }
   return view.is_direct ? view.body : `${sender(view)}: ${view.body}`;
+}
+
+/** `body` split around its custom emotes. */
+export function bodySegments(view: NotificationView): (string | PreviewEmote)[] {
+  if (!showsContent(view)) return [body(view)];
+  const segments = previewSegments(view.body, view.emotes);
+  return view.is_direct ? segments : [`${sender(view)}: `, ...segments];
 }
 
 function sender(view: NotificationView): string {

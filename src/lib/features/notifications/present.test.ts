@@ -8,7 +8,7 @@ vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { body, title } from './present';
+import { body, bodySegments, title } from './present';
 
 function view(overrides: Partial<NotificationView> = {}): NotificationView {
   return {
@@ -23,6 +23,7 @@ function view(overrides: Partial<NotificationView> = {}): NotificationView {
     sender_name: 'Ada',
     sender_avatar_url: null,
     body: 'shipped the patch',
+    emotes: [],
     mention: false,
     noisy: true,
     ...overrides,
@@ -56,4 +57,15 @@ test('an encrypted room keeps its content back until it is allowed', () => {
 
   preferences.notificationEncryptedContent = true;
   expect(body(view({ encrypted: true }))).toBe('Ada: shipped the patch');
+});
+
+test('custom emotes show only with the content and never in the sender name', () => {
+  const blob = { alt: ':blob:', source: 'mxc://example.org/blob' };
+  const emoted = view({ sender_name: ':blob:', body: 'hi :blob:', emotes: [blob] });
+
+  expect(bodySegments(emoted)).toEqual([':blob:: ', 'hi ', blob]);
+  expect(bodySegments({ ...emoted, is_direct: true })).toEqual(['hi ', blob]);
+
+  preferences.notificationContent = false;
+  expect(bodySegments(emoted)).toEqual(['New message from :blob:']);
 });

@@ -336,6 +336,7 @@ function invite(): NotificationView {
     sender_name: 'Alice',
     sender_avatar_url: null,
     body: 'invited you',
+    emotes: [],
     mention: false,
     noisy: false,
   };
@@ -735,6 +736,7 @@ function bannerMessage(overrides: Partial<NotificationView> = {}): NotificationV
     sender_name: 'Bob',
     sender_avatar_url: null,
     body: 'hello',
+    emotes: [],
     mention: false,
     noisy: true,
     ...overrides,

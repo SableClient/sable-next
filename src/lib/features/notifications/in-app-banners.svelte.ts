@@ -1,11 +1,11 @@
-import type { NotificationView } from '#src/generated/protocol';
+import type { NotificationView, PreviewEmote } from '#src/generated/protocol';
 
 import { isTauri } from '@tauri-apps/api/core';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { windowActivity } from '#lib/platform/window-activity.js';
 
-import { body, title } from './present';
+import { body, bodySegments, title } from './present';
 
 export type Banner = {
   roomId: string;
@@ -13,6 +13,7 @@ export type Banner = {
   eventId: string;
   title: string;
   body: string;
+  segments: (string | PreviewEmote)[];
   avatar: string | null;
   mention: boolean;
   count: number;
@@ -58,6 +59,7 @@ export class InAppBanners {
       eventId: view.event_id,
       title: title(view),
       body: body(view),
+      segments: bodySegments(view),
       avatar: view.room_avatar_url ?? view.sender_avatar_url,
       mention: view.mention || (previous?.mention ?? false),
       count: (previous?.count ?? 0) + 1,

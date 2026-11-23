@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use ruma_html::{Html, ListBehavior, NodeData, NodeRef, SanitizerConfig};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 static PREVIEW_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
     SanitizerConfig::compat()
@@ -109,7 +109,7 @@ pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PreviewEmote {
     pub alt: String,

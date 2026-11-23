@@ -34,6 +34,7 @@ test('plays sound for noisy native notifications', () => {
     sender_name: 'Alice',
     sender_avatar_url: null,
     body: 'hello',
+    emotes: [],
     mention: false,
     noisy: true,
   });

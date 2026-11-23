@@ -550,6 +550,7 @@ export type InboxItemView = {
 	sender: string,
 	sender_name: string | null,
 	body: string | null,
+	emotes: PreviewEmote[],
 	highlight: boolean,
 	is_direct: boolean,
 	encrypted: boolean,
@@ -792,6 +793,7 @@ export type NotificationView = {
 	sender_name: string | null,
 	sender_avatar_url: string | null,
 	body: string,
+	emotes: PreviewEmote[],
 	mention: boolean,
 	noisy: boolean | null,
 };

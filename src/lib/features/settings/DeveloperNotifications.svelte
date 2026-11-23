@@ -34,6 +34,7 @@
       sender_name: 'Sable',
       sender_avatar_url: null,
       body: i18n.t('settings.developerNotificationsBody', { count }),
+      emotes: [],
       mention: false,
       noisy: true,
     };

@@ -291,6 +291,7 @@ pub(crate) async fn invite_notification(
             .as_ref()
             .and_then(|member| member.avatar_url().map(ToString::to_string)),
         body: "invited you".to_owned(),
+        emotes: Vec::new(),
         mention: actions.iter().any(Action::is_highlight),
         noisy: Some(actions.iter().any(|action| action.sound().is_some())),
     })
@@ -332,6 +333,10 @@ fn view(
         sender_name: item.sender_display_name.and_then(visible_name),
         sender_avatar_url: item.sender_avatar_url,
         body: body(&item.event),
+        emotes: match &item.event {
+            NotificationEvent::Invite(_) => Vec::new(),
+            NotificationEvent::Timeline(event) => preview::emotes(event.as_ref()),
+        },
         mention: item.has_mention.unwrap_or(false),
         noisy: item.is_noisy,
     }

@@ -12,6 +12,7 @@ function item(eventId: string): InboxItemView {
     sender: '@alice:example.org',
     sender_name: 'Alice',
     body: 'hello',
+    emotes: [],
     highlight: false,
     is_direct: false,
     encrypted: false,

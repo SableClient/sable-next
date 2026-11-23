@@ -499,6 +499,68 @@ async fn a_message_alerts_when_the_server_reports_no_counts() {
 }
 
 #[tokio::test]
+async fn a_message_notification_lists_its_custom_emotes() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!emotes:example.org");
+    server.mock_room_state_encryption().plain().mount().await;
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.member(client.user_id().unwrap()))
+                .add_state_event(factory.power_levels()),
+        )
+        .await;
+    let (core, mut events) = watching(&server, &client).await;
+    let message = json!({
+        "type": "m.room.message", "event_id": "$emote", "room_id": room_id,
+        "sender": User::Alice, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+        "content": {
+            "msgtype": "m.text", "body": "hi :blob:",
+            "format": "org.matrix.custom.html",
+            "formatted_body": "hi <img data-mx-emoticon src=\"mxc://example.org/blob\" alt=\":blob:\">"
+        }
+    });
+    Mock::given(method("GET"))
+        .and(path_regex(r"/context/.*emote$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "event": message, "events_before": [], "events_after": [],
+            "state": [], "start": "s", "end": "e"
+        })))
+        .mount(server.server())
+        .await;
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 1, "highlight_count": 0}),
+                    )
+                    .add_timeline_event(
+                        ruma::serde::Raw::new(&message)
+                            .unwrap()
+                            .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
+                    ),
+            );
+        })
+        .await;
+
+    let view = next_notification(&mut events).await;
+    assert_eq!(view.body, "hi :blob:");
+    assert_eq!(
+        view.emotes,
+        [crate::protocol::PreviewEmote {
+            alt: ":blob:".to_owned(),
+            source: "mxc://example.org/blob".to_owned(),
+        }]
+    );
+    core.session_tasks.lock().clear();
+}
+
+#[tokio::test]
 #[expect(
     clippy::too_many_lines,
     reason = "one sequential flow kept in a single function"

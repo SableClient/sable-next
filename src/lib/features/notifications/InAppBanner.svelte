@@ -12,6 +12,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import PreviewSegments from '#lib/features/room/messages/PreviewSegments.svelte';
 
   import type { Banner } from './in-app-banners.svelte';
 
@@ -229,7 +230,7 @@
             <span class="count">{i18n.t('banner.new', { count: banner.count })}</span>
           {/if}
         </span>
-        <span class="body">{banner.body}</span>
+        <span class="body"><PreviewSegments segments={banner.segments} /></span>
       </span>
     </button>
     <div class="actions">

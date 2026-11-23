@@ -278,6 +278,7 @@ mod tests {
             sender_name: Some("Ada".to_owned()),
             sender_avatar_url: None,
             body: "shipped the patch".to_owned(),
+            emotes: Vec::new(),
             mention: false,
             noisy: Some(true),
         }

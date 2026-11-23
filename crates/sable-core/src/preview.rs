@@ -3,6 +3,8 @@ use matrix_sdk::ruma::events::room::message::{MessageFormat, MessageType};
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncStateEvent, AnySyncTimelineEvent};
 use sable_model::truncate::truncate_graphemes;
 
+use crate::matrix_html::{PreviewEmote, preview_body, preview_emotes};
+
 const FALLBACK: &str = "sent a message";
 const MAX_REACTION_BYTES: usize = 256;
 
@@ -59,15 +61,30 @@ fn describe_reaction(key: &str) -> String {
     format!("reacted with {shown}{ellipsis}")
 }
 
-fn describe_message(msgtype: &MessageType) -> String {
-    let formatted = match msgtype {
+/// The emotes in `describe`'s text, in order.
+pub(crate) fn emotes(event: &AnySyncTimelineEvent) -> Vec<PreviewEmote> {
+    let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(message)) = event
+    else {
+        return Vec::new();
+    };
+    message
+        .as_original()
+        .map(|event| preview_emotes(formatted(&event.content.msgtype)))
+        .unwrap_or_default()
+}
+
+fn formatted(msgtype: &MessageType) -> Option<&str> {
+    match msgtype {
         MessageType::Text(content) => content.formatted.as_ref(),
         MessageType::Notice(content) => content.formatted.as_ref(),
         MessageType::Emote(content) => content.formatted.as_ref(),
         _ => None,
     }
     .filter(|formatted| formatted.format == MessageFormat::Html)
-    .map(|formatted| formatted.body.as_str());
+    .map(|formatted| formatted.body.as_str())
+}
+
+fn describe_message(msgtype: &MessageType) -> String {
     match msgtype {
         MessageType::Image(_) => "sent an image".to_owned(),
         MessageType::Video(_) => "sent a video".to_owned(),
@@ -75,7 +92,7 @@ fn describe_message(msgtype: &MessageType) -> String {
         MessageType::File(_) => "sent a file".to_owned(),
         MessageType::Gallery(_) => "sent a gallery".to_owned(),
         MessageType::VerificationRequest(_) => "requested verification".to_owned(),
-        _ => crate::matrix_html::preview_body(msgtype.body(), formatted),
+        _ => preview_body(msgtype.body(), formatted(msgtype)),
     }
 }
 
@@ -85,7 +102,8 @@ mod tests {
     use matrix_sdk::ruma::serde::Raw;
     use serde_json::json;
 
-    use super::{MAX_REACTION_BYTES, describe, describe_message, describe_reaction};
+    use super::{MAX_REACTION_BYTES, describe, describe_message, describe_reaction, emotes};
+    use crate::matrix_html::PreviewEmote;
 
     fn message(content: serde_json::Value) -> RoomMessageEventContent {
         serde_json::from_value(content).expect("a valid message content")
@@ -122,6 +140,27 @@ mod tests {
                 "Alice hi & welcome"
             );
         }
+    }
+
+    #[test]
+    fn a_rich_text_preview_lists_its_emotes() {
+        let content = json!({
+            "msgtype": "m.text",
+            "body": "hi :blob:",
+            "format": "org.matrix.custom.html",
+            "formatted_body": "hi <img data-mx-emoticon src=\"mxc://example.org/blob\" alt=\":blob:\">"
+        });
+        let message = event("m.room.message", &content);
+        assert_eq!(describe(&message), "hi :blob:");
+        assert_eq!(
+            emotes(&message),
+            [PreviewEmote {
+                alt: ":blob:".to_owned(),
+                source: "mxc://example.org/blob".to_owned(),
+            }]
+        );
+        let image = json!({"msgtype": "m.image", "body": ":blob:", "url": "mxc://example.org/cat"});
+        assert_eq!(emotes(&event("m.room.message", &image)), []);
     }
 
     #[test]

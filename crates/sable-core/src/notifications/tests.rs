@@ -2510,6 +2510,7 @@ fn only_mentions_and_direct_messages_want_a_banner() {
         sender_name: None,
         sender_avatar_url: None,
         body: "hi".to_owned(),
+        emotes: Vec::new(),
         mention,
         noisy: None,
     };

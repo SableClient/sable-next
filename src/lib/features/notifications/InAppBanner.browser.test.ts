@@ -4,8 +4,10 @@ import { render } from 'vitest-browser-svelte';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('#lib/core/context.js');
 
 import '../../../styles.css';
+import { core } from '#lib/core/__mocks__/context.js';
 import InAppBanner from './InAppBanner.svelte';
 import type { Banner } from './in-app-banners.svelte';
 
@@ -15,6 +17,7 @@ const banner: Banner = {
   eventId: '$one',
   title: 'Room',
   body: 'Bob: hello',
+  segments: ['Bob: hello'],
   avatar: null,
   mention: true,
   count: 2,
@@ -45,6 +48,30 @@ test('tapping the banner opens the room and the close button dismisses it', asyn
 
   await screen.getByRole('button', { name: 'Dismiss' }).click();
   expect(handlers.ondismiss).toHaveBeenCalledOnce();
+});
+
+test('a custom emote shows as its image', async () => {
+  core.fetchMedia.mockResolvedValue(
+    Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGOYFvXsPwAGNgLW0emd+QAAAABJRU5ErkJggg=='
+      ),
+      (char) => char.charCodeAt(0)
+    )
+  );
+  const screen = await render(
+    InAppBanner,
+    props({
+      banner: {
+        ...banner,
+        body: 'Bob: hi :blob:',
+        segments: ['Bob: hi ', { alt: ':blob:', source: 'mxc://example.org/blob' }],
+      },
+    })
+  );
+
+  await expect.element(screen.getByRole('img', { name: ':blob:' })).toBeVisible();
+  await expect.element(screen.getByText('Bob: hi')).toBeVisible();
 });
 
 test('a quick reply sends the typed text', async () => {

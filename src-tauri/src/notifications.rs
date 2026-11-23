@@ -93,6 +93,7 @@ fn test_view(sequence: u32) -> NotificationView {
         sender_name: Some("Sable".to_owned()),
         sender_avatar_url: None,
         body: format!("Test notification {sequence}"),
+        emotes: Vec::new(),
         mention: false,
         noisy: Some(true),
     }

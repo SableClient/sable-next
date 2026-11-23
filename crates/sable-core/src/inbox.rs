@@ -22,7 +22,7 @@ use crate::Core;
 use crate::ResultExt;
 use crate::notifications;
 use crate::preview;
-use crate::protocol::{CoreEvent, InboxItemView, RpcCode, RpcError};
+use crate::protocol::{CoreEvent, InboxItemView, PreviewEmote, RpcCode, RpcError};
 use crate::push_rules;
 
 const SCHEMA: u32 = 1;
@@ -45,6 +45,8 @@ pub(crate) struct Entry {
     sender: OwnedUserId,
     sender_name: Option<String>,
     body: Option<String>,
+    #[serde(default)]
+    emotes: Vec<PreviewEmote>,
     highlight: bool,
     is_direct: bool,
     encrypted: bool,
@@ -528,13 +530,20 @@ impl Core {
                     .map(ToOwned::to_owned)
             });
         let encrypted = crate::rooms::room_maybe_encrypted(room);
+        let body = self.inbox_body(&event, encrypted);
+        let emotes = if body.is_some() {
+            preview::emotes(&event)
+        } else {
+            Vec::new()
+        };
         Some(Entry {
             room_id: room.room_id().to_owned(),
             event_id: event.event_id().to_owned(),
             ts: u64::from(event.origin_server_ts().get()),
             sender: event.sender().to_owned(),
             sender_name,
-            body: self.inbox_body(&event, encrypted),
+            body,
+            emotes,
             highlight: actions.iter().any(Action::is_highlight),
             is_direct: is_dm(room).await,
             encrypted,
@@ -785,15 +794,15 @@ impl Core {
                 has_more = true;
                 break;
             }
+            let shows_body = self.shows_inbox_body(entry.encrypted);
             items.push(InboxItemView {
                 room_id: entry.room_id.to_string(),
                 event_id: entry.event_id.to_string(),
                 ts: entry.ts,
                 sender: entry.sender.to_string(),
                 sender_name: entry.sender_name.and_then(visible_name),
-                body: entry
-                    .body
-                    .filter(|_| self.shows_inbox_body(entry.encrypted)),
+                body: entry.body.filter(|_| shows_body),
+                emotes: if shows_body { entry.emotes } else { Vec::new() },
                 highlight: entry.highlight,
                 is_direct: entry.is_direct,
                 encrypted: entry.encrypted,
@@ -937,8 +946,8 @@ mod tests {
     };
 
     use super::{
-        Entry, InboxScope, MAX_ENTRIES, RoomReadState, UnreadScan, is_reply, is_unread, merge,
-        preview,
+        Entry, InboxScope, MAX_ENTRIES, PreviewEmote, RoomReadState, UnreadScan, is_reply,
+        is_unread, merge, preview,
     };
     use crate::{
         Core, api::notifications::InboxFilter, session::Session, store::MemorySessionStore,
@@ -1176,6 +1185,10 @@ mod tests {
         let (core, client, _room) = setup(&server, 1).await;
         let stored = Entry {
             body: Some("secret".to_owned()),
+            emotes: vec![PreviewEmote {
+                alt: ":blob:".to_owned(),
+                source: "mxc://example.org/blob".to_owned(),
+            }],
             encrypted: true,
             ..entry("secret", 200)
         };
@@ -1192,6 +1205,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(items[0].body.as_deref(), Some("secret"));
+        assert_eq!(items[0].emotes.len(), 1);
 
         core.notification_encrypted_content
             .store(false, std::sync::atomic::Ordering::Relaxed);
@@ -1200,6 +1214,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(items[0].body, None);
+        assert_eq!(items[0].emotes, []);
     }
 
     #[tokio::test]
@@ -1695,6 +1710,7 @@ mod tests {
             sender: owned_user_id!("@alice:example.org"),
             sender_name: None,
             body: None,
+            emotes: Vec::new(),
             highlight: false,
             is_direct: false,
             encrypted: false,

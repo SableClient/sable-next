@@ -20,6 +20,7 @@ function item(overrides: Partial<InboxItemView>): InboxItemView {
     sender: '@alice:example.org',
     sender_name: 'Alice',
     body: 'hi',
+    emotes: [],
     highlight: false,
     is_direct: false,
     encrypted: false,
