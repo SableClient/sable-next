@@ -137,6 +137,8 @@ pub enum RpcCode {
     DocumentLocked,
     /// A key backup this device cannot unlock is already on the server.
     BackupExists,
+    /// A key backup this device can read is turned off for the whole account (MSC4287).
+    BackupPaused,
     /// Secret storage no longer matches the account's identity.
     KeyStorageOutOfSync,
     /// Static: safe to hide UI.

@@ -1,6 +1,6 @@
 use sable_model::text::visible_name;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -133,6 +133,21 @@ impl LocalContent {
             }
         }
         content
+    }
+
+    /// Reads the queue again after missed updates and returns the events whose queued edits may
+    /// have changed. An edit already sent is no longer queued, so it is kept until its remote
+    /// echo settles it.
+    pub(crate) fn resync(&mut self, echoes: &[LocalEcho]) -> HashSet<OwnedEventId> {
+        let mut targets: HashSet<_> = self.edits.iter().map(|edit| edit.target.clone()).collect();
+        let mut sent = std::mem::take(&mut self.edits);
+        sent.retain(|edit| edit.sent.is_some());
+        *self = Self::new(echoes);
+        sent.retain(|edit| self.edit_target(&edit.transaction_id).is_none());
+        sent.append(&mut self.edits);
+        self.edits = sent;
+        targets.extend(self.edits.iter().map(|edit| edit.target.clone()));
+        targets
     }
 
     pub fn apply(&mut self, update: &RoomSendQueueUpdate) -> Option<OwnedEventId> {
@@ -929,6 +944,33 @@ mod tests {
 
         local_content.settle(&target, Some(&sent));
         assert!(local_content.pending_edit(&target).is_none());
+    }
+
+    #[test]
+    fn a_resync_keeps_a_sent_edit_and_drops_one_the_queue_no_longer_holds() {
+        let target = OwnedEventId::try_from("$target:example.org").expect("an event id");
+        let edit = |transaction_id: &str| RoomSendQueueUpdate::ReplacedLocalEvent {
+            transaction_id: OwnedTransactionId::from(transaction_id),
+            new_content: queued_edit(Some(json!({ "id": "kris" }))),
+        };
+        let mut cancelled = LocalContent::default();
+        cancelled.apply(&edit("txn"));
+
+        assert!(cancelled.resync(&[]).contains(&target));
+        assert!(cancelled.pending_edit(&target).is_none());
+
+        let mut sent = LocalContent::default();
+        sent.apply(&edit("txn"));
+        sent.apply(&RoomSendQueueUpdate::SentEvent {
+            transaction_id: OwnedTransactionId::from("txn"),
+            event_id: OwnedEventId::try_from("$edit:example.org").expect("an event id"),
+        });
+
+        assert!(sent.resync(&[]).contains(&target));
+        assert!(
+            sent.pending_edit(&target).is_some(),
+            "its remote echo has not arrived yet"
+        );
     }
 
     #[test]

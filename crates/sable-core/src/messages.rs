@@ -610,7 +610,8 @@ impl Core {
         let Some(joined_at) = joined_at else {
             return Ok(0);
         };
-        let kept = room
+        // A failed fetch must not read as "the server did not redact" and trigger a second bulk redaction.
+        let member = room
             .client()
             .send(get_state_event_for_key::v3::Request::new(
                 room.room_id().to_owned(),
@@ -618,14 +619,12 @@ impl Core {
                 user_id.to_string(),
             ))
             .await
+            .or_failed(self, "remove_redacting_events")?;
+        let kept = member
+            .into_content()
+            .get_field::<bool>("org.matrix.msc4293.redact_events")
             .ok()
-            .and_then(|response| {
-                response
-                    .into_content()
-                    .get_field::<bool>("org.matrix.msc4293.redact_events")
-                    .ok()
-                    .flatten()
-            })
+            .flatten()
             .unwrap_or(false);
         if kept {
             return Ok(0);
@@ -3196,6 +3195,33 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_queued_message_is_cancelled_through_its_send_queue_handle() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.send_queue().set_enabled(false).await;
+        let room_id = room_id!("!pending:example.org");
+        let room = server.sync_joined_room(&client, room_id).await;
+        let core = core(&server, client).await;
+        let params = serde_json::from_value::<crate::api::messages::SendParams>(json!({
+            "room_id": room_id,
+            "body": "queued",
+        }))
+        .unwrap();
+        core.run(params).await.unwrap();
+        let (echoes, _updates) = room.send_queue().subscribe().await.unwrap();
+        let transaction_id = echoes[0].transaction_id.to_string();
+
+        let handle = core
+            .local_echo(&room_id.to_owned(), &transaction_id)
+            .await
+            .unwrap();
+        assert!(handle.abort().await.unwrap());
+        core.local_echo(&room_id.to_owned(), &transaction_id)
+            .await
+            .unwrap_err();
     }
 
     #[tokio::test]

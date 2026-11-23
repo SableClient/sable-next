@@ -52,6 +52,7 @@
   let newRecoveryKey = $state<string | null>(null);
   let confirmingReset = $state(false);
   let confirmingReplaceBackup = $state(false);
+  let confirmingResumeBackup = $state(false);
   let deleting = $state<string | null>(null);
   let removing = $state<string | null>(null);
   let verificationOpen = $state(false);
@@ -259,7 +260,11 @@
     void removeDevice(deviceId, authWindow);
   }
 
-  async function manageRecovery(reset = false, replaceBackup = false): Promise<void> {
+  async function manageRecovery(
+    reset = false,
+    replaceBackup = false,
+    resumeBackup = false
+  ): Promise<void> {
     managingRecovery = true;
     error = null;
     try {
@@ -268,12 +273,16 @@
         : await core.rpc.encryption.enableRecovery({
             passphrase: null,
             replace_backup: replaceBackup,
+            resume_backup: resumeBackup,
           });
       confirmingReplaceBackup = false;
+      confirmingResumeBackup = false;
       await refresh();
     } catch (cause) {
       if (isCoreError(cause, 'backup_exists')) {
         confirmingReplaceBackup = true;
+      } else if (isCoreError(cause, 'backup_paused')) {
+        confirmingResumeBackup = true;
       } else {
         error = messageFor(cause);
       }
@@ -711,6 +720,16 @@
     {i18n.t('settings.replaceKeyBackupUseExisting')}
   </Button>
 </ConfirmDialog>
+
+<ConfirmDialog
+  bind:open={confirmingResumeBackup}
+  title={i18n.t('settings.resumeKeyBackupConfirmTitle')}
+  description={i18n.t('settings.resumeKeyBackupConfirmDescription')}
+  confirmLabel={i18n.t('settings.resumeKeyBackup')}
+  confirmVariant="primary"
+  busy={managingRecovery}
+  onConfirm={() => void manageRecovery(false, false, true)}
+/>
 
 {#if status}
   <VerifyDeviceDialog

@@ -10,6 +10,7 @@ use matrix_sdk_base::crypto::olm::InboundGroupSession;
 use serde::{Deserialize, Serialize};
 
 use super::Handler;
+use crate::key_backup::ReadableBackup;
 use crate::protocol::{RpcCode, RpcError, DehydratedDeviceView, DeviceView, EncryptionStatusView, IdentityResetStep, KeyBackupDownloadView, KeyBackupStatusView, ShareHistoryView, SignOutSafetyView, UserSecurityView};
 use crate::verification::{self, VERIFICATION_METHODS, encryption_status, sign_out_safety};
 use crate::{Core, ResultExt};
@@ -168,6 +169,10 @@ pub struct EnableRecoveryParams {
     /// Deletes the unreadable server backup and the history it holds.
     #[serde(default)]
     pub replace_backup: bool,
+    /// Turns the account's key backup back on. Without it, a backup the account paused ends
+    /// the call with `backup_paused`.
+    #[serde(default)]
+    pub resume_backup: bool,
 }
 
 impl Handler for EnableRecoveryParams {
@@ -177,7 +182,18 @@ impl Handler for EnableRecoveryParams {
     async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
         let client = core.client().await?;
         let backups = client.encryption().backups();
-        if self.replace_backup && !backups.are_enabled().await {
+        // A backup paused by the account preference is not enabled either, yet it is readable, so
+        // it is turned back on, once the user agrees, instead of being offered for replacement.
+        let resumed = !backups.are_enabled().await
+            && match core
+                .resume_readable_backup(&client, self.resume_backup)
+                .await?
+            {
+                ReadableBackup::Paused => return Err(RpcCode::BackupPaused.into()),
+                ReadableBackup::Resumed => true,
+                ReadableBackup::None => false,
+            };
+        if self.replace_backup && !resumed && core.server_backup_unreadable(&client).await? {
             backups
                 .disable_and_delete()
                 .await

@@ -2264,6 +2264,39 @@ async fn memberships_follow_the_server_joined_rooms() {
 }
 
 #[tokio::test]
+async fn a_room_joined_by_sync_while_the_snapshot_was_out_stays_joined() {
+    use matrix_sdk::RoomState;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let fresh = room_id!("!fresh:example.org");
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/joined_rooms"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_millis(300))
+                .set_body_json(json!({"joined_rooms": []})),
+        )
+        .mount(server.server())
+        .await;
+
+    let reconcile = crate::rooms::reconcile_memberships(&client);
+    let sync = async {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_joined_room(JoinedRoomBuilder::new(fresh));
+            })
+            .await;
+    };
+    let (reconciled, ()) = tokio::join!(reconcile, sync);
+    reconciled.unwrap();
+
+    assert_eq!(client.get_room(fresh).unwrap().state(), RoomState::Joined);
+}
+
+#[tokio::test]
 async fn our_own_membership_is_fetched_for_small_rooms_that_lack_it() {
     use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
     use matrix_sdk_test::event_factory::EventFactory;
@@ -4162,6 +4195,60 @@ async fn a_ban_that_redacts_events_relies_on_a_server_that_kept_the_flag() {
 #[tokio::test]
 async fn a_ban_whose_flag_the_server_dropped_redacts_the_messages_itself() {
     ban_redacting_events(false).await;
+}
+
+#[tokio::test]
+async fn a_ban_whose_member_state_cannot_be_read_returns_the_error_without_redacting() {
+    use matrix_sdk::ruma::{room_id, user_id};
+    use matrix_sdk_test::event_factory::EventFactory;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!moderated:example.org");
+    let spammer = user_id!("@spam:example.org");
+    let joined = EventFactory::new()
+        .room(room_id)
+        .sender(spammer)
+        .member(spammer)
+        .server_ts(5);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(joined),
+        )
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"^/_matrix/client/v3/rooms/.*/ban$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v3/rooms/.*/state/m\.room\.member/.*",
+        ))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+            "errcode": "M_FORBIDDEN", "error": "no"
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/_matrix/client/v3/rooms/.*/messages$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "t0", "chunk": []})))
+        .expect(0)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let banned = core
+        .run(crate::api::members::BanParams {
+            room_id: room_id.to_owned(),
+            user_id: spammer.to_owned(),
+            reason: None,
+            redact_events: true,
+        })
+        .await;
+
+    assert!(banned.is_err(), "{banned:?}");
 }
 
 async fn read_unredacted(

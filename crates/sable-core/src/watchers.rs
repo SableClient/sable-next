@@ -110,7 +110,11 @@ impl Core {
                 let rules_cleaned = Arc::new(AtomicBool::new(false));
                 let mut after_running = None;
                 loop {
-                    let next = if matches!(states.get(), SyncState::Offline) {
+                    // The SDK's offline mode already polls the server and resumes by itself; only
+                    // an OS-reported outage, which blocks every restart, needs this probe.
+                    let next = if matches!(states.get(), SyncState::Offline)
+                        && !core.activity.network_available()
+                    {
                         matrix_sdk::timeout::timeout(states.next(), OFFLINE_RECHECK).await
                     } else {
                         Ok(states.next().await)
@@ -228,6 +232,7 @@ impl Core {
         let queue = client.send_queue();
         let mut errors = queue.subscribe_errors();
         let mut updates = queue.subscribe();
+        let core = self.clone();
 
         self.track_session_task(
             spawn(async move {
@@ -259,7 +264,11 @@ impl Core {
 
                     failures = failures.saturating_add(1);
                     retry_backoff(failures).await;
-                    queue.set_enabled(true).await;
+                    // Unlocking re-enables the queue itself; a paused sync retries once it resumes.
+                    core.wait_until_sync_resumes().await;
+                    if !core.activity.account_locked() {
+                        queue.set_enabled(true).await;
+                    }
                 }
             })
             .abort_on_drop(),

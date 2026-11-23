@@ -28,6 +28,9 @@ impl Core {
             spawn(async move {
                 let mut states = sync_service.state();
                 loop {
+                    // Nothing to catch while paused. A resume the OS-reported outage refused changes
+                    // no state, and it is the one the probe below is for.
+                    core.wait_until_sync_resumes().await;
                     // A state change restarts the wait, so a sync that just started is not
                     // charged for the time it was stopped.
                     let beat = std::pin::pin!(client.wait_for_sync());

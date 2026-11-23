@@ -21,10 +21,8 @@ use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::member::MembershipState;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
-use matrix_sdk::ruma::{
-    OwnedEventId, OwnedRoomId, OwnedServerName, RoomId, RoomOrAliasId, ServerName, UInt,
-};
-use matrix_sdk::send_queue::SendHandle;
+use matrix_sdk::ruma::{OwnedRoomId, OwnedServerName, RoomId, RoomOrAliasId, ServerName, UInt};
+use matrix_sdk::send_queue::{LocalEchoContent, SendHandle};
 use matrix_sdk::{Client, EncryptionState, RoomMemberships, RoomState};
 use matrix_sdk_base::{RawStateEventWithKeys, RoomInfo, RoomInfoNotableUpdateReasons};
 
@@ -89,15 +87,33 @@ pub(crate) async fn migrate_saved_tombstones(client: &Client) -> Result<(), matr
     Ok(())
 }
 
+/// Leaves alone a room that changed while the request was out, since sync knows better than the
+/// snapshot, and the whole pass when updates were missed.
 pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_sdk::Error> {
+    use tokio::sync::broadcast::error::TryRecvError;
+
+    let mut updates = client.room_info_notable_update_receiver();
     let joined: std::collections::HashSet<_> = client
         .send(joined_rooms::v3::Request::new())
         .await?
         .joined_rooms
         .into_iter()
         .collect();
+    let mut changed = std::collections::HashSet::new();
+    loop {
+        match updates.try_recv() {
+            Ok(update) => {
+                changed.insert(update.room_id);
+            }
+            Err(TryRecvError::Lagged(_)) => return Ok(()),
+            Err(TryRecvError::Empty | TryRecvError::Closed) => break,
+        }
+    }
 
     for room in client.rooms() {
+        if changed.contains(room.room_id()) {
+            continue;
+        }
         let mark: fn(&mut RoomInfo) = match (room.state(), joined.contains(room.room_id())) {
             (RoomState::Joined, false) => RoomInfo::mark_as_left,
             (RoomState::Left | RoomState::Invited | RoomState::Knocked, true) => {
@@ -876,25 +892,29 @@ impl Core {
         })
     }
 
-    /// The handle lives on the timeline item, so the id has to be looked up.
+    /// The send queue's local echoes carry the handle, whatever timeline shows them.
     pub(crate) async fn local_echo(
         &self,
         room_id: &OwnedRoomId,
         transaction_id: &str,
-        thread_root: Option<&OwnedEventId>,
     ) -> Result<SendHandle, RpcError> {
-        self.timeline_for(room_id, thread_root)
+        let (echoes, _updates) = self
+            .room(room_id)
             .await?
-            .items()
+            .send_queue()
+            .subscribe()
             .await
-            .iter()
-            .filter_map(|item| item.as_event())
-            .find(|event| {
-                event
-                    .transaction_id()
-                    .is_some_and(|id| id == transaction_id)
+            .or_failed(self, "local_echo")?;
+        echoes
+            .into_iter()
+            .find_map(|echo| match echo.content {
+                LocalEchoContent::Event { send_handle, .. }
+                    if echo.transaction_id == transaction_id =>
+                {
+                    Some(send_handle)
+                }
+                _ => None,
             })
-            .and_then(matrix_sdk_ui::timeline::EventTimelineItem::local_echo_send_handle)
             .ok_or_else(|| RpcCode::UnknownLocalEcho.into())
     }
 }

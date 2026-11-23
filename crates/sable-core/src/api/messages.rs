@@ -797,15 +797,14 @@ impl Handler for RetrySendParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.client().await?.send_queue().set_enabled(true).await;
+        let client = core.client().await?;
+        if !core.sync_paused() {
+            client.send_queue().set_enabled(true).await;
+        }
 
-        core.local_echo(
-            &self.room_id,
-            &self.transaction_id,
-            self.thread_root.as_ref(),
-        )
-        .await?
-        .unwedge()
+        core.local_echo(&self.room_id, &self.transaction_id)
+            .await?
+            .unwedge()
         .await
         .or_failed(core, "retry_send")
     }
@@ -829,17 +828,16 @@ impl Handler for CancelSendParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
         let cancelled = core
-            .local_echo(
-                &self.room_id,
-                &self.transaction_id,
-                self.thread_root.as_ref(),
-            )
+            .local_echo(&self.room_id, &self.transaction_id)
             .await?
             .abort()
             .await
             .or_failed(core, "cancel_send")?;
 
-        core.client().await?.send_queue().set_enabled(true).await;
+        let client = core.client().await?;
+        if !core.sync_paused() {
+            client.send_queue().set_enabled(true).await;
+        }
 
         Ok(cancelled)
     }

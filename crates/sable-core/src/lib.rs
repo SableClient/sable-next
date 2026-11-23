@@ -179,6 +179,8 @@ pub struct Core {
     lifecycle: lifecycle::Lifecycle,
     session_store_lock: Mutex<()>,
     credential_writers: Mutex<HashMap<String, u64>>,
+    /// Accounts whose rotated tokens could not be saved, which the SDK only logs.
+    unsaved_tokens: parking_lot::Mutex<std::collections::HashSet<String>>,
     next_credential_writer: AtomicU64,
     next_login_attempt: AtomicU64,
     account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
@@ -382,6 +384,7 @@ impl Core {
             lifecycle: lifecycle::Lifecycle::new(),
             session_store_lock: Mutex::new(()),
             credential_writers: Mutex::new(HashMap::new()),
+            unsaved_tokens: parking_lot::Mutex::new(std::collections::HashSet::new()),
             next_credential_writer: AtomicU64::new(1),
             next_login_attempt: AtomicU64::new(1),
             account_clients: Mutex::new(HashMap::new()),

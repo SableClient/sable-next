@@ -257,6 +257,7 @@ test('an unreadable server backup asks before it is replaced', async () => {
   expect(encryption.enableRecovery).toHaveBeenCalledWith({
     passphrase: null,
     replace_backup: false,
+    resume_backup: false,
   });
 
   await user.click(within(dialog).getByRole('button', { name: 'Replace backup' }));
@@ -264,6 +265,30 @@ test('an unreadable server backup asks before it is replaced', async () => {
   expect(encryption.enableRecovery).toHaveBeenLastCalledWith({
     passphrase: null,
     replace_backup: true,
+    resume_backup: false,
+  });
+});
+
+test('a key backup the account turned off asks before it is turned back on', async () => {
+  encryption.enableRecovery
+    .mockRejectedValueOnce(new CoreError({ code: 'backup_paused' }))
+    .mockResolvedValueOnce('NEW KEY');
+  encryption.status.mockResolvedValue({ ...status, recovery: 'disabled' });
+  encryption.devices.mockResolvedValue({ devices: [own] });
+  render(DevicesSettings);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByRole('button', { name: 'Set up recovery' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText(/turned off for your account/)).toBeInTheDocument();
+  expect(encryption.enableRecovery).toHaveBeenCalledOnce();
+
+  await user.click(within(dialog).getByRole('button', { name: 'Turn on backup' }));
+  expect(await screen.findByText('NEW KEY')).toBeInTheDocument();
+  expect(encryption.enableRecovery).toHaveBeenLastCalledWith({
+    passphrase: null,
+    replace_backup: false,
+    resume_backup: true,
   });
 });
 

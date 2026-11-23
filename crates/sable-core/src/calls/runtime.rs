@@ -1493,11 +1493,12 @@ async fn receive_call_key(
         );
         return;
     };
-    let Some(device) = encryption.sender_device else {
+    let Some(device) = sticky::trusted_sender_device(&encryption) else {
         tracing::warn!(
             reported = true,
             sender = %sender,
-            "ignoring a call media key from an unknown device"
+            verification = ?encryption.verification_state,
+            "ignoring a call media key from an unknown or untrusted device"
         );
         return;
     };

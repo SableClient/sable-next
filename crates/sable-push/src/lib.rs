@@ -455,12 +455,12 @@ fn message_text(settings: &Policy, event: Option<&Value>, encrypted: bool) -> St
 async fn signed_in(root: &Path, user: &str) -> Option<(String, String)> {
     let bytes = FileSessionStore::new(root).load().await.ok()??;
     let (registry, _) = AccountRegistry::from_bytes(&bytes, root.to_str()?).ok()?;
+    // A pusher is registered for every signed-in account, so the push names the account.
     // Never select an arbitrary saved account for a push, including after logout.
-    let account = registry.accounts.iter().find(|account| {
-        !account.needs_reauth
-            && registry.active_account_id.as_deref() == Some(account.account_id.as_str())
-            && account.session.credentials.user_id() == user
-    })?;
+    let account = registry
+        .accounts
+        .iter()
+        .find(|account| !account.needs_reauth && account.session.credentials.user_id() == user)?;
     Some((
         account.account_id.clone(),
         account.session.credentials.device_id(),
@@ -1542,6 +1542,28 @@ mod tests {
         let response = render_response(alert, issue, Some("unavailable")).unwrap();
         assert_eq!(response["body"], json!("New message"));
         assert_eq!(response["diagnostic"]["issue"], "no_session");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_push_for_a_non_active_signed_in_account_still_resolves() {
+        let root = shape_root("inactive").await;
+        let registry = json!({"version":1,"active_account_id":"a2","next_account_id":3,"accounts":[
+            {"account_id":"a1","store_id":"old","needs_reauth":false,
+             "session":{"homeserver":"https://example.org","credentials":{
+                "kind":"password","user_id":"@alice:example.org","device_id":"A","access_token":"test"}}},
+            {"account_id":"a2","store_id":"new","needs_reauth":false,
+             "session":{"homeserver":"https://example.org","credentials":{
+                "kind":"password","user_id":"@carol:example.org","device_id":"C","access_token":"test"}}}
+        ]});
+        FileSessionStore::new(&root)
+            .save(registry.to_string().into_bytes())
+            .await
+            .unwrap();
+
+        let (account, device) = signed_in(&root, "@alice:example.org").await.unwrap();
+
+        assert_eq!((account.as_str(), device.as_str()), ("a1", "A"));
         std::fs::remove_dir_all(root).unwrap();
     }
 

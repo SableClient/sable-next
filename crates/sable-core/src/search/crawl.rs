@@ -31,6 +31,9 @@ const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(3);
 pub(super) const CRAWL_MAX_AGE_MS: u64 = 26 * 7 * 24 * 60 * 60 * 1000;
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
+/// A busy crawl rewrites the whole checkpoint map at most this often; a crawl that stops does so
+/// at once.
+const CHECKPOINT_INTERVAL: Duration = Duration::from_secs(30);
 const COVERAGE_PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 const CRAWL_BASE_EVENTS: usize = 20_000;
 const MAX_CRAWLED_EVENTS: usize = 50_000;
@@ -118,6 +121,10 @@ pub(crate) struct CrawlProgress {
     discarded: HashSet<OwnedRoomId>,
     awaiting: HashMap<OwnedRoomId, u64>,
     saved: BTreeMap<OwnedRoomId, StoredCrawlRoom>,
+    /// When the checkpoints were last written, so a busy crawl saves them in batches.
+    checkpointed: Option<web_time::Instant>,
+    #[cfg(test)]
+    checkpoint_writes: usize,
     events: usize,
     changed: bool,
     metrics: CrawlMetrics,
@@ -483,6 +490,7 @@ impl Core {
             }
 
             let Some(room_id) = self.next_room_to_crawl(client).await else {
+                self.save_changed_checkpoints(client).await;
                 self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
                 matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
                 continue;
@@ -543,9 +551,12 @@ impl Core {
             return true;
         }
 
-        self.save_changed_checkpoints(client).await;
+        if !self.checkpoint_batch_open().await {
+            self.save_changed_checkpoints(client).await;
+        }
 
         if !self.search_crawl_active() {
+            self.save_changed_checkpoints(client).await;
             self.search_crawl
                 .lock()
                 .await
@@ -570,6 +581,7 @@ impl Core {
         let spent = self.search_crawl.lock().await.spent();
         let full = self.search_index.lock().await.is_full();
         if spent || full {
+            self.save_changed_checkpoints(client).await;
             self.search_crawl.lock().await.enter(if spent {
                 SearchCrawlPhase::BudgetSpent
             } else {
@@ -580,6 +592,15 @@ impl Core {
         }
 
         false
+    }
+
+    /// Whether the last save is recent enough that this change may join the next batch.
+    async fn checkpoint_batch_open(&self) -> bool {
+        self.search_crawl
+            .lock()
+            .await
+            .checkpointed
+            .is_some_and(|at| at.elapsed() < CHECKPOINT_INTERVAL)
     }
 
     pub(super) async fn save_changed_checkpoints(&self, client: &matrix_sdk::Client) {
@@ -604,7 +625,13 @@ impl Core {
             return;
         }
         if persist::save_crawl(client, checkpoints.clone()).await {
-            self.search_crawl.lock().await.saved = checkpoints;
+            let mut progress = self.search_crawl.lock().await;
+            progress.saved = checkpoints;
+            progress.checkpointed = Some(web_time::Instant::now());
+            #[cfg(test)]
+            {
+                progress.checkpoint_writes += 1;
+            }
         } else {
             self.search_crawl.lock().await.changed = true;
         }
@@ -1796,6 +1823,62 @@ mod tests {
                 .get(&room_id)
                 .and_then(|room| room.token.as_deref()),
             Some("deeper")
+        );
+
+        drop(joined);
+    }
+
+    #[async_test]
+    async fn test_an_idle_crawl_writes_no_checkpoints_and_a_busy_one_batches_them() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+
+        let room_id = room();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@kris:localhost"))
+            .server_ts(super::now_ms());
+        server.mock_room_state_encryption().plain().mount().await;
+        let joined = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous"),
+            )
+            .await;
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default()
+                .events(vec![factory.text_msg("older archaeology")])
+                .end_token("deeper"))
+            .mount()
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "crawl-quiescent",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.crawl_once(&client, &room_id)
+            .await
+            .expect("crawl one batch");
+        core.flush_search_index(&client).await;
+        core.save_changed_checkpoints(&client).await;
+        assert_eq!(core.search_crawl.lock().await.checkpoint_writes, 1);
+        assert!(core.checkpoint_batch_open().await, "a busy crawl batches");
+
+        for _ in 0..3 {
+            core.save_changed_checkpoints(&client).await;
+        }
+        core.crawl_once(&client, &room_id)
+            .await
+            .expect("crawl the same batch again");
+        core.flush_search_index(&client).await;
+        core.save_changed_checkpoints(&client).await;
+        assert_eq!(
+            core.search_crawl.lock().await.checkpoint_writes,
+            1,
+            "nothing new, so nothing is written"
         );
 
         drop(joined);

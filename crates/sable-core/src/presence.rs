@@ -354,6 +354,7 @@ impl Core {
             spawn(async move {
                 let mut since = stored_since(&core, &client).await;
                 let revised = core.revised_presence().await.is_some();
+                let mut failures = 0u32;
 
                 loop {
                     core.wait_until_active().await;
@@ -374,6 +375,7 @@ impl Core {
                         .await
                     {
                         Ok(response) => {
+                            failures = 0;
                             for raw in response.presence.events {
                                 let Ok(event) = raw.deserialize() else {
                                     continue;
@@ -387,6 +389,7 @@ impl Core {
                         }
                         Err(error) => {
                             tracing::debug!("presence sync failed: {error}");
+                            failures = failures.saturating_add(1);
                             if since.is_some()
                                 && error.as_client_api_error().is_some_and(|error| {
                                     error.status_code == http::StatusCode::BAD_REQUEST
@@ -401,6 +404,9 @@ impl Core {
                         break;
                     }
 
+                    if failures > 0 {
+                        crate::watchers::retry_backoff(failures).await;
+                    }
                     matrix_sdk::sleep::sleep(POLL_GAP).await;
                 }
             })

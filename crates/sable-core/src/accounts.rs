@@ -22,6 +22,14 @@ use crate::lifecycle::SessionGeneration;
 use crate::search;
 use crate::session;
 
+/// The other sign-ins of a user that a new one replaces.
+#[derive(Debug, Default)]
+pub(crate) struct ReplacedSignIns {
+    pub(crate) all: Vec<String>,
+    /// Those that were usable until now.
+    pub(crate) usable: Vec<String>,
+}
+
 impl Core {
     pub(crate) async fn delete_device(
         &self,
@@ -313,28 +321,35 @@ impl Core {
         let session = self.take_session().await;
         let account_id = session.as_ref().map(|session| session.account_id.clone());
         if let Some(session) = session {
-            let result = if session.oauth {
-                session
-                    .client
-                    .oauth()
-                    .logout()
-                    .await
-                    .map_err(|e| e.to_string())
-            } else {
-                session
-                    .client
-                    .matrix_auth()
-                    .logout()
-                    .await
-                    .map(|_| ())
-                    .map_err(|e| e.to_string())
-            };
-
-            if let Err(error) = result {
-                tracing::warn!("server-side logout failed, clearing locally anyway: {error}");
-            }
-
+            // Stopped first, so the stores are not held open while the server is slow to answer.
             session.sync_service.stop().await;
+            let request = async {
+                if session.oauth {
+                    session
+                        .client
+                        .oauth()
+                        .logout()
+                        .await
+                        .map_err(|e| e.to_string())
+                } else {
+                    session
+                        .client
+                        .matrix_auth()
+                        .logout()
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
+                }
+            };
+            match matrix_sdk::timeout::timeout(Box::pin(request), LOG_OUT_TIMEOUT).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    tracing::warn!("server-side logout failed, clearing locally anyway: {error}");
+                }
+                Err(_) => {
+                    tracing::warn!("server-side logout timed out, clearing locally anyway");
+                }
+            }
         }
 
         self.remove_account(account_id.as_deref()).await
@@ -356,14 +371,22 @@ impl Core {
         }
 
         let accounts = self.accounts().await?;
-        if !accounts
+        let Some(account) = accounts
             .accounts
             .iter()
-            .any(|account| account.account_id == account_id)
-        {
+            .find(|account| account.account_id == account_id)
+        else {
             return Err(RpcCode::NotLoggedIn.into());
-        }
+        };
 
+        // A twin of the active session's own device must stay signed in.
+        let twin = self.active_session_info().is_some_and(|session| {
+            session.user_id.as_str() == account.session.credentials.user_id()
+                && session.device_id == account.session.credentials.device_id()
+        });
+        if !account.device_invalidated && !twin {
+            self.log_out_saved(account).await;
+        }
         self.remove_account(Some(&account_id)).await
     }
 
@@ -424,7 +447,7 @@ impl Core {
         store_id: &str,
         persisted: &PersistedSession,
         reauth: Option<&PersistedAccount>,
-    ) -> Result<Vec<String>, RpcError> {
+    ) -> Result<ReplacedSignIns, RpcError> {
         let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
         let Some(registry) = accounts.as_ref() else {
@@ -441,12 +464,15 @@ impl Core {
         }
         let mut updated = registry.clone();
         let user_id = persisted.credentials.user_id();
-        let mut replaced = Vec::new();
+        let mut replaced = ReplacedSignIns::default();
         for account in &mut updated.accounts {
             if account.account_id != account_id && account.session.credentials.user_id() == user_id
             {
+                if !account.needs_reauth {
+                    replaced.usable.push(account.account_id.clone());
+                }
                 account.needs_reauth = true;
-                replaced.push(account.account_id.clone());
+                replaced.all.push(account.account_id.clone());
             }
         }
         let account = PersistedAccount {
@@ -464,11 +490,34 @@ impl Core {
             .await
             .or_failed(self, "persist_save")?;
         self.invalidate_account_client(account_id).await;
-        for account_id in &replaced {
+        for account_id in &replaced.all {
             self.invalidate_account_client(account_id).await;
         }
         *accounts = Some(updated);
         Ok(replaced)
+    }
+
+    /// The sign-in that replaced these never started, so they are the user's usable ones again.
+    async fn keep_replaced(&self, account_ids: &[String]) -> Result<(), RpcError> {
+        if account_ids.is_empty() {
+            return Ok(());
+        }
+        let _guard = self.session_store_lock.lock().await;
+        let mut accounts = self.accounts.lock().await;
+        let Some(registry) = accounts.as_ref() else {
+            return Err(self.failed("keep_replaced", "account registry is not initialized"));
+        };
+        let mut updated = registry.clone();
+        for account in &mut updated.accounts {
+            if account_ids.contains(&account.account_id) {
+                account.needs_reauth = false;
+            }
+        }
+        self.write_registry(&updated)
+            .await
+            .or_failed(self, "keep_replaced_save")?;
+        *accounts = Some(updated);
+        Ok(())
     }
 
     async fn persist_refreshed(
@@ -481,12 +530,56 @@ impl Core {
         let _guard = self.session_store_lock.lock().await;
         if self.credential_writers.lock().await.get(account_id) != Some(&generation) {
             tracing::info!("session tokens: save skipped, another client writes this account");
+            // The writer's own tokens are saved by the retry, which a refresh here may have made stale.
+            self.unsaved_tokens.lock().insert(account_id.to_owned());
             return Ok(());
         }
-        self.save_current_credentials(client, homeserver, account_id)
-            .await?;
+        let saved = self
+            .save_current_credentials(client, homeserver, account_id)
+            .await;
+        if saved.is_ok() {
+            self.unsaved_tokens.lock().remove(account_id);
+        } else {
+            self.unsaved_tokens.lock().insert(account_id.to_owned());
+        }
+        saved?;
         tracing::info!(refresh = %refresh_tag(client), "session tokens: save finished");
         Ok(())
+    }
+
+    /// The SDK only logs a failed save, and the refresh token it replaced is spent, so the next
+    /// start would sign the account out.
+    pub(crate) async fn retry_unsaved_tokens(&self) {
+        if self.unsaved_tokens.lock().is_empty() {
+            return;
+        }
+        let Some((client, homeserver, account_id)) = self.session.current(|session| {
+            (
+                session.client.clone(),
+                session.homeserver.clone(),
+                session.account_id.clone(),
+            )
+        }) else {
+            return;
+        };
+        if !self.unsaved_tokens.lock().contains(&account_id) {
+            return;
+        }
+        let Some(generation) = self
+            .credential_writers
+            .lock()
+            .await
+            .get(&account_id)
+            .copied()
+        else {
+            return;
+        };
+        if let Err(error) = self
+            .persist_refreshed(&client, &homeserver, &account_id, generation)
+            .await
+        {
+            tracing::warn!("could not save the refreshed session tokens again: {error:?}");
+        }
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -816,7 +909,19 @@ impl Core {
         self.install_session_callbacks(client, homeserver, account_id, writer);
     }
 
-    async fn invalidate_account_client(&self, account_id: &str) {
+    /// Closes what a push opened for an account that is not the active one. The active account's
+    /// client belongs to its session.
+    pub(crate) async fn evict_idle_account_client(&self, account_id: &str) {
+        let active = self
+            .session
+            .current(|session| session.account_id.clone())
+            .is_some_and(|active| active == account_id);
+        if !active {
+            self.invalidate_account_client(account_id).await;
+        }
+    }
+
+    pub(crate) async fn invalidate_account_client(&self, account_id: &str) {
         self.credential_writers.lock().await.remove(account_id);
         self.account_clients.lock().await.remove(account_id);
         let route = self.notification_routes.lock().await.remove(account_id);
@@ -987,6 +1092,15 @@ impl Core {
         else {
             return Ok(());
         };
+        // Another user's store must not take these keys. The sign-in stays waiting until a restore
+        // of its own user retires it.
+        if let Some(successor) = successor
+            && successor
+                .session_meta()
+                .is_none_or(|meta| meta.user_id.as_str() != account.session.credentials.user_id())
+        {
+            return Ok(());
+        }
         self.invalidate_account_client(account_id).await;
         if let Some(successor) = successor {
             match crate::store_disposal::carry_room_keys(&account.store_id, successor).await {
@@ -1001,7 +1115,7 @@ impl Core {
                     meta.device_id.as_str() != account.session.credentials.device_id()
                 })
             {
-                self.log_out_replaced(&account).await;
+                self.log_out_saved(&account).await;
             }
         }
         self.forget_login_tokens(Some(account_id)).await;
@@ -1031,7 +1145,7 @@ impl Core {
     }
 
     /// Best effort: a device the server cannot be reached for stays signed in there.
-    async fn log_out_replaced(&self, account: &PersistedAccount) {
+    async fn log_out_saved(&self, account: &PersistedAccount) {
         let persisted = account.session.clone();
         #[cfg(not(target_family = "wasm"))]
         let persisted = {
@@ -1061,9 +1175,9 @@ impl Core {
         match matrix_sdk::timeout::timeout(Box::pin(session::log_out(&persisted)), LOG_OUT_TIMEOUT)
             .await
         {
-            Ok(Ok(())) => tracing::info!("signed the replaced device out"),
-            Ok(Err(error)) => tracing::warn!("could not sign the replaced device out: {error}"),
-            Err(_) => tracing::warn!("signing the replaced device out timed out"),
+            Ok(Ok(())) => tracing::info!("signed the saved device out"),
+            Ok(Err(error)) => tracing::warn!("could not sign the saved device out: {error}"),
+            Err(_) => tracing::warn!("signing the saved device out timed out"),
         }
     }
 
@@ -1143,6 +1257,21 @@ impl Core {
         persisted: PersistedSession,
         reauth: Option<&PersistedAccount>,
     ) -> Result<SessionGeneration<'_>, RpcError> {
+        self.finish_sign_in_leased(client, account_id, store_id, persisted, reauth, None)
+            .await
+    }
+
+    /// `lease` is the one a caller took before building `client` on a store that may already be
+    /// open, so no other client opens it in between.
+    pub(crate) async fn finish_sign_in_leased(
+        self: &Arc<Self>,
+        client: matrix_sdk::Client,
+        account_id: String,
+        store_id: &str,
+        persisted: PersistedSession,
+        reauth: Option<&PersistedAccount>,
+        lease: Option<session::StoreLease>,
+    ) -> Result<SessionGeneration<'_>, RpcError> {
         if matches!(
             self.require_sliding_sync(&client).await,
             Err(RpcError {
@@ -1155,25 +1284,74 @@ impl Core {
             }
             return Err(RpcCode::SlidingSyncUnsupported.into());
         }
-        session::enable_crypto_store_lock(&client)
+        if let Err(error) = session::enable_crypto_store_lock(&client)
             .await
-            .or_report(self, "enable_crypto_store_lock")?;
+            .or_report(self, "enable_crypto_store_lock")
+        {
+            self.abandon_sign_in(&client, reauth).await;
+            return Err(error);
+        }
         // Pushes can find the login once it is persisted.
-        let lease = session::store_lease(store_id).await;
+        let lease = match lease {
+            Some(lease) => lease,
+            None => session::store_lease(store_id).await,
+        };
         let generation = self.claim_session_generation().await;
-        let replaced = self
+        let replaced = match self
             .persist(&account_id, store_id, &persisted, reauth)
-            .await?;
-        self.start_session(
-            client,
-            persisted.homeserver,
-            account_id,
-            &generation,
-            &lease,
-        )
-        .await?;
-        self.retire_replaced(replaced, store_id);
+            .await
+        {
+            Ok(replaced) => replaced,
+            Err(error) => {
+                self.abandon_sign_in(&client, reauth).await;
+                return Err(error);
+            }
+        };
+        let started = self
+            .start_session(
+                client.clone(),
+                persisted.homeserver,
+                account_id.clone(),
+                &generation,
+                &lease,
+            )
+            .await;
+        if let Err(error) = started {
+            // The saved login would name a device the server no longer knows.
+            self.abandon_sign_in(&client, reauth).await;
+            if reauth.is_none_or(|account| account.device_invalidated) {
+                if let Err(error) = self
+                    .mark_account_needs_reauth(Some(&account_id), true)
+                    .await
+                {
+                    tracing::warn!(?error, "could not retire an account that failed to start");
+                }
+                // Without this the user would be left with no usable sign-in at all.
+                if let Err(error) = self.keep_replaced(&replaced.usable).await {
+                    tracing::warn!(?error, "could not keep the sign-ins a failed one replaced");
+                }
+            }
+            return Err(error);
+        }
+        self.retire_replaced(replaced.all, store_id);
         Ok(generation)
+    }
+
+    /// Best effort: a new device nothing saved would otherwise stay signed in on the server. A
+    /// reauthentication that kept its device leaves it as it was.
+    async fn abandon_sign_in(
+        &self,
+        client: &matrix_sdk::Client,
+        reauth: Option<&PersistedAccount>,
+    ) {
+        if reauth.is_some_and(|account| !account.device_invalidated) {
+            return;
+        }
+        match matrix_sdk::timeout::timeout(Box::pin(client.logout()), LOG_OUT_TIMEOUT).await {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => tracing::warn!(?error, "could not log out an unsaved sign-in"),
+            Err(_) => tracing::warn!("logging out an unsaved sign-in timed out"),
+        }
     }
 
     pub(crate) async fn start_session(
@@ -1279,6 +1457,8 @@ impl Core {
         self.watch_ignored_history(&client, &sync_service);
         self.watch_sync_stall(&client, &sync_service, crate::sync_support::SYNC_STALL);
         self.watch_backup_preference(&client);
+        // Before the start: the subscriber yields only changes, so it would miss the first `Running`.
+        self.watch_sync_state(&client, &sync_service, generation);
         sync_service.start().await;
 
         client.send_queue().enable_upload_progress(true);
@@ -1287,13 +1467,11 @@ impl Core {
             .respawn_tasks_for_rooms_with_unsent_requests()
             .await;
 
-        self.watch_sync_state(&client, &sync_service, generation);
         self.watch_activity_health();
 
         self.refresh_own_identity(&client);
 
-        // `Suspended` found no session to stop while this one was still starting.
-        self.apply_app_activity(false).await;
+        self.apply_activity_after_session_start().await;
         Ok(())
     }
 
@@ -1314,7 +1492,8 @@ impl Core {
             let account_id = saved_account_id.clone();
             let homeserver = saved_homeserver.clone();
             let Some(core) = saver.upgrade() else {
-                return Ok(());
+                tracing::warn!("session tokens: refreshed after the session owner was dropped");
+                return Err("session owner was dropped".into());
             };
 
             #[cfg(not(target_family = "wasm"))]
@@ -1386,6 +1565,7 @@ impl Core {
                             if core.handle_session_change(&change, generation) {
                                 return;
                             }
+                            core.retry_unsaved_tokens().await;
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
@@ -2074,6 +2254,151 @@ mod regression_tests {
         core.update_app_active(false).await;
         assert!(matches!(sync_service.state().get(), State::Idle));
         assert!(core.activity.sync_suspended());
+    }
+
+    #[tokio::test]
+    async fn removing_an_inactive_account_signs_its_device_out() {
+        use crate::api::session::RemoveAccountParams;
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+
+        let (_store, server, core, room) = core_with_room().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/logout"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let store_id = session::account_store_id(&core.store_id, "second");
+        std::fs::create_dir_all(&store_id).unwrap();
+        // Its own device: a twin of the active one is left signed in.
+        let mut session =
+            serde_json::to_value(current_session(&room.client(), server.server().uri()).unwrap())
+                .unwrap();
+        session["credentials"]["device_id"] = "SECOND".into();
+        let account = PersistedAccount {
+            account_id: "second".to_owned(),
+            store_id,
+            session: serde_json::from_value(session).unwrap(),
+            needs_reauth: false,
+            device_invalidated: false,
+        };
+        core.save_login_tokens(&account).await.unwrap();
+        let mut registry = AccountRegistry::empty();
+        registry.upsert(account);
+        *core.accounts.lock().await = Some(registry);
+
+        core.remove_inactive_account(RemoveAccountParams {
+            account_id: "second".to_owned(),
+        })
+        .await
+        .unwrap();
+
+        server.server().verify().await;
+    }
+
+    struct FailingSaves {
+        failing: Arc<std::sync::atomic::AtomicBool>,
+        inner: MemorySessionStore,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::store::SessionStore for FailingSaves {
+        async fn load(&self) -> Result<Option<Vec<u8>>, crate::store::StoreError> {
+            self.inner.load().await
+        }
+
+        async fn save(&self, bytes: Vec<u8>) -> Result<(), crate::store::StoreError> {
+            if self.failing.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err(crate::store::StoreError::Invalid("saving is refused"));
+            }
+            self.inner.save(bytes).await
+        }
+
+        async fn clear(&self) -> Result<(), crate::store::StoreError> {
+            self.inner.clear().await
+        }
+    }
+
+    #[tokio::test]
+    async fn refreshed_tokens_that_failed_to_save_are_saved_again() {
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+
+        let (store, server, _core, room) = core_with_room().await;
+        let failing = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let (core, _events) = Core::new(
+            store.path().to_str().unwrap(),
+            Box::new(FailingSaves {
+                failing: failing.clone(),
+                inner: MemorySessionStore::default(),
+            }),
+        );
+        let client = room.client();
+        *core.session.write().await = Some(Session {
+            account_id: "first".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        let mut registry = AccountRegistry::empty();
+        registry.upsert(PersistedAccount {
+            account_id: "first".to_owned(),
+            store_id: core.store_id.clone(),
+            session: current_session(&client, server.server().uri()).unwrap(),
+            needs_reauth: false,
+            device_invalidated: false,
+        });
+        *core.accounts.lock().await = Some(registry);
+        core.credential_writers
+            .lock()
+            .await
+            .insert("first".to_owned(), 1);
+
+        core.persist_refreshed(&client, &server.server().uri(), "first", 1)
+            .await
+            .unwrap_err();
+        assert!(core.unsaved_tokens.lock().contains("first"));
+
+        failing.store(false, std::sync::atomic::Ordering::SeqCst);
+        core.retry_unsaved_tokens().await;
+        assert!(core.unsaved_tokens.lock().is_empty());
+    }
+
+    #[tokio::test]
+    async fn tokens_refreshed_by_a_superseded_writer_are_not_forgotten() {
+        let (_store, server, core, room) = core_with_room().await;
+        core.credential_writers
+            .lock()
+            .await
+            .insert("first".to_owned(), 2);
+
+        core.persist_refreshed(&room.client(), &server.server().uri(), "first", 1)
+            .await
+            .unwrap();
+
+        assert!(core.unsaved_tokens.lock().contains("first"));
+    }
+
+    #[tokio::test]
+    async fn the_active_client_is_listed_once_among_the_clients_with_stores() {
+        let (_store, _server, core, room) = core_with_room().await;
+        assert_eq!(core.store_clients().await.len(), 1);
+
+        core.account_clients
+            .lock()
+            .await
+            .insert("first".to_owned(), room.client());
+        assert_eq!(core.store_clients().await.len(), 1);
+
+        core.account_clients
+            .lock()
+            .await
+            .insert("second".to_owned(), room.client());
+        assert_eq!(core.store_clients().await.len(), 2);
     }
 
     #[tokio::test]
@@ -3264,6 +3589,104 @@ mod regression_tests {
                 .all(|account| account.account_id != "second")
         );
         assert!(!std::path::Path::new(&second.store_id).exists());
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn a_sign_in_that_never_started_gives_back_the_one_it_replaced() {
+        let (_server, _base, core, first, _events) = restorable_core().await;
+        let waiting = PersistedAccount {
+            needs_reauth: true,
+            ..other_sign_in(&core, &first, "waiting")
+        };
+        let mut registry = core.accounts().await.unwrap();
+        registry.upsert(waiting);
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+        let newer = other_sign_in(&core, &first, "newer");
+
+        let replaced = core
+            .persist(&newer.account_id, &newer.store_id, &newer.session, None)
+            .await
+            .unwrap();
+        assert_eq!(replaced.all.len(), 2);
+        assert_eq!(replaced.usable, ["first"]);
+        core.keep_replaced(&replaced.usable).await.unwrap();
+
+        let accounts = core.accounts().await.unwrap().accounts;
+        let waits = |account_id: &str| {
+            accounts
+                .iter()
+                .find(|account| account.account_id == account_id)
+                .unwrap()
+                .needs_reauth
+        };
+        assert!(!waits("first"));
+        assert!(waits("waiting"), "one that already waited still does");
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn a_stale_sign_in_of_another_user_keeps_its_store_and_waits() {
+        let (_server, _base, core, first, _events) = restorable_core().await;
+        let mut session =
+            serde_json::to_value(&other_sign_in(&core, &first, "other").session).unwrap();
+        session["credentials"]["user_id"] = "@other:example.org".into();
+        let other = PersistedAccount {
+            session: serde_json::from_value(session).unwrap(),
+            needs_reauth: true,
+            ..other_sign_in(&core, &first, "other")
+        };
+        let mut registry = core.accounts().await.unwrap();
+        registry.upsert(other.clone());
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+        assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+        let successor = session::base_client(&first.store_id).unwrap();
+
+        core.retire_account("other", Some(&successor))
+            .await
+            .unwrap();
+
+        let accounts = core.accounts().await.unwrap().accounts;
+        assert!(accounts.iter().any(|account| account.account_id == "other"));
+        assert!(std::path::Path::new(&other.store_id).exists());
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn removing_a_twin_of_the_active_device_leaves_it_signed_in() {
+        use crate::api::session::RemoveAccountParams;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let (server, _base, core, first, _events) = restorable_core().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/logout"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+            .expect(0)
+            .mount(server.server())
+            .await;
+        assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+        let twin = PersistedAccount {
+            session: first.session.clone(),
+            needs_reauth: true,
+            ..other_sign_in(&core, &first, "twin")
+        };
+        let mut registry = core.accounts().await.unwrap();
+        registry.upsert(twin.clone());
+        core.save_login_tokens(&twin).await.unwrap();
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+
+        core.remove_inactive_account(RemoveAccountParams {
+            account_id: "twin".to_owned(),
+        })
+        .await
+        .unwrap();
+
+        server.server().verify().await;
         core.shutdown().await;
     }
 

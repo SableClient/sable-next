@@ -69,26 +69,69 @@ pub(crate) async fn carry_room_keys(
 
 #[cfg(not(target_family = "wasm"))]
 async fn discard_files(base_store_id: &str, store_id: &str) -> Result<(), StoreError> {
-    crate::store_encryption::forget(store_id);
     let root = std::path::Path::new(store_id);
-    let paths = if store_id == base_store_id {
+    let own_directory = store_id != base_store_id;
+    let paths = if own_directory {
+        let mut paths = Vec::new();
+        match tokio::fs::read_dir(root).await {
+            Ok(mut entries) => {
+                while let Some(entry) =
+                    entries
+                        .next_entry()
+                        .await
+                        .map_err(|source| StoreError::Path {
+                            path: root.to_owned(),
+                            source,
+                        })?
+                {
+                    if entry.file_name() != crate::store_encryption::KEY_REFERENCE {
+                        paths.push(entry.path());
+                    }
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => {
+                return Err(StoreError::Path {
+                    path: root.to_owned(),
+                    source,
+                });
+            }
+        }
+        paths
+    } else {
         vec![
             root.join("store"),
             root.join("store.new"),
             root.join("store.old"),
             root.join("cache"),
         ]
-    } else {
-        vec![root.to_owned()]
     };
     for path in paths {
-        match tokio::fs::remove_dir_all(&path).await {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(source) => return Err(StoreError::Path { path, source }),
-        }
+        remove_path(path).await?;
+    }
+    // After the files, so a failed removal can be retried with the key that still opens what is
+    // left. The reference sits beside them and goes with the key.
+    crate::store_encryption::forget(store_id);
+    if own_directory {
+        remove_path(root.to_owned()).await?;
     }
     Ok(())
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn remove_path(path: std::path::PathBuf) -> Result<(), StoreError> {
+    let removed = match tokio::fs::symlink_metadata(&path).await {
+        Ok(metadata) if metadata.is_dir() => tokio::fs::remove_dir_all(&path).await,
+        Ok(_) => tokio::fs::remove_file(&path).await,
+        Err(error) => Err(error),
+    };
+    match removed {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(StoreError::Path {
+            path,
+            source: error,
+        }),
+        _ => Ok(()),
+    }
 }
 
 #[cfg(target_family = "wasm")]
@@ -142,6 +185,37 @@ mod tests {
                 .unwrap(),
             b"registry"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_failed_disposal_keeps_the_key_of_the_files_left_behind() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let base = directory.path().join("sable");
+        let base = base.to_str().unwrap();
+        let account = crate::session::account_store_id(base, "a1");
+        let store = std::path::Path::new(&account).join("store");
+        tokio::fs::create_dir_all(&store).await.unwrap();
+        tokio::fs::write(store.join("keys"), b"secret")
+            .await
+            .unwrap();
+        let reference = std::path::Path::new(&account).join("store-key");
+        crate::secrets::load_or_create(&reference).unwrap();
+        // A directory that cannot be modified keeps its entries from being removed.
+        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o500)).unwrap();
+
+        let failed = super::discard(base, &account).await;
+
+        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o700)).unwrap();
+        // Skipped where permissions do not bind, such as a root user.
+        if failed.is_ok() {
+            return;
+        }
+        assert!(crate::secrets::load(&reference).unwrap().is_some());
+        super::discard(base, &account).await.unwrap();
+        assert!(crate::secrets::load(&reference).unwrap().is_none());
     }
 
     #[tokio::test]

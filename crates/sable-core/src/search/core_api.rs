@@ -358,6 +358,9 @@ impl Core {
                 index.rooms_due_to_flush()
             }
         };
+        if due.is_empty() {
+            return;
+        }
         self.save_rooms(client, due).await;
     }
 

@@ -78,7 +78,7 @@ impl PendingRegistration {
     }
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", test))]
 impl PendingRegistration {
     pub(super) fn client(&self) -> matrix_sdk::Client {
         self.client.clone()

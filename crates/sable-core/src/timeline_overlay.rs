@@ -242,6 +242,12 @@ impl TimelineOverlay {
             .position(|item| item.event_id.as_ref() == Some(event_id))
     }
 
+    pub(crate) fn index_of_transaction(&self, transaction_id: &str) -> Option<usize> {
+        self.items
+            .iter()
+            .position(|item| item.transaction_id.as_deref() == Some(transaction_id))
+    }
+
     /// The items to send for a fresh snapshot.
     pub(crate) fn reset(&mut self, items: Vec<TimelineItemView>) -> Vec<TimelineItemView> {
         self.real_names.clear();

@@ -101,7 +101,40 @@ pub struct PushClient {
     client: Client,
     /// Only a client opened without a `Core` refreshes; the app's own clients refresh themselves.
     refreshes: bool,
-    _lease: Option<crate::session::StoreLease>,
+    _lease: Option<PushLease>,
+}
+
+/// Holds a store lease for as long as a push uses it. A client the core cached only for the push
+/// of an account that is not active is evicted before the lease is released, so its stores and
+/// their locks do not stay open for the next switch.
+pub(super) struct PushLease {
+    lease: Option<crate::session::StoreLease>,
+    evict: Option<(std::sync::Arc<crate::Core>, String)>,
+}
+
+impl PushLease {
+    const fn plain(lease: crate::session::StoreLease) -> Self {
+        Self {
+            lease: Some(lease),
+            evict: None,
+        }
+    }
+}
+
+impl Drop for PushLease {
+    fn drop(&mut self) {
+        let lease = self.lease.take();
+        let Some((core, account_id)) = self.evict.take() else {
+            return;
+        };
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        drop(runtime.spawn(async move {
+            core.evict_idle_account_client(&account_id).await;
+            drop(lease);
+        }));
+    }
 }
 
 impl std::ops::Deref for PushClient {
@@ -203,7 +236,7 @@ pub(super) async fn open_push_client(
     Some(PushClient {
         client,
         refreshes: true,
-        _lease: Some(lease),
+        _lease: Some(PushLease::plain(lease)),
     })
 }
 
@@ -238,7 +271,7 @@ pub(super) enum PushHost {
     },
     Shared {
         client: Client,
-        lease: crate::session::StoreLease,
+        lease: PushLease,
     },
     Own(PushClient),
 }
@@ -307,6 +340,10 @@ pub(super) async fn push_host(
         .set_presence(ruma::presence::PresenceState::Offline, None, false)
         .await
         .ok()?;
+    let lease = PushLease {
+        lease: Some(lease),
+        evict: Some((core.clone(), account.account_id.clone())),
+    };
     Some(PushHost::Shared { client, lease })
 }
 

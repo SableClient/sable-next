@@ -422,6 +422,81 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     }
 
     #[tokio::test]
+    async fn a_paused_backup_is_resumed_only_once_the_user_agrees() {
+        use crate::key_backup::ReadableBackup;
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        let server = MatrixMockServer::new().await;
+        let (core, client, _store) = core_for(&server).await;
+        let key = BackupDecryptionKey::new();
+        backup_metadata(&server, &key, 1).await;
+        let save = async |key: BackupDecryptionKey| {
+            let machine = client.olm_machine_for_testing().await;
+            machine
+                .as_ref()
+                .unwrap()
+                .backup_machine()
+                .save_decryption_key(Some(key), Some("1".to_owned()))
+                .await
+                .unwrap();
+        };
+
+        save(BackupDecryptionKey::new()).await;
+        assert_eq!(
+            core.resume_readable_backup(&client, true).await.unwrap(),
+            ReadableBackup::None
+        );
+        assert!(!client.encryption().backups().are_enabled().await);
+
+        // The account turned key backup off, as another client does on request.
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(
+                "/account_data/m.key_backup$",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200).set_body_json(json!({ "enabled": false })),
+            )
+            .mount(server.server())
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("PUT"))
+            .and(wiremock::matchers::path_regex(
+                "/account_data/(m.key_backup|m.org.matrix.custom.backup_disabled)$",
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(2)
+            .mount(server.server())
+            .await;
+        let written = async || {
+            let requests = server.server().received_requests().await.unwrap();
+            requests
+                .into_iter()
+                .find(|request| {
+                    request.method == wiremock::http::Method::PUT
+                        && request.url.path().ends_with("/account_data/m.key_backup")
+                })
+                .map(|request| request.body_json::<serde_json::Value>().unwrap())
+        };
+        save(key.clone()).await;
+
+        assert_eq!(
+            core.resume_readable_backup(&client, false).await.unwrap(),
+            ReadableBackup::Paused
+        );
+        assert!(!client.encryption().backups().are_enabled().await);
+        assert_eq!(
+            written().await,
+            None,
+            "nothing changes until the user agrees"
+        );
+
+        assert_eq!(
+            core.resume_readable_backup(&client, true).await.unwrap(),
+            ReadableBackup::Resumed
+        );
+        assert!(client.encryption().backups().are_enabled().await);
+        assert_eq!(written().await, Some(json!({ "enabled": true })));
+    }
+
+    #[tokio::test]
     async fn a_utd_report_says_whether_the_backup_holds_the_key() {
         use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
         let server = MatrixMockServer::new().await;

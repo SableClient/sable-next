@@ -14,7 +14,7 @@ use crate::secrets::{self, Key};
 use crate::store::StoreError;
 
 const MARKER: &str = "encrypted";
-const KEY_REFERENCE: &str = "store-key";
+pub(crate) const KEY_REFERENCE: &str = "store-key";
 const CRYPTO_DATABASE: &str = "matrix-sdk-crypto.sqlite3";
 const SLIDING_SYNC_PREFIX: &str = "sliding_sync_store::";
 
@@ -614,7 +614,50 @@ mod tests {
     };
     use matrix_sdk_base::crypto::{DeviceData, EncryptionSettings};
 
-    use super::{config, store_dir};
+    use super::{CRYPTO_DATABASE, config, store_dir};
+
+    /// Whatever table the SDK adds must be either copied by `copy_crypto` or listed here as
+    /// not needing it, or the encrypted copy silently drops its rows.
+    #[tokio::test]
+    async fn every_crypto_table_is_copied_or_known_to_need_no_copy() {
+        let directory = tempfile::tempdir().unwrap();
+        drop(
+            SqliteCryptoStore::open(directory.path(), None)
+                .await
+                .unwrap(),
+        );
+        let raw = super::read_only(&directory.path().join(CRYPTO_DATABASE)).unwrap();
+        let mut tables: Vec<String> = super::column(
+            &raw,
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        )
+        .unwrap();
+        tables.sort();
+
+        let copied = [
+            "device",
+            "direct_withheld_info",
+            "identity",
+            "inbound_group_session",
+            "key_requests",
+            "kv",
+            "olm_hash",
+            "outbound_group_session",
+            "received_room_key_bundle",
+            "room_key_backups_fully_downloaded",
+            "room_settings",
+            "rooms_pending_key_bundle",
+            "secrets_inbox",
+            "session",
+            "tracked_user",
+        ];
+        // Held leases belong to the process that took them.
+        let not_copied = ["lease_locks"];
+        let mut handled: Vec<&str> = copied.iter().chain(&not_copied).copied().collect();
+        handled.sort_unstable();
+
+        assert_eq!(tables, handled);
+    }
 
     async fn plaintext_store(store_id: &str) -> IdentityKeys {
         let store = store_dir(store_id);
@@ -835,7 +878,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let store_id = directory.path().to_str().unwrap();
         let identity_keys = plaintext_store(store_id).await;
-        rusqlite::Connection::open(store_dir(store_id).join(super::CRYPTO_DATABASE))
+        rusqlite::Connection::open(store_dir(store_id).join(CRYPTO_DATABASE))
             .unwrap()
             .execute("UPDATE inbound_group_session SET data = x'00'", [])
             .unwrap();

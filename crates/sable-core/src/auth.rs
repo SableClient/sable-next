@@ -150,6 +150,12 @@ impl Core {
             homeserver,
             "building Matrix client"
         );
+        // Held until the session starts, so no push or switch opens the store the reauthentication
+        // reuses while its new client is built and signs in.
+        let lease = session::store_lease(&account_store_id).await;
+        if reauth.is_some() {
+            self.invalidate_account_client(&account_id).await;
+        }
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await?;
@@ -187,7 +193,7 @@ impl Core {
         self.validate_reauthentication(reauth.as_ref(), &client)
             .await?;
         let _activation = self
-            .finish_sign_in(
+            .finish_sign_in_leased(
                 client,
                 account_id.clone(),
                 &account_store_id,
@@ -199,6 +205,7 @@ impl Core {
                     credentials: Credentials::Password(matrix),
                 },
                 reauth.as_ref(),
+                Some(lease),
             )
             .await?;
         tracing::info!(

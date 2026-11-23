@@ -104,6 +104,7 @@ impl Activity {
 
     pub(crate) fn unlock_account(&self) {
         self.account_locked.store(false, Ordering::SeqCst);
+        self.wake.notify_waiters();
     }
 
     pub(crate) fn sync_suspended(&self) -> bool {
@@ -167,6 +168,9 @@ impl Transition<'_> {
         self.activity
             .sync_suspended
             .store(suspended, Ordering::SeqCst);
+        if !suspended {
+            self.activity.wake.notify_waiters();
+        }
     }
 
     #[cfg(target_os = "ios")]
@@ -183,6 +187,15 @@ impl Core {
     #[must_use]
     pub fn is_app_active(&self) -> bool {
         self.activity.app_active()
+    }
+
+    /// `Suspended` found no session to stop while this one was still starting, and a retry to
+    /// reopen the stores ended with the previous session.
+    pub(crate) async fn apply_activity_after_session_start(self: &Arc<Self>) {
+        let active = self.activity.app_active();
+        if !active || self.activity.sync_suspended() {
+            self.apply_activity(active, None).await;
+        }
     }
 
     pub async fn update_app_active(self: &Arc<Self>, active: bool) {
@@ -215,6 +228,11 @@ impl Core {
         }
         transition.suspend_sync(!should_sync);
         let Ok(sync_service) = self.sync_service().await else {
+            // A login or registration still in progress holds open stores of its own.
+            #[cfg(target_os = "ios")]
+            if !should_sync {
+                self.close_stores(&transition).await;
+            }
             return;
         };
         if should_sync {
@@ -228,6 +246,7 @@ impl Core {
                 ));
             }
             drop(transition);
+            self.retry_unsaved_tokens().await;
             // Fetches replied-to events, which must not hold up local reads or the next pause.
             Box::pin(self.until_stores_close(self.retry_cached_decryption())).await;
         } else {
@@ -316,16 +335,22 @@ impl Core {
         }
     }
 
-    #[cfg(target_os = "ios")]
-    async fn store_clients(&self) -> Vec<matrix_sdk::Client> {
-        let mut clients: Vec<_> = self
-            .account_clients
-            .lock()
-            .await
-            .values()
-            .cloned()
-            .collect();
-        clients.extend(self.client().await.ok());
+    #[cfg(any(target_os = "ios", test))]
+    pub(crate) async fn store_clients(&self) -> Vec<matrix_sdk::Client> {
+        let mut clients: Vec<_> = Vec::new();
+        {
+            let accounts = self.account_clients.lock().await;
+            clients.extend(accounts.values().cloned());
+            // The active account's client is already one of them.
+            let active = self
+                .session
+                .current(|session| (session.account_id.clone(), session.client.clone()));
+            if let Some((account_id, client)) = active
+                && !accounts.contains_key(&account_id)
+            {
+                clients.push(client);
+            }
+        }
         if let Some(pending) = self.pending_login.lock().await.as_ref() {
             clients.push(pending.client.clone());
         }
@@ -370,7 +395,8 @@ impl Core {
         true
     }
 
-    /// Reopening is idempotent, so the clients that did reopen are safe to resume again.
+    /// Reopening is idempotent, so the clients that did reopen are safe to resume again. A session
+    /// change ends the retries, and `start_session` applies the activity again.
     #[cfg(target_os = "ios")]
     fn retry_reopening_stores(self: &Arc<Self>, active: bool, revision: Option<u64>) {
         let failures = self.activity.reopen_failures.load(Ordering::SeqCst);
@@ -383,10 +409,13 @@ impl Core {
             },
         ));
         let core = self.clone();
-        drop(spawn(async move {
-            matrix_sdk::sleep::sleep(delay).await;
-            core.apply_activity(active, revision).await;
-        }));
+        self.track_session_task(
+            spawn(async move {
+                matrix_sdk::sleep::sleep(delay).await;
+                core.apply_activity(active, revision).await;
+            })
+            .abort_on_drop(),
+        );
     }
 
     pub(crate) async fn wait_for_stores(&self) {
@@ -429,6 +458,17 @@ impl Core {
             woken.await;
         }
     }
+
+    /// Unlike `wait_until_active`, this returns in the background while a call keeps sync running.
+    pub(crate) async fn wait_until_sync_resumes(&self) {
+        loop {
+            let woken = self.activity.wake.notified();
+            if !self.sync_paused() {
+                return;
+            }
+            woken.await;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -436,6 +476,35 @@ mod tests {
     use std::time::Duration;
 
     use super::Activity;
+
+    #[tokio::test]
+    async fn waiting_for_sync_ends_when_it_resumes_behind_a_backgrounded_app() {
+        let (core, _events) = crate::Core::new(
+            "test",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.set_app_active(false);
+        core.activity.transition().await.suspend_sync(true);
+        core.activity.lock_account();
+        let resumed = tokio::spawn({
+            let core = core.clone();
+            async move { core.wait_until_sync_resumes().await }
+        });
+        let parked = || tokio::time::sleep(Duration::from_millis(20));
+        parked().await;
+
+        core.activity.unlock_account();
+        parked().await;
+        assert!(!resumed.is_finished(), "sync is still suspended");
+
+        // A call starts: sync resumes while the app stays in the background.
+        core.activity.transition().await.suspend_sync(false);
+        tokio::time::timeout(Duration::from_secs(1), resumed)
+            .await
+            .expect("resuming sync ends the wait")
+            .unwrap();
+        assert!(!core.is_app_active());
+    }
 
     #[tokio::test]
     async fn only_a_transition_that_stays_held_counts_as_stuck() {

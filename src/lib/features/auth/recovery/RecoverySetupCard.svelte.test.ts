@@ -49,13 +49,41 @@ test('an unreadable server backup asks before it is replaced', async () => {
 
   await user.click(screen.getByRole('button', { name: /Create recovery key/ }));
   const dialog = await screen.findByRole('dialog');
-  expect(enableRecovery).toHaveBeenCalledWith({ passphrase: null, replace_backup: false });
+  expect(enableRecovery).toHaveBeenCalledWith({
+    passphrase: null,
+    replace_backup: false,
+    resume_backup: false,
+  });
 
   await user.click(within(dialog).getByRole('button', { name: 'Replace backup' }));
   await vi.waitFor(() => {
     expect(keyField()).toHaveValue('EsTa bLiS hEd');
   });
-  expect(enableRecovery).toHaveBeenLastCalledWith({ passphrase: null, replace_backup: true });
+  expect(enableRecovery).toHaveBeenLastCalledWith({
+    passphrase: null,
+    replace_backup: true,
+    resume_backup: false,
+  });
+});
+
+test('a key backup the account turned off asks before it is turned back on', async () => {
+  enableRecovery.mockRejectedValueOnce(new CoreError({ code: 'backup_paused' }));
+  const { user } = setup();
+
+  await user.click(screen.getByRole('button', { name: /Create recovery key/ }));
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText(/turned off for your account/)).toBeInTheDocument();
+  expect(enableRecovery).toHaveBeenCalledOnce();
+
+  await user.click(within(dialog).getByRole('button', { name: 'Turn on backup' }));
+  await vi.waitFor(() => {
+    expect(keyField()).toHaveValue('EsTa bLiS hEd');
+  });
+  expect(enableRecovery).toHaveBeenLastCalledWith({
+    passphrase: null,
+    replace_backup: false,
+    resume_backup: true,
+  });
 });
 
 test('copying the key is not enough without ticking the box', async () => {

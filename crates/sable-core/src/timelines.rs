@@ -403,6 +403,8 @@ impl Core {
     }
 }
 
+/// Every timeline asks, since the fetch only fills the profiles of the timeline it is called on.
+/// The SDK shares one request between the timelines of a room.
 pub(crate) fn fill_sender_profiles(room: &Room, timeline: &Arc<Timeline>) {
     if room.are_members_synced() {
         return;

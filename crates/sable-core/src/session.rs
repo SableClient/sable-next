@@ -412,7 +412,7 @@ pub(crate) async fn restore_notification_client(
     room_load: matrix_sdk::store::RoomLoadSettings,
     before_restore: impl FnOnce(&Client),
 ) -> Result<Client, CoreError> {
-    validate_saved_crypto_store(store_id, persisted)
+    validate_saved_crypto_store_for(store_id, persisted, ClientRole::Notification)
         .await
         .map_err(|error| {
             tracing::error!(context = "notification_restore_crypto_store", "{error}");
@@ -507,6 +507,14 @@ pub(crate) async fn validate_saved_crypto_store(
     store_id: &str,
     persisted: &PersistedSession,
 ) -> Result<(), CoreError> {
+    validate_saved_crypto_store_for(store_id, persisted, ClientRole::Account).await
+}
+
+async fn validate_saved_crypto_store_for(
+    store_id: &str,
+    persisted: &PersistedSession,
+    role: ClientRole,
+) -> Result<(), CoreError> {
     use matrix_sdk_base::crypto::store::CryptoStore;
 
     #[cfg(not(target_family = "wasm"))]
@@ -524,18 +532,22 @@ pub(crate) async fn validate_saved_crypto_store(
             }
             key => key?,
         };
-        matrix_sdk::SqliteCryptoStore::open_with_config(&crate::store_encryption::config(
-            path,
-            key.as_ref(),
-        ))
+        matrix_sdk::SqliteCryptoStore::open_with_config(
+            &role
+                .store_config(path)
+                .key(key.as_ref().map(|key| key.as_slice())),
+        )
         .await
         .context("saved crypto database could not be opened")?
     };
     #[cfg(target_family = "wasm")]
-    let store = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None)
-        .await
-        .context("saved crypto database could not be opened")?
-        .crypto;
+    let store = {
+        let _ = role;
+        matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None)
+            .await
+            .context("saved crypto database could not be opened")?
+            .crypto
+    };
 
     let account = store
         .load_account()
@@ -739,6 +751,13 @@ async fn build_account_client(
                 .await
         {
             tracing::error!("could not enable the OAuth refresh lock: {error}");
+            // Without it the app and the notification extension could both spend one refresh token.
+            if cfg!(target_os = "ios") {
+                return Err(crate::store::StoreError::Invalid(
+                    "the OAuth refresh lock could not be enabled",
+                )
+                .into());
+            }
         }
         if role.is_account() {
             register_base_client(store_id, base, &client);

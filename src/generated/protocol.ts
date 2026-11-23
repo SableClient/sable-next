@@ -1660,6 +1660,8 @@ export type RpcCode = { code: "not_logged_in" } | { code: "unknown_subscription"
 { code: "document_locked" } |
 /**  A key backup this device cannot unlock is already on the server. */
 { code: "backup_exists" } |
+/**  A key backup this device can read is turned off for the whole account (MSC4287). */
+{ code: "backup_paused" } |
 /**  Secret storage no longer matches the account's identity. */
 { code: "key_storage_out_of_sync" } |
 /**  Static: safe to hide UI. */
@@ -2780,6 +2782,11 @@ export type Rpc = {
 	passphrase?: string | null,
 	/**  Deletes the unreadable server backup and the history it holds. */
 	replace_backup?: boolean,
+	/**
+	 *  Turns the account's key backup back on. Without it, a backup the account paused ends
+	 *  the call with `backup_paused`.
+	 */
+	resume_backup?: boolean,
 }) => Promise<string>;
     resetRecoveryKey: (params: {
 	passphrase?: string | null,

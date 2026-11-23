@@ -442,6 +442,45 @@ async fn the_core_cannot_activate_a_login_while_a_push_runs_on_its_client() {
 }
 
 #[tokio::test]
+async fn a_push_for_an_inactive_account_leaves_no_client_or_open_store_behind() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    let core = core_of(data_dir.path());
+    let host = push_host(
+        &cold_push_store_dir(data_dir.path()),
+        "@alice:example.org",
+        "A",
+        matrix_sdk::store::RoomLoadSettings::default(),
+    )
+    .await;
+    assert!(matches!(host, Some(PushHost::Shared { .. })));
+    assert!(
+        core.account_clients
+            .lock()
+            .await
+            .contains_key(&account.account_id)
+    );
+
+    drop(host);
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if core.account_clients.lock().await.is_empty()
+                && crate::session::base_client(&account.store_id).is_none()
+            {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the push's client is evicted and its stores are released");
+    drop(crate::session::store_lease(&account.store_id).await);
+}
+
+#[tokio::test]
 async fn a_push_for_a_login_whose_key_is_gone_asks_to_sign_in_again_quietly() {
     let data_dir = tempfile::tempdir().unwrap();
     let server = MatrixMockServer::new().await;

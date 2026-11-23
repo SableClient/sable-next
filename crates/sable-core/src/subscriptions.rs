@@ -21,9 +21,9 @@ use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk_ui::room_list_service::RoomListItem;
 use matrix_sdk_ui::room_list_service::filters::new_filter_non_left;
 use matrix_sdk_ui::timeline::{
-    Error as TimelineError, EventSendState, SendTarget, Timeline, TimelineItem,
+    Error as TimelineError, EventSendState, EventTimelineItem, SendTarget, Timeline, TimelineItem,
 };
-use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio_stream::{StreamMap, wrappers::BroadcastStream};
 use web_time::Instant;
@@ -51,22 +51,16 @@ const BRIDGE_EVENTS: [&str; 2] = ["m.bridge", "uk.half-shot.bridge"];
 
 enum Wake {
     Diffs(Option<Vec<VectorDiff<Arc<TimelineItem>>>>),
-    Queue(Option<RoomSendQueueUpdate>),
+    Queue(Result<RoomSendQueueUpdate, RecvError>),
 }
 
 async fn next_queue_update(
     updates: &mut Option<broadcast::Receiver<RoomSendQueueUpdate>>,
-) -> Option<RoomSendQueueUpdate> {
+) -> Result<RoomSendQueueUpdate, RecvError> {
     let Some(receiver) = updates.as_mut() else {
         return future::pending().await;
     };
-    loop {
-        match receiver.recv().await {
-            Ok(update) => return Some(update),
-            Err(RecvError::Lagged(_)) => {}
-            Err(RecvError::Closed) => return None,
-        }
-    }
+    receiver.recv().await
 }
 
 /// A lagged room list resends a `Reset` cut to the page size, so a smaller page drops rooms.
@@ -567,40 +561,90 @@ impl TimelineWorker {
             match wake {
                 Wake::Diffs(Some(diffs)) => self.on_diffs(diffs).await,
                 Wake::Diffs(None) => break,
-                Wake::Queue(Some(update)) => self.on_queue_update(&update).await,
-                Wake::Queue(None) => self.queue_updates = None,
+                Wake::Queue(Ok(update)) => self.on_queue_update(&update).await,
+                Wake::Queue(Err(RecvError::Lagged(_))) => self.resync_queue().await,
+                Wake::Queue(Err(RecvError::Closed)) => self.queue_updates = None,
             }
         }
+    }
+
+    /// Updates were missed, so the local echoes are read again and the items they change are
+    /// resent one by one. A `Reset` from the timeline's items would repeat the diffs its stream
+    /// still holds.
+    async fn resync_queue(&mut self) {
+        let Ok((echoes, updates)) = self.room.send_queue().subscribe().await else {
+            self.queue_updates = None;
+            return;
+        };
+        self.queue_updates = Some(updates);
+        let targets = self.content.resync(&echoes);
+        self.resend(|event| {
+            event.is_local_echo() || event.event_id().is_some_and(|id| targets.contains(id))
+        })
+        .await;
     }
 
     async fn on_queue_update(&mut self, update: &RoomSendQueueUpdate) {
         let Some(target) = self.content.apply(update) else {
             return;
         };
+        self.resend(|event| event.event_id() == Some(&target)).await;
+    }
+
+    /// Renders the chosen events again where the host already holds them. One it does not hold
+    /// yet is rendered when its own diff arrives.
+    async fn resend(&self, chosen: impl Fn(&EventTimelineItem) -> bool) {
         let items = self.timeline.items().await;
-        let Some(item) = items
+        let items: Vec<_> = items
             .iter()
-            .find(|item| item.as_event().and_then(|event| event.event_id()) == Some(&target))
-        else {
+            .filter(|item| item.as_event().is_some_and(&chosen))
+            .cloned()
+            .collect();
+        // Held across the awaits below, it would have to be `Send`.
+        drop(chosen);
+        if items.is_empty() {
             return;
-        };
+        }
         let push = self.room.push_context().await.ok().flatten();
-        let highlights = view::Highlights::compute(push.as_ref(), [item]).await;
-        let value = view::timeline_item(item, self.user_id.as_deref(), &highlights, &self.content);
+        let highlights = view::Highlights::compute(push.as_ref(), &items).await;
         let mut overlay = self.overlay.lock();
-        if let Some(index) = overlay.index_of_event(&target) {
+        let diffs: Vec<_> = items
+            .iter()
+            .filter_map(|item| {
+                let value =
+                    view::timeline_item(item, self.user_id.as_deref(), &highlights, &self.content);
+                let index = match (&value.event_id, &value.transaction_id) {
+                    (Some(event_id), _) => overlay.index_of_event(event_id),
+                    (None, Some(transaction_id)) => overlay.index_of_transaction(transaction_id),
+                    (None, None) => None,
+                }?;
+                Some(overlay.apply(crate::protocol::VectorDiff::Set { index, value }))
+            })
+            .collect();
+        if !diffs.is_empty() {
             self.core.emit(CoreEvent::TimelineDiff {
                 subscription: self.subscription,
-                diffs: vec![overlay.apply(crate::protocol::VectorDiff::Set { index, value })],
+                diffs,
             });
         }
     }
 
     async fn on_diffs(&mut self, diffs: Vec<VectorDiff<Arc<TimelineItem>>>) {
+        let mut lagged = false;
         if let Some(updates) = self.queue_updates.as_mut() {
-            while let Ok(update) = updates.try_recv() {
-                self.content.apply(&update);
+            loop {
+                match updates.try_recv() {
+                    Ok(update) => drop(self.content.apply(&update)),
+                    Err(TryRecvError::Lagged(_)) => {
+                        lagged = true;
+                        break;
+                    }
+                    Err(TryRecvError::Empty | TryRecvError::Closed) => break,
+                }
             }
+        }
+        if lagged {
+            self.resync_queue().await;
         }
         let push = self.room.push_context().await.ok().flatten();
         let highlights = view::Highlights::for_diffs(push.as_ref(), &diffs).await;
@@ -647,15 +691,12 @@ impl Core {
         let subscription = self.allocate_subscription();
         let core = self.clone();
         let stores_open = self.activity.subscribe_stores();
+        let room_list = sync_service
+            .room_list_service()
+            .all_rooms()
+            .await
+            .or_failed(self, "subscribe_room_list")?;
         let task = spawn(async move {
-            let room_list = match sync_service.room_list_service().all_rooms().await {
-                Ok(room_list) => room_list,
-                Err(error) => {
-                    tracing::error!("all_rooms failed: {error}");
-                    return;
-                }
-            };
-
             let (stream, controller) = room_list.entries_with_dynamic_adapters(ROOM_LIST_PAGE_SIZE);
             controller.set_filter(Box::new(new_filter_non_left()));
 
@@ -1190,6 +1231,7 @@ impl Core {
             return (Vec::new(), None);
         };
         let rules = room.clone_info().room_version_rules_or_default();
+        let resync = cache.clone();
         let lookup = move |id: OwnedEventId| {
             let cache = cache.clone();
             async move { cache.find_event(&id).await.ok().flatten() }
@@ -1204,7 +1246,22 @@ impl Core {
             loop {
                 let update = match updates.recv().await {
                     Ok(update) => update,
-                    Err(RecvError::Lagged(_)) => continue,
+                    Err(RecvError::Lagged(_)) => {
+                        // The missed updates are gone, so what the cache holds now is resent.
+                        let Ok((cached, resubscribed)) = resync.subscribe().await else {
+                            break;
+                        };
+                        updates = resubscribed;
+                        let cached = scope.retain(cached, &lookup).await;
+                        let items = aggregation_items(cached, &rules, own_user_id.as_deref());
+                        if !items.is_empty() {
+                            core.emit(CoreEvent::TimelineAggregations {
+                                subscription,
+                                items,
+                            });
+                        }
+                        continue;
+                    }
                     Err(RecvError::Closed) => break,
                 };
                 let RoomEventCacheUpdate::UpdateTimelineEvents(update) = update else {

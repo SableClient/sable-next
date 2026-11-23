@@ -20,6 +20,7 @@ use tokio::sync::broadcast::{
     error::{RecvError, TryRecvError},
 };
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio_stream::{StreamExt as _, StreamMap, wrappers::BroadcastStream};
 use web_time::Instant;
 
 use super::{
@@ -212,24 +213,92 @@ async fn run(
     mut receive: UnboundedReceiver<Event>,
 ) {
     let mut watcher = Watcher::default();
-    let mut updates = client.subscribe_to_all_room_updates();
     loop {
-        let mut changed = HashSet::new();
+        core.wait_for_stores().await;
+        let done = core
+            .until_stores_close(serve(
+                &core,
+                &client,
+                generation,
+                &mut watcher,
+                &mut receive,
+            ))
+            .await;
+        if done.is_some() {
+            break;
+        }
+    }
+}
+
+/// Steps on events and room updates, and while an invitation is live until it lapses, so an idle
+/// account never wakes. Returns once the channels close.
+async fn serve(
+    core: &Core,
+    client: &Client,
+    generation: u64,
+    watcher: &mut Watcher,
+    receive: &mut UnboundedReceiver<Event>,
+) {
+    let mut updates = client.subscribe_to_all_room_updates();
+    // A sync that only carries sticky events changes no room, so each joined room is listened to.
+    let mut sticky: StreamMap<ruma::OwnedRoomId, BroadcastStream<StickyEventsUpdate>> =
+        StreamMap::new();
+    listen_to_sticky(&mut sticky, client);
+    // Every joined room, once: sticky events may have arrived while nothing was listening.
+    watcher.step(core, client, generation, None).await;
+    loop {
+        let wake = watcher.next_wake(crate::now_ms());
+        let mut touched = HashSet::new();
+        let mut all = false;
         tokio::select! {
             event = receive.recv() => {
                 let Some((room, value, received)) = event else { break; };
                 watcher.observe(&room, &value, received).await;
+                touched.insert(room.room_id().to_owned());
             }
-            update = updates.recv() => match update {
-                Ok(update) => changed.extend(update.iter_all_room_ids().cloned()),
-                Err(RecvError::Lagged(_)) => {
-                    changed.extend(client.joined_rooms().iter().map(|room| room.room_id().to_owned()));
+            update = updates.recv() => {
+                match update {
+                    Ok(update) => touched.extend(update.iter_all_room_ids().cloned()),
+                    Err(RecvError::Lagged(_)) => all = true,
+                    Err(RecvError::Closed) => break,
                 }
-                Err(RecvError::Closed) => break,
-            },
-            () = matrix_sdk::sleep::sleep(Duration::from_secs(1)) => {}
+                listen_to_sticky(&mut sticky, client);
+            }
+            Some((room_id, _)) = sticky.next(), if !sticky.is_empty() => {
+                touched.insert(room_id);
+            }
+            () = async {
+                match wake {
+                    Some(wake) => matrix_sdk::sleep::sleep(wake).await,
+                    None => std::future::pending().await,
+                }
+            } => {}
         }
-        watcher.step(&core, &client, generation, &changed).await;
+        watcher
+            .step(core, client, generation, (!all).then_some(&touched))
+            .await;
+    }
+}
+
+fn listen_to_sticky(
+    sticky: &mut StreamMap<ruma::OwnedRoomId, BroadcastStream<StickyEventsUpdate>>,
+    client: &Client,
+) {
+    let joined = client.joined_rooms();
+    let keys: HashSet<_> = sticky.keys().cloned().collect();
+    for room in &joined {
+        if !keys.contains(room.room_id()) {
+            sticky.insert(
+                room.room_id().to_owned(),
+                BroadcastStream::new(room.sticky_events().subscribe()),
+            );
+        }
+    }
+    let live: HashSet<_> = joined.iter().map(|room| room.room_id()).collect();
+    for id in keys {
+        if !live.contains(&*id) {
+            sticky.remove(&id);
+        }
     }
 }
 
@@ -237,6 +306,8 @@ async fn run(
 #[derive(Default)]
 struct Watcher {
     rooms: HashMap<ruma::OwnedRoomId, WatchedRoom>,
+    /// When the last step ran: an invitation live then may have lapsed since.
+    stepped: u64,
 }
 
 impl Watcher {
@@ -256,15 +327,45 @@ impl Watcher {
         watched.invitations.apply(value, crate::now_ms(), allowed);
     }
 
+    /// How long until a live invitation next needs a look: it is retried, its slot rechecked and
+    /// its end announced once a second, and nothing is due while none is live.
+    fn next_wake(&self, now: u64) -> Option<Duration> {
+        let expiry = self
+            .rooms
+            .values()
+            .filter_map(|watched| watched.invitations.next_expiry(now))
+            .min()?;
+        Some(Duration::from_millis(
+            expiry.saturating_sub(now).clamp(1, 1_000),
+        ))
+    }
+
+    /// Reads `rooms`, or every joined room when `None`, plus those with a live invitation.
     #[tracing::instrument(skip_all, target = "sable_core::tasks", name = "calls.invite.step")]
     async fn step(
         &mut self,
         core: &Core,
         client: &Client,
         generation: u64,
-        changed: &HashSet<ruma::OwnedRoomId>,
+        changed: Option<&HashSet<ruma::OwnedRoomId>>,
     ) {
-        for room in client.joined_rooms() {
+        let live = self.stepped;
+        self.stepped = crate::now_ms();
+        let due: Vec<_> =
+            match changed {
+                None => client.joined_rooms(),
+                Some(changed) => changed
+                    .iter()
+                    .chain(self.rooms.iter().filter_map(|(id, watched)| {
+                        watched.invitations.next_expiry(live).map(|_| id)
+                    }))
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .filter_map(|id| client.get_room(id))
+                    .filter(|room| room.state() == matrix_sdk::RoomState::Joined)
+                    .collect(),
+            };
+        for room in due {
             let values: Vec<_> = sticky::live_events(&room)
                 .into_iter()
                 .map(sticky::Event::into_value)
@@ -278,7 +379,7 @@ impl Watcher {
                 .or_insert_with(|| WatchedRoom::new(&room));
             let reread = !watched.members_read
                 || !watched.sticky.is_empty()
-                || changed.contains(room.room_id());
+                || changed.is_none_or(|changed| changed.contains(room.room_id()));
             watched.reconcile_sticky(&values, crate::now_ms());
             for value in values {
                 let allowed = watched.allowed(&room, &value).await;
@@ -775,7 +876,7 @@ mod tests {
             .await;
 
         reads.reset();
-        watcher.step(&core, &client, 0, &HashSet::new()).await;
+        watcher.step(&core, &client, 0, None).await;
         assert_eq!(
             reads.state(),
             2,
@@ -784,11 +885,11 @@ mod tests {
 
         reads.reset();
         for _ in 0..10 {
-            watcher.step(&core, &client, 0, &HashSet::new()).await;
+            watcher.step(&core, &client, 0, Some(&HashSet::new())).await;
         }
         let other = room_id!("!other:example.org").to_owned();
         watcher
-            .step(&core, &client, 0, &HashSet::from([other]))
+            .step(&core, &client, 0, Some(&HashSet::from([other])))
             .await;
         assert_eq!(
             reads.state(),
@@ -801,7 +902,7 @@ mod tests {
                 &core,
                 &client,
                 0,
-                &HashSet::from([room.room_id().to_owned()]),
+                Some(&HashSet::from([room.room_id().to_owned()])),
             )
             .await;
         assert_eq!(
@@ -809,6 +910,11 @@ mod tests {
             2,
             "an update to the room reads its call state again"
         );
+    }
+
+    #[test]
+    fn an_idle_watcher_has_nothing_to_wake_for() {
+        assert_eq!(Watcher::default().next_wake(crate::now_ms()), None);
     }
 
     #[tokio::test]
@@ -829,7 +935,7 @@ mod tests {
             .await;
 
         reads.reset();
-        watcher.step(&core, &client, 0, &HashSet::new()).await;
+        watcher.step(&core, &client, 0, None).await;
         assert_eq!(reads.state(), 0);
     }
 

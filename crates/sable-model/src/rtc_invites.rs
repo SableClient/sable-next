@@ -540,6 +540,20 @@ impl Invitations {
             .collect()
     }
 
+    /// When the first invitation still counting lapses, or `None` once none can.
+    #[must_use]
+    pub fn next_expiry(&self, now: u64) -> Option<u64> {
+        self.entries
+            .values()
+            .filter(|entry| !entry.removed && entry.expires > now)
+            .filter_map(|entry| entry.invite.as_ref())
+            .chain(self.legacy.values())
+            .chain(self.shown.values())
+            .map(|invite| invite.expires)
+            .filter(|expires| *expires > now)
+            .min()
+    }
+
     #[must_use]
     pub fn active(&mut self, now: u64) -> Vec<Invite> {
         // Keep expired ranks long enough to reject a stale snapshot with an older map value.

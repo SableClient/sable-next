@@ -572,14 +572,8 @@ impl Handler for MarkReadParams {
                 .or_failed(core, "build_mark_read_timeline")?;
             receipt_sent(core, timeline
                 .mark_as_read(receipt_type.clone()).await)?;
-            let main = room
-                .timeline_builder()
-                .with_focus(TimelineFocus::Live {
-                    hide_threaded_events: true,
-                })
-                .build()
-                .await
-                .or_failed(core, "build_mark_read_timeline")?;
+            // The cached live timeline already hides threaded events, which is the main one.
+            let main = core.timeline(&self.room_id).await?;
             receipt_sent(core, main.mark_as_read(receipt_type).await)?;
             if self.fully_read {
                 receipt_sent(core, timeline

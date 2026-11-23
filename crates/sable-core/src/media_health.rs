@@ -10,6 +10,7 @@ const MAX_BACKOFF_MS: u64 = 5 * 60 * 1000;
 const PROBE_WAIT_MS: u64 = 5 * 1000;
 const MEDIA_FAILURES_TO_REFUSE: u32 = 3;
 const PERSISTENT_MEDIA_FAILURE_MS: u64 = 10 * 1000;
+const MAX_FILES: usize = 4096;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Admission {
@@ -113,6 +114,10 @@ impl MediaHealth {
     }
 
     fn file_failed(&mut self, server: &ServerName, media_id: &str, now_ms: u64) {
+        if self.files.len() >= MAX_FILES {
+            self.files
+                .retain(|_, file| file.backoff_ms > 0 && now_ms < file.open_until_ms);
+        }
         let file = self
             .files
             .entry((server.to_owned(), media_id.to_owned()))

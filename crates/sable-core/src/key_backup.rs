@@ -159,18 +159,7 @@ impl Core {
         };
         progress(counts);
         for batch in sessions.chunks(IMPORT_BATCH) {
-            let exported: Vec<ExportedRoomKey> = batch
-                .iter()
-                .filter_map(|(room_id, session_id, backed_up)| {
-                    let backed_up = backed_up.deserialize().ok()?;
-                    let room_key = key.decrypt_session_data(backed_up.session_data).ok()?;
-                    Some(ExportedRoomKey::from_backed_up_room_key(
-                        room_id.clone(),
-                        session_id.clone(),
-                        room_key,
-                    ))
-                })
-                .collect();
+            let exported = decrypt_batch(key.clone(), batch.to_vec()).await?;
             let result = machine
                 .store()
                 .import_room_keys(exported, Some(&version), |_, _| {})
@@ -194,6 +183,46 @@ impl Core {
 }
 
 const IMPORT_BATCH: usize = 100;
+
+type BackedUpSession = (
+    ruma::OwnedRoomId,
+    String,
+    ruma::serde::Raw<ruma::api::client::backup::KeyBackupData>,
+);
+
+/// Decrypting a batch is CPU-bound, so it stays off the async task. A session
+/// that cannot be read is logged and counted as failed by the caller.
+async fn decrypt_batch(
+    key: BackupDecryptionKey,
+    batch: Vec<BackedUpSession>,
+) -> Result<Vec<ExportedRoomKey>, CoreError> {
+    let decrypt = move || {
+        batch
+            .into_iter()
+            .filter_map(|(room_id, session_id, backed_up)| {
+                let backed_up = backed_up
+                    .deserialize()
+                    .inspect_err(|error| {
+                        tracing::warn!(%session_id, "unreadable backed up room key: {error}");
+                    })
+                    .ok()?;
+                let room_key = key
+                    .decrypt_session_data(backed_up.session_data)
+                    .inspect_err(|error| {
+                        tracing::warn!(%session_id, "undecryptable backed up room key: {error}");
+                    })
+                    .ok()?;
+                Some(ExportedRoomKey::from_backed_up_room_key(
+                    room_id, session_id, room_key,
+                ))
+            })
+            .collect()
+    };
+    #[cfg(not(target_family = "wasm"))]
+    return tokio::task::spawn_blocking(decrypt).await.backend();
+    #[cfg(target_family = "wasm")]
+    Ok(decrypt())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct BackupStatus {
@@ -224,6 +253,14 @@ async fn current_backup(
     }
 }
 
+/// A server backup this device holds no key for. A paused backup still matches its key, so it is not one.
+fn is_unreadable(
+    key: Option<&BackupDecryptionKey>,
+    current: Option<&get_latest_backup_info::v3::Response>,
+) -> bool {
+    current.is_some_and(|info| !matches_backup(key, info))
+}
+
 fn matches_backup(
     key: Option<&BackupDecryptionKey>,
     info: &get_latest_backup_info::v3::Response,
@@ -235,10 +272,80 @@ fn matches_backup(
     })
 }
 
+/// What recovery setup finds of a server backup that is not enabled on this device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReadableBackup {
+    /// No backup, or one this device holds no key for.
+    None,
+    /// Readable, and left off because the account turned key backup off.
+    Paused,
+    Resumed,
+}
+
 impl Core {
+    /// Whether the server holds a backup whose key this device lacks.
+    pub(crate) async fn server_backup_unreadable(&self, client: &Client) -> Result<bool, RpcError> {
+        let base = self.base_client().await?;
+        let unreadable = async {
+            let machine = base.olm_machine().await;
+            let machine = machine.as_ref().ok_or("no olm machine")?;
+            let keys = machine.store().load_backup_keys().await.backend()?;
+            let current = current_backup(client).await?;
+            Ok::<_, CoreError>(is_unreadable(
+                keys.decryption_key.as_ref(),
+                current.as_ref(),
+            ))
+        };
+        unreadable.await.or_report(self, "replace_backup")
+    }
+
+    /// Enables a server backup this device holds the key for, which recovery setup needs. A
+    /// pause is the account's choice (MSC4287), so it is only set back once `turn_on` says the
+    /// user agreed. A preference that cannot be read fails rather than guess.
+    pub(crate) async fn resume_readable_backup(
+        &self,
+        client: &Client,
+        turn_on: bool,
+    ) -> Result<ReadableBackup, RpcError> {
+        let base = self.base_client().await?;
+        let resumed = async {
+            let machine = base.olm_machine().await;
+            let machine = machine.as_ref().ok_or("no olm machine")?;
+            let keys = machine.store().load_backup_keys().await.backend()?;
+            let (Some(key), Some(info)) = (keys.decryption_key, current_backup(client).await?)
+            else {
+                return Ok(ReadableBackup::None);
+            };
+            if !matches_backup(Some(&key), &info) {
+                return Ok(ReadableBackup::None);
+            }
+            if backups_marked_disabled(client).await.backend()? {
+                if !turn_on {
+                    return Ok(ReadableBackup::Paused);
+                }
+                mark_backups_enabled(client).await.backend()?;
+            }
+            let public = key.megolm_v1_public_key();
+            public.set_version(info.version);
+            machine
+                .backup_machine()
+                .enable_backup_v1(public)
+                .await
+                .backend()?;
+            Ok::<_, CoreError>(ReadableBackup::Resumed)
+        };
+        resumed.await.or_report(self, "resume_backup")
+    }
+
     pub(crate) async fn honor_backup_preference(&self, client: &Client) {
-        if !matches!(backups_marked_disabled(client).await, Ok(true)) {
-            return;
+        match backups_marked_disabled(client).await {
+            Ok(true) => {}
+            Ok(false) => return,
+            Err(error) => {
+                // Pausing on a transient failure would silently stop every user's backup.
+                tracing::warn!("could not read the key backup preference: {error}");
+                return;
+            }
         }
         let Ok(base) = self.base_client().await else {
             return;
@@ -276,6 +383,28 @@ impl Core {
     }
 }
 
+/// The stable preference and the unstable one older clients still read.
+async fn mark_backups_enabled(client: &Client) -> Result<(), matrix_sdk::Error> {
+    use matrix_sdk::ruma::events::GlobalAccountDataEventType;
+
+    for (event_type, content) in [
+        ("m.key_backup", serde_json::json!({ "enabled": true })),
+        (
+            "m.org.matrix.custom.backup_disabled",
+            serde_json::json!({ "disabled": false }),
+        ),
+    ] {
+        client
+            .account()
+            .set_account_data_raw(
+                GlobalAccountDataEventType::from(event_type),
+                ruma::serde::Raw::new(&content)?.cast_unchecked(),
+            )
+            .await?;
+    }
+    Ok(())
+}
+
 async fn backups_marked_disabled(client: &Client) -> Result<bool, matrix_sdk::Error> {
     use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 
@@ -299,4 +428,43 @@ async fn backups_marked_disabled(client: &Client) -> Result<bool, matrix_sdk::Er
         .await?
         .and_then(|raw| field(raw, "disabled"))
         .unwrap_or(false))
+}
+
+#[cfg(test)]
+mod tests {
+    use matrix_sdk::ruma::serde::Raw;
+
+    use super::*;
+
+    fn info_for(key: &BackupDecryptionKey) -> get_latest_backup_info::v3::Response {
+        get_latest_backup_info::v3::Response::new(
+            Raw::new(&key.to_backup_info()).unwrap().cast_unchecked(),
+            0u32.into(),
+            String::new(),
+            "1".to_owned(),
+        )
+    }
+
+    #[test]
+    fn a_backup_the_device_holds_the_key_for_is_never_unreadable() {
+        let key = BackupDecryptionKey::new();
+
+        assert!(!is_unreadable(Some(&key), Some(&info_for(&key))));
+    }
+
+    #[test]
+    fn a_backup_under_another_key_is_unreadable() {
+        let info = info_for(&BackupDecryptionKey::new());
+
+        assert!(is_unreadable(
+            Some(&BackupDecryptionKey::new()),
+            Some(&info)
+        ));
+        assert!(is_unreadable(None, Some(&info)));
+    }
+
+    #[test]
+    fn no_server_backup_leaves_nothing_to_replace() {
+        assert!(!is_unreadable(None, None));
+    }
 }

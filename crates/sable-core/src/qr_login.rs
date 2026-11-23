@@ -4,7 +4,7 @@ use crate::api::auth::StartQrGrantParams;
 use crate::api::auth::StartQrLoginParams;
 use std::sync::Arc;
 
-use futures_util::{Stream, StreamExt, pin_mut};
+use futures_util::{FutureExt, Stream, StreamExt, pin_mut};
 use matrix_sdk::authentication::oauth::qrcode::{
     CheckCodeSender, ContinuationMessageSender, DeviceAuthorizationOAuthError, GeneratedQrProgress,
     GrantLoginProgress, LoginProgress, Msc4108IntentData, QRCodeGrantLoginError, QRCodeLoginError,
@@ -41,6 +41,20 @@ impl QrSlots {
 
     fn take_continuation(&self) -> Option<ContinuationMessageSender> {
         self.continuation.lock().take()
+    }
+}
+
+/// Forwards a flow's progress; `drain` makes sure the last updates go out before the flow's final event.
+struct Watch {
+    _task: Task,
+    stop: tokio::sync::oneshot::Sender<()>,
+    drained: tokio::sync::oneshot::Receiver<()>,
+}
+
+impl Watch {
+    async fn drain(self) {
+        let _ = self.stop.send(());
+        let _ = self.drained.await;
     }
 }
 
@@ -183,20 +197,40 @@ impl Core {
         self.emit(CoreEvent::QrLogin { grant, progress });
     }
 
-    fn watch<P, S, V>(self: &Arc<Self>, grant: bool, progress: S, view: V) -> Task
+    fn watch<P, S, V>(self: &Arc<Self>, grant: bool, progress: S, view: V) -> Watch
     where
         P: Send + 'static,
         S: Stream<Item = P> + Send + 'static,
         V: Fn(P) -> QrLoginProgressView + Send + 'static,
     {
         let core = self.clone();
-        spawn(async move {
+        let (stop, mut stopped) = tokio::sync::oneshot::channel::<()>();
+        let (drained_tx, drained) = tokio::sync::oneshot::channel::<()>();
+        let task = spawn(async move {
             pin_mut!(progress);
-            while let Some(update) = progress.next().await {
-                core.emit_qr(grant, view(update));
+            loop {
+                tokio::select! {
+                    update = progress.next() => {
+                        let Some(update) = update else { break };
+                        core.emit_qr(grant, view(update));
+                    }
+                    _ = &mut stopped => {
+                        // The flow ended: forward what it already queued before the final event.
+                        while let Some(Some(update)) = progress.next().now_or_never() {
+                            core.emit_qr(grant, view(update));
+                        }
+                        break;
+                    }
+                }
             }
+            let _ = drained_tx.send(());
         })
-        .abort_on_drop()
+        .abort_on_drop();
+        Watch {
+            _task: task,
+            stop,
+            drained,
+        }
     }
 
     pub(crate) async fn start_qr_login(
@@ -230,19 +264,23 @@ impl Core {
             let builder = oauth.login_with_qr_code(Some(&registration));
             let result = if let Some(data) = &scanned_code {
                 let login = builder.scan(data);
-                let _watch = core.watch(false, login.subscribe_to_progress(), |update| {
+                let watch = core.watch(false, login.subscribe_to_progress(), |update| {
                     login_view(update, scanned)
                 });
-                login.await
+                let result = login.await;
+                watch.drain().await;
+                result
             } else {
                 let mut login = builder.generate();
                 if msc_4388_supported(&oauth).await {
                     login.with_msc4388_support();
                 }
-                let _watch = core.watch(false, login.subscribe_to_progress(), move |update| {
+                let watch = core.watch(false, login.subscribe_to_progress(), move |update| {
                     login_view(update, |state| generated(&flow_slots, state))
                 });
-                login.await
+                let result = login.await;
+                watch.drain().await;
+                result
             };
             let outcome = match result {
                 Ok(()) => core
@@ -321,19 +359,23 @@ impl Core {
             let oauth = client.oauth();
             let result = if let Some(data) = &scanned_code {
                 let grant = oauth.grant_login_with_qr_code().scan(data);
-                let _watch = core.watch(true, grant.subscribe_to_progress(), move |update| {
+                let watch = core.watch(true, grant.subscribe_to_progress(), move |update| {
                     grant_view(&flow_slots, update, scanned)
                 });
-                grant.await
+                let result = grant.await;
+                watch.drain().await;
+                result
             } else {
                 let mut grant = oauth.grant_login_with_qr_code().generate();
                 if msc_4388_supported(&oauth).await {
                     grant.with_msc4388_support();
                 }
-                let _watch = core.watch(true, grant.subscribe_to_progress(), move |update| {
+                let watch = core.watch(true, grant.subscribe_to_progress(), move |update| {
                     grant_view(&flow_slots, update, |state| generated(&flow_slots, state))
                 });
-                grant.await
+                let result = grant.await;
+                watch.drain().await;
+                result
             };
             core.emit_qr(
                 true,
@@ -415,6 +457,30 @@ mod tests {
     use url::Url;
 
     use super::{QrLoginFailureView, grant_failure, login_failure, reciprocating_homeserver};
+
+    #[tokio::test]
+    async fn queued_progress_is_forwarded_before_the_watch_finishes() {
+        use crate::Core;
+        use futures_util::StreamExt as _;
+
+        use crate::protocol::{CoreEvent, QrLoginProgressView};
+        use crate::store::MemorySessionStore;
+
+        let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+        // Two updates are ready and the stream then stays open, as a live flow's does.
+        let progress = futures_util::stream::iter([1u8, 2]).chain(futures_util::stream::pending());
+        let watch = core.watch(false, progress, |_| QrLoginProgressView::Done);
+
+        watch.drain().await;
+
+        let mut forwarded = 0;
+        while let Ok(event) = events.try_recv() {
+            if matches!(event, CoreEvent::QrLogin { .. }) {
+                forwarded += 1;
+            }
+        }
+        assert_eq!(forwarded, 2);
+    }
 
     fn code(intent: Msc4108IntentData) -> QrCodeData {
         QrCodeData::new_msc4108(
