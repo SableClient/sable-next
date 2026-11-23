@@ -10,7 +10,7 @@ import type {
   RoomPowerLevelsView,
 } from '#src/generated/protocol';
 
-import { roomView } from '#lib/test-support/room-views.js';
+import { roomView, spaceChild } from '#lib/test-support/room-views.js';
 import { reactiveToggle } from '#lib/test-support/toggle.svelte.js';
 
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -37,16 +37,7 @@ const space = (room_id: string): RoomListItemView =>
     room_id,
     room_kind: 'space',
     state: 'joined',
-    space_children: [
-      {
-        room_id: ROOM_ID,
-        via: [],
-        order: null,
-        origin_server_ts: 0,
-        suggested: false,
-        private: false,
-      },
-    ],
+    space_children: [spaceChild({ room_id: ROOM_ID })],
   });
 const managed = space('!managed:example.org');
 const unmanaged = space('!unmanaged:example.org');

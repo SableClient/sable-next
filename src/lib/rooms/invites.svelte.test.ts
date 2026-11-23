@@ -11,7 +11,7 @@ vi.mock('$app/paths', () => ({
 }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { roomView } from '#lib/test-support/room-views.js';
+import { roomView, spaceChild } from '#lib/test-support/room-views.js';
 import { InviteActions, isDeclining } from './invites.svelte.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
@@ -96,16 +96,7 @@ test('an accepted invitation opens where the room list files the room', async ()
   const space = roomView({
     room_id: '!space:example.org',
     room_kind: 'space',
-    space_children: [
-      {
-        room_id: room.room_id,
-        via: ['example.org'],
-        order: null,
-        suggested: false,
-        origin_server_ts: 0,
-        private: false,
-      },
-    ],
+    space_children: [spaceChild({ room_id: room.room_id, via: ['example.org'] })],
   });
   const answers = actions({ join: vi.fn(() => Promise.resolve(room.room_id)) }, [space, room]);
   goto.mockClear();
