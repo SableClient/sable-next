@@ -24,6 +24,7 @@ export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'none' | 'compact' | 'cozy' | 'roomy';
 export type MediaAutoLoad = MediaPreviewsView;
 export type ImageMetadata = 'location' | 'all' | 'keep';
+export type MatrixLinkSelector = 'sable' | 'matrix' | 'custom';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type WeekStart = 'sunday' | 'monday' | 'saturday';
@@ -408,6 +409,10 @@ const SETTINGS = {
   sendAttachmentAsCaption: toggle(true, { account: true }),
   sendAttachmentsAsGallery: toggle(false, { account: true }),
   imageMetadata: choice<ImageMetadata>(['location', 'all', 'keep'], 'location'),
+  matrixLinkSelector: choice<MatrixLinkSelector>(['sable', 'matrix', 'custom'], 'sable', {
+    account: true,
+  }),
+  matrixLinkCustom: text('', { account: true }),
 
   personaPicker: toggle(true, { account: true }),
   personaPickerSortOrder: choice<PersonaPickerSortOrder>(

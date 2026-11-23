@@ -21,6 +21,7 @@
   } from '#lib/settings/preferences.svelte.js';
   import { PREFERENCE_RANGES } from '#lib/settings/definitions.js';
   import type { Preferences } from '#lib/settings/definitions.js';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
     category: SettingsCategory;
@@ -59,13 +60,16 @@
 
   /** A gate this platform never renders would disable its dependants forever. */
   function gated(setting: SettingDefinition): boolean {
-    return (
-      setting.gatedBy !== undefined && shown.has(setting.gatedBy) && !preferences[setting.gatedBy]
-    );
+    const gate = setting.gatedBy;
+    if (gate === undefined) return false;
+    if (typeof gate === 'string') return shown.has(gate) && !preferences[gate];
+    return shown.has(gate.key) && preferences[gate.key] !== gate.value;
   }
 
   function gateName(setting: SettingDefinition): string {
-    return supportedSettings.find((item) => item.key === setting.gatedBy)?.name ?? '';
+    const gate = setting.gatedBy;
+    const key = typeof gate === 'object' ? gate.key : gate;
+    return supportedSettings.find((item) => item.key === key)?.name ?? '';
   }
 
   let serverFeatures = $state.raw<readonly string[] | null>(null);
@@ -190,6 +194,15 @@
               /><span class="range-suffix" aria-hidden="true">%</span>
             </label>
           </div>
+        {:else if setting.type === 'text'}
+          {@const key = setting.key}
+          <TextInput
+            {disabled}
+            aria-label={i18n.t(setting.name)}
+            value={preferences[key]}
+            placeholder={setting.placeholder && i18n.t(setting.placeholder)}
+            oninput={(event) => setPreference(key, event.currentTarget.value)}
+          />
         {:else}
           {@const key = setting.key}
           <Switch

@@ -772,6 +772,20 @@
           "type": "boolean",
           "default": false
         },
+        "matrixLinkSelector": {
+          "title": "External Matrix links",
+          "enum": [
+            "sable",
+            "matrix",
+            "custom"
+          ],
+          "default": "sable"
+        },
+        "matrixLinkCustom": {
+          "title": "Custom link host",
+          "type": "string",
+          "default": ""
+        },
         "personaPicker": {
           "title": "Show profile picker in the composer",
           "type": "boolean",
@@ -1632,6 +1646,20 @@
           "title": "Combine attachments into a gallery",
           "type": "boolean",
           "default": false
+        },
+        "matrixLinkSelector": {
+          "title": "External Matrix links",
+          "enum": [
+            "sable",
+            "matrix",
+            "custom"
+          ],
+          "default": "sable"
+        },
+        "matrixLinkCustom": {
+          "title": "Custom link host",
+          "type": "string",
+          "default": ""
         },
         "personaPicker": {
           "title": "Show profile picker in the composer",
