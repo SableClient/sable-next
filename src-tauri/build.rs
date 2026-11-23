@@ -15,5 +15,10 @@ fn main() {
         println!("cargo:rerun-if-env-changed={forwarded}");
     }
 
+    // The NDK linker writes no build ID, which sentry-rust needs to symbolicate a frame.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+        println!("cargo:rustc-link-arg-cdylib=-Wl,--build-id=sha1");
+    }
+
     tauri_build::build();
 }
