@@ -105,4 +105,4 @@ rpm:
     - xdg-utils
     - at-spi2-core
     - (libuuid or libuuid1)
-    - pulseaudio-libs
+    - (pulseaudio-libs or libpulse0)
