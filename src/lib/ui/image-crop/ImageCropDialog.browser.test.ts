@@ -48,19 +48,23 @@ test('an avatar crops to the centred square', async () => {
 });
 
 test.each([
-  ['an opaque', '#3366cc', 'image/jpeg', 'photo.jpg'],
-  ['a transparent', 'transparent', 'image/png', 'photo.png'],
-])('%s picture of another format is saved as %s', async (_, fill, type, name) => {
+  ['an opaque HEIC', 'image/jpeg', 'image/heic', '#3366cc', 'photo.jpg'],
+  ['an opaque HEIF', 'image/jpeg', 'image/heif', '#3366cc', 'photo.jpg'],
+  ['a transparent HEIC', 'image/png', 'image/heic', 'transparent', 'photo.png'],
+  ['an opaque GIF', 'image/png', 'image/gif', '#3366cc', 'photo.png'],
+  ['an opaque BMP', 'image/png', 'image/bmp', '#3366cc', 'photo.png'],
+  ['an opaque AVIF', 'image/png', 'image/avif', '#3366cc', 'photo.png'],
+])('%s picture is saved as %s', async (_, type, source, fill, name) => {
   await render(ImageCropHost);
   const canvas = new OffscreenCanvas(400, 400);
   const context = canvas.getContext('2d');
   if (!context) throw new Error('No canvas context');
   context.fillStyle = fill;
   context.fillRect(0, 0, 400, 400);
-  const heic = new File([await canvas.convertToBlob({ type: 'image/png' })], 'photo.heic', {
-    type: 'image/heic',
+  const file = new File([await canvas.convertToBlob({ type: 'image/png' })], 'photo.img', {
+    type: source,
   });
-  const result = requestCrop(heic, 'avatar');
+  const result = requestCrop(file, 'avatar');
   const apply = page.getByRole('button', { name: 'Apply' });
   await expect.element(apply).toBeEnabled();
   await apply.click();
