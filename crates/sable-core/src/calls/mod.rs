@@ -61,6 +61,7 @@ use sfu::ProvisionError;
 mod transport_discovery {
     use ruma::api::{auth_scheme::AccessToken, request, response};
     use ruma::metadata;
+    use ruma::serde::Raw;
 
     metadata! {
         method: GET,
@@ -78,9 +79,9 @@ mod transport_discovery {
     #[response]
     pub(super) struct Response {
         #[serde(default)]
-        pub transports: Vec<ruma::api::client::rtc::RtcTransport>,
+        pub transports: Vec<Raw<ruma::api::client::rtc::RtcTransport>>,
         #[serde(default)]
-        pub rtc_transports: Vec<ruma::api::client::rtc::RtcTransport>,
+        pub rtc_transports: Vec<Raw<ruma::api::client::rtc::RtcTransport>>,
     }
 }
 
@@ -92,6 +93,7 @@ async fn stable_transports(client: &Client) -> Vec<String> {
         .transports
         .iter()
         .chain(&response.rtc_transports)
+        .filter_map(|raw| crate::lenient::parse_or_skip(raw, "RTC transport"))
         .filter_map(|transport| {
             (transport.transport_type() == "m.livekit")
                 .then(|| {

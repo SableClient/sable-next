@@ -2024,6 +2024,31 @@ async fn a_jwt_service_from_any_source_is_preferred_to_an_sfu_url() {
 }
 
 #[tokio::test]
+async fn a_malformed_rtc_transport_does_not_hide_the_valid_ones() {
+    use serde_json::json;
+    use wiremock::matchers::{method, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let server = MatrixMockServer::new().await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"/rtc/transports$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "rtc_transports": [
+                {"type": "m.livekit"},
+                {"type": "m.livekit", "url": "wss://sfu.example.org"},
+            ],
+        })))
+        .mount(server.server())
+        .await;
+    let client = server.client_builder().build().await;
+
+    assert_eq!(
+        crate::calls::stable_transports(&client).await,
+        ["wss://sfu.example.org"]
+    );
+}
+
+#[tokio::test]
 async fn call_support_reuses_the_prefetched_well_known() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
