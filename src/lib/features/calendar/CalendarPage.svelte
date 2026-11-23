@@ -285,6 +285,7 @@
       PageUp: shift(0, -1),
       PageDown: shift(0, 1),
     };
+    // eslint-disable-next-line no-restricted-syntax -- not a text input
     if (event.key === 'Enter' && permissions?.can_post !== false) {
       event.preventDefault();
       openNew(day);

@@ -194,6 +194,7 @@
     else if (event.key === '0') view = fitView(image, frame);
     else if (event.key === 'r') rotate(1);
     else if (event.key === 'R') rotate(-1);
+    // eslint-disable-next-line no-restricted-syntax -- not a text input
     else if (event.key === 'Enter') void apply();
     else return;
     event.preventDefault();

@@ -25,6 +25,7 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
   import { holdUnsaved } from '#lib/ui/unsaved-guard.js';
   import { VirtualWindow } from '#lib/ui/virtual-window.svelte.js';
   import { uprightImageBytes } from '#lib/ui/upright-jpeg.js';
@@ -489,7 +490,8 @@
               disabled={busy}
               {@attach focusWhenAdded(entry.preview)}
               onkeydown={(event: KeyboardEvent) => {
-                if (event.key === 'Enter' && rejected === null) void apply();
+                if (event.key === 'Enter' && !isComposingKey(event) && rejected === null)
+                  void apply();
               }}
             />
             <IconButton
@@ -564,7 +566,7 @@
                   bind:value={renameDraft}
                   aria-label={i18n.t('emotes.shortcode')}
                   onkeydown={(event: KeyboardEvent) => {
-                    if (event.key === 'Enter') {
+                    if (event.key === 'Enter' && !isComposingKey(event)) {
                       commitRename(image);
                       if (rejected === null) void apply();
                     }
@@ -576,7 +578,7 @@
                   aria-label={i18n.t('emotes.body')}
                   placeholder={i18n.t('emotes.body')}
                   onkeydown={(event: KeyboardEvent) => {
-                    if (event.key === 'Enter') {
+                    if (event.key === 'Enter' && !isComposingKey(event)) {
                       commitRename(image);
                       if (rejected === null) void apply();
                     }

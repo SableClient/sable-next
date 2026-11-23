@@ -28,6 +28,7 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import { UserDirectoryLookup } from '../members/user-directory-lookup.svelte.js';
   import UserSuggestionList from '../members/UserSuggestionList.svelte';
@@ -174,7 +175,7 @@
   }
 
   function onInviteKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'Enter') return;
+    if (event.key !== 'Enter' || isComposingKey(event)) return;
     // Enter adds the invite; the form must not submit.
     event.preventDefault();
     addInvite();

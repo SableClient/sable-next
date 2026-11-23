@@ -23,6 +23,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import '#lib/features/room/members/sender-identity.css';
 
@@ -243,8 +244,10 @@
         id="persona-search"
         bind:value={query}
         label={i18n.t('personas.search')}
-        onkeyup={(event) => {
+        onkeydown={(event) => {
+          if (isComposingKey(event)) return;
           if (event.key === 'Enter' && query && filteredPersonas && filteredPersonas.length !== 0) {
+            event.preventDefault();
             onChoose(filteredPersonas[0]);
           }
         }}

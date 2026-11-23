@@ -23,6 +23,7 @@
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import '#lib/ui/primitives/settings-row.css';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -426,7 +427,7 @@
             placeholder={i18n.t('room.createInvitePlaceholder')}
             disabled={upgrading}
             onkeydown={(event: KeyboardEvent) => {
-              if (event.key !== 'Enter') return;
+              if (event.key !== 'Enter' || isComposingKey(event)) return;
               event.preventDefault();
               addCreator();
             }}

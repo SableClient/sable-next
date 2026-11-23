@@ -590,6 +590,7 @@
       event.preventDefault();
       return;
     }
+    // eslint-disable-next-line no-restricted-syntax -- not a text input
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const target = event.target;
     if (!(target instanceof Element) || !target.matches('[data-mx-spoiler]')) return;

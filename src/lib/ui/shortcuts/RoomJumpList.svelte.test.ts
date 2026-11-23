@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
 
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
@@ -56,4 +57,26 @@ test('a room whose unread dot the room list hides shows no dot in the jump list'
   const loud = screen.getByRole('option', { name: /Loud/ });
   expect(quiet.querySelector('.unread-badge')).toBeNull();
   expect(loud.querySelector('.unread-badge')).not.toBeNull();
+});
+
+function press(target: Element, key: string, keyCode: number): void {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'keyCode', { value: keyCode });
+  target.dispatchEvent(event);
+}
+
+test('keys that drive an IME composition neither move the selection nor open a room', async () => {
+  const onSelect = vi.fn();
+  render(RoomJumpList, { onSelect });
+  const input = screen.getByRole('combobox');
+  const first = input.getAttribute('aria-activedescendant');
+
+  press(input, 'ArrowDown', 229);
+  await tick();
+  expect(input.getAttribute('aria-activedescendant')).toBe(first);
+  press(input, 'Enter', 229);
+  expect(onSelect).not.toHaveBeenCalled();
+
+  press(input, 'Enter', 13);
+  expect(onSelect).toHaveBeenCalledOnce();
 });

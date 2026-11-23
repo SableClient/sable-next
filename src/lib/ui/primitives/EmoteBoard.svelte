@@ -22,6 +22,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { emojiGroupIcons, type BoardTab } from '#lib/ui/primitives/emote-board.js';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
   import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
   import {
     writeBoardSize,
@@ -543,7 +544,7 @@
   }
 
   function searchKeydown(event: KeyboardEvent): void {
-    if (gifTab) return;
+    if (gifTab || isComposingKey(event)) return;
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
       if (event.key === 'Enter') submitQuery(event);
       return;
@@ -552,12 +553,11 @@
       event.preventDefault();
       return;
     }
-    submitQuery(event);
+    if (event.key === 'Enter') submitQuery(event);
   }
 
   /** A reaction key is any string, so an unmatched query is still a valid one. */
   function submitQuery(event: KeyboardEvent): void {
-    if (event.key !== 'Enter') return;
     const cell = showFreeText && chosen.key !== boardKey ? undefined : selectedCell();
     if (cell) {
       event.preventDefault();

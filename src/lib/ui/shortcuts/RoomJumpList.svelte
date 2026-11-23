@@ -7,6 +7,7 @@
   import RoomIcon from '#lib/ui/primitives/RoomIcon.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
   import '#lib/ui/primitives/menu.css';
 
   import { fuzzyMatchParts } from './fuzzy.js';
@@ -47,6 +48,7 @@
   }
 
   function onKeydown(event: KeyboardEvent): void {
+    if (isComposingKey(event)) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (results.length > 0) activeIndex = (active + 1) % results.length;

@@ -60,6 +60,7 @@
   import { previewMessage } from '#lib/features/room/timeline/preview-message.js';
   import { rovingFocus } from '#lib/ui/roving-focus.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   interface Props {
     profile: ProfileView;
@@ -685,7 +686,7 @@
                 aria-label={i18n.t('settings.otherProfileFieldsKeyPlaceholder')}
                 placeholder={i18n.t('settings.otherProfileFieldsKeyPlaceholder')}
                 onkeydown={(event) => {
-                  if (event.key !== 'Enter') return;
+                  if (event.key !== 'Enter' || isComposingKey(event)) return;
                   event.preventDefault();
                   commitExtra();
                 }}

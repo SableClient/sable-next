@@ -840,7 +840,7 @@
   }
   function feedKeydown(event: KeyboardEvent): void {
     const target = event.target;
-    if (!(target instanceof HTMLElement) || event.defaultPrevented) return;
+    if (!(target instanceof HTMLElement) || event.defaultPrevented || isComposingKey(event)) return;
     const article = target.closest<HTMLElement>(ARTICLE);
     if (!article) return;
     const plain = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;

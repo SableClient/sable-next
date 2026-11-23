@@ -14,6 +14,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import { canSendState } from './permission-groups';
 
@@ -348,7 +349,7 @@
           placeholder={i18n.t('room.addressesPlaceholder')}
           aria-label={i18n.t('common.add')}
           onkeydown={(event: KeyboardEvent) => {
-            if (event.key !== 'Enter') return;
+            if (event.key !== 'Enter' || isComposingKey(event)) return;
             event.preventDefault();
             add();
           }}

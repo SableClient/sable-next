@@ -17,6 +17,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
   import { UserDirectoryLookup } from './members/user-directory-lookup.svelte.js';
   import UserSuggestionList from './members/UserSuggestionList.svelte';
 
@@ -221,7 +222,7 @@
           bind:value={() => draft, setDraft}
           placeholder={i18n.t('room.createInvitePlaceholder')}
           onkeydown={(event: KeyboardEvent) => {
-            if (event.key !== 'Enter') return;
+            if (event.key !== 'Enter' || isComposingKey(event)) return;
             event.preventDefault();
             void invite();
           }}

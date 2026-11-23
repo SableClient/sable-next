@@ -22,7 +22,7 @@
   import { mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { pixelatedImage } from '#lib/ui/pixelated.js';
   import { wheelZoomFactor } from '#lib/ui/wheel-zoom.js';
-  import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
+  import { isComposingKey, isEditableTarget } from '#lib/ui/shortcuts/binding.js';
   import {
     AXIS_LOCK_THRESHOLD,
     SWIPE_THRESHOLD,
@@ -671,7 +671,7 @@
                       bind:value={zoomInput}
                       onblur={commitZoomEdit}
                       onkeydown={(event) => {
-                        if (event.key === 'Enter') commitZoomEdit();
+                        if (event.key === 'Enter' && !isComposingKey(event)) commitZoomEdit();
                       }}
                     />%
                   </span>

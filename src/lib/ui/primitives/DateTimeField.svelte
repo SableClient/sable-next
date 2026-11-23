@@ -5,6 +5,7 @@
 
   import { currentLocale } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   interface Props {
     label: string;
@@ -53,7 +54,12 @@
     <DateField.Input
       class="form-control date-time-field-input"
       onkeydown={(event: KeyboardEvent) => {
-        if (event.key !== 'Enter' || !(event.target instanceof HTMLElement)) return;
+        if (
+          event.key !== 'Enter' ||
+          isComposingKey(event) ||
+          !(event.target instanceof HTMLElement)
+        )
+          return;
         event.preventDefault();
         event.target.closest('form')?.requestSubmit();
       }}

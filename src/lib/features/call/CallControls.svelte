@@ -161,11 +161,13 @@
         onpointercancel={() => setTalking(false)}
         onlostpointercapture={() => setTalking(false)}
         onkeydown={(event) => {
+          // eslint-disable-next-line no-restricted-syntax -- not a text input
           if (event.key !== ' ' && event.key !== 'Enter') return;
           event.preventDefault();
           setTalking(true);
         }}
         onkeyup={(event) => {
+          // eslint-disable-next-line no-restricted-syntax -- not a text input
           if (event.key !== ' ' && event.key !== 'Enter') return;
           event.preventDefault();
           setTalking(false);

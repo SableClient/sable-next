@@ -24,6 +24,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import '#lib/ui/primitives/menu.css';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import { UserDirectoryLookup } from '../members/user-directory-lookup.svelte.js';
   import '#lib/ui/primitives/dialog-body.css';
@@ -151,7 +152,7 @@
   }
 
   function onKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'Enter') return;
+    if (event.key !== 'Enter' || isComposingKey(event)) return;
     event.preventDefault();
     if (room) void enterRoom();
     else if (people[0]) void message(people[0].user_id);

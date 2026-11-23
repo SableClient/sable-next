@@ -14,6 +14,7 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import {
     acceptsType,
@@ -281,7 +282,12 @@
                   }
                 }
                 onkeydown={(event: KeyboardEvent) => {
-                  if (event.key !== 'Enter' || (pending[parameter.key] ?? '').trim() === '') return;
+                  if (
+                    event.key !== 'Enter' ||
+                    isComposingKey(event) ||
+                    (pending[parameter.key] ?? '').trim() === ''
+                  )
+                    return;
                   event.preventDefault();
                   addEntry(parameter.key);
                 }}

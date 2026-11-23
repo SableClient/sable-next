@@ -22,6 +22,33 @@ function persona(id: string, color: string | null): PersonaView {
   };
 }
 
+function press(target: Element, type: 'keydown' | 'keyup', keyCode: number): void {
+  const event = new KeyboardEvent(type, { key: 'Enter', bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'keyCode', { value: keyCode });
+  target.dispatchEvent(event);
+}
+
+test('Enter picks the first match, but not the Enter that commits an IME composition', async () => {
+  const onChoose = vi.fn();
+  renderWithTooltips(PersonaMenu, {
+    personas: [persona('Tinted', null)],
+    selected: null,
+    scope: 'account',
+    onScope: vi.fn(),
+    onChoose,
+  });
+  const search = screen.getByRole('searchbox');
+  await fireEvent.input(search, { target: { value: 'tin' } });
+
+  press(search, 'keydown', 229);
+  press(search, 'keyup', 13);
+  expect(onChoose).not.toHaveBeenCalled();
+
+  press(search, 'keydown', 13);
+  press(search, 'keyup', 13);
+  expect(onChoose).toHaveBeenCalledOnce();
+});
+
 test('a persona with a name colour is listed in that colour', async () => {
   renderWithTooltips(PersonaMenu, {
     personas: [persona('Tinted', '#c04040'), persona('Plain', null)],
