@@ -568,6 +568,31 @@ test('a Rust panic associates wasm addresses with its worker image in Sentry', a
   });
 });
 
+test('a Rust panic is grouped on where it was raised, not the values it names', async () => {
+  const { Scope } = await import('@sentry/sveltekit');
+  const fingerprints: unknown[] = [];
+  for (const index of [7, 29]) {
+    const transport = await load();
+    void transport.call('members.list', { room_id: '!r:example.org' }).catch(() => {});
+    FakeSharedWorker.last?.port.receive({
+      panic: {
+        message: `panicked at crates/sable-core/src/rooms.rs:412:9:\nindex out of bounds: the len is 3 but the index is ${String(index)}`,
+      },
+    });
+    const [, context] = captureException.mock.lastCall ?? [];
+    const scope = (context as (scope: InstanceType<typeof Scope>) => InstanceType<typeof Scope>)(
+      new Scope()
+    );
+    fingerprints.push(scope.getScopeData().fingerprint);
+    transport.close();
+  }
+
+  expect(fingerprints).toEqual([
+    ['wasm-core-crash', 'crates/sable-core/src/rooms.rs:412:9'],
+    ['wasm-core-crash', 'crates/sable-core/src/rooms.rs:412:9'],
+  ]);
+});
+
 test('a panicked worker is replaced under a new name', async () => {
   const transport = await load();
   void transport.call('members.list', { room_id: '!r:example.org' }).catch(() => {});

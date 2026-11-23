@@ -214,11 +214,13 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
   }
 
   function handleCrash(message: string, stack?: string, wasm?: WasmDebugImage): void {
-    // Rust panics differ only in their stack, so the fingerprint groups on the message.
+    // Rust panics differ only in their stack, so the fingerprint skips it. A panic's message
+    // names the values it failed on, so a panic groups on where it was raised instead.
     const error = new Error(message);
     if (stack) error.stack = stack;
+    const origin = /^panicked at (\S+:\d+:\d+):/.exec(message)?.[1] ?? message;
     Sentry.captureException(error, (scope) => {
-      scope.setFingerprint(['wasm-core-crash', message]).setTag('source', 'wasm-core');
+      scope.setFingerprint(['wasm-core-crash', origin]).setTag('source', 'wasm-core');
       if (wasm) scope.addEventProcessor((event) => applyWasmDebugImage(event, wasm));
       return scope;
     });
