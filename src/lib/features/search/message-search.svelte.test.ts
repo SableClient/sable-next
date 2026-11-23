@@ -29,9 +29,10 @@ function hit(eventId: string): SearchHitView {
 
 function page(
   hits: SearchHitView[],
-  older: string | null = null
-): { hits: SearchHitView[]; older: string | null } {
-  return { hits, older };
+  older: string | null = null,
+  words: string[] = []
+): { hits: SearchHitView[]; older: string | null; words: string[] } {
+  return { hits, older, words };
 }
 
 function coverage(
@@ -540,4 +541,63 @@ test('a space with no joined rooms finds nothing instead of searching everywhere
   expect(search.hits).toEqual([]);
   expect(search.searching).toBe(false);
   expect(search.unresolved).toEqual([]);
+});
+
+test('a Japanese query is sent with the words the platform cut it into', async () => {
+  vi.stubGlobal('Intl', {
+    ...Intl,
+    Segmenter: class {
+      segment(text: string): { segment: string; isWordLike: boolean }[] {
+        return (text === '日本語勉強' ? ['日本語', '勉強'] : [text]).map((segment) => ({
+          segment,
+          isWordLike: true,
+        }));
+      }
+    },
+  });
+  const messages = vi
+    .fn()
+    .mockResolvedValueOnce(page([hit('$recent')], 'cold-cursor'))
+    .mockResolvedValueOnce(page([]));
+  const { core } = coreReturning(messages);
+  const search = new MessageSearch(core, () => directory);
+  search.query = '日本語勉強';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+  await search.loadMore();
+  vi.unstubAllGlobals();
+
+  expect(messages).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ query: '日本語勉強', words: ['日本語', '勉強'] })
+  );
+  expect(messages).toHaveBeenLastCalledWith(
+    expect.objectContaining({ older: 'cold-cursor', words: ['日本語', '勉強'] })
+  );
+});
+
+test('highlighting uses the words the core matched, not the raw segments', async () => {
+  vi.stubGlobal('Intl', {
+    ...Intl,
+    Segmenter: class {
+      segment(text: string): { segment: string; isWordLike: boolean }[] {
+        return (text === '東京都' ? ['東京', '都'] : [text]).map((segment) => ({
+          segment,
+          isWordLike: true,
+        }));
+      }
+    },
+  });
+  const messages = vi.fn().mockResolvedValue(page([hit('$tokyo')], null, ['東京都']));
+  const { core } = coreReturning(messages);
+  const search = new MessageSearch(core, () => directory);
+  search.query = 'deploy 東京都';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+
+  expect(messages).toHaveBeenCalledWith(
+    expect.objectContaining({ words: ['deploy', '東京', '都'] })
+  );
+  expect(search.terms).toEqual(['deploy', '東京都']);
+  vi.unstubAllGlobals();
 });

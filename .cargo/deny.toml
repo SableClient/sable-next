@@ -91,7 +91,7 @@ skip = [
   { crate = "hashbrown@0.12.3", reason = "legacy selectors require hashbrown 0.12" },
   { crate = "hashbrown@0.14.5", reason = "legacy GTK/WebKit bindings require hashbrown 0.14" },
   { crate = "hashbrown@0.15.5", reason = "transitive parser dependencies require hashbrown 0.15" },
-  { crate = "hashbrown@0.16.1", reason = "libflate_lz77, via jieba-rs's dictionary, requires hashbrown 0.16" },
+  { crate = "hashbrown@0.16.1", reason = "governor requires hashbrown 0.16" },
   { crate = "heck@0.4.1", reason = "glib-macros has an incompatible heck requirement" },
   { crate = "html5ever@0.39.0", reason = "ruma-html requires html5ever 0.39 while ammonia requires 0.40" },
   { crate = "indexmap@1.9.3", reason = "schemars has an incompatible indexmap requirement" },

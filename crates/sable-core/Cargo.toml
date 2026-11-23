@@ -65,7 +65,6 @@ parking_lot = { workspace = true }
 reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 ammonia = "4.2.5"
 async-trait = "0.1"
-jieba-rs = { version = "=0.11.0", default-features = false }
 html-escape = { workspace = true }
 html5ever = { workspace = true }
 linkify = { workspace = true }
@@ -146,7 +145,6 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "te
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"
 bs58 = "0.5"
-jieba-rs = { version = "=0.11.0", features = ["default-dict"], default-features = false }
 
 [build-dependencies]
 serde_json.workspace = true

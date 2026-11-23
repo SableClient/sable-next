@@ -155,7 +155,7 @@ impl Core {
 
             for result in &events.results {
                 let Some(Candidate { mut hit, edit }) =
-                    hit_from(result, query.room_id, query.query)
+                    hit_from(result, query.room_id, query.query, &query.filter.words)
                 else {
                     continue;
                 };
@@ -298,7 +298,12 @@ struct Candidate {
     edit: Option<OwnedEventId>,
 }
 
-fn hit_from(result: &SearchResult, room_id: &OwnedRoomId, query: &str) -> Option<Candidate> {
+fn hit_from(
+    result: &SearchResult,
+    room_id: &OwnedRoomId,
+    query: &str,
+    words: &[String],
+) -> Option<Candidate> {
     let original = room_message(result.result.as_ref()?)?;
     let (edit, edited) = match replacement_of(&original) {
         Some(replacement) => (
@@ -309,7 +314,7 @@ fn hit_from(result: &SearchResult, room_id: &OwnedRoomId, query: &str) -> Option
     };
     if edited
         .as_ref()
-        .is_some_and(|body| !tokenize::matches(query, body))
+        .is_some_and(|body| !tokenize::matches(query, words, body))
     {
         return None;
     }
@@ -381,7 +386,7 @@ mod tests {
     }
 
     fn hit_from(result: &SearchResult, query: &str) -> Option<crate::search::Hit> {
-        candidate_from(result, &plain_room(), query).map(|candidate| candidate.hit)
+        candidate_from(result, &plain_room(), query, &[]).map(|candidate| candidate.hit)
     }
 
     #[test]

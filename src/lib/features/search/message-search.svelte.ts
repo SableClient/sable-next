@@ -3,6 +3,7 @@ import type { SearchCoverageView, SearchHitView, SearchOrder } from '#src/genera
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { searchMessages } from '#lib/core/api/search.svelte.js';
 
+import { isUnspaced, queryWords } from './query-words';
 import {
   parseSearchQuery,
   resolveSearchQuery,
@@ -35,6 +36,7 @@ export class MessageSearch {
   query = $state('');
   order = $state<SearchOrder>('recent');
   hits = $state.raw<SearchHitView[]>([]);
+  matchedWords = $state.raw<string[]>([]);
   searching = $state(false);
   refining = $state(false);
   failed = $state(false);
@@ -63,6 +65,18 @@ export class MessageSearch {
 
   get parsed(): ParsedQuery {
     return parseSearchQuery(this.query);
+  }
+
+  get words(): string[] {
+    return queryWords(this.parsed.text);
+  }
+
+  get terms(): string[] {
+    return [
+      ...this.words.filter((word) => !isUnspaced(word)),
+      ...this.matchedWords,
+      ...this.parsed.phrases,
+    ];
   }
 
   get unresolved(): SearchToken[] {
@@ -207,6 +221,7 @@ export class MessageSearch {
 
     try {
       const page = await searchMessages(this.#core.rpc, text, {
+        words: this.words,
         filter: this.resolved.filter,
         order: this.order,
         limit: PAGE_SIZE,
@@ -218,6 +233,7 @@ export class MessageSearch {
 
       if (offset === 0) {
         this.hits = uniqueHits(page.hits);
+        this.matchedWords = page.words;
         this.#olderCursor = page.older;
       } else {
         this.#append(page.hits);
@@ -255,6 +271,7 @@ export class MessageSearch {
   async #runOlder(generation: number, cursor: string): Promise<void> {
     try {
       const page = await searchMessages(this.#core.rpc, this.parsed.text, {
+        words: this.words,
         filter: this.resolved.filter,
         order: this.order,
         limit: PAGE_SIZE,

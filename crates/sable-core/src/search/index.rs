@@ -651,7 +651,7 @@ impl RoomIndex {
         }
 
         self.index
-            .query(query, expand)
+            .query(query, &filter.words, expand)
             .into_iter()
             .filter_map(|(key, score)| {
                 let document = self.documents.get(&key)?;
@@ -1581,7 +1581,7 @@ fn rank_cold_documents(
             scratch.add_document(position, &document.body);
         }
         scratch
-            .query(query, expand)
+            .query(query, &filter.words, expand)
             .into_iter()
             .filter(|(position, _)| {
                 documents
@@ -2019,6 +2019,39 @@ mod tests {
 
         assert_eq!(matched(true), 2);
         assert_eq!(matched(false), 1);
+    }
+
+    #[test]
+    fn test_the_query_words_split_a_japanese_query_in_loaded_and_cold_chunks() {
+        let study = document(
+            "study",
+            "日本語を勉強する",
+            "@kris:localhost",
+            1,
+            None,
+            Vec::new(),
+        );
+        let mut index = MessageIndex::new();
+        index
+            .rooms
+            .entry(matrix_sdk::ruma::room_id!("!words:localhost").to_owned())
+            .or_insert_with(super::RoomIndex::new)
+            .upsert(study.clone());
+        let filter = super::IndexFilter {
+            words: vec!["日本語".to_owned(), "勉強".to_owned()],
+            ..super::IndexFilter::default()
+        };
+        let terms = super::FoldedTerms::of(&filter, std::collections::HashSet::new());
+
+        assert_eq!(found(&index, "日本語勉強", &filter), ["$study"]);
+        assert_eq!(
+            found(&index, "日本語勉強", &super::IndexFilter::default()),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            super::rank_cold_documents(&[study], "日本語勉強", &filter, &terms, true).len(),
+            1
+        );
     }
 
     #[test]

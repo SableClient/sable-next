@@ -967,3 +967,46 @@ async fn test_a_live_pass_applies_an_edit_that_arrives_with_its_original() {
 
     drop(room);
 }
+
+#[async_test]
+async fn test_the_words_of_a_search_request_split_its_query() {
+    use crate::api::Handler as _;
+
+    let (core, _events) = crate::Core::new(
+        "search-words",
+        Box::new(crate::store::MemorySessionStore::default()),
+    );
+    core.search_index
+        .lock()
+        .await
+        .rooms
+        .entry(room_id!("!words:localhost").to_owned())
+        .or_insert_with(crate::search::RoomIndex::new)
+        .upsert(document(
+            "study",
+            "日本語を勉強する",
+            "@kris:localhost",
+            1,
+            None,
+            Vec::new(),
+        ));
+    let search = |words: &[&str]| {
+        serde_json::from_value::<crate::api::search::MessagesParams>(json!({
+            "query": "日本語勉強",
+            "limit": 10,
+            "offset": 0,
+            "words": words,
+        }))
+        .expect("search params")
+        .run(&core)
+    };
+
+    let split = search(&["日本語", "勉強", "猫"]).await.expect("a search");
+    let whole = search(&[]).await.expect("a search");
+
+    assert_eq!(split.hits.len(), 1);
+    assert_eq!(split.hits[0].event_id, event_id!("$study"));
+    assert_eq!(split.words, ["日本語", "勉強"]);
+    assert!(whole.hits.is_empty());
+    assert_eq!(whole.words, ["日本語勉強"]);
+}

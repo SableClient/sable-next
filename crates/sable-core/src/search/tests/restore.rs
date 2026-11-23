@@ -46,7 +46,6 @@ fn chunked_room(count: usize) -> crate::search::RoomIndex {
 
 #[async_test]
 async fn test_chinese_search_survives_restore() {
-    sable_search::tokenize::CHINESE.get_or_init(jieba_rs::Jieba::new);
     let room = room_id!("!chinese:localhost").to_owned();
     let document = document(
         "chinese",

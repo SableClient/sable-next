@@ -23,6 +23,7 @@ pub(crate) struct IndexFilter {
     pub(crate) not_file_types: Vec<String>,
     pub(crate) pattern: Option<String>,
     pub(crate) state_events: Option<bool>,
+    pub(crate) words: Vec<String>,
 }
 
 fn parsed_ids<T: TryFrom<String>>(ids: Vec<String>) -> Result<Vec<T>, RpcError> {
@@ -54,6 +55,7 @@ impl TryFrom<protocol::SearchFilter> for IndexFilter {
             not_file_types: filter.not_file_types,
             pattern: filter.pattern,
             state_events: filter.state_events,
+            words: Vec::new(),
         })
     }
 }

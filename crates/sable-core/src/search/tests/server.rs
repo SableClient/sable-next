@@ -78,6 +78,70 @@ async fn test_an_unencrypted_room_is_searched_on_the_homeserver() {
 }
 
 #[async_test]
+async fn test_an_edited_server_hit_is_split_with_the_query_words() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+
+    let room_id = room_id!("!plain:localhost").to_owned();
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(&client, JoinedRoomBuilder::new(&room_id))
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/search"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "search_categories": { "room_events": { "count": 1, "highlights": [], "results": [{
+                "rank": 0.9,
+                "result": {
+                    "type": "m.room.message",
+                    "event_id": "$original",
+                    "room_id": room_id,
+                    "sender": "@kris:localhost",
+                    "origin_server_ts": 1_000,
+                    "content": { "msgtype": "m.text", "body": "日本語勉強" },
+                    "unsigned": { "m.relations": { "m.replace": {
+                        "type": "m.room.message",
+                        "event_id": "$edit",
+                        "sender": "@kris:localhost",
+                        "origin_server_ts": 2_000,
+                        "content": {
+                            "msgtype": "m.text",
+                            "body": "* 日本語を勉強する",
+                            "m.new_content": { "msgtype": "m.text", "body": "日本語を勉強する" },
+                            "m.relates_to": { "rel_type": "m.replace", "event_id": "$original" }
+                        }
+                    } } }
+                }
+            }] } }
+        })))
+        .mount(server.server())
+        .await;
+
+    let core = logged_in(&server, &client, "search-server-words").await;
+    let filter = crate::search::IndexFilter {
+        words: vec!["日本語".to_owned(), "勉強".to_owned()],
+        ..scoped_to(&room_id)
+    };
+    let hits = core
+        .search_messages(
+            "日本語勉強",
+            &filter,
+            crate::api::search::SearchOrder::Rank,
+            10,
+            0,
+            0,
+        )
+        .await;
+
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].event_id, event_id!("$original"));
+    assert_eq!(hits[0].body, "日本語を勉強する");
+
+    drop(room);
+}
+
+#[async_test]
 async fn test_an_encrypted_room_is_never_searched_on_the_homeserver() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

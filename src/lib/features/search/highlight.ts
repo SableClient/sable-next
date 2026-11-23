@@ -1,5 +1,7 @@
 import escapeStringRegexp from 'escape-string-regexp';
 
+import { UNSPACED } from './query-words';
+
 export interface Segment {
   text: string;
   match: boolean;
@@ -15,7 +17,6 @@ const MIN_STEM_OVERLAP = 4;
 const MIN_STEM_RATIO = [3, 5];
 const WINDOW_RADIUS = 90;
 const WORD = /[\p{L}\p{N}]+/gu;
-const UNSPACED = /[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/u;
 
 type Range = [number, number];
 

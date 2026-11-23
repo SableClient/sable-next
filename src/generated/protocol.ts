@@ -3651,9 +3651,20 @@ export type Rpc = {
 	offset: number,
 	context?: number,
 	older?: string | null,
+	/**
+	 *  The query's words as the platform's word segmenter cut them, which is
+	 *  where Chinese and Japanese are split. Without them each unspaced run is
+	 *  one word.
+	 */
+	words?: string[],
 }) => Promise<{
 	hits: SearchHitView[],
 	older: string | null,
+	/**
+	 *  The Chinese and Japanese words the query was matched by, spelled as it
+	 *  was typed, for highlighting.
+	 */
+	words: string[],
 }>;
     coverage: (params?: Record<string, never>) => Promise<SearchCoverageView>;
     metrics: (params?: Record<string, never>) => Promise<SearchMetricsView>;

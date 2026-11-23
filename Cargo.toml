@@ -7,8 +7,6 @@ default-members = ["crates/sable-core", "src-tauri"]
 resolver = "3"
 
 [patch.crates-io]
-# bytecount 0.6.9 emits wasm SIMD even when simd128 is disabled.
-bytecount = { path = "vendor/bytecount" }
 wry = { path = "vendor/wry" }
 
 [workspace.package]

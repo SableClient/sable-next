@@ -146,7 +146,7 @@
   let input = $state<HTMLInputElement>();
   let results = $state<HTMLElement>();
 
-  let terms = $derived([...search.parsed.text.split(/\s+/), ...search.parsed.phrases]);
+  let terms = $derived(search.terms);
 
   onMount(() => {
     void core.refreshSearchCoverage().then(() => {

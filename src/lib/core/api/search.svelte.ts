@@ -25,6 +25,7 @@ export async function searchMessages(
   rpc: Rpc,
   query: string,
   options: {
+    words?: string[];
     filter?: SearchFilter;
     order?: SearchOrder;
     limit?: number;
@@ -32,7 +33,7 @@ export async function searchMessages(
     context?: number;
     older?: string | null;
   } = {}
-): Promise<{ hits: SearchHitView[]; older: string | null }> {
+): Promise<{ hits: SearchHitView[]; older: string | null; words: string[] }> {
   return rpc.search.messages({
     query,
     filter: $state.snapshot(options.filter ?? EMPTY_SEARCH_FILTER),
@@ -41,5 +42,6 @@ export async function searchMessages(
     offset: options.offset ?? 0,
     context: options.context ?? 0,
     older: options.older ?? null,
+    words: options.words ?? [],
   });
 }

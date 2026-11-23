@@ -268,6 +268,29 @@ pub(super) async fn attach(client: &matrix_sdk::Client, store_id: &str) {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+pub(super) async fn remove_dictionary(base_store: &str) {
+    let directory = std::path::Path::new(base_store).join("search-dictionaries");
+    if let Err(error) = tokio::fs::remove_dir_all(directory).await
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        warn!("removing the old search dictionary failed: {error}");
+    }
+}
+
+#[cfg(target_family = "wasm")]
+pub(super) async fn remove_dictionary() {
+    let deleted = match matrix_indexed_db_futures::database::Database::delete_by_name(
+        "sable-search-dictionary",
+    ) {
+        Ok(request) => request.await.map_err(|error| error.to_string()),
+        Err(error) => Err(error.to_string()),
+    };
+    if let Err(error) = deleted {
+        warn!("removing the old search dictionary failed: {error}");
+    }
+}
+
 async fn read<T: DeserializeOwned>(client: &matrix_sdk::Client, key: &[u8]) -> Read<T> {
     match get(client, key).await.map(|bytes| bytes.map(decode)) {
         Ok(Some(Ok(bytes))) => match serde_json::from_slice(&bytes) {
@@ -742,6 +765,26 @@ mod codec_tests {
         let list = br#"["!a:b"]"#.to_vec();
         assert_eq!(decode(object.clone()).unwrap(), object);
         assert_eq!(decode(list.clone()).unwrap(), list);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn the_old_search_dictionary_goes_and_the_store_stays() {
+        let base = tempfile::tempdir().unwrap();
+        let dictionaries = base.path().join("search-dictionaries");
+        std::fs::create_dir(&dictionaries).unwrap();
+        std::fs::write(dictionaries.join("jieba-0.10.4.dict.zlib"), b"dictionary").unwrap();
+        std::fs::write(base.path().join("accounts.json"), b"{}").unwrap();
+        let base_store = base.path().to_str().unwrap();
+
+        super::remove_dictionary(base_store).await;
+        super::remove_dictionary(base_store).await;
+
+        assert!(!dictionaries.exists());
+        assert_eq!(
+            std::fs::read(base.path().join("accounts.json")).unwrap(),
+            b"{}"
+        );
     }
 
     #[cfg(not(target_family = "wasm"))]

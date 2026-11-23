@@ -83,13 +83,13 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         reason = "counts stay far below 2^52 and only feed a ranking score"
     )]
     #[must_use]
-    pub fn query(&self, query: &str, expand: bool) -> Vec<(K, f64)> {
+    pub fn query(&self, query: &str, words: &[String], expand: bool) -> Vec<(K, f64)> {
         if self.lengths.is_empty() {
             return Vec::new();
         }
         let documents = self.lengths.len() as f64;
         let average_length = self.total_length as f64 / documents;
-        let mut groups = tokenize::tokenize_query(query);
+        let mut groups = tokenize::tokenize_query(query, words);
         for group in &mut groups {
             group.sort_unstable();
             group.dedup();
@@ -229,62 +229,84 @@ mod tests {
     }
 
     fn ranked(index: &InvertedIndex<u32>, query: &str) -> Vec<u32> {
-        let mut hits = index.query(query, true);
+        ranked_words(index, query, &[])
+    }
+
+    fn ranked_words(index: &InvertedIndex<u32>, query: &str, words: &[&str]) -> Vec<u32> {
+        let words: Vec<String> = words.iter().map(|word| (*word).to_owned()).collect();
+        let mut hits = index.query(query, &words, true);
         hits.sort_by(|left, right| right.1.total_cmp(&left.1).then(left.0.cmp(&right.0)));
         hits.into_iter().map(|(key, _)| key).collect()
     }
 
     #[test]
     fn test_a_japanese_word_does_not_match_words_sharing_one_character() {
-        crate::tokenize::load_bundled_chinese();
         let index = index(&["検索を使う", "検討します", "索引です"]);
-        assert_eq!(ranked(&index, "検索"), [0]);
+        assert_eq!(ranked_words(&index, "検索", &["検索"]), [0]);
     }
 
     #[test]
-    fn test_a_japanese_word_is_found_across_a_chinese_dictionary_word() {
-        crate::tokenize::load_bundled_chinese();
+    fn test_a_japanese_word_is_found_inside_a_longer_word() {
         let index = index(&["東京都庁に行く", "京都に行く"]);
-        assert_eq!(ranked(&index, "東京"), [0]);
+        assert_eq!(ranked_words(&index, "東京", &["東京"]), [0]);
     }
 
     #[test]
     fn test_a_japanese_word_does_not_match_text_sharing_only_some_of_its_pairs() {
-        crate::tokenize::load_bundled_chinese();
         let hiragana = index(&[
             "ありがとうございます",
             "ありとあらゆる手段",
             "とうとう終わった",
         ]);
-        assert_eq!(ranked(&hiragana, "ありがとう"), [0]);
+        assert_eq!(ranked_words(&hiragana, "ありがとう", &["ありがとう"]), [0]);
+        assert_eq!(
+            ranked_words(
+                &hiragana,
+                "ありがとうございます",
+                &["ありがとう", "ご", "ざ", "い", "ます"]
+            ),
+            [0]
+        );
 
         let katakana = index(&["メッセージを送る", "メロンとソーセージ"]);
-        assert_eq!(ranked(&katakana, "メッセージ"), [0]);
+        assert_eq!(ranked_words(&katakana, "メッセージ", &["メッセージ"]), [0]);
     }
 
     #[test]
-    fn test_a_japanese_compound_split_by_the_chinese_dictionary_stays_whole() {
-        crate::tokenize::load_bundled_chinese();
+    fn test_a_japanese_compound_stays_whole() {
         let japanese = index(&["日本語を勉強する", "日本と英語", "英語を話す"]);
-        assert_eq!(ranked(&japanese, "日本語"), [0]);
+        assert_eq!(ranked_words(&japanese, "日本語", &["日本語"]), [0]);
 
         let tokyo = index(&["東京都に住む", "東の京都"]);
-        assert_eq!(ranked(&tokyo, "東京都"), [0]);
+        assert_eq!(ranked_words(&tokyo, "東京都", &["東京", "都"]), [0]);
     }
 
     #[test]
     fn test_an_unvoiced_kana_does_not_match_its_voiced_form() {
-        crate::tokenize::load_bundled_chinese();
         let index = index(&["か", "が"]);
-        assert_eq!(ranked(&index, "か"), [0]);
-        assert_eq!(ranked(&index, "が"), [1]);
+        assert_eq!(ranked_words(&index, "か", &["か"]), [0]);
+        assert_eq!(ranked_words(&index, "が", &["が"]), [1]);
     }
 
     #[test]
     fn test_separate_chinese_words_in_one_query_each_add_to_the_score() {
-        crate::tokenize::load_bundled_chinese();
         let index = index(&["中文搜索功能", "中文消息", "天气"]);
-        assert_eq!(ranked(&index, "中文功能"), [0, 1]);
+        assert_eq!(ranked_words(&index, "中文功能", &["中文", "功能"]), [0, 1]);
+    }
+
+    #[test]
+    fn test_a_query_split_into_words_finds_a_message_across_a_word_boundary() {
+        let index = index(&["日本語を勉強する", "日本語の本", "英語"]);
+        assert_eq!(
+            ranked_words(&index, "日本語勉強", &["日本語", "勉強"]),
+            [0, 1]
+        );
+    }
+
+    #[test]
+    fn test_a_query_without_words_needs_its_whole_run() {
+        let index = index(&["日本語を勉強する", "日本語勉強会"]);
+        assert_eq!(ranked(&index, "日本語勉強"), [1]);
     }
 
     #[test]
@@ -347,7 +369,7 @@ mod tests {
     fn test_an_unexpanded_query_matches_only_the_word_and_its_inflections() {
         let index = index(&["please mute it", "so I muted it", "a tokio mutex"]);
         let mut exact: Vec<u32> = index
-            .query("mute", false)
+            .query("mute", &[], false)
             .into_iter()
             .map(|hit| hit.0)
             .collect();
@@ -358,11 +380,10 @@ mod tests {
 
     #[test]
     fn test_an_unexpanded_query_still_finds_text_written_without_spaces() {
-        crate::tokenize::load_bundled_chinese();
         let index = index(&["黒い猫", "検索を使う", "今天我们一起讨论中文搜索功能"]);
         let found = |query: &str| {
             let mut hits: Vec<u32> = index
-                .query(query, false)
+                .query(query, &[], false)
                 .into_iter()
                 .map(|hit| hit.0)
                 .collect();

@@ -6,7 +6,6 @@ mod index;
 mod network;
 mod sharing;
 pub(crate) use network::CrawlNetwork;
-mod dictionary;
 mod filter;
 #[cfg(target_family = "wasm")]
 mod idb;

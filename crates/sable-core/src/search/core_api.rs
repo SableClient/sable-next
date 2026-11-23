@@ -20,23 +20,13 @@ use super::persist::{self, ChunkId};
 use super::server;
 use super::{
     COLD_CHUNKS_PER_PAGE, HYDRATE_CONCURRENCY, INGEST_WAIT, INGEST_WAIT_ATTEMPTS, IndexFilter,
-    OLDER_PAGE_BUDGET_MS, PINNED_FETCH_CONCURRENCY, dictionary, ignored_user_ids,
-    ingestable_events, now_ms, tokenize,
+    OLDER_PAGE_BUDGET_MS, PINNED_FETCH_CONCURRENCY, ignored_user_ids, ingestable_events, now_ms,
 };
 use crate::Core;
 use crate::attachments::attachment_contents;
-use crate::protocol::{RoomAttachmentKind, RoomAttachmentView, RpcCode, RpcError};
+use crate::protocol::{RoomAttachmentKind, RoomAttachmentView};
 
 impl Core {
-    pub(crate) async fn prepare_search_query(&self, query: &str) -> Result<(), RpcError> {
-        if tokenize::contains_chinese(query) {
-            dictionary::ensure(&self.store_id).await.map_err(|error| {
-                crate::errors::coded("search_dictionary", RpcCode::Unavailable, &error)
-            })?;
-        }
-        Ok(())
-    }
-
     pub(crate) async fn search_messages(
         &self,
         query: &str,
@@ -603,6 +593,11 @@ impl Core {
                 let mut updates = event_cache.subscribe_to_room_generic_updates();
 
                 core.settle_retired_search(Some(&account_id)).await;
+                #[cfg(not(target_family = "wasm"))]
+                persist::remove_dictionary(&core.store_id).await;
+                // A tab still on an older version keeps the delete blocked until it closes.
+                #[cfg(target_family = "wasm")]
+                drop(spawn(persist::remove_dictionary()));
                 #[cfg(target_family = "wasm")]
                 persist::attach(&client, &store_id).await;
                 core.restore_persisted_index(&client).await;

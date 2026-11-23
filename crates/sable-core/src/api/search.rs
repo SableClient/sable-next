@@ -79,6 +79,11 @@ pub struct MessagesParams {
     pub context: u32,
     #[serde(default)]
     pub older: Option<String>,
+    /// The query's words as the platform's word segmenter cut them, which is
+    /// where Chinese and Japanese are split. Without them each unspaced run is
+    /// one word.
+    #[serde(default)]
+    pub words: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -86,6 +91,9 @@ pub struct MessagesParams {
 pub struct MessagesOk {
     pub hits: Vec<SearchHitView>,
     pub older: Option<String>,
+    /// The Chinese and Japanese words the query was matched by, spelled as it
+    /// was typed, for highlighting.
+    pub words: Vec<String>,
 }
 
 impl Handler for MessagesParams {
@@ -100,9 +108,13 @@ impl Handler for MessagesParams {
             offset,
             context,
             older,
+            words,
         } = self;
-        let filter = crate::search::IndexFilter::try_from(filter)?;
-        core.prepare_search_query(&query).await?;
+        let unspaced = sable_search::tokenize::unspaced_words(&query, &words);
+        let filter = crate::search::IndexFilter {
+            words,
+            ..crate::search::IndexFilter::try_from(filter)?
+        };
         let limit = (limit as usize).min(MAX_SEARCH_RESULTS);
         let context = (context as usize).min(MAX_SEARCH_CONTEXT);
         let (hits, older) = if let Some(cursor) = older {
@@ -123,6 +135,7 @@ impl Handler for MessagesParams {
         Ok(MessagesOk {
             hits: hits.into_iter().map(view::search_hit_view).collect(),
             older,
+            words: unspaced,
         })
     }
 }

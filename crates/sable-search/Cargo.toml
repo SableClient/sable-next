@@ -15,13 +15,9 @@ charabia = { version = "0.10", default-features = false, features = [
   "swedish-recomposition",
   "chinese-normalization",
 ] }
-jieba-rs = { version = "=0.11.0", default-features = false }
 rust-stemmers = "1.2"
 strsim = "0.11"
 unicode-normalization = "0.1.26"
-
-[dev-dependencies]
-jieba-rs = { version = "=0.11.0", features = ["default-dict"], default-features = false }
 
 [lints]
 workspace = true

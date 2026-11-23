@@ -160,4 +160,5 @@ test('a Japanese or Chinese term inside an unspaced sentence is marked', () => {
   expect(marked('ありがとうございます', ['ありがとう'])).toEqual(['ありがとう']);
   expect(marked('今天我们讨论中文搜索功能', ['搜索'])).toEqual(['搜索']);
   expect(marked('メロンとソーセージ', ['メッセージ'])).toEqual([]);
+  expect(marked('日本語を勉強する', ['日本語', '勉強'])).toEqual(['日本語', '勉強']);
 });
