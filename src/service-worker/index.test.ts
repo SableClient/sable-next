@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('$app/env', () => ({ version: 'test' }));
 vi.mock('#lib/model/model.js', async (original) => ({
   ...(await original<object>()),
-  loadModel: (source: Promise<Response>) => source.then(() => undefined),
+  loadModel: (source: () => Promise<Response>) => source().then(() => undefined),
 }));
 vi.mock('#lib/features/notifications/push-fetch.js', async (original) => ({
   ...(await original<object>()),

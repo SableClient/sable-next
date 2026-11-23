@@ -45,3 +45,15 @@ test('a failed load is retried by the next caller rather than kept', async () =>
   await expect(loadModel()).resolves.toEqual({});
   expect(loadWasm).toHaveBeenCalledTimes(2);
 });
+
+test('a loaded model does not look its source up again', async () => {
+  vi.resetModules();
+  loadWasm.mockReset().mockResolvedValue({});
+  const { loadModel } = await import('./model.js');
+  const source = vi.fn(() => Promise.resolve(new Response('wasm')));
+
+  await loadModel(source);
+  await loadModel(source);
+
+  expect(source).toHaveBeenCalledOnce();
+});

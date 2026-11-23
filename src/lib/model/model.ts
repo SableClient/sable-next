@@ -79,13 +79,11 @@ async function fetchModel(): Promise<Response> {
 }
 
 /** Every call below needs this to have settled once; a failed load is retried. */
-export function loadModel(source?: Promise<Response>): Promise<unknown> {
-  const pending = (loading ??= loadWasm({ module_or_path: source ?? fetchModel() }).catch(
-    (error: unknown) => {
-      loading = null;
-      throw error;
-    }
-  ));
+export function loadModel(source: () => Promise<Response> = fetchModel): Promise<unknown> {
+  const pending = (loading ??= loadWasm({ module_or_path: source() }).catch((error: unknown) => {
+    loading = null;
+    throw error;
+  }));
   return pending;
 }
 

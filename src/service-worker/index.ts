@@ -123,7 +123,7 @@ worker.addEventListener('push', (event) => {
   event.waitUntil(
     watchWorkerOperation(
       'push',
-      loadModel(cachedModel()).then(() => receive(raw))
+      loadModel(cachedModel).then(() => receive(raw))
     ).catch(showFallback)
   );
 });
