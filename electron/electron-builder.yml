@@ -78,7 +78,30 @@ linux:
     - AppImage
     - tar.gz
 
+# Chromium loads libpulse at runtime and falls back to bare ALSA without it.
+# These lists replace electron-builder's defaults, which are repeated here.
 deb:
   packageName: sable
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libpulse0
 rpm:
   packageName: sable
+  depends:
+    - gtk3
+    - libnotify
+    - nss
+    - libXScrnSaver
+    - (libXtst or libXtst6)
+    - xdg-utils
+    - at-spi2-core
+    - (libuuid or libuuid1)
+    - pulseaudio-libs

@@ -15,6 +15,7 @@ depends=(
   'gtk3'
   'nss'
   'libnotify'
+  'libpulse'
   'libxss'
   'libxtst'
   'at-spi2-core'

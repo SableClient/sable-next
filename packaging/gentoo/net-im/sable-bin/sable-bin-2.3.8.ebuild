@@ -22,6 +22,7 @@ RDEPEND="
 	app-accessibility/at-spi2-core:2
 	dev-libs/nss
 	media-libs/alsa-lib
+	media-libs/libpulse
 	media-libs/mesa[gbm(+)]
 	media-video/pipewire
 	net-print/cups
