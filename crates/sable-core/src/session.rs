@@ -264,6 +264,8 @@ pub(crate) async fn store_holds_data(store_id: &str) -> std::io::Result<bool> {
     match tokio::fs::read_dir(store_id).await {
         Ok(mut entries) => Ok(entries.next_entry().await?.is_some()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        // A file in the slot cannot become a store either.
+        Err(error) if error.kind() == std::io::ErrorKind::NotADirectory => Ok(true),
         Err(error) => Err(error),
     }
 }
@@ -1380,6 +1382,20 @@ mod tests {
             .collect();
         assert_eq!(kept, ["a2", "a4", "a5"]);
         assert_eq!(registry.active_account_id.as_deref(), Some("a2"));
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_file_in_a_store_slot_counts_as_taken() {
+        let directory = tempfile::tempdir().unwrap();
+        let slot = directory.path().join("slot");
+        std::fs::write(&slot, b"not a folder").unwrap();
+
+        assert!(
+            super::store_holds_data(slot.to_str().unwrap())
+                .await
+                .unwrap()
+        );
     }
 
     #[test]
