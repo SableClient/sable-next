@@ -66,3 +66,12 @@ test('ignores a keydown that carries no key', () => {
   Object.defineProperty(event, 'key', { value: undefined });
   expect(shouldFocusComposer(event)).toBe(false);
 });
+
+test('leaves a keystroke the IME is composing alone', () => {
+  const opening = press('a');
+  Object.defineProperty(opening, 'keyCode', { value: 229 });
+  expect(shouldFocusComposer(opening)).toBe(false);
+
+  const composing = press('b', undefined, { isComposing: true });
+  expect(shouldFocusComposer(composing)).toBe(false);
+});

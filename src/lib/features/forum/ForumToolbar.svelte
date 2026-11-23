@@ -10,6 +10,7 @@
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import SearchField from '#lib/ui/primitives/SearchField.svelte';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import type { ForumSort, ForumView } from './forum-threads';
 
@@ -37,7 +38,7 @@
     bind:value={query}
     label={onCreate ? i18n.t('forum.searchOrCreate') : i18n.t('forum.search')}
     onkeydown={(event) => {
-      if (event.key === 'Enter' && !event.isComposing) onSubmit();
+      if (event.key === 'Enter' && !isComposingKey(event)) onSubmit();
     }}
   />
   <ActionMenu label={i18n.t('forum.sortBy')}>

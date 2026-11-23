@@ -134,6 +134,11 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
+export function isComposingKey(event: KeyboardEvent): boolean {
+  // oxlint-disable-next-line typescript/no-deprecated -- the keydown that opens a composition only carries 229, isComposing is still false
+  return event.isComposing || event.keyCode === 229;
+}
+
 export function isDialogOpen(root: ParentNode = document): boolean {
   return root.querySelector('.dialog-content, [role="dialog"]') !== null;
 }

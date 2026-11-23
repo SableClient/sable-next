@@ -37,7 +37,12 @@
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { rovingFocus } from '#lib/ui/roving-focus.js';
-  import { isDialogOpen, isEditableTarget, matchesBinding } from '#lib/ui/shortcuts/binding.js';
+  import {
+    isComposingKey,
+    isDialogOpen,
+    isEditableTarget,
+    matchesBinding,
+  } from '#lib/ui/shortcuts/binding.js';
   import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
   import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
 
@@ -807,7 +812,7 @@
     });
   }
   function onTimelineKeydown(event: KeyboardEvent): void {
-    if (event.defaultPrevented || event.isComposing || !active || !selection.active) return;
+    if (event.defaultPrevented || isComposingKey(event) || !active || !selection.active) return;
     if (event.target instanceof Element && event.target.closest('[role="dialog"], [role="menu"]')) {
       return;
     }
@@ -1182,7 +1187,7 @@
     void controller?.jumpTo(null, 'start', !shouldReduceMotion());
   }
   function onJumpShortcut(event: KeyboardEvent): void {
-    if (event.defaultPrevented || event.isComposing || !active) return;
+    if (event.defaultPrevented || isComposingKey(event) || !active) return;
     if (isEditableTarget(event.target) || isDialogOpen()) return;
     const mac = isMacPlatform();
     const pressed = (id: string): boolean => {

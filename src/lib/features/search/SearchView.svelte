@@ -15,6 +15,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
   import '#lib/ui/primitives/form-control.css';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -287,7 +288,7 @@
   }
 
   function onHitKeydown(event: KeyboardEvent, hit: SearchHitView): void {
-    if (event.target !== event.currentTarget || event.isComposing) return;
+    if (event.target !== event.currentTarget || isComposingKey(event)) return;
 
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -338,7 +339,7 @@
   }
 
   function onKeydown(event: KeyboardEvent): void {
-    if (event.isComposing) return;
+    if (isComposingKey(event)) return;
     if (event.key === 'Backspace' && field.draft === '' && field.chips.length > 0) {
       event.preventDefault();
       void editChip(field.chips[field.chips.length - 1]);

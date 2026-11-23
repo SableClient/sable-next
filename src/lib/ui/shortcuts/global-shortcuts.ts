@@ -1,6 +1,6 @@
 import { on } from 'svelte/events';
 
-import { isDialogOpen, isEditableTarget, matchesBinding } from './binding.js';
+import { isComposingKey, isDialogOpen, isEditableTarget, matchesBinding } from './binding.js';
 import { effectiveShortcuts } from './bindings.svelte.js';
 import { type ShortcutDefinition, type ShortcutId } from './shortcuts.js';
 
@@ -28,7 +28,7 @@ export function registerGlobalShortcuts(
 
   const offKeydown = on(window, 'keydown', (event) => {
     if (event.defaultPrevented) return;
-    if (event.isComposing) return;
+    if (isComposingKey(event)) return;
 
     const isMac = isMacPlatform();
 
