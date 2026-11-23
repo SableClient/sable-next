@@ -13,9 +13,9 @@ use matrix_sdk::ruma::api::FeatureFlag;
 use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::push::get_pushrules_all;
-use matrix_sdk::ruma::api::client::space::SpaceHierarchyRoomsChunk;
+use matrix_sdk::ruma::api::client::space::{SpaceHierarchyRoomsChunk, get_hierarchy};
 use matrix_sdk::ruma::api::error::ErrorKind;
-use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
+use matrix_sdk::ruma::directory::{Filter, PublicRoomsChunk, RoomTypeFilter};
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::member::MembershipState;
@@ -31,7 +31,9 @@ use crate::ResultExt;
 use crate::api::rooms::PublicRoomsOk;
 use crate::api::spaces::HierarchyOk;
 use crate::errors::CoreResultExt as _;
-use crate::protocol::{JoinRuleView, RoomPreviewView, RpcCode, RpcError, SpaceHierarchyRoomView};
+use crate::protocol::{
+    JoinRuleView, PublicRoomView, RoomPreviewView, RpcCode, RpcError, SpaceHierarchyRoomView,
+};
 
 use crate::Core;
 use crate::view;
@@ -769,12 +771,12 @@ impl Core {
         let response = self
             .client()
             .await?
-            .public_rooms_filtered(request)
+            .send(lenient_public_rooms::Request::new(request))
             .await
             .or_failed(self, "public_rooms")?;
 
         Ok(PublicRoomsOk {
-            rooms: response.chunk.iter().map(view::public_room).collect(),
+            rooms: public_rooms(&response.chunk),
             next_batch: response.next_batch,
             total: response.total_room_count_estimate.map(u64::from),
         })
@@ -787,13 +789,13 @@ impl Core {
     ) -> Result<HierarchyOk, RpcError> {
         let client = self.client().await?;
 
+        let mut request = get_hierarchy::v1::Request::new(space_id.clone());
+        request.from = from;
+        request.limit = Some(UInt::from(HIERARCHY_PAGE_SIZE));
+        request.max_depth = Some(UInt::from(HIERARCHY_MAX_DEPTH));
+
         let response = client
-            .send(lenient_hierarchy::Request {
-                room_id: space_id.clone(),
-                from,
-                limit: Some(UInt::from(HIERARCHY_PAGE_SIZE)),
-                max_depth: Some(UInt::from(HIERARCHY_MAX_DEPTH)),
-            })
+            .send(lenient_hierarchy::Request::new(request))
             .with_request_config(RequestConfig::short_retry())
             .await
             .or_failed(self, "space_hierarchy")?;
@@ -828,17 +830,13 @@ impl Core {
 }
 
 /// Ordering lives on each parent's `m.space.child` edges, so the chunks are passed through
-/// unsorted. A room with an invalid field is dropped instead of failing the whole page.
+/// unsorted.
 fn hierarchy_rooms(
     chunks: &[ruma::serde::Raw<SpaceHierarchyRoomsChunk>],
 ) -> Vec<SpaceHierarchyRoomView> {
     chunks
         .iter()
-        .filter_map(|raw| {
-            raw.deserialize()
-                .inspect_err(|error| tracing::warn!("skipping an invalid hierarchy room: {error}"))
-                .ok()
-        })
+        .filter_map(|raw| crate::lenient::parse_or_skip(raw, "hierarchy room"))
         .map(|chunk| {
             let children = view::hierarchy_child_edges(&chunk.children_state);
             view::space_hierarchy_room(&chunk.summary, children)
@@ -846,40 +844,43 @@ fn hierarchy_rooms(
         .collect()
 }
 
-/// ruma's `get_hierarchy` response fails as a whole when one room in the page is invalid.
+fn public_rooms(chunks: &[ruma::serde::Raw<PublicRoomsChunk>]) -> Vec<PublicRoomView> {
+    chunks
+        .iter()
+        .filter_map(|raw| crate::lenient::parse_or_skip(raw, "public room"))
+        .map(|chunk| view::public_room(&chunk))
+        .collect()
+}
+
 mod lenient_hierarchy {
-    use ruma::api::client::space::SpaceHierarchyRoomsChunk;
-    use ruma::api::{auth_scheme::AccessToken, request, response};
-    use ruma::metadata;
+    use ruma::api::client::space::{SpaceHierarchyRoomsChunk, get_hierarchy};
+    use ruma::api::response;
     use ruma::serde::Raw;
-    use ruma::{OwnedRoomId, UInt};
 
-    metadata! {
-        method: GET,
-        rate_limited: true,
-        authentication: AccessToken,
-        history: {
-            unstable => "/_matrix/client/unstable/org.matrix.msc2946/rooms/{room_id}/hierarchy",
-            1.2 => "/_matrix/client/v1/rooms/{room_id}/hierarchy",
-        }
-    }
-
-    #[request]
-    pub(crate) struct Request {
-        #[ruma_api(path)]
-        pub room_id: OwnedRoomId,
-        #[ruma_api(query)]
-        pub from: Option<String>,
-        #[ruma_api(query)]
-        pub limit: Option<UInt>,
-        #[ruma_api(query)]
-        pub max_depth: Option<UInt>,
-    }
+    pub(crate) type Request = crate::lenient::Request<get_hierarchy::v1::Request, Response>;
 
     #[response]
     pub(crate) struct Response {
         pub next_batch: Option<String>,
         pub rooms: Vec<Raw<SpaceHierarchyRoomsChunk>>,
+    }
+}
+
+mod lenient_public_rooms {
+    use ruma::UInt;
+    use ruma::api::client::directory::get_public_rooms_filtered;
+    use ruma::api::response;
+    use ruma::directory::PublicRoomsChunk;
+    use ruma::serde::Raw;
+
+    pub(crate) type Request =
+        crate::lenient::Request<get_public_rooms_filtered::v3::Request, Response>;
+
+    #[response]
+    pub(crate) struct Response {
+        pub chunk: Vec<Raw<PublicRoomsChunk>>,
+        pub next_batch: Option<String>,
+        pub total_room_count_estimate: Option<UInt>,
     }
 }
 
@@ -920,7 +921,6 @@ mod tests {
     #[test]
     fn an_invalid_hierarchy_room_does_not_fail_the_page() {
         use ruma::api::IncomingResponseExt as _;
-        use ruma::api::client::space::get_hierarchy;
         use serde_json::json;
 
         let room = |room_id: &str, alias: &str| {
@@ -944,12 +944,6 @@ mod tests {
         })
         .to_string();
 
-        let strict = get_hierarchy::v1::Response::try_from_http_response(http::Response::new(
-            body.as_bytes(),
-        ))
-        .expect_err("ruma rejects the whole page");
-        assert!(strict.to_string().contains("leading sigil"), "{strict}");
-
         let response = super::lenient_hierarchy::Response::try_from_http_response(
             http::Response::new(body.as_bytes()),
         )
@@ -961,6 +955,57 @@ mod tests {
 
         assert_eq!(rooms, ["!space:example.org", "!fine:example.org"]);
         assert_eq!(response.next_batch.as_deref(), Some("next"));
+    }
+
+    #[tokio::test]
+    async fn the_directory_request_reaches_the_server_unchanged() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use serde_json::json;
+        use wiremock::matchers::{body_json, method, path, query_param};
+        use wiremock::{Mock, ResponseTemplate};
+
+        let server = MatrixMockServer::new().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/publicRooms"))
+            .and(query_param("server", "other.example.org"))
+            .and(body_json(json!({
+                "limit": super::DIRECTORY_PAGE_SIZE,
+                "since": "start",
+                "filter": {"generic_search_term": "matrix"},
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "chunk": [
+                    {"room_id": "!first:example.org", "canonical_alias": "#first:example.org", "num_joined_members": 1, "world_readable": false, "guest_can_join": false},
+                    {"room_id": "!broken:example.org", "canonical_alias": "broken", "num_joined_members": 1, "world_readable": false, "guest_can_join": false},
+                    {"room_id": "!fine:example.org", "num_joined_members": 2, "world_readable": true, "guest_can_join": false},
+                ],
+                "next_batch": "next",
+                "total_room_count_estimate": 3,
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let client = server.client_builder().build().await;
+        let (core, _events) = crate::test_support::signed_in_core(&server, client).await;
+
+        let page = core
+            .public_rooms(crate::api::rooms::PublicRoomsParams {
+                server: Some("other.example.org".to_owned()),
+                search: Some("matrix".to_owned()),
+                since: Some("start".to_owned()),
+                room_type: None,
+            })
+            .await
+            .unwrap();
+
+        let rooms: Vec<_> = page
+            .rooms
+            .iter()
+            .map(|room| room.room_id.as_str())
+            .collect();
+        assert_eq!(rooms, ["!first:example.org", "!fine:example.org"]);
+        assert_eq!(page.next_batch.as_deref(), Some("next"));
+        assert_eq!(page.total, Some(3));
     }
 
     #[tokio::test]

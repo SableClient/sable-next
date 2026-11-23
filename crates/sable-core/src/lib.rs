@@ -27,6 +27,7 @@ pub mod image_packs;
 mod inbox;
 mod invites;
 mod key_backup;
+mod lenient;
 mod lifecycle;
 mod link_previews;
 pub mod matrix_html;
