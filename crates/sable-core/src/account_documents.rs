@@ -530,11 +530,11 @@ impl Core {
 
     async fn update_thread_sidebar(
         &self,
-        context: &'static str,
+        operation: &'static str,
         update: impl FnOnce(&mut ThreadSidebarView),
     ) -> Result<ThreadSidebarView, RpcError> {
         let content = self
-            .update_account_data(&[THREAD_SIDEBAR_EVENT], context, async |stored| {
+            .update_account_data(&[THREAD_SIDEBAR_EVENT], operation, async |stored| {
                 Ok(Some(thread_sidebar_content(stored, update)))
             })
             .await?;
@@ -747,12 +747,12 @@ mod tests {
                     },
                     ThreadRefView {
                         room_id: room.clone(),
-                        event_id: second.clone(),
+                        event_id: second,
                     },
                 ],
                 dismissed: vec![ThreadRefView {
                     room_id: room.clone(),
-                    event_id: third.clone(),
+                    event_id: third,
                 }],
             }
         );
@@ -777,7 +777,7 @@ mod tests {
         );
 
         let repinned = thread_sidebar_content(Some(dismissed), |sidebar| {
-            apply_thread_sidebar_flag(sidebar, room.clone(), first.clone(), true, true);
+            apply_thread_sidebar_flag(sidebar, room, first, true, true);
         });
         assert_eq!(
             repinned,
