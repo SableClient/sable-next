@@ -963,6 +963,73 @@ mod tests {
 
     #[cfg(not(target_family = "wasm"))]
     #[tokio::test]
+    async fn signing_in_again_replaces_the_saved_account_of_the_same_user() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "user_id": "@alice:example.org", "device_id": "NEW", "access_token": "new-token"
+            })))
+            .mount(server.server())
+            .await;
+        server.mock_sync().ok(|_| {}).mount().await;
+        let directory = tempfile::tempdir().unwrap();
+        let base = directory.path().join("data");
+        let base = base.to_str().unwrap();
+        let stale_store = session::account_store_id(base, "a1");
+        let bob_store = session::account_store_id(base, "a2");
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": null, "next_account_id": 3,
+            "accounts": [
+                {"account_id": "a1", "store_id": stale_store,
+                    "session": {"homeserver": server.server().uri(), "resolved_homeserver": server.server().uri(),
+                        "credentials": {"kind": "password", "user_id": "@alice:example.org", "device_id": "OLD", "access_token": ""}}},
+                {"account_id": "a2", "store_id": bob_store, "needs_reauth": true,
+                    "session": {"homeserver": server.server().uri(), "resolved_homeserver": server.server().uri(),
+                        "credentials": {"kind": "password", "user_id": "@bob:example.org", "device_id": "BOB", "access_token": ""}}}
+            ]
+        })).unwrap();
+        let (registry, _) = session::AccountRegistry::from_bytes(&bytes, base).unwrap();
+        std::fs::create_dir_all(std::path::Path::new(&stale_store).join("store")).unwrap();
+        std::fs::create_dir_all(std::path::Path::new(&bob_store).join("store")).unwrap();
+        let (core, _) = Core::new(base, Box::new(crate::store::MemorySessionStore::default()));
+        *core.accounts.lock().await = Some(registry);
+
+        core.login(
+            server.server().uri(),
+            LoginIdentifier::User {
+                user: "@alice:example.org".into(),
+            },
+            "password".into(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let accounts = core.accounts().await.unwrap().accounts;
+        let ids: Vec<_> = accounts.iter().map(|a| a.account_id.as_str()).collect();
+        assert_eq!(ids, ["a2", "a3"]);
+        assert!(!std::path::Path::new(&stale_store).exists());
+        assert!(std::path::Path::new(&bob_store).exists());
+        if let Some(session) = core.take_session().await {
+            session.sync_service.stop().await;
+        }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
     async fn a_store_without_an_identity_falls_back_to_a_new_device() {
         let directory = tempfile::tempdir().unwrap();
         let base = directory.path().join("data");

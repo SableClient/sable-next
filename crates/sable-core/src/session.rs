@@ -185,6 +185,37 @@ impl AccountRegistry {
         }
     }
 
+    /// Keeps each user's latest usable sign-in. Sign-ins are appended, so the last entry is the
+    /// latest, and one waiting for reauthentication only stays when the user has no other.
+    pub fn drop_stale_sign_ins(&mut self) -> Vec<PersistedAccount> {
+        let (waiting, usable): (Vec<_>, Vec<_>) = self
+            .accounts
+            .iter()
+            .partition(|account| account.needs_reauth);
+        let latest: std::collections::HashMap<_, _> = waiting
+            .into_iter()
+            .chain(usable)
+            .map(|account| {
+                (
+                    account.session.credentials.user_id(),
+                    account.account_id.clone(),
+                )
+            })
+            .collect();
+        let stale: Vec<_> = self
+            .accounts
+            .extract_if(.., |account| {
+                latest.get(&account.session.credentials.user_id()) != Some(&account.account_id)
+            })
+            .collect();
+        if let Some(active) = &self.active_account_id
+            && let Some(dropped) = stale.iter().find(|account| &account.account_id == active)
+        {
+            self.active_account_id = latest.get(&dropped.session.credentials.user_id()).cloned();
+        }
+        stale
+    }
+
     pub fn reanchor_stores(&mut self, base_store_id: &str) -> bool {
         let base = std::path::Path::new(base_store_id);
         let mut changed = false;
@@ -1311,6 +1342,44 @@ mod tests {
         let (_, first) = accounts.allocate_account("sable-next");
         let (_, second) = accounts.allocate_account("sable-next");
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn a_stale_sign_in_gives_way_to_the_latest_usable_one_of_its_user() {
+        let account = |id: &str, user: &str, needs_reauth: bool| {
+            serde_json::json!({
+                "account_id": id, "store_id": id, "needs_reauth": needs_reauth,
+                "session": {"homeserver": "https://example.org", "credentials": {
+                    "kind": "password", "user_id": user, "device_id": id, "access_token": ""}}
+            })
+        };
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": "a3", "next_account_id": 6,
+            "accounts": [
+                account("a1", "@alice:example.org", false),
+                account("a2", "@alice:example.org", false),
+                account("a3", "@alice:example.org", true),
+                account("a4", "@bob:example.org", true),
+                account("a5", "@carol:example.org", false),
+            ]
+        }))
+        .unwrap();
+        let (mut registry, _) = AccountRegistry::from_bytes(&bytes, "base").unwrap();
+
+        let stale: Vec<_> = registry
+            .drop_stale_sign_ins()
+            .into_iter()
+            .map(|account| account.account_id)
+            .collect();
+
+        assert_eq!(stale, ["a1", "a3"]);
+        let kept: Vec<_> = registry
+            .accounts
+            .iter()
+            .map(|account| account.account_id.as_str())
+            .collect();
+        assert_eq!(kept, ["a2", "a4", "a5"]);
+        assert_eq!(registry.active_account_id.as_deref(), Some("a2"));
     }
 
     #[test]
