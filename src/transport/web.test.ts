@@ -665,6 +665,39 @@ test('reports an undecryptable message once per megolm session, grouped together
   await restored;
 });
 
+test('reports undecryptable messages as one issue, searchable by their fields', async () => {
+  const transport = await load();
+  const restored = transport.call('session.restore', {}).catch(() => undefined);
+  captureException.mockClear();
+  FakeSharedWorker.last?.port.receive({
+    logs: [
+      '\u001eWARN sable_core::utd: unable to decrypt a message reported=true cause=Unknown age="before_this_device" same_homeserver=true backup=Enabled megolm_session="1a2b3c4d5e6f" sender_device="0a1b2c3d4e5f"',
+      '\u001eWARN sable_core::utd: unable to decrypt a message reported=true cause=SentBeforeWeJoined same_homeserver=false backup=Unknown megolm_session="6f5e4d3c2b1a"',
+    ],
+  });
+  expect(captureException).toHaveBeenCalledTimes(2);
+  const [[error, first], [, second]] = captureException.mock.calls as [
+    Error,
+    { fingerprint: string[]; tags: Record<string, string>; contexts: Record<string, object> },
+  ][];
+  expect(error.message).toBe('sable_core::utd: unable to decrypt a message');
+  expect(first.fingerprint).toEqual(second.fingerprint);
+  expect(first.tags).toEqual({
+    source: 'wasm-core',
+    cause: 'Unknown',
+    age: 'before_this_device',
+    same_homeserver: 'true',
+    backup: 'Enabled',
+  });
+  expect(second.tags).toMatchObject({ cause: 'SentBeforeWeJoined', same_homeserver: 'false' });
+  expect(first.contexts['Rust Tracing Fields']).toMatchObject({
+    megolm_session: '1a2b3c4d5e6f',
+    sender_device: '0a1b2c3d4e5f',
+  });
+  transport.close();
+  await restored;
+});
+
 test('keeps errors that are not ours as breadcrumbs', async () => {
   const transport = await load();
   const restored = transport.call('session.restore', {}).catch(() => undefined);

@@ -12,7 +12,9 @@ import { recordDebugLog } from '../lib/observability/debug-log.svelte.js';
 import {
   readCoreLine,
   wasmErrorFingerprint,
+  wasmErrorKey,
   wasmErrorTitle,
+  wasmLogFields,
   wasmLogLevel,
 } from '../lib/observability/wasm-log.js';
 import { readText, writeText } from '../lib/platform/local-json.js';
@@ -26,17 +28,35 @@ function isStorageFailure(line: string): boolean {
   );
 }
 
+/** Fields with few values, searchable as tags. The rest, identifiers included, stay in context. */
+const TAGGED_FIELDS = [
+  'context',
+  'cause',
+  'age',
+  'own_identity_trusted',
+  'same_homeserver',
+  'backup',
+  'backup_lookup',
+  'account_cross_signed',
+  'device_cross_signed',
+];
+
 function reportCoreError(line: string): void {
   const fingerprint = wasmErrorFingerprint(line);
-  const title = wasmErrorTitle(line);
   const seen =
-    wasmLogLevel(line) === 'warn' && line.includes('megolm_session=') ? title : fingerprint;
+    wasmLogLevel(line) === 'warn' && line.includes('megolm_session=')
+      ? wasmErrorTitle(line)
+      : wasmErrorKey(line);
   if (fingerprint === '' || reportedCoreErrors.has(seen)) return;
   reportedCoreErrors.add(seen);
-  Sentry.captureException(Object.assign(new Error(title), { name: 'CoreLog' }), {
+  const { message, fields } = wasmLogFields(line);
+  const tags: Record<string, string> = { source: 'wasm-core' };
+  for (const key of TAGGED_FIELDS) if (key in fields) tags[key] = fields[key];
+  Sentry.captureException(Object.assign(new Error(message), { name: 'CoreLog' }), {
     level: isStorageFailure(line) ? 'warning' : 'error',
     fingerprint: ['wasm-core-error', fingerprint],
-    tags: { source: 'wasm-core' },
+    tags,
+    contexts: { 'Rust Tracing Fields': fields },
   });
 }
 

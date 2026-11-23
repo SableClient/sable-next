@@ -1,9 +1,21 @@
 import { describe, expect, test } from 'vitest';
 
-import { readCoreLine, wasmErrorFingerprint, wasmErrorTitle, wasmLogLevel } from './wasm-log';
+import {
+  readCoreLine,
+  wasmErrorFingerprint,
+  wasmErrorTitle,
+  wasmLogFields,
+  wasmLogLevel,
+} from './wasm-log';
 
 const REMOVE_7 =
   'ERROR room_updates_task{room_id="!a:b.org"}:remove_events: matrix_sdk: failed to remove duplicated events: The item index is invalid: `7`';
+const UTD_UNKNOWN =
+  'WARN sable_core::utd: unable to decrypt a message reported=true cause=Unknown age="before_this_device" own_identity_trusted=true same_homeserver=true backup=Enabled backup_lookup="imported" account_cross_signed=true device_cross_signed=true megolm_session="c1d4ace413de"';
+const UTD_BEFORE_JOIN =
+  'WARN sable_core::utd: unable to decrypt a message reported=true cause=SentBeforeWeJoined age="before_this_device" own_identity_trusted=true same_homeserver=false backup=Enabled backup_lookup="not_in_backup" megolm_session="2213949a9c1d" sender_device="0a1b2c3d4e5f"';
+const olm = (errors: string) =>
+  `WARN receive_to_device_event{sender="@a:b.org"}: matrix_sdk_crypto::olm::account: Failed to decrypt a non-pre-key message with all available sessions errors_by_olm_session=${errors}`;
 const REMOVE_29 =
   'ERROR room_updates_task{room_id="!c:d.org"}:remove_events: matrix_sdk: failed to remove duplicated events: The item index is invalid: `29`';
 
@@ -65,6 +77,74 @@ describe('wasmErrorFingerprint', () => {
     expect(wasmErrorFingerprint(REMOVE_7)).not.toBe(
       wasmErrorFingerprint('ERROR sable_core: Event not found in timeline')
     );
+  });
+
+  test('groups undecryptable messages whatever their fields say', () => {
+    expect(wasmErrorFingerprint(UTD_UNKNOWN)).toBe(wasmErrorFingerprint(UTD_BEFORE_JOIN));
+    expect(wasmErrorFingerprint(UTD_UNKNOWN)).toBe('sable_core::utd: unable to decrypt a message');
+  });
+
+  test('groups olm failures whatever sessions failed and how', () => {
+    expect(
+      wasmErrorFingerprint(
+        olm('[("Xc2bUfTFHxJ0Ycs5kd8CmWyDJM5aRjMTXCVqU7yjNmE", MissingMessageKey(5))]')
+      )
+    ).toBe(
+      wasmErrorFingerprint(
+        olm(
+          '[("Xc2bUfTFHxJ0Ycs5kd8CmWyDJM5aRjMTXCVqU7yjNmE", InvalidMAC(MacError)), ("Yc2bUfTFHxJ0Ycs5kd8CmWyDJM5aRjMTXCVqU7yjNmE", MissingMessageKey(1772))]'
+        )
+      )
+    );
+  });
+});
+
+describe('wasmLogFields', () => {
+  test('splits the fields from the message and unquotes their values', () => {
+    expect(wasmLogFields(UTD_BEFORE_JOIN)).toEqual({
+      message: 'sable_core::utd: unable to decrypt a message',
+      fields: {
+        cause: 'SentBeforeWeJoined',
+        age: 'before_this_device',
+        own_identity_trusted: 'true',
+        same_homeserver: 'false',
+        backup: 'Enabled',
+        backup_lookup: 'not_in_backup',
+        megolm_session: '2213949a9c1d',
+        sender_device: '0a1b2c3d4e5f',
+      },
+    });
+  });
+
+  test('keeps a value with spaces, brackets and quotes whole', () => {
+    expect(
+      wasmLogFields(olm('[("Xc2bUfTFHxJ0Ycs5kd8CmWyDJM5aRjMTXCVqU7yjNmE", InvalidMAC(MacError))]'))
+        .fields
+    ).toEqual({ errors_by_olm_session: '[("[KEY]", InvalidMAC(MacError))]' });
+  });
+
+  test('reads dotted keys and leaves a message without fields alone', () => {
+    expect(
+      wasmLogFields(
+        'ERROR sable_core::errors: the server returned an error: [400 / M_UNKNOWN] failed body.server=Some("example.org") context="public_rooms"'
+      )
+    ).toEqual({
+      message: 'sable_core::errors: the server returned an error: [400 / M_UNKNOWN] failed',
+      fields: { 'body.server': 'Some("example.org")', context: 'public_rooms' },
+    });
+    expect(wasmLogFields(REMOVE_7)).toEqual({ message: wasmErrorTitle(REMOVE_7), fields: {} });
+  });
+
+  test('finds the fields after a URL whose redaction takes its closing bracket', () => {
+    expect(
+      wasmLogFields(
+        'ERROR sable_core::errors: error sending request for url (https://hs.example.org/_matrix/client/v3/rooms/!r:hs.example.org/typing/@u:hs.example.org) log_id="e19" context="set_typing"'
+      )
+    ).toEqual({
+      message:
+        'sable_core::errors: error sending request for url (https://[HOMESERVER]/_matrix/client/v3/rooms/![ROOM_ID]/typing/@[USER_ID]',
+      fields: { log_id: 'e19', context: 'set_typing' },
+    });
   });
 });
 
