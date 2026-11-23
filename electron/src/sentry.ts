@@ -2,8 +2,7 @@ import * as Sentry from '@sentry/electron/main';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { sanitizePayload, scrubMatrixIds } from '../../src/lib/observability/scrubbers';
-import { scrubSentryEvent } from '../../src/lib/observability/sentry-event';
+import { scrubBreadcrumb, scrubSentryEvent } from '../../src/lib/observability/sentry-event';
 
 declare const __SABLE_SENTRY__: { dsn?: string; environment?: string; release?: string };
 
@@ -35,12 +34,7 @@ export function initSentry(userDataDir: string): void {
       consent
         ? (scrubSentryEvent(event as Parameters<typeof scrubSentryEvent>[0]) as typeof event)
         : null,
-    beforeBreadcrumb(breadcrumb) {
-      if (breadcrumb.message) breadcrumb.message = scrubMatrixIds(breadcrumb.message);
-      if (breadcrumb.data)
-        breadcrumb.data = sanitizePayload(breadcrumb.data) as typeof breadcrumb.data;
-      return breadcrumb;
-    },
+    beforeBreadcrumb: scrubBreadcrumb,
   });
 }
 

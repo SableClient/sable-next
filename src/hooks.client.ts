@@ -11,7 +11,7 @@ import {
 } from '#lib/observability/dynamic-import-recovery.js';
 import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
 import { tagCoreError } from '#lib/observability/core-failure.js';
-import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
+import { scrubBreadcrumb, scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadModelForApp } from '#lib/model/model-load.svelte.js';
@@ -84,13 +84,7 @@ if (dsn && preferences.errorReporting) {
       return log;
     },
 
-    beforeBreadcrumb(breadcrumb) {
-      if (breadcrumb.message) breadcrumb.message = scrubMatrixIds(breadcrumb.message);
-      if (breadcrumb.data) {
-        breadcrumb.data = sanitizePayload(breadcrumb.data) as typeof breadcrumb.data;
-      }
-      return breadcrumb;
-    },
+    beforeBreadcrumb: scrubBreadcrumb,
 
     beforeSendSpan(span) {
       span.name = scrubMatrixUrl(span.name);
