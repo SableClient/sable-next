@@ -69,9 +69,11 @@ export class VirtualWindow {
       this.#syncing = true;
       try {
         const anchor = this.#visibleAnchor();
+        // TanStack also keys rows outside a read, such as on teardown, after the list may have shrunk.
+        const keys = Array.from({ length: next.count }, (_, index) => next.key(index));
         this.#update({
           count: next.count,
-          getItemKey: next.key,
+          getItemKey: (index) => keys[index],
           overscan: next.overscan,
           estimateSize: next.size ?? (() => estimate),
           rangeExtractor: (range) => {
