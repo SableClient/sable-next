@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   complete: vi.fn(),
   record: vi.fn().mockResolvedValue(undefined),
   location: { protocol: 'https:' },
+  update: vi.fn(),
+  watched: [] as Promise<unknown>[],
 }));
 
 vi.mock('$app/env', () => ({ version: 'test' }));
@@ -21,9 +23,13 @@ vi.mock('#lib/features/notifications/push-fetch.js', async (original) => ({
   ...(await original<object>()),
   completePushPayload: mocks.complete,
 }));
-vi.mock('./telemetry.js', () => ({
+vi.mock('./telemetry.js', async (original) => ({
+  ...(await original<object>()),
   reportWorkerError: vi.fn(),
-  watchWorkerOperation: (_operation: string, pending: Promise<unknown>) => pending,
+  watchWorkerOperation: (_operation: string, pending: Promise<unknown>) => {
+    mocks.watched.push(pending);
+    return pending;
+  },
 }));
 vi.mock('#lib/notifications/room-names.js', () => ({
   currentServerUser: () => Promise.resolve(null),
@@ -54,7 +60,11 @@ beforeAll(async () => {
     addEventListener: (type: string, handler: (event: PushEvent) => void) => {
       mocks.handlers.set(type, handler);
     },
-    registration: { showNotification: mocks.show, getNotifications: mocks.notifications },
+    registration: {
+      showNotification: mocks.show,
+      getNotifications: mocks.notifications,
+      update: mocks.update,
+    },
     clients: { matchAll: () => Promise.resolve([]) },
   });
   vi.stubGlobal('navigator', {});
@@ -215,4 +225,42 @@ test('pushes load the model without Cache API on the desktop custom scheme', asy
   expect(fetch).toHaveBeenCalledOnce();
   expect(match).not.toHaveBeenCalled();
   expect(open).not.toHaveBeenCalled();
+});
+
+const notFound = (): Response => new Response('Not found', { status: 404 });
+const spaFallback = (): Response =>
+  new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } });
+
+async function pushWithoutModel(answer: () => Response = notFound): Promise<unknown> {
+  vi.stubGlobal('caches', { match: () => Promise.resolve(undefined) });
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(answer()));
+  mocks.watched.length = 0;
+  await push({ user_id: '@me:example.org', room_id: '!room:example.org', counts: { unread: 1 } });
+  expect(mocks.show).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({ tag: 'sable-fallback' })
+  );
+  return mocks.watched[0]?.catch((error: unknown) => error);
+}
+
+test.each([
+  ['a 404', notFound],
+  ['the page of an SPA fallback', spaFallback],
+])(
+  'a worker whose removed model is answered with %s falls back as a replaced worker',
+  async (_answer, answer) => {
+    mocks.update.mockClear();
+    mocks.update.mockResolvedValue({ installing: null, waiting: {} });
+    const { StaleWorkerError } = await import('./telemetry.js');
+
+    expect(await pushWithoutModel(answer)).toBeInstanceOf(StaleWorkerError);
+    expect(mocks.update).toHaveBeenCalledOnce();
+  }
+);
+
+test('a missing model with no newer worker to replace this one is still a failure', async () => {
+  mocks.update.mockResolvedValue({ installing: null, waiting: null });
+  const { ModelAssetError } = await import('#lib/model/model.js');
+
+  expect(await pushWithoutModel()).toBeInstanceOf(ModelAssetError);
 });

@@ -61,3 +61,12 @@ test('drops events after consent is revoked', async () => {
   expect(state.consent).toHaveBeenCalledTimes(2);
   expect(state.envelopes).toEqual([]);
 });
+
+test('does not report a worker that a newer deploy replaced', async () => {
+  vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.invalid/1');
+  state.consent.mockResolvedValue(true);
+  const { StaleWorkerError, watchWorkerOperation } = await import('./telemetry');
+  const error = new StaleWorkerError();
+  await expect(watchWorkerOperation('push', Promise.reject(error))).rejects.toBe(error);
+  expect(state.envelopes).toEqual([]);
+});

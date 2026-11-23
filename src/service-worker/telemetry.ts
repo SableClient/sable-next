@@ -11,9 +11,17 @@ const environment = import.meta.env as {
   MODE: string;
 };
 
+/** A newer deploy removed this worker's assets, and the worker replacing it is on its way. */
+export class StaleWorkerError extends Error {
+  constructor(options?: ErrorOptions) {
+    super('a newer service worker replaces this one', options);
+    this.name = 'StaleWorkerError';
+  }
+}
+
 export async function reportWorkerError(operation: string, error: unknown): Promise<void> {
   const dsn = environment.VITE_SENTRY_DSN;
-  if (!dsn || !(await telemetryConsent())) return;
+  if (error instanceof StaleWorkerError || !dsn || !(await telemetryConsent())) return;
 
   client ??= new BrowserClient({
     dsn,

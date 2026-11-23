@@ -46,11 +46,11 @@ import {
   roomName,
   settlePushActivation,
 } from '#lib/notifications/room-names.js';
-import { loadModel } from '#lib/model/model.js';
+import { loadModel, ModelAssetError } from '#lib/model/model.js';
 import type { WorkerMessage } from '#lib/notifications/worker-message.js';
 import modelWasm from '#src/generated/wasm/sable_model_bg.wasm?url';
 import type { PushFetchView } from '#src/generated/protocol';
-import { reportWorkerError, watchWorkerOperation } from './telemetry.js';
+import { reportWorkerError, StaleWorkerError, watchWorkerOperation } from './telemetry.js';
 import { roomsToReconcile } from './read-reconcile.js';
 import { belongsToServerUser, clientHasServerIdentity } from './push-scope.js';
 
@@ -67,9 +67,24 @@ function supportsModelCache(): boolean {
 async function fetchModel(): Promise<Response> {
   const response = await fetch(modelWasm);
   if (!response.ok || response.headers.get('content-type')?.includes('text/html')) {
-    throw new Error(`model wasm unavailable: ${String(response.status)}`);
+    throw new ModelAssetError(response.status);
   }
   return response;
+}
+
+/**
+ * A worker outlives its deploy until the user takes the update, so once the
+ * model it cached is gone, a 404 is the next deploy having removed it. A host
+ * with an SPA fallback answers with index.html and a 200 instead.
+ */
+async function unlessReplaced(error: unknown): Promise<never> {
+  if (error instanceof ModelAssetError && (error.status === 404 || error.status === 200)) {
+    const registration = await worker.registration.update().catch(() => null);
+    if (registration?.installing || registration?.waiting) {
+      throw new StaleWorkerError({ cause: error });
+    }
+  }
+  throw error;
 }
 
 worker.addEventListener('install', (event) => {
@@ -99,7 +114,7 @@ async function cachedModel(): Promise<Response> {
   if (!supportsModelCache()) return fetchModel();
   const cached = await caches.match(modelWasm, { cacheName: MODEL_CACHE });
   if (cached && !cached.headers.get('content-type')?.includes('text/html')) return cached;
-  const response = await fetchModel();
+  const response = await fetchModel().catch(unlessReplaced);
   const cache = await caches.open(MODEL_CACHE);
   await cache.put(modelWasm, response.clone());
   return response;
