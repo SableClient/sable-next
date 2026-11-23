@@ -13,7 +13,7 @@ use matrix_sdk::ruma::api::FeatureFlag;
 use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::push::get_pushrules_all;
-use matrix_sdk::ruma::api::client::space::get_hierarchy;
+use matrix_sdk::ruma::api::client::space::SpaceHierarchyRoomsChunk;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
 use matrix_sdk::ruma::events::StateEventType;
@@ -31,7 +31,7 @@ use crate::ResultExt;
 use crate::api::rooms::PublicRoomsOk;
 use crate::api::spaces::HierarchyOk;
 use crate::errors::CoreResultExt as _;
-use crate::protocol::{JoinRuleView, RoomPreviewView, RpcCode, RpcError};
+use crate::protocol::{JoinRuleView, RoomPreviewView, RpcCode, RpcError, SpaceHierarchyRoomView};
 
 use crate::Core;
 use crate::view;
@@ -787,30 +787,19 @@ impl Core {
     ) -> Result<HierarchyOk, RpcError> {
         let client = self.client().await?;
 
-        let mut request = get_hierarchy::v1::Request::new(space_id.clone());
-        request.from = from;
-        request.limit = Some(UInt::from(HIERARCHY_PAGE_SIZE));
-        request.max_depth = Some(UInt::from(HIERARCHY_MAX_DEPTH));
-
         let response = client
-            .send(request)
+            .send(lenient_hierarchy::Request {
+                room_id: space_id.clone(),
+                from,
+                limit: Some(UInt::from(HIERARCHY_PAGE_SIZE)),
+                max_depth: Some(UInt::from(HIERARCHY_MAX_DEPTH)),
+            })
             .with_request_config(RequestConfig::short_retry())
             .await
             .or_failed(self, "space_hierarchy")?;
 
-        // Ordering lives on each parent's `m.space.child` edges, so the chunks
-        // are passed through unsorted.
-        let rooms = response
-            .rooms
-            .into_iter()
-            .map(|chunk| {
-                let children = view::hierarchy_child_edges(&chunk.children_state);
-                view::space_hierarchy_room(&chunk.summary, children)
-            })
-            .collect();
-
         Ok(HierarchyOk {
-            rooms,
+            rooms: hierarchy_rooms(&response.rooms),
             next_batch: response.next_batch,
         })
     }
@@ -835,6 +824,62 @@ impl Core {
             })
             .and_then(matrix_sdk_ui::timeline::EventTimelineItem::local_echo_send_handle)
             .ok_or_else(|| RpcCode::UnknownLocalEcho.into())
+    }
+}
+
+/// Ordering lives on each parent's `m.space.child` edges, so the chunks are passed through
+/// unsorted. A room with an invalid field is dropped instead of failing the whole page.
+fn hierarchy_rooms(
+    chunks: &[ruma::serde::Raw<SpaceHierarchyRoomsChunk>],
+) -> Vec<SpaceHierarchyRoomView> {
+    chunks
+        .iter()
+        .filter_map(|raw| {
+            raw.deserialize()
+                .inspect_err(|error| tracing::warn!("skipping an invalid hierarchy room: {error}"))
+                .ok()
+        })
+        .map(|chunk| {
+            let children = view::hierarchy_child_edges(&chunk.children_state);
+            view::space_hierarchy_room(&chunk.summary, children)
+        })
+        .collect()
+}
+
+/// ruma's `get_hierarchy` response fails as a whole when one room in the page is invalid.
+mod lenient_hierarchy {
+    use ruma::api::client::space::SpaceHierarchyRoomsChunk;
+    use ruma::api::{auth_scheme::AccessToken, request, response};
+    use ruma::metadata;
+    use ruma::serde::Raw;
+    use ruma::{OwnedRoomId, UInt};
+
+    metadata! {
+        method: GET,
+        rate_limited: true,
+        authentication: AccessToken,
+        history: {
+            unstable => "/_matrix/client/unstable/org.matrix.msc2946/rooms/{room_id}/hierarchy",
+            1.2 => "/_matrix/client/v1/rooms/{room_id}/hierarchy",
+        }
+    }
+
+    #[request]
+    pub(crate) struct Request {
+        #[ruma_api(path)]
+        pub room_id: OwnedRoomId,
+        #[ruma_api(query)]
+        pub from: Option<String>,
+        #[ruma_api(query)]
+        pub limit: Option<UInt>,
+        #[ruma_api(query)]
+        pub max_depth: Option<UInt>,
+    }
+
+    #[response]
+    pub(crate) struct Response {
+        pub next_batch: Option<String>,
+        pub rooms: Vec<Raw<SpaceHierarchyRoomsChunk>>,
     }
 }
 
@@ -870,6 +915,52 @@ mod tests {
     #[test]
     fn an_unknown_encryption_state_is_treated_as_encrypted() {
         assert!(maybe_encrypted(&EncryptionState::Unknown));
+    }
+
+    #[test]
+    fn an_invalid_hierarchy_room_does_not_fail_the_page() {
+        use ruma::api::IncomingResponseExt as _;
+        use ruma::api::client::space::get_hierarchy;
+        use serde_json::json;
+
+        let room = |room_id: &str, alias: &str| {
+            json!({
+                "room_id": room_id,
+                "canonical_alias": alias,
+                "num_joined_members": 1,
+                "world_readable": false,
+                "guest_can_join": false,
+                "join_rule": "public",
+                "children_state": [],
+            })
+        };
+        let body = json!({
+            "rooms": [
+                room("!space:example.org", "#space:example.org"),
+                room("!broken:example.org", "broken:example.org"),
+                room("!fine:example.org", "#fine:example.org"),
+            ],
+            "next_batch": "next",
+        })
+        .to_string();
+
+        let strict = get_hierarchy::v1::Response::try_from_http_response(http::Response::new(
+            body.as_bytes(),
+        ))
+        .expect_err("ruma rejects the whole page");
+        assert!(strict.to_string().contains("leading sigil"), "{strict}");
+
+        let response = super::lenient_hierarchy::Response::try_from_http_response(
+            http::Response::new(body.as_bytes()),
+        )
+        .expect("the page parses");
+        let rooms: Vec<_> = super::hierarchy_rooms(&response.rooms)
+            .into_iter()
+            .map(|room| room.room_id.to_string())
+            .collect();
+
+        assert_eq!(rooms, ["!space:example.org", "!fine:example.org"]);
+        assert_eq!(response.next_batch.as_deref(), Some("next"));
     }
 
     #[tokio::test]
