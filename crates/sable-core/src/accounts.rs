@@ -998,6 +998,14 @@ impl Core {
                 Err(crate::store::StoreError::KeyMissing) => {}
                 Err(error) => return Err(self.failed_with("retire_account_room_keys", &error)),
             }
+            // A twin of the successor's own device must stay signed in.
+            if !account.device_invalidated
+                && successor.session_meta().is_some_and(|meta| {
+                    meta.device_id.as_str() != account.session.credentials.device_id()
+                })
+            {
+                self.log_out_replaced(&account).await;
+            }
         }
         self.forget_login_tokens(Some(account_id)).await;
         if let Err(error) = self.discard_account_store(&account.store_id).await {
@@ -1022,6 +1030,35 @@ impl Core {
             .or_failed(self, "retire_account_save")?;
         *accounts = Some(updated);
         Ok(())
+    }
+
+    /// Best effort: a device the server cannot be reached for stays signed in there.
+    async fn log_out_replaced(&self, account: &PersistedAccount) {
+        #[cfg_attr(
+            target_family = "wasm",
+            expect(unused_mut, reason = "the web registry holds the tokens itself")
+        )]
+        let mut persisted = account.session.clone();
+        #[cfg(not(target_family = "wasm"))]
+        {
+            let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
+            let account_id = account.account_id.clone();
+            let device_id = account.session.credentials.device_id();
+            match tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id)).await {
+                Ok(Ok(Ok(tokens))) => persisted.credentials.set_tokens(tokens),
+                _ => return,
+            }
+        }
+        if persisted.credentials.tokens().access_token.is_empty() {
+            return;
+        }
+        match matrix_sdk::timeout::timeout(Box::pin(session::log_out(&persisted)), LOG_OUT_TIMEOUT)
+            .await
+        {
+            Ok(Ok(())) => tracing::info!("signed the replaced device out"),
+            Ok(Err(error)) => tracing::warn!("could not sign the replaced device out: {error}"),
+            Err(_) => tracing::warn!("signing the replaced device out timed out"),
+        }
     }
 
     pub(crate) async fn discard_account_store(&self, store_id: &str) -> Result<(), RpcError> {
@@ -1468,6 +1505,8 @@ fn oauth_account_deactivate_url(
     url.map(|url| url.to_string())
         .ok_or_else(|| RpcCode::Unsupported.into())
 }
+
+const LOG_OUT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[cfg(not(target_family = "wasm"))]
 const CACHE_DATABASES: [&str; 2] = ["matrix-sdk-event-cache.sqlite3", "matrix-sdk-media.sqlite3"];
@@ -3085,6 +3124,39 @@ mod regression_tests {
             .expect("the stale sign-in waits for a later retry");
         assert!(kept.needs_reauth);
         assert!(std::path::Path::new(&stale.store_id).exists());
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn retiring_a_stale_sign_in_signs_its_own_device_out() {
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let (server, _base, core, first, _events) = restorable_core().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/logout"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let stale = other_sign_in(&core, &first, "stale");
+        let twin = PersistedAccount {
+            session: first.session.clone(),
+            ..other_sign_in(&core, &first, "twin")
+        };
+        let mut registry = core.accounts().await.unwrap();
+        for account in [&twin, &stale] {
+            registry.accounts.insert(0, account.clone());
+            core.save_login_tokens(account).await.unwrap();
+        }
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+
+        assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+
+        assert_eq!(core.list_accounts().await.unwrap().len(), 1);
+        server.server().verify().await;
         core.shutdown().await;
     }
 

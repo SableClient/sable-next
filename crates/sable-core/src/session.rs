@@ -441,6 +441,25 @@ pub(crate) async fn restore_credentials(
     enable_crypto_store_lock(client).await
 }
 
+/// Signs a saved login out on the server without opening its store.
+pub(crate) async fn log_out(persisted: &PersistedSession) -> Result<(), CoreError> {
+    let builder = persisted.resolved_homeserver.as_ref().map_or_else(
+        || apply_server(Client::builder(), &persisted.homeserver),
+        |url| crate::tls::apply_sdk(Client::builder()).homeserver_url(url.as_str()),
+    );
+    let client = builder.handle_refresh_tokens().build().await.backend()?;
+    restore_credentials_with(
+        &client,
+        persisted,
+        matrix_sdk::store::RoomLoadSettings::default(),
+    )
+    .await?;
+    match persisted.credentials {
+        Credentials::Password(_) => client.matrix_auth().logout().await.map(|_| ()).backend(),
+        Credentials::OAuth { .. } => client.oauth().logout().await.backend(),
+    }
+}
+
 async fn restore_credentials_with(
     client: &Client,
     persisted: &PersistedSession,
