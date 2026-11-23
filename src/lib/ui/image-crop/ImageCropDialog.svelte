@@ -381,6 +381,7 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow-dialog);
       height: min(46rem, calc(100dvh - 3rem));
+      inset-inline-start: auto;
       /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
       left: 50%;
       overflow: hidden;

@@ -30,8 +30,10 @@ async function size(file: Blob): Promise<{ width: number; height: number }> {
   return result;
 }
 
-afterEach(() => {
+afterEach(async () => {
   cropRequest.settle(null);
+  document.documentElement.dir = 'ltr';
+  await page.viewport(414, 896);
 });
 
 test('an avatar crops to the centred square', async () => {
@@ -72,6 +74,21 @@ test.each([
   const cropped = await result;
   expect(cropped?.type).toBe(type);
   expect(cropped?.name).toBe(name);
+});
+
+test('right-to-left layouts centre the dialog', async () => {
+  document.documentElement.dir = 'rtl';
+  await page.viewport(1280, 900);
+  await render(ImageCropHost);
+  void requestCrop(await png(800, 400), 'avatar');
+  const dialog = page.getByRole('dialog', { name: 'Crop picture' });
+  await expect.element(dialog).toBeVisible();
+  await expect
+    .poll(() => {
+      const { left, right } = dialog.element().getBoundingClientRect();
+      return Math.abs(left + right - window.innerWidth);
+    })
+    .toBeLessThan(2);
 });
 
 test('dragging the image moves the crop', async () => {
