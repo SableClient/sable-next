@@ -249,13 +249,13 @@
     : dismissing
       ? 'sheet-dismissing'
       : 'sheet-settling'}
-  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight || expanded ? 'height: calc(100dvh - var(--safe-top) - var(--keyboard-overlap) - var(--space-300) * 2); overflow: hidden;' : ''} transform: translateY(${dismissing ? '100%' : `${String(dragOffset)}px`})`}
+  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight || expanded ? 'height: calc(100dvh - var(--safe-top) - var(--keyboard-overlap) - var(--space-300) * 2);' : ''} transform: translateY(${dismissing ? '100%' : `${String(dragOffset)}px`})`}
   {onOpenChange}
   {onOpenAutoFocus}
 >
   <div
     bind:this={body}
-    class={{ 'content-inset': contentInset, expanded }}
+    class={['sheet-body', { 'content-inset': contentInset, expanded }]}
     role="presentation"
     onclickcapture={contentClick}
     onpointerdown={startContentDrag}
@@ -331,13 +331,27 @@
     outline-offset: var(--focus-ring-offset);
   }
 
+  .sheet-body {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: var(--sheet-inset-bottom);
+  }
+
   .content-inset {
-    padding: var(--control-height-large) 0 var(--space-400);
+    padding: var(--control-height-large) 0 calc(var(--space-400) + var(--sheet-inset-bottom));
+  }
+
+  .sheet-body:has(> :global([data-inset-owner~='bottom'])) {
+    padding-bottom: 0;
+  }
+
+  .content-inset:has(> :global([data-inset-owner~='bottom'])) {
+    padding-bottom: var(--space-400);
   }
 
   .expanded {
-    display: flex;
-    flex-direction: column;
     height: 100%;
   }
 

@@ -140,8 +140,10 @@
 
 <style>
   .share {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-400);
+    min-height: 0;
     width: min(28rem, calc(100vw - 2rem));
   }
 
@@ -154,6 +156,7 @@
     background: var(--surface-container);
     border-radius: var(--radii-300);
     color: var(--surface-on-container);
+    flex-shrink: 0;
     font-size: var(--font-size-small);
     margin: 0;
     max-height: 6rem;

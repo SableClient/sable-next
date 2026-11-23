@@ -97,8 +97,10 @@
 
 <style>
   .capabilities {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-300);
+    min-height: 0;
     width: min(26rem, calc(100vw - 2rem));
   }
 

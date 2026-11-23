@@ -102,7 +102,6 @@
     display: grid;
     list-style: none;
     margin: 0;
-    max-height: 60vh;
     overflow-y: auto;
     padding: 0;
   }

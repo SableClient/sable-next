@@ -260,8 +260,10 @@
 
 <style>
   .find-or-join {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-400);
+    min-height: 0;
     width: min(26rem, calc(100vw - 2rem));
   }
 

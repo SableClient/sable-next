@@ -75,7 +75,8 @@ test.each([
     const dialog = screen.getByRole('dialog', { name: 'Options' });
     await expect.element(dialog).toBeVisible();
     document.documentElement.style.setProperty('--keyboard-height', `${keyboard}px`);
-    dialog.element().scrollTop = dialog.element().scrollHeight;
+    const body = dialog.element().querySelector('.sheet-body') as HTMLElement;
+    body.scrollTop = body.scrollHeight;
 
     const last = screen
       .getByRole('button', { name: 'Option 12', exact: true })
@@ -85,3 +86,27 @@ test.each([
     expect(last.bottom).toBeLessThanOrEqual(lastBottom);
   }
 );
+
+test('a downward swipe dismisses only once the sheet content is scrolled to its top', async () => {
+  const screen = await render(Harness);
+  const dialog = screen.getByRole('dialog', { name: 'Options' });
+  await expect.element(dialog).toBeVisible();
+  const body = dialog.element().querySelector('.sheet-body') as HTMLElement;
+  const option = screen.getByRole('button', { name: 'Option 6', exact: true }).element();
+  function swipeClaimed(): boolean {
+    const at = (clientY: number) => [
+      new Touch({ identifier: 1, target: option, clientX: 100, clientY }),
+    ];
+    option.dispatchEvent(new TouchEvent('touchstart', { touches: at(100), bubbles: true }));
+    const move = new TouchEvent('touchmove', { touches: at(160), bubbles: true, cancelable: true });
+    option.dispatchEvent(move);
+    option.dispatchEvent(new TouchEvent('touchcancel', { bubbles: true }));
+    return move.defaultPrevented;
+  }
+
+  body.scrollTop = 40;
+  expect(swipeClaimed()).toBe(false);
+
+  body.scrollTop = 0;
+  expect(swipeClaimed()).toBe(true);
+});

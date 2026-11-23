@@ -384,6 +384,7 @@
     gap: var(--space-400);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
+    min-block-size: 0;
     width: min(44rem, calc(100vw - 2rem));
   }
 

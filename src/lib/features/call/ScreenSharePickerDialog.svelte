@@ -90,9 +90,11 @@
 
 <style>
   .screen-picker {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-300);
     max-width: 100%;
+    min-height: 0;
     width: min(44rem, calc(100vw - 2rem));
   }
 
@@ -110,7 +112,7 @@
   :global(.screen-picker-groups) {
     display: grid;
     gap: var(--space-300);
-    max-height: min(60vh, 32rem);
+    max-height: 32rem;
     overflow-y: auto;
   }
 

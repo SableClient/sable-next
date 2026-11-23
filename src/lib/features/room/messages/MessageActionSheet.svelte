@@ -74,6 +74,7 @@
 <style>
   .sheet-source {
     color: var(--surface-var-on-container);
+    flex-shrink: 0;
     font-size: var(--font-size-small);
     margin: 0 0 var(--space-200);
     overflow: hidden;
@@ -85,6 +86,7 @@
   .sheet-line {
     background: var(--surface-container-line);
     block-size: var(--border-width);
+    flex-shrink: 0;
   }
 
   .sheet-list {

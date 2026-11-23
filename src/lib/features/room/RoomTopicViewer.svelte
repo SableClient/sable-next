@@ -40,8 +40,10 @@
 
 <style>
   .topic-dialog {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-400);
+    min-height: 0;
   }
 
   h2 {
@@ -53,7 +55,6 @@
   .topic-full {
     color: var(--surface-var-on-container);
     margin: 0;
-    max-height: 60vh;
     overflow-wrap: anywhere;
     overflow-y: auto;
   }

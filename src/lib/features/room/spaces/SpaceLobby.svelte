@@ -1126,8 +1126,10 @@
   }
 
   .topic-dialog {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-300);
+    min-height: 0;
     width: min(32rem, calc(100vw - 2rem));
   }
 
@@ -1167,7 +1169,6 @@
     color: var(--surface-var-on-container);
     line-height: 1.45;
     margin: 0;
-    max-height: 60dvh;
     overflow: auto;
     overflow-wrap: break-word;
   }

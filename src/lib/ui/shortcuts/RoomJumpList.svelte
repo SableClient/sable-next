@@ -151,8 +151,10 @@
 
 <style>
   .jump-list {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-200);
+    min-height: 0;
   }
 
   ul {
@@ -160,7 +162,7 @@
     gap: var(--space-100);
     list-style: none;
     margin: 0;
-    max-height: min(60vh, 24rem);
+    max-height: 24rem;
     overflow-y: auto;
     padding: 0;
   }

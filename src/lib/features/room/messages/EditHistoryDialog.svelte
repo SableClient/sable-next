@@ -111,8 +111,10 @@
 
 <style>
   .edit-history {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-300);
+    min-height: 0;
     width: min(32rem, calc(100vw - 2rem));
   }
 

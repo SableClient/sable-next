@@ -102,8 +102,10 @@
 
 <style>
   .rules-dialog {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-400);
+    min-height: 0;
   }
 
   h2 {
@@ -118,7 +120,6 @@
   }
 
   .rules-body {
-    max-height: 50vh;
     overflow-wrap: anywhere;
     overflow-y: auto;
   }
