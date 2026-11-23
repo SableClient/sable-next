@@ -2910,7 +2910,7 @@ mod regression_tests {
         let capture = tracing::subscriber::set_default(
             tracing_subscriber::fmt()
                 .with_ansi(false)
-                .with_max_level(tracing::Level::WARN)
+                .with_env_filter("sable_core=warn")
                 .with_writer({
                     let logs = logs.clone();
                     move || logs.clone()
