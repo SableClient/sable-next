@@ -644,6 +644,7 @@ export type LatestEventView = {
 	 *  `kind` this is the caption or poll question, empty when there is none.
 	 */
 	body: string,
+	emotes: PreviewEmote[],
 	timestamp: number | null,
 	sending: boolean,
 	event_id: string | null,
@@ -2139,6 +2140,7 @@ export type ThreadSummaryView = {
 	latest_body: string | null,
 	/**  What the latest reply was when it has no body to show. */
 	latest_fallback: ReplyFallbackView | null,
+	latest_emotes: PreviewEmote[],
 };
 
 export type TimelineFocusView = { kind: "live" } | { kind: "event"; event_id: string } | { kind: "thread"; root_event_id: string };

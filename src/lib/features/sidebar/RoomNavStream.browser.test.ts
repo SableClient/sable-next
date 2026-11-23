@@ -38,6 +38,7 @@ const dm = (index: number) =>
       sender_label: null,
       kind: 'text',
       body: 'hi',
+      emotes: [],
       timestamp: 1,
       sending: false,
       event_id: null,

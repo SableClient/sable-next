@@ -34,6 +34,12 @@
     threadParticipants,
     threadReplyRevision,
   } from '#lib/rooms/thread-replies.js';
+  import PreviewSegments from '../messages/PreviewSegments.svelte';
+  import { previewSegments } from '../messages/reply-preview.js';
+  import {
+    hasRoomMediaPreviews,
+    useRoomMediaPreviews,
+  } from '../media/room-media-previews.svelte.js';
 
   const MAX_PARTICIPANTS = 3;
 
@@ -70,6 +76,7 @@
   const core = useCoreClient();
   const sidebar = useThreadSidebar();
   const senderColors = useSenderColors();
+  const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   let visible = $state(false);
   let fetchedParticipants = $state.raw<readonly string[] | null>(null);
 
@@ -206,7 +213,13 @@
         />
       {/if}
       {#if latest}
-        <span class="thread-latest"><bdi>{latest}</bdi></span>
+        <span class="thread-latest"
+          ><bdi
+            ><PreviewSegments
+              segments={previewSegments(latest, roomMedia?.hidden ? [] : summary.latest_emotes)}
+            /></bdi
+          ></span
+        >
       {/if}
       {#if latestTimestamp !== null}
         <time class="thread-time" datetime={new Date(latestTimestamp).toISOString()}>

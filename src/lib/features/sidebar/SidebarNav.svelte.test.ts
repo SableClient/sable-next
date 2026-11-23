@@ -320,6 +320,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
       sender_label: null,
       kind: 'text',
       body: 'Hello',
+      emotes: [],
       timestamp: 1000,
       sending: false,
       event_id: '$message',

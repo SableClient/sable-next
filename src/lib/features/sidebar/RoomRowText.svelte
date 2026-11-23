@@ -1,12 +1,18 @@
 <script module lang="ts">
+  import type { PreviewEmote } from '#src/generated/protocol';
+
   export interface RoomPreview {
     sender: string | null;
     text: string;
+    emotes: readonly PreviewEmote[];
   }
 </script>
 
 <script lang="ts">
   import type { RoomListItemView, StatusView } from '#src/generated/protocol';
+  import PreviewSegments from '#lib/features/room/messages/PreviewSegments.svelte';
+  import { previewSegments } from '#lib/features/room/messages/reply-preview.js';
+  import { mediaPreviewSettings, previewsShown } from '#lib/settings/media-previews.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import CalendarRowEvent from '#lib/features/calendar/CalendarRowEvent.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -20,6 +26,10 @@
   }
 
   let { name, room, preview = null, peerStatus = null }: Props = $props();
+
+  let emotesShown = $derived(
+    previewsShown(mediaPreviewSettings.mediaPreviews, room?.join_rule ?? null)
+  );
 </script>
 
 <span class="room-text">
@@ -30,7 +40,11 @@
         <strong class="room-preview-sender"
           >{i18n.t('nav.previewSender', { name: preview.sender })}</strong
         >
-      {/if}<bdi>{preview.text}</bdi>
+      {/if}<bdi
+        ><PreviewSegments
+          segments={previewSegments(preview.text, emotesShown ? preview.emotes : [])}
+        /></bdi
+      >
     </span>
   {:else if room?.is_direct && room.topic && preferences.showDmTopics}
     <span class="room-topic"><bdi>{room.topic}</bdi></span>

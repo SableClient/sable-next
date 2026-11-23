@@ -78,19 +78,23 @@ pub(super) fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
 pub(super) fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
     let summary = msg_like(content)?.thread_summary.as_ref()?;
 
-    let (latest_event_id, latest_timestamp, latest_sender, (latest_body, latest_fallback, _)) =
-        match &summary.latest_event {
-            TimelineDetails::Ready(event) => (
-                match &event.identifier {
-                    TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
-                    TimelineEventItemId::TransactionId(_) => None,
-                },
-                Some(event.timestamp.0.into()),
-                Some(event.sender.to_string()),
-                embedded_reply_preview(event),
-            ),
-            _ => (None, None, None, (None, None, Vec::new())),
-        };
+    let (
+        latest_event_id,
+        latest_timestamp,
+        latest_sender,
+        (latest_body, latest_fallback, latest_emotes),
+    ) = match &summary.latest_event {
+        TimelineDetails::Ready(event) => (
+            match &event.identifier {
+                TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
+                TimelineEventItemId::TransactionId(_) => None,
+            },
+            Some(event.timestamp.0.into()),
+            Some(event.sender.to_string()),
+            embedded_reply_preview(event),
+        ),
+        _ => (None, None, None, (None, None, Vec::new())),
+    };
 
     Some(ThreadSummaryView {
         num_replies: summary.num_replies,
@@ -100,6 +104,7 @@ pub(super) fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSumm
         current_user_participated: None,
         latest_body,
         latest_fallback,
+        latest_emotes,
     })
 }
 
@@ -109,20 +114,22 @@ pub(super) fn merge_thread_summary(
 ) -> Option<ThreadSummaryView> {
     match (local, bundled) {
         (Some(local), Some(bundled)) => {
-            let (latest_event_id, latest_body, latest_fallback) = if local.latest_event_id.is_some()
-            {
-                (
-                    local.latest_event_id,
-                    local.latest_body,
-                    local.latest_fallback,
-                )
-            } else {
-                (
-                    bundled.latest_event_id,
-                    bundled.latest_body,
-                    bundled.latest_fallback,
-                )
-            };
+            let (latest_event_id, latest_body, latest_fallback, latest_emotes) =
+                if local.latest_event_id.is_some() {
+                    (
+                        local.latest_event_id,
+                        local.latest_body,
+                        local.latest_fallback,
+                        local.latest_emotes,
+                    )
+                } else {
+                    (
+                        bundled.latest_event_id,
+                        bundled.latest_body,
+                        bundled.latest_fallback,
+                        bundled.latest_emotes,
+                    )
+                };
             Some(ThreadSummaryView {
                 num_replies: local.num_replies.max(bundled.num_replies),
                 latest_event_id,
@@ -133,6 +140,7 @@ pub(super) fn merge_thread_summary(
                     .or(bundled.current_user_participated),
                 latest_body,
                 latest_fallback,
+                latest_emotes,
             })
         }
         (local, bundled) => local.or(bundled),
@@ -248,18 +256,21 @@ pub(super) fn bundled_thread_summary(unsigned: &serde_json::Value) -> Option<Thr
         },
         |(_, fallback, _)| matches!(fallback, Some(ReplyFallbackView::VerificationRequest)),
     );
-    let latest_body = if let Some((body, _, _)) = forwarded_preview {
-        body
+    let (latest_body, latest_emotes) = if let Some((body, _, emotes)) = forwarded_preview {
+        (body, emotes)
     } else {
         latest_content
             .filter(|_| !verification)
             .and_then(|content| {
                 let formatted = content.formatted_body.as_deref();
-                content
-                    .body
-                    .as_deref()
-                    .map(|body| preview_body(body, formatted))
+                content.body.as_deref().map(|body| {
+                    (
+                        Some(preview_body(body, formatted)),
+                        preview_emotes(formatted),
+                    )
+                })
             })
+            .unwrap_or_default()
     };
 
     Some(ThreadSummaryView {
@@ -270,6 +281,7 @@ pub(super) fn bundled_thread_summary(unsigned: &serde_json::Value) -> Option<Thr
         current_user_participated: summary.current_user_participated,
         latest_body,
         latest_fallback: verification.then_some(ReplyFallbackView::VerificationRequest),
+        latest_emotes,
     })
 }
 
@@ -516,6 +528,31 @@ mod tests {
     }
 
     #[test]
+    fn a_bundled_latest_reply_keeps_its_custom_emotes() {
+        let summary = bundled_thread_summary(&json!({
+            "m.relations": { "m.thread": { "count": 1, "latest_event": {
+                "event_id": "$reply:example.org",
+                "content": {
+                    "msgtype": "m.text",
+                    "body": "hi :blob:",
+                    "format": "org.matrix.custom.html",
+                    "formatted_body": "hi <img data-mx-emoticon src=\"mxc://example.org/blob\" alt=\":blob:\">"
+                }
+            } } },
+        }))
+        .expect("thread summary");
+
+        assert_eq!(summary.latest_body.as_deref(), Some("hi :blob:"));
+        assert_eq!(
+            summary.latest_emotes,
+            [PreviewEmote {
+                alt: ":blob:".to_owned(),
+                source: "mxc://example.org/blob".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
     fn a_verification_request_as_the_latest_reply_shows_its_fallback_not_its_body() {
         let unsigned = json!({
             "m.relations": {
@@ -550,6 +587,7 @@ mod tests {
             current_user_participated: None,
             latest_body: None,
             latest_fallback: None,
+            latest_emotes: Vec::new(),
         };
         let merged = merge_thread_summary(
             Some(view(0, Some("$local"))),
@@ -574,6 +612,7 @@ mod tests {
             current_user_participated: Some(true),
             latest_body: Some("Latest".to_owned()),
             latest_fallback: None,
+            latest_emotes: Vec::new(),
         };
         let fallback = merge_thread_summary(Some(view(1, None)), Some(bundled)).expect("summary");
         assert_eq!(fallback.latest_event_id.as_deref(), Some("$bundled"));

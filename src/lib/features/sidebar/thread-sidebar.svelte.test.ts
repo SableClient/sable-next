@@ -30,6 +30,7 @@ function activeThread(id: string, title: string, latestTimestamp: number, partic
       current_user_participated: participated,
       latest_body: 'Reply',
       latest_fallback: null,
+      latest_emotes: [],
     },
   };
 }

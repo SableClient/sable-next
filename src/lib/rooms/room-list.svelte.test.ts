@@ -318,6 +318,28 @@ test('a snapshot from a build before resolved counts paints nothing', () => {
   roomList.stop();
 });
 
+test('a snapshot from a build before preview emotes paints nothing', () => {
+  stubLocalStorage().set(
+    'sable.room-list.v2.acct',
+    snapshotOf([{ room_id: '!old:example.org', counts: {}, latest_event: { body: 'hi :blob:' } }])
+  );
+  const core = {
+    session: { account_id: 'acct' },
+    subscribeEvents: vi.fn(() => () => {}),
+    rpc: {
+      timeline: {
+        subscribeRoomList: vi.fn(() => new Promise(() => {})),
+        unsubscribe: vi.fn(() => Promise.resolve()),
+      },
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  void roomList.start();
+  expect(roomList.rooms).toEqual([]);
+  roomList.stop();
+});
+
 test('is not settled on a painted snapshot', async () => {
   const room = withCounts({
     room_id: '!room:example.org',

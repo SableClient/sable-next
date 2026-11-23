@@ -69,8 +69,13 @@ pub(crate) fn emotes(event: &AnySyncTimelineEvent) -> Vec<PreviewEmote> {
     };
     message
         .as_original()
-        .map(|event| preview_emotes(formatted(&event.content.msgtype)))
+        .map(|event| message_emotes(&event.content.msgtype))
         .unwrap_or_default()
+}
+
+/// The emotes in a message's preview text, in order.
+pub(crate) fn message_emotes(msgtype: &MessageType) -> Vec<PreviewEmote> {
+    preview_emotes(formatted(msgtype))
 }
 
 fn formatted(msgtype: &MessageType) -> Option<&str> {

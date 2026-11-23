@@ -26,6 +26,7 @@ function threadRoot(id: string, body: string, timestamp: number, summary?: Summa
         current_user_participated: null,
         latest_body: null,
         latest_fallback: null,
+        latest_emotes: [],
         ...summary,
       },
     }),
@@ -132,6 +133,9 @@ test('hydrates latest reply activity and explicit thread receipts without blocki
   const topic = threadRoot('topic', 'Topic', 0, {
     num_replies: 2,
     latest_event_id: '$reply',
+    latest_timestamp: null,
+    latest_sender: null,
+    current_user_participated: null,
     latest_body: 'Reply',
   });
   const reply = {

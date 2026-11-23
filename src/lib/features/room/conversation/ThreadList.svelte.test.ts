@@ -110,6 +110,7 @@ test('shows reactions on both the root and the latest reply preview', async () =
     current_user_participated: null,
     latest_body: 'Still working on it',
     latest_fallback: null,
+    latest_emotes: [],
   };
   listThreads.mockResolvedValueOnce({ roots: [topic], next_batch: null });
   core.rpc.messages.eventReactions.mockImplementation(({ event_id }) =>
@@ -177,8 +178,12 @@ test('a root shows its reply count and latest reply instead of an open button', 
         thread_summary: {
           num_replies: 3,
           latest_event_id: '$z',
+          latest_timestamp: null,
+          latest_sender: null,
+          current_user_participated: null,
           latest_body: 'Last word',
           latest_fallback: null,
+          latest_emotes: [],
         },
       },
     ],

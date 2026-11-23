@@ -1347,6 +1347,7 @@ function latest(
     sender_label: null,
     kind: 'text',
     body,
+    emotes: [],
     timestamp,
     sending: false,
     event_id: `$${timestamp}`,
@@ -1407,6 +1408,57 @@ test.each([
 
   expect(roomTopics()).toEqual([expected]);
 });
+
+test('a custom emote in a message preview shows as its image', async () => {
+  visit('/home');
+  setPreference('showHome', true);
+  setPreference('messagePreviews', 'all');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!r:example.org',
+      name: 'Room',
+      latest_event: latest('hi :blob:', 1, {
+        emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+      }),
+    }),
+  ];
+  await mountNav();
+  await tick();
+
+  expect(roomTopics().map((topic) => topic?.trim())).toEqual(['hi']);
+  expect(document.querySelector('.room-row .room-topic .preview-emote')).toBeInTheDocument();
+});
+
+test.each([
+  ['off', 'invite'],
+  ['private', 'public'],
+] as const)(
+  'a custom emote in a message preview stays text when media previews are %s in a %s room',
+  async (level, joinRule) => {
+    visit('/home');
+    setPreference('showHome', true);
+    setPreference('messagePreviews', 'all');
+    setPreference('mediaAutoLoad', level);
+    onTestFinished(() => {
+      setPreference('mediaAutoLoad', 'on');
+    });
+    roomsFixture.rooms = [
+      makeRoom({
+        room_id: '!r:example.org',
+        name: 'Room',
+        join_rule: joinRule,
+        latest_event: latest('hi :blob:', 1, {
+          emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+        }),
+      }),
+    ];
+    await mountNav();
+    await tick();
+
+    expect(roomTopics()).toEqual(['hi :blob:']);
+    expect(document.querySelector('.room-row .room-topic .preview-emote')).toBeNull();
+  }
+);
 
 test('the preview sender is set apart from the message', async () => {
   visit('/home');

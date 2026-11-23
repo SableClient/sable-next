@@ -199,6 +199,7 @@ const cases: Record<string, TimelineItemView> = {
       current_user_participated: null,
       latest_body: long,
       latest_fallback: null,
+      latest_emotes: [],
     },
   },
   'moderation notice': {

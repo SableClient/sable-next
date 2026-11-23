@@ -2134,6 +2134,7 @@ pub struct ThreadSummaryView {
     pub latest_body: Option<String>,
     /// What the latest reply was when it has no body to show.
     pub latest_fallback: Option<ReplyFallbackView>,
+    pub latest_emotes: Vec<PreviewEmote>,
 }
 
 /// Without this a failed send renders as an ordinary message.
@@ -2878,6 +2879,7 @@ pub struct LatestEventView {
     /// Plain text: a list row must not run untrusted HTML. For a non-text
     /// `kind` this is the caption or poll question, empty when there is none.
     pub body: String,
+    pub emotes: Vec<PreviewEmote>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub timestamp: Option<u64>,
     pub sending: bool,

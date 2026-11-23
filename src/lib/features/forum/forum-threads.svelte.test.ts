@@ -81,6 +81,7 @@ test('an older redacted thread stays hidden through discovery refresh and reopen
       current_user_participated: null,
       latest_body: 'Old reply',
       latest_fallback: null,
+      latest_emotes: [],
     },
   };
   const other = timelineItem('other');

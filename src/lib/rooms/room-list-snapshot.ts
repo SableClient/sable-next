@@ -20,9 +20,14 @@ function storage(): Storage | null {
   }
 }
 
-/** A snapshot from a build before the core resolved counts paints nothing. */
+/**
+ * A snapshot from a build before the core resolved counts, or listed preview
+ * emotes, paints nothing.
+ */
 function isCurrentSummary(room: unknown): boolean {
-  return typeof room === 'object' && room !== null && 'counts' in room;
+  if (typeof room !== 'object' || room === null || !('counts' in room)) return false;
+  const latest = (room as { latest_event?: unknown }).latest_event;
+  return typeof latest !== 'object' || latest === null || 'emotes' in latest;
 }
 
 function isSnapshot(value: unknown): value is RoomListSnapshot {

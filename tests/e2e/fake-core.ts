@@ -208,6 +208,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         sender_label: null,
         kind: 'text',
         body: 'General message 19',
+        emotes: [],
         timestamp: 1_700_000_000_019,
         sending: false,
         event_id: '$general-19:example.test',
@@ -236,6 +237,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         sender_label: null,
         kind: 'text',
         body: 'invited you',
+        emotes: [],
         timestamp: 1_700_000_000_000,
         sending: false,
         event_id: null,
@@ -676,6 +678,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           current_user_participated: id !== 'welcome',
           latest_body: id === 'release' ? 'Ready to ship' : 'A reply',
           latest_fallback: null,
+          latest_emotes: [],
         },
       }));
     })();

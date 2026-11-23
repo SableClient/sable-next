@@ -273,7 +273,7 @@
     }
     if (!text) return null;
     const sender = event.own ? i18n.t('nav.previewYou') : event.sender_label;
-    return { sender, text };
+    return { sender, text, emotes: event.emotes };
   }
 
   const peerProfiles = new PeerProfiles(core);

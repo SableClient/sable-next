@@ -120,6 +120,7 @@ for (const layout of ['list', 'gallery']) {
         latest_event_id: '$reply',
         latest_body: 'Old reply',
         latest_fallback: null,
+        latest_emotes: [],
       },
     };
     const other = { ...timelineItem('other', 'Still open'), forum_title: 'Unfinished feature' };

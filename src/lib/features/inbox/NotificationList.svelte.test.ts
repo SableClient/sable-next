@@ -2,8 +2,8 @@
 
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { beforeEach, expect, test, vi } from 'vitest';
-import type { RoomListItemView } from '#src/generated/protocol';
+import { beforeEach, expect, onTestFinished, test, vi } from 'vitest';
+import type { InboxItemView, RoomListItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -12,14 +12,19 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useRoomList: () => roomList,
 }));
+vi.mock('#lib/features/room/messages/event-items.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useEventItems: () => ({ get: () => null, pending: () => false }),
+}));
 
 import { core } from '#lib/core/__mocks__/context.js';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 import NotificationList from './NotificationList.svelte';
 
 const roomList = new RoomList(core as unknown as CoreClient);
-const inbox = vi.fn(() => Promise.resolve({ items: [], has_more: false }));
+const inbox = vi.fn(() => Promise.resolve({ items: [] as InboxItemView[], has_more: false }));
 Object.assign(core.rpc.notifications, {
   inbox,
   backfillInbox: vi.fn(() => Promise.resolve({ recorded: 0, has_more: false })),
@@ -69,3 +74,44 @@ test('reloads the feed when a room gains unread notifications', async () => {
 
   expect(inbox.mock.calls.length).toBeGreaterThan(loads);
 });
+
+test.each([
+  ['on', 'public', true],
+  ['off', 'invite', false],
+  ['private', 'public', false],
+] as const)(
+  'with media previews %s, a custom emote in a %s room notification shows as an image: %s',
+  async (level, joinRule, image) => {
+    setPreference('mediaAutoLoad', level);
+    onTestFinished(() => {
+      setPreference('mediaAutoLoad', 'on');
+      inbox.mockResolvedValue({ items: [], has_more: false });
+    });
+    roomList.rooms = [room('!a:example.org', { join_rule: joinRule })];
+    inbox.mockResolvedValue({
+      items: [
+        {
+          room_id: '!a:example.org',
+          event_id: '$e',
+          ts: 1,
+          sender: '@bob:example.org',
+          sender_name: 'Bob',
+          body: 'hi :blob:',
+          emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+          highlight: false,
+          is_direct: false,
+          encrypted: false,
+          read: false,
+          thread_root: null,
+          reply: false,
+        },
+      ],
+      has_more: false,
+    });
+    render(NotificationList, { filter: 'all', onFilter: vi.fn() });
+    await settle();
+
+    expect(document.querySelector('.preview')).not.toBeNull();
+    expect(document.querySelector('.preview .preview-emote') !== null).toBe(image);
+  }
+);

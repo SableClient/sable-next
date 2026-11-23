@@ -62,7 +62,7 @@
       return [stateEventText(target, i18n.t)];
     }
     const text = stripReplyFallback(replyText(reply, i18n.t), persona);
-    return roomMedia?.hidden ? [text] : previewSegments(text, reply.emotes);
+    return previewSegments(text, roomMedia?.hidden ? [] : reply.emotes);
   });
   let colors = $derived(
     senderColors(sender, profile, {

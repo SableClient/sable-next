@@ -23,6 +23,7 @@ function latest(timestamp: number): RoomListItemView['latest_event'] {
     sender_label: null,
     kind: 'text',
     body: '',
+    emotes: [],
     timestamp,
     sending: false,
     event_id: null,

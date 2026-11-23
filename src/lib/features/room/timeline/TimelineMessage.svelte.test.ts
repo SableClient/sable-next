@@ -346,6 +346,7 @@ test('strips a per-message-profile fallback from a thread summary', async () => 
             current_user_participated: null,
             latest_body: 'Josie: the latest reply',
             latest_fallback: null,
+            latest_emotes: [],
           },
         },
         collapsed: false,
@@ -372,6 +373,36 @@ test('strips a per-message-profile fallback from a thread summary', async () => 
   expect(document.querySelector('.thread-latest')?.textContent).toBe('the latest reply');
 });
 
+test('a custom emote in a thread summary shows as its image', async () => {
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: {
+        item: {
+          ...item(false),
+          thread_root: '$root',
+          thread_summary: {
+            num_replies: 1,
+            latest_event_id: null,
+            latest_timestamp: null,
+            latest_sender: null,
+            current_user_participated: null,
+            latest_body: 'hi :blob:',
+            latest_fallback: null,
+            latest_emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+          },
+        },
+        collapsed: false,
+        onOpenThread: vi.fn(),
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.thread-latest')?.textContent.trim()).toBe('hi');
+  expect(document.querySelector('.thread-latest .preview-emote')).toBeInTheDocument();
+});
+
 test('keeps a thread summary body without a fallback', async () => {
   render(TimelineItemHarness, {
     props: {
@@ -388,6 +419,7 @@ test('keeps a thread summary body without a fallback', async () => {
             current_user_participated: null,
             latest_body: 'we shipped it: finally',
             latest_fallback: null,
+            latest_emotes: [],
           },
         },
         collapsed: false,
@@ -416,6 +448,7 @@ test('names a verification request as the latest thread reply', async () => {
             current_user_participated: null,
             latest_body: null,
             latest_fallback: { kind: 'verification_request' },
+            latest_emotes: [],
           },
         },
         collapsed: false,
@@ -904,6 +937,7 @@ test('shows a defined thread card with participant avatars, latest sender, and t
               current_user_participated: null,
               latest_body: 'Ready to ship',
               latest_fallback: null,
+              latest_emotes: [],
             },
           },
           collapsed: false,
