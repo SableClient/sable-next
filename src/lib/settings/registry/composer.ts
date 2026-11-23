@@ -109,8 +109,8 @@ export const composerCategory: SettingsCategory = {
       description: 'settings.matrixLinkSelectorHint',
       type: 'select',
       options: [
-        { value: 'sable', label: 'settings.matrixLinkSelectorSable' },
-        { value: 'matrix', label: 'settings.matrixLinkSelectorMatrix' },
+        { value: 'sable', label: 'link.sable.moe', literal: true },
+        { value: 'matrix', label: 'matrix.to', literal: true },
         { value: 'custom', label: 'settings.matrixLinkSelectorCustom' },
       ],
     },
@@ -121,8 +121,7 @@ export const composerCategory: SettingsCategory = {
       name: 'settings.matrixLinkCustom',
       type: 'text',
       placeholder: 'settings.matrixLinkCustomPlaceholder',
-      require: 'matrixLinkSelector',
-      toBe: 'custom',
+      gatedBy: { key: 'matrixLinkSelector', value: 'custom' },
     },
     {
       key: 'linkMscReferences',

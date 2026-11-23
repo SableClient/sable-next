@@ -60,13 +60,16 @@
 
   /** A gate this platform never renders would disable its dependants forever. */
   function gated(setting: SettingDefinition): boolean {
-    return (
-      setting.gatedBy !== undefined && shown.has(setting.gatedBy) && !preferences[setting.gatedBy]
-    );
+    const gate = setting.gatedBy;
+    if (gate === undefined) return false;
+    if (typeof gate === 'string') return shown.has(gate) && !preferences[gate];
+    return shown.has(gate.key) && preferences[gate.key] !== gate.value;
   }
 
   function gateName(setting: SettingDefinition): string {
-    return supportedSettings.find((item) => item.key === setting.gatedBy)?.name ?? '';
+    const gate = setting.gatedBy;
+    const key = typeof gate === 'object' ? gate.key : gate;
+    return supportedSettings.find((item) => item.key === key)?.name ?? '';
   }
 
   let serverFeatures = $state.raw<readonly string[] | null>(null);
@@ -108,116 +111,113 @@
       {@const lockedByDeployment = isLockedPreference(setting.key)}
       {@const disabled = setting.unavailable === true || gate || unsupported || lockedByDeployment}
       {@const anchor = settingFocusId(setting.key)}
-
-      {#if setting.require === undefined || preferences[setting.require] === setting.toBe}
-        <SettingsRow
-          id={anchor}
-          key={setting.key}
-          data-settings-focus={anchor}
-          title={i18n.t(setting.name)}
-          description={setting.description ? i18n.t(setting.description) : undefined}
-          {disabled}
-          badge={lockedByDeployment
-            ? i18n.t('settings.managedByDeployment')
-            : setting.unavailable
-              ? i18n.t('settings.notAvailableYet')
-              : gate
-                ? i18n.t('settings.needsSetting', { name: i18n.t(gateName(setting)) })
-                : unsupported
-                  ? i18n.t('settings.needsServerFeature')
-                  : undefined}
-          wide={setting.type !== 'boolean'}
-          control={setting.type === 'boolean' && !disabled ? `${anchor}-switch` : undefined}
-          class={setting.gatedBy !== undefined ? 'gated' : undefined}
-        >
-          {#if setting.type === 'select'}
-            {@const key = setting.key}
-            <Select
+      <SettingsRow
+        id={anchor}
+        key={setting.key}
+        data-settings-focus={anchor}
+        title={i18n.t(setting.name)}
+        description={setting.description ? i18n.t(setting.description) : undefined}
+        {disabled}
+        badge={lockedByDeployment
+          ? i18n.t('settings.managedByDeployment')
+          : setting.unavailable
+            ? i18n.t('settings.notAvailableYet')
+            : gate
+              ? i18n.t('settings.needsSetting', { name: i18n.t(gateName(setting)) })
+              : unsupported
+                ? i18n.t('settings.needsServerFeature')
+                : undefined}
+        wide={setting.type !== 'boolean'}
+        control={setting.type === 'boolean' && !disabled ? `${anchor}-switch` : undefined}
+        class={setting.gatedBy !== undefined ? 'gated' : undefined}
+      >
+        {#if setting.type === 'select'}
+          {@const key = setting.key}
+          <Select
+            {disabled}
+            forceDropdown={setting.key === 'profileChangePropagation'}
+            aria-label={i18n.t(setting.name)}
+            value={setting.getValue?.() ?? preferences[key]}
+            items={setting.options.map((option) => ({
+              value: option.value,
+              label: option.literal ? option.label : i18n.t(option.label),
+              labelClass: option.literal ? 'literal-label' : undefined,
+            }))}
+            onValueChange={(value) => {
+              if (setting.setValue) setting.setValue(value);
+              else setPreference(key, value as Preferences[typeof key]);
+              setting.onChange?.(value);
+            }}
+          />
+        {:else if setting.type === 'range'}
+          {@const key = setting.key}
+          <div class="range">
+            <Slider
               {disabled}
-              forceDropdown={setting.key === 'profileChangePropagation'}
-              aria-label={i18n.t(setting.name)}
-              value={setting.getValue?.() ?? preferences[key]}
-              items={setting.options.map((option) => ({
-                value: option.value,
-                label: option.literal ? option.label : i18n.t(option.label),
-                labelClass: option.literal ? 'literal-label' : undefined,
-              }))}
-              onValueChange={(value) => {
-                if (setting.setValue) setting.setValue(value);
-                else setPreference(key, value as Preferences[typeof key]);
+              requireThumbForTouch
+              min={PREFERENCE_RANGES[key].min}
+              max={PREFERENCE_RANGES[key].max}
+              step={setting.step}
+              label={i18n.t(setting.name)}
+              value={preferences[key]}
+              oninput={(value) => {
+                if (setting.applyOnCommit) onRangeDraft?.(key, value);
+                else setPreference(key, value);
+              }}
+              oncommit={(value) => {
+                onRangeDraft?.(key, null);
+                if (setting.applyOnCommit) setPreference(key, value);
                 setting.onChange?.(value);
               }}
             />
-          {:else if setting.type === 'range'}
-            {@const key = setting.key}
-            <div class="range">
-              <Slider
+            <label class="form-control range-reading">
+              <input
+                class="range-input"
+                type="number"
+                inputmode="numeric"
                 {disabled}
-                requireThumbForTouch
-                min={PREFERENCE_RANGES[key].min}
-                max={PREFERENCE_RANGES[key].max}
-                step={setting.step}
-                label={i18n.t(setting.name)}
-                value={preferences[key]}
-                oninput={(value) => {
-                  if (setting.applyOnCommit) onRangeDraft?.(key, value);
-                  else setPreference(key, value);
+                min={Math.round(PREFERENCE_RANGES[key].min * 100)}
+                max={Math.round(PREFERENCE_RANGES[key].max * 100)}
+                step={Math.round(setting.step * 100)}
+                value={Math.round(preferences[key] * 100)}
+                aria-label={i18n.t('settings.rangePercent', { name: i18n.t(setting.name) })}
+                onchange={(event) => {
+                  const typed = Number(event.currentTarget.value) / 100;
+                  if (event.currentTarget.value !== '' && Number.isFinite(typed)) {
+                    const { min, max } = PREFERENCE_RANGES[key];
+                    const next = clamp(typed, min, max);
+                    setPreference(key, next);
+                    setting.onChange?.(next);
+                  }
+                  event.currentTarget.value = String(Math.round(preferences[key] * 100));
                 }}
-                oncommit={(value) => {
-                  onRangeDraft?.(key, null);
-                  if (setting.applyOnCommit) setPreference(key, value);
-                  setting.onChange?.(value);
-                }}
-              />
-              <label class="form-control range-reading">
-                <input
-                  class="range-input"
-                  type="number"
-                  inputmode="numeric"
-                  {disabled}
-                  min={Math.round(PREFERENCE_RANGES[key].min * 100)}
-                  max={Math.round(PREFERENCE_RANGES[key].max * 100)}
-                  step={Math.round(setting.step * 100)}
-                  value={Math.round(preferences[key] * 100)}
-                  aria-label={i18n.t('settings.rangePercent', { name: i18n.t(setting.name) })}
-                  onchange={(event) => {
-                    const typed = Number(event.currentTarget.value) / 100;
-                    if (event.currentTarget.value !== '' && Number.isFinite(typed)) {
-                      const { min, max } = PREFERENCE_RANGES[key];
-                      const next = clamp(typed, min, max);
-                      setPreference(key, next);
-                      setting.onChange?.(next);
-                    }
-                    event.currentTarget.value = String(Math.round(preferences[key] * 100));
-                  }}
-                /><span class="range-suffix" aria-hidden="true">%</span>
-              </label>
-            </div>
-          {:else if setting.type === 'text'}
-            {@const key = setting.key}
-            <TextInput
-              value={preferences[key]}
-              placeholder={setting.placeholder && i18n.t(setting.placeholder)}
-              oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
-                setPreference(key, event.currentTarget.value);
-              }}
-            />
-          {:else}
-            {@const key = setting.key}
-            <Switch
-              id={`${anchor}-switch`}
-              {disabled}
-              label={i18n.t(setting.name)}
-              checked={gate ? false : preferences[key]}
-              onCheckedChange={(checked: boolean) => {
-                setPreference(key, checked);
-                setting.onChange?.(checked);
-                if (setting.requiresReload) reloadPending = true;
-              }}
-            />
-          {/if}
-        </SettingsRow>
-      {/if}
+              /><span class="range-suffix" aria-hidden="true">%</span>
+            </label>
+          </div>
+        {:else if setting.type === 'text'}
+          {@const key = setting.key}
+          <TextInput
+            {disabled}
+            aria-label={i18n.t(setting.name)}
+            value={preferences[key]}
+            placeholder={setting.placeholder && i18n.t(setting.placeholder)}
+            oninput={(event) => setPreference(key, event.currentTarget.value)}
+          />
+        {:else}
+          {@const key = setting.key}
+          <Switch
+            id={`${anchor}-switch`}
+            {disabled}
+            label={i18n.t(setting.name)}
+            checked={gate ? false : preferences[key]}
+            onCheckedChange={(checked: boolean) => {
+              setPreference(key, checked);
+              setting.onChange?.(checked);
+              if (setting.requiresReload) reloadPending = true;
+            }}
+          />
+        {/if}
+      </SettingsRow>
     {/each}
   </ul>
 {/snippet}

@@ -5,6 +5,7 @@ vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 import type { RoomListItemView } from '#src/generated/protocol';
 
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import { roomView } from '#lib/test-support/room-views.js';
 
 import {
@@ -237,6 +238,21 @@ test('an event link nests the event under the room', () => {
   ).toBe('https://link.sable.moe/#/!somewhere%3Aexample.org/%24event?via=a.example&via=b.example');
 });
 
+test.each([
+  ['sable', '', 'link.sable.moe'],
+  ['matrix', 'links.example.org', 'matrix.to'],
+  ['custom', 'links.example.org', 'links.example.org'],
+  ['custom', ' https://links.example.org/path ', 'links.example.org'],
+  ['custom', '', 'matrix.to'],
+  ['custom', 'not a host', 'matrix.to'],
+] as const)('the %s link host with %j writes %s', (selector, custom, host) => {
+  preferences.matrixLinkSelector = selector;
+  preferences.matrixLinkCustom = custom;
+  expect(matrixToUrl({ alias: '#lobby:example.org' })).toBe(
+    `https://${host}/#/%23lobby%3Aexample.org`
+  );
+});
+
 test('a link the app generates parses back to what it named', () => {
   const url = matrixToUrl({ roomId: '!somewhere:example.org', via: ['elsewhere.ca'] }, '$event');
   expect(parseMatrixLink(url)).toEqual({
@@ -298,6 +314,8 @@ test('a via naming only our server adds the parent space members', async () => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  preferences.matrixLinkSelector = 'sable';
+  preferences.matrixLinkCustom = '';
 });
 
 function linkCore(via: string[] | Error) {

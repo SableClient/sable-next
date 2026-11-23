@@ -1072,9 +1072,9 @@
           "default": "sable"
         },
         "matrixLinkCustom": {
-          "title": "Input custom Matrix link",
+          "title": "Custom link host",
           "type": "string",
-          "default": "mtarix.to"
+          "default": ""
         },
         "personaPicker": {
           "title": "Show profile picker in the composer",
@@ -2606,9 +2606,9 @@
           "default": "sable"
         },
         "matrixLinkCustom": {
-          "title": "Input custom Matrix link",
+          "title": "Custom link host",
           "type": "string",
-          "default": "mtarix.to"
+          "default": ""
         },
         "personaPicker": {
           "title": "Show profile picker in the composer",

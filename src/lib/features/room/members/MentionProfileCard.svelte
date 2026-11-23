@@ -36,7 +36,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { mentionUri } from '#lib/model/model.js';
-  import type { PermalinkFormat } from '#lib/rooms/permalink.js';
+  import { matrixLinkHost, type PermalinkFormat } from '#lib/rooms/permalink.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { formatNowInZone } from '#lib/ui/date-time.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -253,13 +253,7 @@
         : ownPowerLevel > (roomMember?.power_level ?? 0))
   );
   let powerConfirm = $state<number | null>(null);
-  const matrixLinkProvider =
-    preferences.matrixLinkSelector === 'sable'
-      ? 'link.sable.moe'
-      : preferences.matrixLinkSelector === 'custom' && preferences.matrixLinkCustom.length > 0
-        ? preferences.matrixLinkCustom
-        : 'matrix.to';
-  let profileLink = $derived(`https://${matrixLinkProvider}/#/${userId}`);
+  let profileLink = $derived(`https://${matrixLinkHost()}/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
   const relations = new MemberProfileRelations(core);
   const profileActions = new MemberProfileActions(core);

@@ -140,8 +140,8 @@ accepts the same settings except those marked deployment only.
 - `sendAttachmentAsCaption` (Use message text as attachment caption): `true` or `false`. Default `true`.
 - `sendAttachmentsAsGallery` (Combine attachments into a gallery): `true` or `false`. Default `false`.
 - `imageMetadata` (Image metadata): One of `location`, `all`, `keep`. Default `location`. Deployment only.
-- `matrixLinkSelector` (External Matrix links): One of `sable`, `matrix`, `custom`. Default `sable`. Deployment only.
-- `matrixLinkCustom` (Input custom Matrix link): Text. Default `mtarix.to`. Deployment only.
+- `matrixLinkSelector` (External Matrix links): One of `sable`, `matrix`, `custom`. Default `sable`.
+- `matrixLinkCustom` (Custom link host): Text. Default empty.
 
 ## Per-message profiles
 

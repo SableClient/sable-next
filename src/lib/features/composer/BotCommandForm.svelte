@@ -67,7 +67,7 @@
     server_name: 'example.org',
     room_alias: '#room:example.org',
     room_id: '!room:example.org',
-    event_id: '$event_id',
+    event_id: 'https://link.sable.moe/#/!room:example.org/$event',
   };
 
   function placeholderFor(parameter: BotCommandParameter): string | undefined {

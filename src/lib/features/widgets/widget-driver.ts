@@ -24,16 +24,11 @@ import {
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { CoreError } from '#src/transport';
 import { sleep } from '#lib/sleep.js';
-import { preferences } from '#lib/settings/preferences.svelte.ts';
 
 export type CapabilityApproval = (requested: Set<Capability>) => Promise<Set<Capability>>;
 
 const REDACTION_EVENT_TYPE = 'm.room.redaction';
-const MATRIX_LINK_PREFIXES = [
-  'https://link.sable.moe/#/',
-  'https://matrix.to/#/',
-  `https://${preferences.matrixLinkCustom}/#/`,
-];
+const MATRIX_LINK_PREFIXES = ['https://link.sable.moe/#/', 'https://matrix.to/#/'];
 const TURN_REFRESH_FRACTION = 0.9;
 const TURN_MIN_REFRESH_MS = 30_000;
 

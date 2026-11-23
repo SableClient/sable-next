@@ -136,22 +136,34 @@ export async function joinVia(
   return [...via, ...(await core.rpc.rooms.viaServers({ room_id: parentId }))];
 }
 
+function customLinkHost(value: string): string | null {
+  try {
+    return new URL(`https://${value.trim().replace(/^https?:\/\//i, '')}`).host || null;
+  } catch {
+    return null;
+  }
+}
+
+export function matrixLinkHost(): string {
+  switch (preferences.matrixLinkSelector) {
+    case 'sable':
+      return 'link.sable.moe';
+    case 'custom':
+      return customLinkHost(preferences.matrixLinkCustom) ?? 'matrix.to';
+    default:
+      return 'matrix.to';
+  }
+}
+
 export function matrixToUrl(target: LinkTarget, eventId?: string | null): string {
   const [address, via] = 'alias' in target ? [target.alias, []] : [target.roomId, target.via];
-
-  const matrixLinkProvider =
-    preferences.matrixLinkSelector === 'sable'
-      ? 'link.sable.moe'
-      : preferences.matrixLinkSelector === 'custom' && preferences.matrixLinkCustom.length > 0
-        ? preferences.matrixLinkCustom
-        : 'matrix.to';
-
   const path = eventId
     ? `${encodeURIComponent(address)}/${encodeURIComponent(eventId)}`
     : encodeURIComponent(address);
 
+  // The query belongs inside the fragment, so it cannot be built with `URL`.
   const query = new URLSearchParams(via.map((server) => ['via', server])).toString();
-  return `https://${matrixLinkProvider}/#/${path}${query === '' ? '' : `?${query}`}`;
+  return `https://${matrixLinkHost()}/#/${path}${query === '' ? '' : `?${query}`}`;
 }
 
 export function matrixEventUri(roomId: string, eventId: string, via: Route): string {

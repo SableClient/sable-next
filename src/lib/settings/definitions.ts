@@ -409,8 +409,10 @@ const SETTINGS = {
   sendAttachmentAsCaption: toggle(true, { account: true }),
   sendAttachmentsAsGallery: toggle(false, { account: true }),
   imageMetadata: choice<ImageMetadata>(['location', 'all', 'keep'], 'location'),
-  matrixLinkSelector: choice<MatrixLinkSelector>(['sable', 'matrix', 'custom'], 'sable'),
-  matrixLinkCustom: text('mtarix.to'),
+  matrixLinkSelector: choice<MatrixLinkSelector>(['sable', 'matrix', 'custom'], 'sable', {
+    account: true,
+  }),
+  matrixLinkCustom: text('', { account: true }),
 
   personaPicker: toggle(true, { account: true }),
   personaPickerSortOrder: choice<PersonaPickerSortOrder>(
