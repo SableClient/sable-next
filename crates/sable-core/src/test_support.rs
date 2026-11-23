@@ -45,3 +45,42 @@ pub(crate) async fn signed_in_core(
     });
     (core, events)
 }
+
+#[derive(Clone, Default)]
+pub(crate) struct TestWriter(pub(crate) Arc<parking_lot::Mutex<Vec<u8>>>);
+
+impl std::io::Write for TestWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().write(bytes)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.lock().flush()
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn plant_tokens_sealed_with_another_key(
+    base: &std::path::Path,
+    account_id: &str,
+    device_id: &str,
+    tokens: &matrix_sdk::SessionTokens,
+) {
+    let other = tempfile::tempdir().unwrap();
+    crate::credentials::LoginTokens::new(other.path())
+        .save(account_id, device_id, tokens)
+        .unwrap();
+    let foreign = std::fs::read_dir(other.path().join("login-tokens"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "tokens")
+        })
+        .unwrap();
+    std::fs::copy(
+        &foreign,
+        base.join("login-tokens").join(foreign.file_name().unwrap()),
+    )
+    .unwrap();
+}

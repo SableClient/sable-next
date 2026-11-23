@@ -1387,6 +1387,54 @@ test('soft logout retains the account to reauthenticate', async () => {
   core.stop();
 });
 
+test('a restore whose saved logins cannot be opened asks to sign in again', async () => {
+  const accounts = { accounts: [session, otherSession] };
+  const fake = fakeTransport({
+    'session.restore': null,
+    'session.list_accounts': () => accounts.accounts,
+  });
+  const call = fake.call.getMockImplementation();
+  if (!call) throw new Error('missing transport handler');
+  fake.call.mockImplementation((method, params) => {
+    if (method !== 'session.switch_account') return call(method, params);
+    const { account_id } = params as { account_id: string };
+    accounts.accounts = accounts.accounts.map((account) =>
+      account.account_id === account_id ? { ...account, needs_reauth: true } : account
+    );
+    return Promise.reject(new CoreError({ code: 'not_logged_in' }));
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+
+  expect(core.status).toBe('signed-out');
+  expect(core.reauthenticationAccountId).toBe(session.account_id);
+  core.stop();
+});
+
+test('switching to an account whose saved login cannot be opened shows it needs signing in again', async () => {
+  const accounts = { accounts: [session, otherSession] };
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': () => accounts.accounts,
+  });
+  const call = fake.call.getMockImplementation();
+  if (!call) throw new Error('missing transport handler');
+  fake.call.mockImplementation((method, params) => {
+    if (method !== 'session.switch_account') return call(method, params);
+    accounts.accounts = [session, { ...otherSession, needs_reauth: true }];
+    return Promise.reject(new CoreError({ code: 'not_logged_in' }));
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+
+  await expect(core.switchAccount(otherSession.account_id)).rejects.toThrow();
+
+  expect(core.accounts[1]?.needs_reauth).toBe(true);
+  expect(core.session).toEqual(session);
+  core.stop();
+});
+
 test('a rejected token retains the account to reauthenticate', async () => {
   const accounts = { accounts: [session] };
   const fake = fakeTransport({

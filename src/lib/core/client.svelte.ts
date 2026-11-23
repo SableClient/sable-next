@@ -831,6 +831,7 @@ export class CoreClient {
       });
     } catch (error) {
       reportSessionFailure('switch', error);
+      if (isCoreError(error, 'not_logged_in')) await this.refreshAccounts();
       throw error;
     } finally {
       clearTimeout(slow);
@@ -900,6 +901,7 @@ export class CoreClient {
         await this.switchAccount(account.account_id);
         return true;
       } catch (error) {
+        if (isCoreError(error, 'not_logged_in')) continue;
         failure = error instanceof Error ? error : new Error(String(error));
       }
     }

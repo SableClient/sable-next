@@ -13,6 +13,31 @@ const SEALED: &str = "tokens";
 const LEGACY: &str = "json";
 const KEY: &str = "key";
 
+/// Why a login has no tokens to use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MissingTokens {
+    NoFile,
+    /// The credential store no longer holds the key, as after a restore onto another device.
+    KeyMissing,
+    /// No key a reference still names sealed them.
+    OtherKey,
+}
+
+impl MissingTokens {
+    pub(crate) const fn reason(self) -> &'static str {
+        match self {
+            Self::NoFile => "no_file",
+            Self::KeyMissing => "key_missing",
+            Self::OtherKey => "sealed_with_another_key",
+        }
+    }
+
+    /// A file may come back once storage recovers; a lost key never does.
+    pub(crate) const fn is_lost(self) -> bool {
+        !matches!(self, Self::NoFile)
+    }
+}
+
 /// One file per login: whichever process refreshes a login rewrites only its file, under the
 /// SDK's cross-process refresh lock. A login's tokens leave the account registry once it holds them.
 /// Files are sealed with a key from the OS credential store.
@@ -96,9 +121,43 @@ impl LoginTokens {
                 }
             }
         }
-        if resealing && !left {
+        if resealing && self.reseal_moved(&legacy_reference) && !left {
             crate::secrets::forget(&legacy_reference);
         }
+    }
+
+    /// Sable 2.3.9 moved files before their key, so files already here may need the legacy key.
+    /// Returns whether none still does.
+    fn reseal_moved(&self, legacy_reference: &Path) -> bool {
+        let key = match crate::secrets::load(legacy_reference) {
+            Ok(Some(key)) => key,
+            Ok(None) | Err(StoreError::KeyMissing) => return true,
+            Err(error) => {
+                tracing::warn!("could not load the key of moved token files: {error}");
+                return false;
+            }
+        };
+        let Ok(entries) = std::fs::read_dir(&self.directory) else {
+            return false;
+        };
+        let mut resealed = true;
+        for file in entries.flatten().map(|entry| entry.path()).filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == SEALED)
+        }) {
+            let sealed_again = std::fs::read(&file)
+                .map_err(StoreError::from)
+                .and_then(|bytes| Self::open_with(&key, &bytes))
+                .and_then(|tokens| match tokens {
+                    Some(tokens) => self.publish(&self.seal(&tokens)?, &file, true).map(drop),
+                    None => Ok(()),
+                });
+            if let Err(error) = sealed_again {
+                resealed = false;
+                tracing::warn!("could not seal a moved token file again: {error}");
+            }
+        }
+        resealed
     }
 
     /// Returns whether the files left behind need sealing again.
@@ -177,21 +236,14 @@ impl LoginTokens {
         Ok(serde_json::to_vec(&sealed)?)
     }
 
-    fn open(&self, bytes: &[u8]) -> Result<Option<SessionTokens>, StoreError> {
+    fn open(&self, bytes: &[u8]) -> Result<Result<SessionTokens, MissingTokens>, StoreError> {
         let key = match crate::secrets::load(&self.key_reference()) {
             Ok(Some(key)) => key,
             Ok(None) => return Err(StoreError::Invalid("saved login tokens have no key")),
-            Err(StoreError::KeyMissing) => {
-                tracing::warn!("the key for saved login tokens is gone, so they cannot be read");
-                return Ok(None);
-            }
+            Err(StoreError::KeyMissing) => return Ok(Err(MissingTokens::KeyMissing)),
             Err(error) => return Err(error),
         };
-        let tokens = Self::open_with(&key, bytes)?;
-        if tokens.is_none() {
-            tracing::warn!("saved login tokens were sealed with a key that is gone");
-        }
-        Ok(tokens)
+        Ok(Self::open_with(&key, bytes)?.ok_or(MissingTokens::OtherKey))
     }
 
     /// `Ok(None)` when the envelope is intact but `key` did not seal it.
@@ -210,13 +262,12 @@ impl LoginTokens {
             .map_err(Into::into)
     }
 
-    /// `Ok(None)` when the login has no file, or the key that sealed it is gone for good. A file
-    /// that cannot be read or parsed must not pass for missing.
+    /// A file that cannot be read or parsed must not pass for missing.
     pub(crate) fn read(
         &self,
         account_id: &str,
         device_id: &str,
-    ) -> Result<Option<SessionTokens>, StoreError> {
+    ) -> Result<Result<SessionTokens, MissingTokens>, StoreError> {
         match std::fs::read(self.path(account_id, device_id, SEALED)) {
             Ok(bytes) => return self.open(&bytes),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -225,7 +276,9 @@ impl LoginTokens {
         let legacy = self.path(account_id, device_id, LEGACY);
         let tokens: SessionTokens = match std::fs::read(&legacy) {
             Ok(bytes) => serde_json::from_slice(&bytes)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Err(MissingTokens::NoFile));
+            }
             Err(error) => return Err(error.into()),
         };
         // Another process may have sealed it first, with tokens rotated since.
@@ -237,7 +290,7 @@ impl LoginTokens {
         {
             tracing::warn!("could not remove a plain token file: {error}");
         }
-        Ok(Some(tokens))
+        Ok(Ok(tokens))
     }
 
     pub(crate) fn read_or_migrate(
@@ -245,24 +298,22 @@ impl LoginTokens {
         account_id: &str,
         device_id: &str,
         embedded: &SessionTokens,
-    ) -> Result<(SessionTokens, bool), StoreError> {
+    ) -> Result<Result<(SessionTokens, bool), MissingTokens>, StoreError> {
         let (tokens, migrated) = match self.read(account_id, device_id)? {
-            Some(tokens) => (tokens, false),
-            None if embedded.access_token.is_empty() => {
-                return Err(StoreError::Invalid("saved login tokens are missing"));
-            }
-            None => {
+            Ok(tokens) => (tokens, false),
+            Err(MissingTokens::NoFile) if !embedded.access_token.is_empty() => {
                 let migrated = self.save_new(account_id, device_id, embedded)?;
-                let tokens = self
-                    .read(account_id, device_id)?
-                    .ok_or(StoreError::Invalid("saved login tokens are missing"))?;
-                (tokens, migrated)
+                match self.read(account_id, device_id)? {
+                    Ok(tokens) => (tokens, migrated),
+                    Err(missing) => return Ok(Err(missing)),
+                }
             }
+            Err(missing) => return Ok(Err(missing)),
         };
         if tokens.access_token.is_empty() {
             return Err(StoreError::Invalid("saved login access token is empty"));
         }
-        Ok((tokens, migrated))
+        Ok(Ok((tokens, migrated)))
     }
 
     pub(crate) fn save(
@@ -422,13 +473,19 @@ mod tests {
             "new"
         );
         logins.forget("a1");
-        assert!(logins.read("a1", "NEW").unwrap().is_none());
+        assert_eq!(
+            logins.read("a1", "NEW").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
         assert_eq!(
             logins.read("a2", "OLD").unwrap().unwrap().access_token,
             "other"
         );
         logins.forget_all();
-        assert!(logins.read("a2", "OLD").unwrap().is_none());
+        assert_eq!(
+            logins.read("a2", "OLD").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
     }
 
     #[test]
@@ -440,7 +497,10 @@ mod tests {
         logins.save("a1.extra", "OLD", &tokens("dotted")).unwrap();
         logins.forget("a1");
 
-        assert!(logins.read("a1", "OLD").unwrap().is_none());
+        assert_eq!(
+            logins.read("a1", "OLD").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
         assert_eq!(
             logins
                 .read("a1.extra", "OLD")
@@ -465,13 +525,13 @@ mod tests {
         assert!(logins.save_new("a2", "D", &tokens("embedded")).unwrap());
         assert_eq!(
             logins.read_or_migrate("a1", "D", &tokens("stale")).unwrap(),
-            (tokens("rotated"), false)
+            Ok((tokens("rotated"), false))
         );
         assert_eq!(
             logins
                 .read_or_migrate("a3", "D", &tokens("legacy"))
                 .unwrap(),
-            (tokens("legacy"), true)
+            Ok((tokens("legacy"), true))
         );
     }
 
@@ -483,7 +543,10 @@ mod tests {
         std::fs::write(logins.path("a1", "D", super::SEALED), b"not tokens").unwrap();
 
         logins.read("a1", "D").unwrap_err();
-        assert!(logins.read("a2", "D").unwrap().is_none());
+        assert_eq!(
+            logins.read("a2", "D").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
     }
 
     #[test]
@@ -497,9 +560,15 @@ mod tests {
 
         logins.retain([("a1", "NEW")]);
 
-        assert!(logins.read("a1", "NEW").unwrap().is_some());
-        assert!(logins.read("a1", "OLD").unwrap().is_none());
-        assert!(logins.read("a2", "D").unwrap().is_none());
+        logins.read("a1", "NEW").unwrap().unwrap();
+        assert_eq!(
+            logins.read("a1", "OLD").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
+        assert_eq!(
+            logins.read("a2", "D").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
         assert!(base.path().join("login-tokens/.tmp-in-progress").exists());
         assert!(base.path().join("login-tokens/key").exists());
     }
@@ -614,7 +683,10 @@ mod tests {
         std::fs::write(&file, b"{}").unwrap();
 
         let logins = LoginTokens::new(base.path());
-        assert!(logins.read("a1", "D").unwrap().is_none());
+        assert_eq!(
+            logins.read("a1", "D").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
         assert!(legacy.join("key").exists());
 
         std::fs::write(&file, sealed).unwrap();
@@ -622,6 +694,33 @@ mod tests {
         assert_eq!(
             logins.read("a1", "D").unwrap().unwrap().access_token,
             "older"
+        );
+    }
+
+    #[test]
+    fn a_key_still_sealing_a_moved_file_is_kept() {
+        let base = tempfile::tempdir().unwrap();
+        let legacy = two_keys(base.path());
+        let name = LoginTokens::new(base.path().join("unused").as_path())
+            .path("a1", "D", super::SEALED)
+            .file_name()
+            .unwrap()
+            .to_owned();
+        std::fs::rename(
+            legacy.join(&name),
+            base.path().join("login-tokens").join(&name),
+        )
+        .unwrap();
+
+        let logins = LoginTokens::new(base.path());
+
+        assert_eq!(
+            logins.read("a1", "D").unwrap().unwrap().access_token,
+            "older"
+        );
+        assert_eq!(
+            logins.read("a2", "D").unwrap().unwrap().access_token,
+            "newer"
         );
     }
 
@@ -662,7 +761,14 @@ mod tests {
         )
         .unwrap();
 
-        assert!(logins.read("a1", "D").unwrap().is_none());
+        assert_eq!(
+            logins.read("a1", "D").unwrap(),
+            Err(super::MissingTokens::OtherKey)
+        );
+        assert_eq!(
+            logins.read_or_migrate("a1", "D", &tokens("stale")).unwrap(),
+            Err(super::MissingTokens::OtherKey)
+        );
         assert!(!logins.save_new("a1", "D", &tokens("stale")).unwrap());
         logins.save("a1", "D", &tokens("new")).unwrap();
         assert_eq!(logins.read("a1", "D").unwrap().unwrap().access_token, "new");
@@ -724,6 +830,13 @@ mod tests {
         logins.save("a1", "D", &tokens("saved")).unwrap();
         std::fs::write(base.path().join("login-tokens/key"), "another-device").unwrap();
 
-        assert!(logins.read("a1", "D").unwrap().is_none());
+        assert_eq!(
+            logins.read("a1", "D").unwrap(),
+            Err(super::MissingTokens::KeyMissing)
+        );
+        assert_eq!(
+            logins.read("a2", "D").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
     }
 }

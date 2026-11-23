@@ -225,6 +225,7 @@ async fn saved_push_account(
     })
     .await
     .ok()?
+    .ok()?
     .ok()?;
     account.session.credentials.set_tokens(tokens);
     Some(account)
@@ -336,7 +337,7 @@ fn install_push_session_callbacks(client: &Client, base_store: &str, account: &P
         move |_: Client| {
             let tokens = logins
                 .read(&account_id, &device_id)?
-                .ok_or("this login has no saved tokens")?;
+                .map_err(|_| "this login has no saved tokens")?;
             if tokens.access_token.is_empty() {
                 return Err("saved login access token is empty".into());
             }

@@ -442,6 +442,40 @@ async fn the_core_cannot_activate_a_login_while_a_push_runs_on_its_client() {
 }
 
 #[tokio::test]
+async fn a_push_for_a_login_whose_key_is_gone_asks_to_sign_in_again_quietly() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    saved_login(&server, data_dir.path()).await;
+    let base = cold_push_store_dir(data_dir.path());
+    let (core, mut events) = crate::Core::new(
+        base.to_str().unwrap(),
+        Box::new(FileSessionStore::new(&base)),
+    );
+    core.accounts().await.unwrap();
+    std::fs::write(base.join("login-tokens/key"), "another-device").unwrap();
+
+    for _ in 0..2 {
+        let host = push_host(
+            &base,
+            "@alice:example.org",
+            "A",
+            matrix_sdk::store::RoomLoadSettings::default(),
+        )
+        .await;
+        assert!(host.is_none());
+    }
+
+    assert!(core.accounts().await.unwrap().accounts[0].needs_reauth);
+    while let Ok(event) = events.try_recv() {
+        assert!(
+            !matches!(event, crate::protocol::CoreEvent::Failure { .. }),
+            "{event:?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn pushes_reuse_one_restored_client() {
     let data_dir = tempfile::tempdir().unwrap();
     let server = MatrixMockServer::new().await;
@@ -2056,7 +2090,7 @@ async fn saved_refresh_token(store: &FileSessionStore, store_dir: &std::path::Pa
             &account.session.credentials.device_id(),
         )
         .unwrap()
-        .unwrap_or_else(|| account.session.credentials.tokens())
+        .unwrap_or_else(|_| account.session.credentials.tokens())
         .refresh_token
         .unwrap()
 }

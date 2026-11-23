@@ -42,14 +42,12 @@ impl Core {
             .ok_or(RpcCode::NotLoggedIn)?;
         if !account.needs_reauth {
             #[cfg(not(target_family = "wasm"))]
-            let missing = self.login_tokens_missing(&account).await?;
+            let retired = self.retire_unusable_login(&account).await?;
             #[cfg(target_family = "wasm")]
-            let missing = false;
-            if !missing {
+            let retired = false;
+            if !retired {
                 return Err(RpcCode::NotLoggedIn.into());
             }
-            self.mark_account_needs_reauth(Some(&account_id), false)
-                .await?;
             account.needs_reauth = true;
         }
         if !account.device_invalidated {
@@ -869,6 +867,95 @@ mod tests {
             old_key
         );
         assert_eq!(old.encryption().curve25519_key().await.unwrap(), old_key);
+        if let Some(session) = core.take_session().await {
+            session.sync_service.stop().await;
+        }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn signing_in_again_seals_tokens_another_key_sealed_with_the_current_one() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "user_id": "@alice:example.org", "device_id": "EXISTING", "access_token": "new-token"
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        server.mock_sync().ok(|_| {}).mount().await;
+        let directory = tempfile::tempdir().unwrap();
+        let base = directory.path().join("data");
+        let base = base.to_str().unwrap();
+        let store = session::account_store_id(base, "a1");
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": null, "next_account_id": 2,
+            "accounts": [{"account_id": "a1", "store_id": store, "needs_reauth": false, "device_invalidated": false,
+                "session": {"homeserver": server.server().uri(), "resolved_homeserver": server.server().uri(),
+                    "credentials": {"kind": "password", "user_id": "@alice:example.org", "device_id": "EXISTING", "access_token": ""}}
+            }]
+        })).unwrap();
+        let (registry, _) = session::AccountRegistry::from_bytes(&bytes, base).unwrap();
+        let mut seeded = registry.accounts[0].session.clone();
+        seeded.credentials.set_tokens(matrix_sdk::SessionTokens {
+            access_token: "old".to_owned(),
+            refresh_token: None,
+        });
+        let old = session::restore_client(&store, &seeded, true)
+            .await
+            .unwrap();
+        session::restore_credentials(&old, &seeded).await.unwrap();
+        drop(old);
+        let logins = crate::credentials::LoginTokens::new(std::path::Path::new(base));
+        logins
+            .save("a2", "OTHER", &seeded.credentials.tokens())
+            .unwrap();
+        crate::test_support::plant_tokens_sealed_with_another_key(
+            std::path::Path::new(base),
+            "a1",
+            "EXISTING",
+            &seeded.credentials.tokens(),
+        );
+        assert_eq!(
+            logins.read("a1", "EXISTING").unwrap(),
+            Err(crate::credentials::MissingTokens::OtherKey)
+        );
+        let (core, _) = Core::new(base, Box::new(crate::store::MemorySessionStore::default()));
+        *core.accounts.lock().await = Some(registry);
+
+        core.login(
+            server.server().uri(),
+            LoginIdentifier::User {
+                user: "@alice:example.org".into(),
+            },
+            "password".into(),
+            Some("a1".into()),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let accounts = core.accounts().await.unwrap();
+        assert_eq!(accounts.accounts.len(), 1);
+        assert_eq!(accounts.accounts[0].account_id, "a1");
+        assert_eq!(accounts.accounts[0].store_id, store);
+        assert!(!accounts.accounts[0].needs_reauth);
+        assert_eq!(
+            logins.read("a1", "EXISTING").unwrap().unwrap().access_token,
+            "new-token"
+        );
         if let Some(session) = core.take_session().await {
             session.sync_service.stop().await;
         }

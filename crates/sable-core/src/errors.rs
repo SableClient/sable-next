@@ -756,11 +756,7 @@ impl Core {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        io::{self, Write},
-        sync::Arc,
-        time::Duration,
-    };
+    use std::{io, sync::Arc, time::Duration};
 
     use parking_lot::Mutex;
 
@@ -774,21 +770,9 @@ mod tests {
     use crate::Core;
     use crate::protocol::{RpcCode, RpcError};
     use crate::store::MemorySessionStore;
+    use crate::test_support::TestWriter;
 
     use super::{ResultExt, retry_delay_ms};
-
-    #[derive(Clone)]
-    struct TestWriter(Arc<Mutex<Vec<u8>>>);
-
-    impl Write for TestWriter {
-        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            self.0.lock().write(bytes)
-        }
-
-        fn flush(&mut self) -> io::Result<()> {
-            self.0.lock().flush()
-        }
-    }
 
     type Check = fn(&RpcCode) -> bool;
 

@@ -180,7 +180,17 @@ impl Core {
             return Ok(None);
         }
         let lease = session::store_lease(&account.store_id).await;
-        let client = self.saved_account_client(&account, &lease).await?;
+        let client =
+            match self.saved_account_client(&account, &lease).await {
+                Ok(client) => client,
+                Err(error) => {
+                    let retired =
+                        self.accounts().await?.accounts.iter().any(|saved| {
+                            saved.account_id == account.account_id && saved.needs_reauth
+                        });
+                    return if retired { Ok(None) } else { Err(error) };
+                }
+            };
         let persisted = account.session;
 
         let info = SessionInfo {
@@ -499,7 +509,7 @@ impl Core {
             .await
             .or_failed(self, "reload_session_read")?
             .or_failed(self, "reload_session_read")?
-            .ok_or(RpcCode::NotLoggedIn)?;
+            .map_err(|_| RpcCode::NotLoggedIn)?;
         if tokens.access_token.is_empty() {
             return Err(self.failed("reload_session_read", "saved login access token is empty"));
         }
@@ -519,7 +529,7 @@ impl Core {
                 let device_id = account.session.credentials.device_id();
                 if matches!(
                     logins.read(&account.account_id, &device_id),
-                    Ok(Some(tokens)) if !tokens.access_token.is_empty()
+                    Ok(Ok(tokens)) if !tokens.access_token.is_empty()
                 ) {
                     account.session.credentials.discard_tokens();
                 }
@@ -585,10 +595,12 @@ impl Core {
                 let device_id = credentials.device_id();
                 match logins.read_or_migrate(&account.account_id, &device_id, &credentials.tokens())
                 {
-                    Ok((tokens, migrated)) => {
+                    Ok(Ok((tokens, migrated))) => {
                         credentials.set_tokens(tokens);
                         embedded |= migrated;
                     }
+                    // Reported once the account is opened.
+                    Ok(Err(_)) => {}
                     Err(error) => tracing::warn!(
                         account_id = account.account_id,
                         "saved login tokens are unavailable: {error}"
@@ -618,8 +630,9 @@ impl Core {
         Ok(embedded)
     }
 
+    /// Returns whether the account must now sign in again.
     #[cfg(not(target_family = "wasm"))]
-    pub(crate) async fn login_tokens_missing(
+    pub(crate) async fn retire_unusable_login(
         &self,
         account: &PersistedAccount,
     ) -> Result<bool, RpcError> {
@@ -630,7 +643,27 @@ impl Core {
             .await
             .or_failed(self, "reauth_login_tokens")?
             .or_failed(self, "reauth_login_tokens")?;
-        Ok(tokens.is_none())
+        let Err(missing) = tokens else {
+            return Ok(false);
+        };
+        self.sign_in_again(&account.account_id, missing).await?;
+        Ok(true)
+    }
+
+    /// The account keeps its crypto store and settings until it signs in again.
+    #[cfg(not(target_family = "wasm"))]
+    async fn sign_in_again(
+        &self,
+        account_id: &str,
+        missing: crate::credentials::MissingTokens,
+    ) -> Result<(), RpcError> {
+        tracing::warn!(
+            reported = true,
+            reason = missing.reason(),
+            "saved login tokens cannot be used, so the account must sign in again"
+        );
+        self.mark_account_needs_reauth(Some(account_id), false)
+            .await
     }
 
     /// `None` forgets every login.
@@ -708,13 +741,23 @@ impl Core {
             let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
             let account_id = account.account_id.clone();
             let device_id = persisted.credentials.device_id();
-            let tokens = tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id))
-                .await
-                .or_failed(self, "restore_login_tokens")?
-                .or_failed(self, "restore_login_tokens")?
-                .ok_or_else(|| {
-                    self.failed("restore_login_tokens", "saved login tokens are missing")
-                })?;
+            let tokens =
+                match tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id))
+                    .await
+                    .or_failed(self, "restore_login_tokens")?
+                    .or_failed(self, "restore_login_tokens")?
+                {
+                    Ok(tokens) => tokens,
+                    Err(missing) if missing.is_lost() => {
+                        self.sign_in_again(&account.account_id, missing).await?;
+                        return Err(RpcCode::NotLoggedIn.into());
+                    }
+                    Err(_) => {
+                        return Err(
+                            self.failed("restore_login_tokens", "saved login tokens are missing")
+                        );
+                    }
+                };
             if tokens.access_token.is_empty() {
                 return Err(
                     self.failed("restore_login_tokens", "saved login access token is empty")
@@ -2697,17 +2740,18 @@ mod regression_tests {
                 &account.account_id,
                 &account.session.credentials.device_id(),
             )
-            .is_ok_and(|tokens| tokens.is_some())
+            .is_ok_and(|tokens| tokens.is_ok())
     }
     async fn restorable_core() -> (
         MatrixMockServer,
         tempfile::TempDir,
         Arc<Core>,
         PersistedAccount,
+        tokio::sync::mpsc::UnboundedReceiver<crate::protocol::CoreEvent>,
     ) {
         let (_store, server, _, room) = core_with_room().await;
         let base = tempfile::tempdir().unwrap();
-        let (core, _) = Core::new(
+        let (core, events) = Core::new(
             base.path().join("data").to_str().unwrap(),
             Box::new(MemorySessionStore::default()),
         );
@@ -2730,13 +2774,68 @@ mod regression_tests {
         registry.upsert(account.clone());
         core.save_login_tokens(&account).await.unwrap();
         core.write_registry(&registry).await.unwrap();
-        (server, base, core, account)
+        (server, base, core, account, events)
+    }
+
+    #[tokio::test]
+    async fn tokens_sealed_with_another_key_ask_to_sign_in_again_once() {
+        let (_server, _base, core, account, mut events) = restorable_core().await;
+        let device_id = account.session.credentials.device_id();
+        crate::test_support::plant_tokens_sealed_with_another_key(
+            std::path::Path::new(&core.store_id),
+            &account.account_id,
+            &device_id,
+            &account.session.credentials.tokens(),
+        );
+        let logs = crate::test_support::TestWriter::default();
+        let capture = tracing::subscriber::set_default(
+            tracing_subscriber::fmt()
+                .with_ansi(false)
+                .with_max_level(tracing::Level::WARN)
+                .with_writer({
+                    let logs = logs.clone();
+                    move || logs.clone()
+                })
+                .finish(),
+        );
+
+        assert!(core.restore().await.unwrap().is_none());
+        assert!(core.restore().await.unwrap().is_none());
+        core.switch_account(crate::api::session::SwitchAccountParams {
+            account_id: account.account_id.clone(),
+        })
+        .await
+        .unwrap_err();
+
+        drop(capture);
+        let accounts = core.accounts().await.unwrap();
+        assert!(accounts.accounts[0].needs_reauth);
+        assert!(!accounts.accounts[0].device_invalidated);
+        assert_eq!(accounts.accounts[0].store_id, account.store_id);
+        assert!(std::path::Path::new(&account.store_id).exists());
+        let lines: Vec<_> = String::from_utf8_lossy(&logs.0.lock())
+            .lines()
+            .map(ToOwned::to_owned)
+            .collect();
+        assert!(
+            lines.iter().all(|line| !line.contains("ERROR")),
+            "{lines:?}"
+        );
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(lines[0].contains("sealed_with_another_key"), "{lines:?}");
+        while let Ok(event) = events.try_recv() {
+            assert!(
+                !matches!(event, crate::protocol::CoreEvent::Failure { .. }),
+                "{event:?}"
+            );
+        }
+        core.shutdown().await;
     }
 
     #[tokio::test]
     async fn missing_login_tokens_preserve_the_registry_until_storage_recovers() {
         use crate::session::AccountRegistry;
-        let (_server, _base, core, account) = restorable_core().await;
+        let (_server, _base, core, account, _events) = restorable_core().await;
         let bytes = core.sessions.load().await.unwrap().unwrap();
         let (mut registry, _) = AccountRegistry::from_bytes(&bytes, &core.store_id).unwrap();
         assert_eq!(
@@ -2769,7 +2868,7 @@ mod regression_tests {
 
     #[tokio::test]
     async fn unreadable_login_tokens_never_fall_back_to_stale_embedded_tokens() {
-        let (_server, _base, core, account) = restorable_core().await;
+        let (_server, _base, core, account, _events) = restorable_core().await;
         let mut registry = core.accounts().await.unwrap();
         let before = core.sessions.load().await.unwrap().unwrap();
         let path = std::fs::read_dir(std::path::Path::new(&core.store_id).join("login-tokens"))
@@ -2796,7 +2895,7 @@ mod regression_tests {
     #[tokio::test]
     async fn unreadable_inactive_tokens_do_not_block_other_accounts_or_removal() {
         use crate::api::session::{RemoveAccountParams, SwitchAccountParams};
-        let (_server, _base, core, first) = restorable_core().await;
+        let (_server, _base, core, first, _events) = restorable_core().await;
         let second = PersistedAccount {
             account_id: "second".to_owned(),
             store_id: session::account_store_id(&core.store_id, "second"),
@@ -2839,12 +2938,10 @@ mod regression_tests {
         .unwrap();
         assert_eq!(core.list_accounts().await.unwrap().len(), 1);
         assert!(!path.exists());
-        assert!(
-            crate::credentials::LoginTokens::new(std::path::Path::new(&core.store_id))
-                .read(&first.account_id, &first.session.credentials.device_id())
-                .unwrap()
-                .is_some()
-        );
+        crate::credentials::LoginTokens::new(std::path::Path::new(&core.store_id))
+            .read(&first.account_id, &first.session.credentials.device_id())
+            .unwrap()
+            .unwrap();
         core.shutdown().await;
     }
 
@@ -2907,8 +3004,8 @@ mod regression_tests {
                 &account.account_id,
                 &account.session.credentials.device_id(),
             )
-            .ok()
-            .flatten()?
+            .ok()?
+            .ok()?
             .refresh_token
     }
 
@@ -2962,12 +3059,10 @@ mod regression_tests {
         core.mark_account_needs_reauth(Some("first"), true)
             .await
             .unwrap_err();
-        assert!(
-            crate::credentials::LoginTokens::new(base.path())
-                .read("first", &device_id)
-                .unwrap()
-                .is_some()
-        );
+        crate::credentials::LoginTokens::new(base.path())
+            .read("first", &device_id)
+            .unwrap()
+            .unwrap();
         let accounts = core.accounts().await.unwrap();
         assert!(accounts.active_account_id.is_none());
         assert!(accounts.accounts[0].needs_reauth);
