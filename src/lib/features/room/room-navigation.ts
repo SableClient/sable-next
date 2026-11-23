@@ -147,10 +147,16 @@ export function isRoomSwitch(href: string): boolean {
 }
 
 export function goToPage(href: string): void {
-  const target = new URL(href, page.url.href).pathname;
+  const url = new URL(href, page.url.href);
+  const target = url.pathname;
   const mobile = !matchesAppLayout();
   if (target === page.url.pathname && mobile) {
-    setMobileDrawerOpen(false);
+    if (url.searchParams.get('thread') !== page.url.searchParams.get('thread')) {
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
+      void goto(href, { replace: true, state: { ...page.state }, persistState: true }).then(() => {
+        if (page.url.pathname === target) setMobileDrawerOpen(false);
+      });
+    } else setMobileDrawerOpen(false);
     return;
   }
   if (mobile) {

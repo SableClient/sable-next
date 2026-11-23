@@ -3030,6 +3030,7 @@ mod tests {
             .run(ListThreadsParams {
                 room_id: room.to_owned(),
                 from: None,
+                participated: false,
             })
             .await
             .unwrap();
@@ -3044,6 +3045,8 @@ mod tests {
     #[tokio::test]
     async fn thread_lists_keep_server_counts_when_local_history_is_empty() {
         use crate::api::timeline::ListThreadsParams;
+        use wiremock::matchers::query_param;
+
         let server = MatrixMockServer::new().await;
         let core = preview_core(&server).await;
         let room = room_id!("!bookmarks:example.org");
@@ -3065,6 +3068,7 @@ mod tests {
                     "origin_server_ts": 2, "content": {"msgtype": "m.text", "body": "Latest reply"}
                 }}}}
             }] })))
+            .up_to_n_times(1)
             .with_priority(1)
             .mount(server.server())
             .await;
@@ -3072,12 +3076,44 @@ mod tests {
             .run(ListThreadsParams {
                 room_id: room.to_owned(),
                 from: None,
+                participated: false,
             })
             .await
             .unwrap();
         let summary = result.roots[0].thread_summary.as_ref().unwrap();
         assert_eq!(summary.num_replies, 2);
         assert_eq!(summary.latest_body.as_deref(), Some("Latest reply"));
+
+        Mock::given(method("GET"))
+            .and(path(format!("/_matrix/client/v1/rooms/{room}/threads")))
+            .and(query_param("include", "participated"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "chunk": [{
+                "type": "m.room.message", "event_id": "$saved", "sender": "@alice:example.org",
+                "origin_server_ts": 1, "room_id": room,
+                "content": {"msgtype": "m.text", "body": "Saved message"},
+                "unsigned": {"m.relations": {"m.thread": {"count": 2, "current_user_participated": true, "latest_event": {
+                    "event_id": "$latest", "type": "m.room.message", "sender": "@bob:example.org",
+                    "origin_server_ts": 2_000, "content": {"msgtype": "m.text", "body": "Latest reply"}
+                }}}}
+            }] })))
+            .with_priority(1)
+            .expect(1)
+            .mount(server.server())
+            .await;
+
+        let filtered = core
+            .run(ListThreadsParams {
+                room_id: room.to_owned(),
+                from: None,
+                participated: true,
+            })
+            .await
+            .unwrap();
+        assert_eq!(filtered.roots.len(), 1);
+        let summary = filtered.roots[0].thread_summary.as_ref().unwrap();
+        assert_eq!(summary.latest_timestamp, Some(2_000));
+        assert_eq!(summary.latest_sender.as_deref(), Some("@bob:example.org"));
+        assert_eq!(summary.current_user_participated, Some(true));
     }
 
     #[tokio::test]

@@ -41,6 +41,8 @@
   import { backToRoomList, searchInRoom, trackRoomEntry } from './room-navigation.js';
   import { isPublicRoom } from '#lib/rooms/public-room.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { ThreadRoots } from '#lib/rooms/thread-roots.svelte.js';
+  import { useThreadSidebar } from '#lib/features/sidebar/thread-sidebar.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
@@ -188,11 +190,41 @@
   });
 
   const bookmarks = useBookmarks();
+  const threadSidebar = useThreadSidebar();
+  const threads = new ThreadRoots(core, { lazyPreviews: true });
+  let linkedThread = $derived(page.url.searchParams.get('thread'));
+  let openedLinkedThread: string | null = null;
+  let roomJoined = $derived(resolvedRoom?.state === 'joined');
+
+  $effect(() => {
+    void core.accountRevision;
+    if (!roomJoined) return;
+    const target = resolvedRoomId;
+    void untrack(() => threads.start(target));
+    return () => threads.stop();
+  });
+
+  $effect(() => {
+    const previewing = panels.threadsOpen;
+    untrack(() => threads.setPreviewing(previewing));
+  });
+
+  $effect(() => {
+    const target = resolvedRoomId;
+    const roots = threads.items;
+    const activity = threads.activity;
+    if (threads.activeRoomId !== target) return;
+    untrack(() => {
+      threadSidebar?.remember(target, roots);
+      threadSidebar?.publishUnread(target, activity);
+    });
+  });
 
   let threadEventId = $state<string | null>(null);
 
   function openThread(rootEventId: string, targetEventId: string | null = null): void {
     threadEventId = targetEventId;
+    threads.markRootRead(rootEventId);
     panels.openThread(rootEventId);
   }
 
@@ -215,10 +247,47 @@
 
   holdOverlayBack(() => panels.threadRootId !== null, closeThread);
 
+  function clearLinkedThread(): void {
+    if (linkedThread === null) return;
+    const { href } = page.url;
+    void afterOverlayPops().then(() => {
+      if (href !== page.url.href) return;
+      const url = new URL(href);
+      url.searchParams.delete('thread');
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current URL
+      return goto(url, { replace: true, reset: false, state: page.state });
+    });
+  }
+
   function closeThread(): void {
     panels.threadRootId = null;
     threadEventId = null;
+    openedLinkedThread = null;
+    clearLinkedThread();
   }
+
+  $effect(() => {
+    const rootId = linkedThread;
+    const ready = !appLayout.drawerCovers(page.state);
+    if (ready && rootId?.startsWith('$')) {
+      openedLinkedThread = rootId;
+      untrack(() => openThread(rootId));
+    } else if (rootId === null && openedLinkedThread !== null) {
+      const previous = openedLinkedThread;
+      openedLinkedThread = null;
+      untrack(() => {
+        if (panels.threadRootId === previous) closeThread();
+      });
+    }
+  });
+
+  $effect(() => {
+    const current = panels.threadRootId;
+    if (openedLinkedThread !== null && current !== openedLinkedThread) {
+      openedLinkedThread = null;
+      untrack(() => clearLinkedThread());
+    }
+  });
 
   let permalinkTarget = $state<{
     roomId: string;
@@ -229,7 +298,7 @@
   $effect(() => {
     const targetEventId = eventId;
     const targetRoomId = resolvedRoomId;
-    if (targetEventId === null) return;
+    if (targetEventId === null || linkedThread !== null) return;
     let active = true;
     void core.rpc.timeline
       .eventSource({ room_id: targetRoomId, event_id: targetEventId, include_original: false })
@@ -441,6 +510,12 @@
   let pageTitle = $derived(mentionCount > 0 ? `(${mentionCount}) ${roomName}` : roomName);
   const appLayout = new AppLayout();
   let phone = $derived(!appLayout.current);
+  let mobileThreads = $derived(
+    phone &&
+      resolvedRoom?.room_kind === 'text' &&
+      !resolvedRoom.is_direct &&
+      (ancestorSpaceKey.length > 0 || cosmeticsSpaceId !== null)
+  );
   let pinsOpen = $state(false);
   let desktop = $derived(sidePanels.current);
   let threadInPanel = $derived(desktop && preferences.threadPresentation === 'panel');
@@ -929,6 +1004,8 @@
       {desktop}
       widgetCount={roomSession.widgets.length}
       {canManageWidgets}
+      threadsUnread={threads.activity.size}
+      threadsOnly={phone}
     />
   {/snippet}
   <RoomHeader
@@ -944,7 +1021,7 @@
     members={memberLoader.members}
     membersOpen={desktop ? panels.desktopMembersOpen : panels.membersOpen}
     searchOpen={panels.searchOpen}
-    onCall={callOffered && !isVoiceRoom ? startCall : null}
+    onCall={callOffered && !isVoiceRoom && !mobileThreads ? startCall : null}
     onToggleChat={isVoiceRoom ? () => (voiceChat.open = !voiceChat.open) : null}
     chatOpen={voiceChat.open}
     chatBeside={desktop}
@@ -954,6 +1031,7 @@
     onSearch={openSearch}
     onTopic={() => (topicOpen = true)}
     {phone}
+    showMobileActions={mobileThreads}
     actions={headerActions}
   >
     {#snippet pins()}
@@ -970,7 +1048,7 @@
       <RoomHeaderMenu
         room={resolvedRoom ?? null}
         canInvite={roomSession.permissions?.can_invite ?? false}
-        compact={!desktop}
+        compact={!desktop || phone}
         onMarkRead={readActions.markRoomRead}
         onMarkUnread={readActions.markRoomUnread}
         onInvite={() => (inviteOpen = true)}
@@ -979,7 +1057,9 @@
         onJumpToTime={() => (jumpOpen = true)}
         onClose={desktop ? backToRoomList : undefined}
         onAttachments={voiceView ? undefined : toggleAttachments}
-        onThreads={phone && !voiceView ? toggleThreads : undefined}
+        onThreads={phone && !voiceView && !mobileThreads ? toggleThreads : undefined}
+        threadsUnread={threads.activity.size}
+        onCall={mobileThreads && callOffered ? startCall : undefined}
         onNotifications={phone && !voiceView && !resolvedRoom?.is_direct
           ? () => panels.toggleNotifications()
           : undefined}
@@ -1057,6 +1137,7 @@
         canPin={roomSession.permissions?.can_pin ?? false}
         encrypted={resolvedRoom?.encrypted ?? null}
         onClose={closeThread}
+        onRead={(rootId, item) => threads.markRead(rootId, item)}
         onSenderProfile={openProfile}
         onMatrixLink={handleMatrixLink}
         onCopyLink={copyEventLink}
@@ -1075,6 +1156,7 @@
     room={resolvedRoom}
     roomId={resolvedRoomId}
     {desktop}
+    {threads}
     {memberLoader}
     {roomSession}
     {canManageWidgets}

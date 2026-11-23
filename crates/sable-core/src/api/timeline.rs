@@ -5,9 +5,11 @@ use matrix_sdk::room::{ListThreadsOptions, Receipts};
 use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType;
 use matrix_sdk::ruma::api::client::room::get_event_by_timestamp;
+use matrix_sdk::ruma::api::client::threads::get_threads::v1::IncludeThreads;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::fully_read::FullyReadEventContent;
-use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, UInt};
+use matrix_sdk::ruma::events::receipt::{ReceiptThread, ReceiptType as StoredReceiptType};
+use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, UInt, UserId};
 use matrix_sdk_base::read_receipts::ReadReceipts;
 use matrix_sdk_ui::timeline::{RoomExt, Timeline, TimelineFocus};
 use serde::{Deserialize, Serialize};
@@ -15,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use super::{Handler, Json};
 use crate::protocol::{
     EditVersionView, PaginationDirection, PinReadStateView, RelationsView, RoomListItemView,
-    RoomListOptionsView, RpcCode, RpcError, SubscriptionId, TimelineItemView, UnredactedEventView,
+    RoomListOptionsView, RpcCode, RpcError, SubscriptionId, ThreadReplyView, TimelineItemView,
+    UnredactedEventView,
 };
 use crate::thread_receipts::thread_receipts;
 use crate::timelines::receipt_thread_root;
@@ -34,6 +37,7 @@ domain! {
     events,
     timestamp_to_event,
     list_threads,
+    thread_replies,
     event_source,
     unredacted_event,
     edit_history,
@@ -344,6 +348,8 @@ pub struct ListThreadsParams {
     pub room_id: OwnedRoomId,
     #[serde(default)]
     pub from: Option<String>,
+    #[serde(default)]
+    pub participated: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -361,7 +367,11 @@ impl Handler for ListThreadsParams {
         let options = ListThreadsOptions {
             from: self.from,
             limit: Some(UInt::from(50u32)),
-            ..ListThreadsOptions::default()
+            include_threads: if self.participated {
+                IncludeThreads::Participated
+            } else {
+                IncludeThreads::All
+            },
         };
         let threads = room
             .list_threads(options)
@@ -384,6 +394,40 @@ impl Handler for ListThreadsParams {
             roots,
             next_batch: threads.prev_batch_token,
         })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct ThreadRepliesParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub root_event_id: OwnedEventId,
+    #[serde(default)]
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub limit: Option<u32>,
+}
+
+impl Handler for ThreadRepliesParams {
+    type Ok = Vec<ThreadReplyView>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<ThreadReplyView>, RpcError> {
+        let page = core
+            .room_event_relations(
+                &self.room_id,
+                &self.root_event_id,
+                RelationsFilter {
+                    rel_type: Some("m.thread"),
+                    event_type: None,
+                    from: None,
+                    to: None,
+                    limit: Some(self.limit.unwrap_or(50)),
+                    direction: Some(PaginationDirection::Backward),
+                },
+            )
+            .await?;
+        Ok(page.chunk.iter().filter_map(view::thread_reply).collect())
     }
 }
 
@@ -663,6 +707,9 @@ pub struct TimelineReadDiagnostics {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ThreadReadDiagnostics {
     pub root_event_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typegen", specta(optional, type = Option<specta_typescript::Number>))]
+    pub receipt_timestamp: Option<u64>,
     #[serde(flatten)]
     pub read: TimelineReadDiagnostics,
 }
@@ -673,11 +720,46 @@ pub struct UnreadDiagnosticsView {
     pub main: TimelineReadDiagnostics,
     pub server_notifications: u32,
     pub server_highlights: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typegen", specta(optional, type = Option<specta_typescript::Number>))]
+    pub unthreaded_receipt_timestamp: Option<u64>,
     pub threads: Vec<ThreadReadDiagnostics>,
 }
 
 fn count(value: u64) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
+}
+
+async fn receipt_event_timestamp(
+    room: &matrix_sdk::Room,
+    event_id: &EventId,
+    receipt_ts: Option<MilliSecondsSinceUnixEpoch>,
+) -> Option<u64> {
+    if let Ok(event) = room.load_or_fetch_event(event_id, None).await
+        && let Ok(Some(ts)) = event
+            .raw()
+            .get_field::<MilliSecondsSinceUnixEpoch>("origin_server_ts")
+    {
+        return Some(ts.0.into());
+    }
+    receipt_ts.map(|ts| ts.0.into())
+}
+
+async fn newest_stored_receipt(
+    room: &matrix_sdk::Room,
+    thread: ReceiptThread,
+    user_id: &UserId,
+) -> Option<(OwnedEventId, Option<u64>)> {
+    let (public, private) = futures_util::join!(
+        room.load_user_receipt(StoredReceiptType::Read, &thread, user_id),
+        room.load_user_receipt(StoredReceiptType::ReadPrivate, &thread, user_id),
+    );
+    let (event_id, receipt) = [public, private]
+        .into_iter()
+        .filter_map(|receipt| receipt.ok().flatten())
+        .max_by_key(|(_, receipt)| receipt.ts)?;
+    let ts = receipt_event_timestamp(room, &event_id, receipt.ts).await;
+    Some((event_id, ts))
 }
 
 fn read_diagnostics(receipts: &ReadReceipts) -> TimelineReadDiagnostics {
@@ -703,9 +785,41 @@ impl Handler for UnreadDiagnosticsParams {
             .into_iter()
             .collect::<std::collections::BTreeMap<_, _>>();
         if let Some(cache) = room.client().event_cache() {
-            for root in self.thread_roots {
-                if let Ok(Some(info)) = cache.thread_info(room.room_id(), &root).await {
-                    threads.insert(root, info.read_receipts);
+            for root in &self.thread_roots {
+                if let Ok(Some(info)) = cache.thread_info(room.room_id(), root).await {
+                    threads.insert(root.clone(), info.read_receipts);
+                }
+            }
+        }
+        let mut unthreaded_receipt_timestamp = None;
+        let mut stored = std::collections::BTreeMap::new();
+        if let Some(user_id) = room.client().user_id() {
+            let (unthreaded, receipts) = core
+                .with_open_stores(async || {
+                    futures_util::join!(
+                        newest_stored_receipt(&room, ReceiptThread::Unthreaded, user_id),
+                        futures_util::future::join_all(self.thread_roots.into_iter().map(
+                            |root| {
+                                let room = &room;
+                                async move {
+                                    let resolved = newest_stored_receipt(
+                                        room,
+                                        ReceiptThread::Thread(root.clone()),
+                                        user_id,
+                                    )
+                                    .await;
+                                    (root, resolved)
+                                }
+                            },
+                        )),
+                    )
+                })
+                .await;
+            unthreaded_receipt_timestamp = unthreaded.and_then(|(_, ts)| ts);
+            for (root, resolved) in receipts {
+                if let Some(resolved) = resolved {
+                    threads.entry(root.clone()).or_default();
+                    stored.insert(root, resolved);
                 }
             }
         }
@@ -713,11 +827,29 @@ impl Handler for UnreadDiagnosticsParams {
             main: read_diagnostics(&room.read_receipts()),
             server_notifications: count(server.notification_count),
             server_highlights: count(server.highlight_count),
+            unthreaded_receipt_timestamp,
             threads: threads
                 .into_iter()
-                .map(|(root, receipts)| ThreadReadDiagnostics {
-                    root_event_id: root.to_string(),
-                    read: read_diagnostics(&receipts),
+                .map(|(root, receipts)| {
+                    let mut read = read_diagnostics(&receipts);
+                    if receipts.latest_active.is_none() {
+                        read.unread = 0;
+                        read.notifying = 0;
+                        read.highlight = 0;
+                    }
+                    let mut receipt_timestamp = None;
+                    if let Some((event, ts)) = stored.remove(&root)
+                        && (read.receipt_event_id.is_none()
+                            || read.receipt_event_id.as_deref() == Some(event.as_str()))
+                    {
+                        read.receipt_event_id = Some(event.to_string());
+                        receipt_timestamp = ts;
+                    }
+                    ThreadReadDiagnostics {
+                        root_event_id: root.to_string(),
+                        receipt_timestamp,
+                        read,
+                    }
                 })
                 .collect(),
         })

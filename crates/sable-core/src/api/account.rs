@@ -11,7 +11,12 @@ use super::{Handler, Json};
 use crate::media::mxc_uri;
 use crate::profile_overrides::OverrideEdit;
 use crate::profiles::profile_view;
-use crate::protocol::{BookmarkView, NotificationModeView, RpcCode, RpcError, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView, MutualRoomView, PresenceSharingEdit, PresenceOverrideView, PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, SealedAccountDataView, UserDirectoryEntryView};
+use crate::protocol::{
+    BookmarkView, FieldEdit, InviteTriageView, MediaPreviewConfigView, MediaPreviewsView,
+    MutualRoomView, NotificationModeView, PresenceOverrideView, PresenceSharingEdit,
+    PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, RpcCode, RpcError,
+    SealedAccountDataView, ThreadSidebarView, UserDirectoryEntryView,
+};
 use crate::{Core, ResultExt};
 
 domain! {
@@ -48,6 +53,9 @@ domain! {
     search_user_directory,
     dismissed_invites,
     set_invite_dismissed,
+    thread_sidebar,
+    set_thread_pin,
+    set_thread_dismissed,
     bookmarks,
     set_bookmark,
     media_preview_config,
@@ -1120,6 +1128,56 @@ impl Handler for SetPresenceOverrideParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<PresenceOverrideView, RpcError> {
         core.set_presence_override(&self.presence_override).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct ThreadSidebarParams {}
+
+impl Handler for ThreadSidebarParams {
+    type Ok = ThreadSidebarView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<ThreadSidebarView, RpcError> {
+        core.thread_sidebar().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetThreadPinParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+    pub pinned: bool,
+}
+
+impl Handler for SetThreadPinParams {
+    type Ok = ThreadSidebarView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<ThreadSidebarView, RpcError> {
+        core.set_thread_pin(self.room_id, self.event_id, self.pinned)
+            .await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct SetThreadDismissedParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+    pub dismissed: bool,
+}
+
+impl Handler for SetThreadDismissedParams {
+    type Ok = ThreadSidebarView;
+
+    async fn run(self, core: &Arc<Core>) -> Result<ThreadSidebarView, RpcError> {
+        core.set_thread_dismissed(self.room_id, self.event_id, self.dismissed)
+            .await
     }
 }
 

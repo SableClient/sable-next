@@ -46,6 +46,7 @@
   import { readText, writeText } from '#lib/platform/local-json.js';
   import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -73,6 +74,7 @@
   const roomList = useRoomList();
   const messageMenu = provideMessageMenu(new OpenMessageMenu());
   const forumThreads = new ForumThreads(core);
+  const appLayout = new AppLayout();
   const memberLoader = new RoomMemberLoader();
   const pinnedEvents = new PinnedEvents(core.rpc.timeline);
   providePinnedEvents(pinnedEvents);
@@ -92,6 +94,8 @@
     return null;
   });
   let linkedEventId = $derived(page.url.searchParams.get('event') ?? page.state.notified ?? null);
+  let linkedThreadId = $derived(page.url.searchParams.get('thread'));
+  let openedLinkedThread: string | null = null;
   let threadEventId = $state<string | null>(null);
   const sidePanels = new MediaQuery(BREAKPOINTS.sidePanels);
   let threadInPanel = $derived(sidePanels.current && preferences.threadPresentation === 'panel');
@@ -164,6 +168,22 @@
   });
 
   $effect(() => {
+    const root = linkedThreadId;
+    if (root?.startsWith('$')) {
+      if (!appLayout.drawerCovers(page.state)) {
+        openedLinkedThread = root;
+        threadRootId = root;
+        threadEventId = null;
+      }
+      return;
+    }
+    if (openedLinkedThread !== null) {
+      if (untrack(() => threadRootId) === openedLinkedThread) {
+        threadRootId = null;
+        threadEventId = null;
+      }
+      openedLinkedThread = null;
+    }
     const target = linkedEventId;
     const targetRoomId = resolvedRoomId;
     if (target === null) return;
@@ -238,6 +258,7 @@
   function openThread(eventId: string): void {
     threadRootId = eventId;
     threadEventId = null;
+    openedLinkedThread = null;
     void clearLinkedEvent();
   }
 
@@ -302,13 +323,15 @@
   function closeThread(): void {
     threadRootId = null;
     threadEventId = null;
+    openedLinkedThread = null;
     void afterOverlayPops().then(clearLinkedEvent);
   }
 
   function clearLinkedEvent(): Promise<void> | undefined {
-    if (!page.url.searchParams.has('event') && !page.state.notified) return;
+    if (!page.url.searchParams.has('event') && !linkedThreadId && !page.state.notified) return;
     const url = new URL(page.url.href);
     url.searchParams.delete('event');
+    url.searchParams.delete('thread');
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
     return goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
   }

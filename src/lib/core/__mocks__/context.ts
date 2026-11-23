@@ -57,11 +57,13 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
     oauthMetadata: null as OAuthMetadataView | null,
     rpc: mockRpc(
       {
+        account: { threadSidebar: vi.fn(() => Promise.resolve({ pins: [], dismissed: [] })) },
         members: {
           powerLevelTags: vi.fn(() => Promise.resolve({})),
           member: vi.fn(() => Promise.resolve(null)),
         },
         messages: {
+          eventReactions: vi.fn(() => Promise.resolve([])),
           reactionShortcodes: vi.fn(() => Promise.resolve([])),
           frequentReactions: vi.fn(() => Promise.resolve([])),
           rememberEmoji: vi.fn(() => Promise.resolve(null)),
@@ -83,7 +85,10 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
           setTag: vi.fn(() => Promise.resolve(null)),
         },
         spaces: { unjoinedSpaceParents: vi.fn(() => Promise.resolve([])) },
-        timeline: { markRead: vi.fn(() => Promise.resolve(null)) },
+        timeline: {
+          markRead: vi.fn(() => Promise.resolve(null)),
+          threadReplies: vi.fn(() => Promise.resolve([])),
+        },
       },
       rpcOverrides
     ),

@@ -16,9 +16,16 @@
   import { SvelteSet } from 'svelte/reactivity';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
+  import ThreadIcon from 'phosphor-svelte/lib/ScribbleLoopIcon';
+  import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
+  import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { isDeclining } from '#lib/rooms/invites.svelte.js';
@@ -64,6 +71,11 @@
   import RoomRowStatus from './RoomRowStatus.svelte';
   import RoomRowText, { type RoomPreview } from './RoomRowText.svelte';
   import RoomThreadLines from './RoomThreadLines.svelte';
+  import {
+    saveThreadSidebarAction,
+    useThreadSidebar,
+    type SidebarThread,
+  } from './thread-sidebar.svelte.js';
   import RoomVoiceLive from './RoomVoiceLive.svelte';
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
   import { roomRow, type RoomNavRow } from './nav-rows.js';
@@ -91,6 +103,17 @@
       ? (contextRoom?.room_id ?? null)
       : null
   );
+  let contextThread = $state.raw<{ roomId: string; thread: SidebarThread } | null>(null);
+  let contextThreadAnchor = $state.raw<HTMLElement | CursorAnchor | null>(null);
+  let contextThreadOpen = $state(false);
+  let optionsThreadKey = $derived(
+    contextThreadOpen &&
+      contextThreadAnchor !== null &&
+      'focus' in contextThreadAnchor &&
+      contextThread
+      ? `${contextThread.roomId}:${contextThread.thread.id}`
+      : null
+  );
 
   function openContextMenu(
     event: MouseEvent,
@@ -99,6 +122,7 @@
   ): void {
     event.preventDefault();
     event.stopPropagation();
+    contextThreadOpen = false;
     contextRoom = room;
     contextParentSpaceId = parentSpaceId;
     contextAnchor = cursorAnchor(event);
@@ -114,10 +138,48 @@
       contextOpen = false;
       return;
     }
+    contextThreadOpen = false;
     contextRoom = room;
     contextParentSpaceId = parentSpaceId;
     contextAnchor = trigger;
     contextOpen = true;
+  }
+
+  function openThreadContextMenu(
+    event: MouseEvent,
+    target: { roomId: string; thread: SidebarThread }
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+    contextOpen = false;
+    contextThread = target;
+    contextThreadAnchor = cursorAnchor(event);
+    contextThreadOpen = true;
+  }
+
+  function toggleThreadOptionsMenu(
+    trigger: HTMLElement,
+    target: { roomId: string; thread: SidebarThread }
+  ): void {
+    if (
+      optionsThreadKey === `${target.roomId}:${target.thread.id}` &&
+      contextThreadAnchor === trigger
+    ) {
+      contextThreadOpen = false;
+      return;
+    }
+    contextOpen = false;
+    contextThread = target;
+    contextThreadAnchor = trigger;
+    contextThreadOpen = true;
+  }
+
+  function threadDiscovery(roomId: string, revision: string, includeActive: boolean) {
+    return whenVisible(
+      () => threadSidebar?.discover(roomId, revision, includeActive),
+      '0px',
+      WARM_DWELL_MS
+    );
   }
 
   interface Props {
@@ -173,6 +235,8 @@
     participantOpen = true;
   }
   const roomList = useRoomList();
+  const threadSidebar = useThreadSidebar();
+  let linkedThread = $derived(page.url.searchParams.get('thread'));
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
 
@@ -543,6 +607,9 @@
     {@const peerStatus = peerId ? resolveUserStatus(peerProfiles.get(peerId), peerPresence) : null}
     {@const preview = room ? messagePreview(room) : null}
     {@const closed = sectionClosed && !(room !== undefined && (active || hasUnread(counts)))}
+    {@const sidebarThreads = !collapsed && !closed ? (threadSidebar?.rows(item.roomId) ?? []) : []}
+    {@const selectedThread = active && sidebarThreads.some((thread) => thread.id === linkedThread)}
+    {@const revision = room?.latest_event?.event_id ?? ''}
     <div class={['room-row-wrap', { 'closed-row': closed }]} data-row-key={item.key}>
       <RoomThreadLines threads={item.threads} {collapsed} />
       {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
@@ -575,7 +642,10 @@
               ? `${roomLabel}, ${countLabel}`
               : roomLabel
             : undefined}
-          aria-current={active ? 'page' : undefined}
+          aria-current={active && !selectedThread ? 'page' : undefined}
+          {@attach threadSidebar && room?.state === 'joined' && !collapsed && !closed
+            ? threadDiscovery(item.roomId, revision, preferences.showActiveThreadsInSidebar)
+            : undefined}
           {@attach peerId !== null && !collapsed
             ? whenVisible(() => {
                 peerProfiles.request(peerId);
@@ -703,6 +773,72 @@
         {/if}
       {/if}
     </div>
+    {#if sidebarThreads.length > 0}
+      {@const parentLines = (item.threads ?? [])
+        .filter((line) => line.kind !== 'last')
+        .map((line) => ({ ...line, kind: 'through' as const }))}
+      {#each sidebarThreads as thread, index (thread.id)}
+        {@const name = thread.title || i18n.t('timeline.thread')}
+        {@const threadHref =
+          href +
+          '?thread=' +
+          encodeURIComponent(thread.id) +
+          (room?.room_kind === 'calendar' ? '&timeline=events' : '')}
+        {@const isSelected = active && linkedThread === thread.id}
+        {@const threadTarget = { roomId: item.roomId, thread }}
+        <div class="room-row-wrap thread-row">
+          <RoomThreadLines
+            threads={[
+              ...parentLines,
+              {
+                level: item.depth,
+                kind: index === sidebarThreads.length - 1 ? ('last' as const) : ('branch' as const),
+              },
+            ]}
+            collapsed={false}
+          />
+          <!-- eslint-disable svelte/no-navigation-without-resolve -- the parent room href is already resolved -->
+          <a
+            class={['room-row selection-current selection-layer', { unread: thread.unread }]}
+            style:--room-depth={item.depth + 1}
+            href={threadHref}
+            role="treeitem"
+            aria-level={3}
+            aria-selected={isSelected}
+            aria-current={isSelected ? 'page' : undefined}
+            aria-label={thread.unread ? i18n.t('nav.unreadThread', { name }) : name}
+            oncontextmenu={mouseContextMenu((event) => {
+              openThreadContextMenu(event, threadTarget);
+            })}
+            {@attach longPress({
+              onPress: (event) => {
+                openThreadContextMenu(event, threadTarget);
+              },
+            })}
+            onclick={() => onNavigate?.(threadHref)}
+          >
+            <ThreadIcon size={16} aria-hidden="true" />
+            <span>{name}</span>
+            {#if thread.pinned || thread.unread}
+              <span class="thread-row-status" aria-hidden="true">
+                {#if thread.pinned}<PushPinIcon size={14} weight="fill" />{/if}
+                {#if thread.unread}<span class="thread-unread-dot"></span>{/if}
+              </span>
+            {/if}
+          </a>
+          <!-- eslint-enable svelte/no-navigation-without-resolve -->
+          <span class="room-options-slot">
+            <RoomOptionsButton
+              label={i18n.t('timeline.threadMenu')}
+              open={optionsThreadKey === `${item.roomId}:${thread.id}`}
+              onToggle={(trigger) => {
+                toggleThreadOptionsMenu(trigger, threadTarget);
+              }}
+            />
+          </span>
+        </div>
+      {/each}
+    {/if}
     {#if room && (voicePlacement === 'both' || voicePlacement === 'below') && live > 0}
       <CallParticipantList
         {participants}
@@ -980,6 +1116,55 @@
   {/key}
 {/if}
 
+{#if contextThread && threadSidebar}
+  {@const fromTrigger = contextThreadAnchor !== null && 'focus' in contextThreadAnchor}
+  {@const target = contextThread}
+  {#key `${target.roomId}:${target.thread.id}`}
+    <ActionMenu
+      bind:open={contextThreadOpen}
+      label={i18n.t('timeline.threadMenu')}
+      class="room-options-menu"
+      anchor={contextThreadAnchor}
+      align={fromTrigger ? 'end' : 'start'}
+      side={fromTrigger ? 'bottom' : 'right'}
+    >
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        <ActionMenuItem
+          disabled={!threadSidebar.ready}
+          onSelect={() => {
+            saveThreadSidebarAction(
+              threadSidebar.togglePin(target.roomId, target.thread.id),
+              'timeline.threadPinFailed',
+              'personal pin'
+            );
+          }}
+        >
+          {#if threadSidebar.hasPin(target.roomId, target.thread.id)}
+            <PushPinSlashIcon />
+            {i18n.t('timeline.threadUnpin')}
+          {:else}
+            <PushPinIcon />
+            {i18n.t('timeline.threadPin')}
+          {/if}
+        </ActionMenuItem>
+        <ActionMenuItem
+          disabled={!threadSidebar.ready}
+          onSelect={() => {
+            saveThreadSidebarAction(
+              threadSidebar.setDismissed(target.roomId, target.thread.id, true),
+              'timeline.threadDismissFailed',
+              'sidebar dismissal'
+            );
+          }}
+        >
+          <EyeSlashIcon />
+          {i18n.t('timeline.threadDismissSidebar')}
+        </ActionMenuItem>
+      </IconContext>
+    </ActionMenu>
+  {/key}
+{/if}
+
 <style>
   .room-nav {
     background: var(--bg-container);
@@ -1048,15 +1233,14 @@
 
   @media (any-hover: hover) and (any-pointer: fine) and (not (any-pointer: coarse)) {
     .room-list:not(.collapsed)
-      .room-row-wrap:not(:has(:global(.room-status > *), :global(.voice-live))):is(
-        :hover,
-        :focus-within
-      )
+      .room-row-wrap:not(
+        :has(:global(.room-status > *), :global(.voice-live), .thread-row-status)
+      ):is(:hover, :focus-within)
       .room-row,
     .room-list:not(.collapsed)
-      .room-row-wrap:not(:has(:global(.room-status > *), :global(.voice-live))):has(
-        :global(.room-options-trigger[data-state='open'])
-      )
+      .room-row-wrap:not(
+        :has(:global(.room-status > *), :global(.voice-live), .thread-row-status)
+      ):has(:global(.room-options-trigger[data-state='open']))
       .room-row {
       padding-inline-end: calc(var(--space-100) + var(--space-600));
     }
@@ -1083,12 +1267,10 @@
       pointer-events: auto;
     }
 
-    .room-row-wrap:hover :global(.room-status),
-    .room-row-wrap:hover :global(.voice-live),
-    .room-row-wrap:focus-within :global(.room-status),
-    .room-row-wrap:focus-within :global(.voice-live),
-    .room-row-wrap:has(:global(.room-options-trigger[data-state='open'])) :global(.room-status),
-    .room-row-wrap:has(:global(.room-options-trigger[data-state='open'])) :global(.voice-live) {
+    .room-row-wrap:is(:hover, :focus-within)
+      :is(:global(.room-status), :global(.voice-live), .thread-row-status),
+    .room-row-wrap:has(:global(.room-options-trigger[data-state='open']))
+      :is(:global(.room-status), :global(.voice-live), .thread-row-status) {
       opacity: 0;
       pointer-events: none;
     }
@@ -1172,6 +1354,38 @@
 
   .room-row.unread {
     font-weight: var(--font-weight-bold);
+  }
+
+  .thread-row .room-row {
+    font-size: var(--font-size-small);
+    min-height: 1.875rem;
+  }
+
+  .thread-row :global(svg) {
+    flex: none;
+  }
+
+  .thread-row .room-row > span:first-of-type {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .thread-row-status {
+    align-items: center;
+    display: inline-flex;
+    flex: none;
+    gap: var(--space-100);
+  }
+
+  .thread-unread-dot {
+    background: var(--primary-main);
+    border-radius: var(--radii-round);
+    flex: none;
+    height: var(--space-200);
+    width: var(--space-200);
   }
 
   .room-avatar {

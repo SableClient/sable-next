@@ -49,7 +49,7 @@ pub(crate) use search::search_hit_view;
 pub(crate) use state::{
     CALL_MEMBER_TYPE, CALL_SLOT_ID, CALL_TYPE, FORUM_ROOM_TYPE, FORUM_TITLE, RTC_SLOT_TYPE,
 };
-pub(crate) use thread::reply_without_body;
+pub(crate) use thread::{reply_without_body, thread_reply};
 
 #[cfg(test)]
 pub(crate) use media::audio_metadata;

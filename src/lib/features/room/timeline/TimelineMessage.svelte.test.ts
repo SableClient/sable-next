@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -43,8 +43,12 @@ import {
 import { senderColor } from './timeline-format';
 import { withRowFields } from './row-fixtures.js';
 import { hideContent, setRevealState } from '../messages/revealed-redactions.svelte.js';
+import { clearThreadRepliesCache } from '#lib/rooms/thread-replies.js';
 
-afterEach(resetTimelineItemTest);
+afterEach(() => {
+  clearThreadRepliesCache();
+  resetTimelineItemTest();
+});
 
 test('places a connected reply preview above the sender header', async () => {
   setPreference('replyPreviewStyle', 'connected');
@@ -337,6 +341,9 @@ test('strips a per-message-profile fallback from a thread summary', async () => 
           thread_summary: {
             num_replies: 2,
             latest_event_id: '$reply',
+            latest_timestamp: null,
+            latest_sender: null,
+            current_user_participated: null,
             latest_body: 'Josie: the latest reply',
             latest_fallback: null,
           },
@@ -376,6 +383,9 @@ test('keeps a thread summary body without a fallback', async () => {
           thread_summary: {
             num_replies: 2,
             latest_event_id: null,
+            latest_timestamp: null,
+            latest_sender: null,
+            current_user_participated: null,
             latest_body: 'we shipped it: finally',
             latest_fallback: null,
           },
@@ -401,6 +411,9 @@ test('names a verification request as the latest thread reply', async () => {
           thread_summary: {
             num_replies: 1,
             latest_event_id: '$reply',
+            latest_timestamp: null,
+            latest_sender: null,
+            current_user_participated: null,
             latest_body: null,
             latest_fallback: { kind: 'verification_request' },
           },
@@ -846,4 +859,69 @@ test('names who shared the key to a message from before the join', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Shared by Alice' }));
   expect(await screen.findByText(/Alice shared keys with you to unlock this message/)).toBeTruthy();
+});
+
+test('shows a defined thread card with participant avatars, latest sender, and timestamp', async () => {
+  vi.stubGlobal('IntersectionObserver', undefined);
+  const member = (user_id: string, display_name: string): MemberView => ({
+    user_id,
+    display_name,
+    avatar_url: null,
+    real_name: null,
+    real_avatar_url: null,
+    power_level: 0,
+    membership: 'join',
+    member_ts: null,
+    kicked: false,
+    service: false,
+  });
+  core.rpc.timeline.threadReplies.mockResolvedValueOnce([
+    { event_id: '$r3', sender: '@bob:example.org', timestamp: 3 },
+    { event_id: '$r2', sender: '@cara:example.org', timestamp: 2 },
+    { event_id: '$r1', sender: '@dave:example.org', timestamp: 1 },
+  ]);
+  try {
+    render(TimelineItemHarness, {
+      props: {
+        core,
+        item: {
+          roomId: '!room:example.org',
+          members: [
+            member('@alice:example.org', 'Alice'),
+            member('@bob:example.org', 'Bob'),
+            member('@cara:example.org', 'Cara'),
+            member('@dave:example.org', 'Dave'),
+          ],
+          item: {
+            ...item(false),
+            event_id: '$root',
+            thread_root: null,
+            thread_summary: {
+              num_replies: 4,
+              latest_event_id: '$reply',
+              latest_sender: '@bob:example.org',
+              latest_timestamp: Date.now(),
+              current_user_participated: null,
+              latest_body: 'Ready to ship',
+              latest_fallback: null,
+            },
+          },
+          collapsed: false,
+          onOpenThread: vi.fn(),
+        },
+      },
+    });
+    await tick();
+
+    expect(document.querySelector('.thread-count')?.textContent).toBe('4 replies');
+    expect(document.querySelector('.thread-sender')?.textContent).toBe('Bob');
+    expect(document.querySelector('.thread-latest')?.textContent).toBe('Ready to ship');
+    expect(document.querySelector('.thread-time')?.textContent.trim()).not.toBe('');
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll('.thread-participants .thread-face')).toHaveLength(3);
+    });
+    expect(document.querySelector('.thread-overflow')?.textContent).toBe('+1');
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

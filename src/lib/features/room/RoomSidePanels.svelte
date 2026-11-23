@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ThreadRoots } from '#lib/rooms/thread-roots.svelte.js';
   import type { RoomListItemView } from '#src/generated/protocol';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import type { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
@@ -17,6 +18,7 @@
     room: RoomListItemView | undefined;
     roomId: string;
     desktop: boolean;
+    threads: ThreadRoots;
     memberLoader: RoomMemberLoader;
     roomSession: RoomSession;
     canManageWidgets: boolean;
@@ -31,6 +33,7 @@
     room,
     roomId,
     desktop,
+    threads,
     memberLoader,
     roomSession,
     canManageWidgets,
@@ -44,6 +47,7 @@
 {#if panels.threadsOpen}
   <RoomThreadsPanel
     {roomId}
+    {threads}
     members={memberLoader.members}
     modal={!desktop}
     {onOpenThread}

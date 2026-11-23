@@ -597,7 +597,13 @@
           {@const target = threadTarget}
           <TimelineThreadSummary
             summary={threadSummary}
+            {roomId}
+            rootId={target}
+            rootSender={item.sender}
+            {members}
+            {currentUserId}
             persona={threadPersona}
+            {preview}
             onOpen={() => {
               onOpenThread(target);
             }}

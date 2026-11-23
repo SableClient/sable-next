@@ -38,3 +38,19 @@ test('a panel button shows its panel open once pressed', async () => {
 
   expect(threads).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('the compact thread shortcut announces its unread thread count', () => {
+  render(RoomHeaderActions, {
+    panels: new RoomPanels(),
+    voiceView: false,
+    direct: false,
+    desktop: false,
+    widgetCount: 2,
+    canManageWidgets: false,
+    threadsOnly: true,
+    threadsUnread: 3,
+  });
+  const threadButton = screen.getByRole('button', { name: 'Threads, 3 unread threads' });
+  expect(threadButton).toHaveTextContent('3');
+  expect(screen.getAllByRole('button')).toEqual([threadButton]);
+});

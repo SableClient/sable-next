@@ -1,49 +1,58 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { ThreadRoots } from '#lib/rooms/thread-roots.svelte.js';
-  import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import type { MemberView } from '#src/generated/protocol';
-  import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
-  import { fallbackText } from '../messages/reply-fallback.js';
-  import { stripReplyFallback } from '../members/members.js';
   import MessagePreview from '../messages/MessagePreview.svelte';
   import { opensFrom } from '../messages/message-preview';
+  import { replyPreviewBody } from '../messages/reply-preview.js';
+  import TimelineThreadSummary from '../timeline/TimelineThreadSummary.svelte';
+  import ThreadReactionPreview from './ThreadReactionPreview.svelte';
+  import ThreadSidebarActions from './ThreadSidebarActions.svelte';
 
   interface Props {
     roomId: string;
+    threads?: ThreadRoots;
     members: readonly MemberView[];
     onOpenThread: (rootEventId: string) => void;
   }
 
-  let { roomId, members, onOpenThread }: Props = $props();
+  let { roomId, threads, members, onOpenThread }: Props = $props();
 
   const core = useCoreClient();
-  const threads = new ThreadRoots(core);
-  const timeline = new RoomTimeline(core);
+  const local = new ThreadRoots(core);
+  let source = $derived(threads ?? local);
+  let currentUserId = $derived(core.session?.user_id ?? null);
 
   $effect(() => {
+    if (threads) return;
     const id = roomId;
-    void untrack(() => timeline.start(id));
-    void untrack(() => threads.start(id));
-    return () => {
-      threads.stop();
-      void timeline.stop();
-    };
+    void untrack(() => local.start(id));
+    return () => local.stop();
   });
 </script>
 
-{#if threads.items.length > 0}
+{#if source.items.length > 0}
   <ul>
-    {#each threads.items as root (root.id)}
+    {#each source.byActivity as root (root.event_id ?? root.id)}
       {@const rootId = root.event_id ?? root.id}
-      {@const threadOpenLabel = i18n.t('timeline.threadOpen')}
+      {@const latestId = root.thread_summary?.latest_event_id ?? null}
+      {@const latestItem = source.latestById.get(latestId)}
+      {@const summary = root.thread_summary
+        ? {
+            ...root.thread_summary,
+            latest_body:
+              (latestItem && replyPreviewBody(latestItem.content)) ||
+              root.thread_summary.latest_body,
+            latest_sender: root.thread_summary.latest_sender ?? latestItem?.sender ?? null,
+            latest_timestamp: root.thread_summary.latest_timestamp ?? latestItem?.timestamp ?? null,
+          }
+        : null}
       <li>
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div
@@ -53,150 +62,95 @@
           }}
         >
           <MessagePreview {roomId} eventId={rootId} item={root} {members} loadPreviewProfile>
+            {#snippet headerAction()}
+              <ThreadSidebarActions {roomId} {rootId} {root} compact />
+            {/snippet}
             {#snippet fallback()}{/snippet}
           </MessagePreview>
         </div>
-        <Tooltip label={threadOpenLabel} disabled={!!root.thread_summary}>
-          {#snippet trigger({ props })}
-            <button
-              {...props}
-              type="button"
-              class={['thread-summary', { 'no-summary': !root.thread_summary }]}
-              aria-label={root.thread_summary ? undefined : threadOpenLabel}
-              onclick={() => {
-                onOpenThread(rootId);
-              }}
-            >
-              <ThreadIcon size={14} aria-hidden="true" />
-              {#if root.thread_summary}
-                <span class="thread-count">
-                  {i18n.t('timeline.threadReplies', {
-                    count: root.thread_summary.num_replies,
-                  })}
-                </span>
-              {/if}
-              {#if root.thread_summary}
-                {@const latest = stripReplyFallback(
-                  fallbackText(
-                    root.thread_summary.latest_body,
-                    root.thread_summary.latest_fallback,
-                    i18n.t
-                  ),
-                  null
-                )}
-                {#if latest}
-                  <span class="thread-latest">{latest}</span>
-                {/if}
-              {/if}
-            </button>
-          {/snippet}
-        </Tooltip>
+        <div class="thread-details">
+          {#if root.event_id && root.reactions.length === 0}
+            <ThreadReactionPreview {roomId} eventId={root.event_id} {members} {currentUserId} />
+          {/if}
+          <TimelineThreadSummary
+            {summary}
+            unread={source.activity.get(rootId)}
+            {roomId}
+            {rootId}
+            rootSender={root.sender}
+            {members}
+            {currentUserId}
+            persona={latestItem?.per_message_profile ?? null}
+            emptyLabel={i18n.t('timeline.threadOpen')}
+            fullWidth
+            onOpen={() => {
+              onOpenThread(rootId);
+            }}
+          />
+          {#if latestId}
+            <ThreadReactionPreview
+              {roomId}
+              eventId={latestId}
+              known={latestItem?.reactions}
+              {members}
+              {currentUserId}
+            />
+          {/if}
+        </div>
       </li>
     {/each}
   </ul>
-{:else if !threads.loading && !threads.error}
+{:else if !source.loading && !source.error}
   <p class="thread-list-status">{i18n.t('timeline.threadsEmpty')}</p>
 {/if}
 
-{#if threads.error}
+{#if source.error}
   <p class="thread-list-status" role="alert">{i18n.t('timeline.threadsFailed')}</p>
 {/if}
-{#if threads.loading}
+{#if source.loading}
   <div class="thread-list-loading"><Spinner small /></div>
-{:else if threads.nextBatch !== null || threads.error}
+{:else if source.nextBatch !== null || source.error}
   <div class="thread-list-more">
     <Button
       size="small"
       variant="secondary"
-      onclick={() => void (threads.error ? threads.retry() : threads.loadMore())}
+      onclick={() => void (source.error ? source.retry() : source.loadMore())}
     >
-      {threads.error ? i18n.t('common.tryAgain') : i18n.t('timeline.threadsLoadMore')}
+      {source.error ? i18n.t('common.tryAgain') : i18n.t('timeline.threadsLoadMore')}
     </Button>
   </div>
 {/if}
 
 <style>
   ul {
-    display: grid;
-    gap: var(--space-200);
     list-style: none;
     margin: 0;
-    padding: var(--space-200);
+    padding: 0;
   }
 
   li {
-    background: var(--surface-container);
-    border-radius: var(--radius-inner);
-    color: var(--surface-on-container);
+    color: var(--bg-on-container);
     display: grid;
     min-width: 0;
-    padding: var(--space-100) var(--space-300) var(--space-300);
+    padding: var(--space-250) var(--space-300);
   }
 
-  .thread-summary {
-    align-items: start;
-    background: none;
-    border: none;
-    border-radius: var(--radius);
-    color: var(--primary-main);
-    cursor: pointer;
-    display: grid;
-    font: inherit;
-    font-size: var(--font-size-small);
-    gap: var(--space-100) var(--space-200);
-    grid-template-columns: auto minmax(0, 1fr);
-    justify-self: stretch;
-    padding: var(--space-100) 0 0;
-    text-align: start;
-  }
-
-  .thread-summary :global(svg) {
-    grid-row: 1 / span 2;
-    margin-block-start: var(--space-050);
-  }
-
-  .thread-summary.no-summary {
-    justify-self: end;
-    padding: var(--space-100);
-  }
-
-  .thread-summary.no-summary :global(svg) {
-    grid-row: auto;
-    margin: 0;
-  }
-
-  .thread-summary:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .thread-count {
-    font-weight: var(--font-weight-medium);
-  }
-
-  .thread-summary:hover .thread-count {
-    text-decoration: underline;
-  }
-
-  .thread-latest {
-    -webkit-box-orient: vertical;
-    color: var(--surface-var-on-container);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    min-width: 0;
-    overflow: hidden;
+  li + li {
+    border-top: var(--border-width) solid var(--bg-container-line);
   }
 
   li:is(:hover, :focus-within) {
-    background: var(--surface-container-hover);
-    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
+    background: var(--bg-container-hover);
   }
 
   .thread-root {
     cursor: pointer;
     min-width: 0;
-    width: 100%;
+  }
+
+  .thread-details {
+    min-width: 0;
+    padding-inline-start: calc(var(--avatar-size-small) + var(--timeline-row-gap));
   }
 
   .thread-list-status {

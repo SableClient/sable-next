@@ -332,6 +332,7 @@ const SETTINGS = {
   tintRoomIcons: toggle(false, { account: true }),
   showBridgeBadges: toggle(true, { account: true }),
   showSpaceEvents: toggle(true, { account: true }),
+  showActiveThreadsInSidebar: toggle(true, { account: true }),
   showAlertZoo: toggle(false),
 
   hour24Clock: toggle(false, { account: true }),

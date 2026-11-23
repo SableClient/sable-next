@@ -5,10 +5,11 @@
 
   interface Props {
     open: boolean;
+    label?: string;
     onToggle: (trigger: HTMLElement) => void;
   }
 
-  let { open, onToggle }: Props = $props();
+  let { open, label = i18n.t('room.menuLabel'), onToggle }: Props = $props();
 </script>
 
 <button
@@ -16,7 +17,7 @@
   class="room-options-trigger selection-open"
   tabindex="-1"
   aria-hidden="true"
-  aria-label={i18n.t('room.menuLabel')}
+  aria-label={label}
   aria-haspopup="menu"
   aria-expanded={open}
   data-state={open ? 'open' : 'closed'}

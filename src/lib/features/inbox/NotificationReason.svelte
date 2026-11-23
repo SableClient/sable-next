@@ -1,7 +1,7 @@
 <script lang="ts">
   import ArrowBendUpLeftIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
   import AtIcon from 'phosphor-svelte/lib/AtIcon';
-  import ChatCircleDotsIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
+  import ThreadIcon from 'phosphor-svelte/lib/ScribbleLoopIcon';
   import type { InboxItemView } from '#src/generated/protocol';
   import type { ClassValue } from 'svelte/elements';
 
@@ -28,7 +28,7 @@
       <span><AtIcon aria-hidden="true" />{i18n.t('inbox.mention')}</span>
     {/if}
     {#if item.thread_root}
-      <span><ChatCircleDotsIcon aria-hidden="true" />{i18n.t('inbox.inThread')}</span>
+      <span><ThreadIcon aria-hidden="true" />{i18n.t('inbox.inThread')}</span>
     {/if}
   </p>
 {/if}

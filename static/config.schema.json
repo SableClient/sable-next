@@ -688,6 +688,11 @@
           "type": "boolean",
           "default": true
         },
+        "showActiveThreadsInSidebar": {
+          "title": "Show recent threads in the sidebar",
+          "type": "boolean",
+          "default": true
+        },
         "showAlertZoo": {
           "title": "Show alert zoo",
           "type": "boolean",
@@ -2219,6 +2224,11 @@
         },
         "showSpaceEvents": {
           "title": "Show today’s events in spaces",
+          "type": "boolean",
+          "default": true
+        },
+        "showActiveThreadsInSidebar": {
+          "title": "Show recent threads in the sidebar",
           "type": "boolean",
           "default": true
         },

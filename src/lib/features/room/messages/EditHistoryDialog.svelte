@@ -1,6 +1,6 @@
 <script lang="ts">
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
-  import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
+  import ThreadIcon from 'phosphor-svelte/lib/ScribbleLoopIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import type { EditVersionView } from '#src/generated/protocol';

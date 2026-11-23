@@ -9,9 +9,10 @@
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
-  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import YarnIcon from 'phosphor-svelte/lib/YarnIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
+  import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import ScrollIcon from 'phosphor-svelte/lib/ScrollIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
@@ -42,6 +43,8 @@
     onClose?: () => void;
     onAttachments?: () => void;
     onThreads?: () => void;
+    threadsUnread?: number;
+    onCall?: () => void;
     onNotifications?: () => void;
     onPins?: () => void;
     pinsUnread?: number;
@@ -64,6 +67,8 @@
     onClose,
     onAttachments,
     onThreads,
+    threadsUnread = 0,
+    onCall,
     onNotifications,
     onPins,
     pinsUnread = 0,
@@ -126,6 +131,12 @@
       <UserPlusIcon />
       {i18n.t('room.menuInvite')}
     </ActionMenuItem>
+    {#if onCall}
+      <ActionMenuItem onSelect={onCall}>
+        <PhoneIcon />
+        {i18n.t((room?.call_participants.length ?? 0) > 0 ? 'call.join' : 'call.start')}
+      </ActionMenuItem>
+    {/if}
     {#if compact}
       <ActionMenuSeparator />
       <ActionMenuItem onSelect={onMembers}>
@@ -134,8 +145,16 @@
       </ActionMenuItem>
       {#if onThreads}
         <ActionMenuItem onSelect={onThreads}>
-          <ChatsIcon />
-          {i18n.t('timeline.threadsOpen')}
+          <YarnIcon />
+          {#if threadsUnread > 0}
+            <span aria-hidden="true">{i18n.t('timeline.threadsOpen')}</span>
+            <span class="screen-reader-only"
+              >{i18n.t('timeline.threadsUnread', { count: threadsUnread })}</span
+            >
+            <span class="menu-count" aria-hidden="true">{threadsUnread}</span>
+          {:else}
+            {i18n.t('timeline.threadsOpen')}
+          {/if}
         </ActionMenuItem>
       {/if}
       {#if onNotifications}

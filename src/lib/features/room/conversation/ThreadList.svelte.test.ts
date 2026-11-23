@@ -46,15 +46,20 @@ vi.mock('../messages/message-scope.svelte.js', async () => {
 });
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
+import { clearThreadRepliesCache } from '#lib/rooms/thread-replies.js';
 
 import ThreadList from './ThreadList.svelte';
-import { withRowFields } from '#lib/features/room/timeline/row-fixtures.js';
 
 const listThreads = vi.fn();
 Object.assign(core.rpc.timeline, { listThreads });
 
 afterEach(() => {
+  clearThreadRepliesCache();
   listThreads.mockReset();
+  core.rpc.messages.eventReactions.mockReset();
+  core.rpc.messages.eventReactions.mockResolvedValue([]);
+  vi.unstubAllGlobals();
 });
 
 function root(id: string, body: string): TimelineItemView {
@@ -93,6 +98,33 @@ function root(id: string, body: string): TimelineItemView {
     shield: null,
   });
 }
+
+test('shows reactions on both the root and the latest reply preview', async () => {
+  vi.stubGlobal('IntersectionObserver', undefined);
+  const topic = root('$topic', 'A thread');
+  topic.thread_summary = {
+    num_replies: 1,
+    latest_event_id: '$reply',
+    latest_timestamp: null,
+    latest_sender: null,
+    current_user_participated: null,
+    latest_body: 'Still working on it',
+    latest_fallback: null,
+  };
+  listThreads.mockResolvedValueOnce({ roots: [topic], next_batch: null });
+  core.rpc.messages.eventReactions.mockImplementation(({ event_id }) =>
+    Promise.resolve([{ key: event_id === '$topic' ? '🚨' : '✅', senders: ['@ana:example.org'] }])
+  );
+  renderWithTooltips(ThreadList, {
+    roomId: '!room:example.org',
+    members: [],
+    onOpenThread: vi.fn(),
+  });
+
+  expect(await screen.findByText('🚨')).toBeVisible();
+  expect(screen.getByText('✅')).toBeVisible();
+  expect(screen.getByText('Still working on it')).toBeVisible();
+});
 
 const rows = () => within(screen.getByRole('list')).getAllByRole('listitem');
 

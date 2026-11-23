@@ -2105,7 +2105,24 @@ export type TermsPolicyView = {
 
 export type ThreadReadDiagnostics = {
 	root_event_id: string,
+	receipt_timestamp?: number | null,
 } & TimelineReadDiagnostics;
+
+export type ThreadRefView = {
+	room_id: string,
+	event_id: string,
+};
+
+export type ThreadReplyView = {
+	event_id: string,
+	sender: string,
+	timestamp: number,
+};
+
+export type ThreadSidebarView = {
+	pins: ThreadRefView[],
+	dismissed: ThreadRefView[],
+};
 
 export type ThreadSummaryView = {
 	/**  Excludes the root, so zero if every reply was redacted. */
@@ -2116,6 +2133,9 @@ export type ThreadSummaryView = {
 	 *  event.
 	 */
 	latest_event_id: string | null,
+	latest_timestamp: number | null,
+	latest_sender: string | null,
+	current_user_participated: boolean | null,
 	latest_body: string | null,
 	/**  What the latest reply was when it has no body to show. */
 	latest_fallback: ReplyFallbackView | null,
@@ -2290,6 +2310,7 @@ export type UnreadDiagnosticsView = {
 	main: TimelineReadDiagnostics,
 	server_notifications: number,
 	server_highlights: number,
+	unthreaded_receipt_timestamp: number | null,
 	threads: ThreadReadDiagnostics[],
 };
 
@@ -2543,6 +2564,17 @@ export type Rpc = {
 	room_id: string,
 	dismissed: boolean,
 }) => Promise<string[]>;
+    threadSidebar: (params?: Record<string, never>) => Promise<ThreadSidebarView>;
+    setThreadPin: (params: {
+	room_id: string,
+	event_id: string,
+	pinned: boolean,
+}) => Promise<ThreadSidebarView>;
+    setThreadDismissed: (params: {
+	room_id: string,
+	event_id: string,
+	dismissed: boolean,
+}) => Promise<ThreadSidebarView>;
     bookmarks: (params?: Record<string, never>) => Promise<BookmarkView[]>;
     setBookmark: (params: {
 	room_id: string,
@@ -3126,6 +3158,10 @@ export type Rpc = {
 	service?: string | null,
 	tunnel?: boolean,
 }) => Promise<UrlPreviewView | null>;
+    eventReactions: (params: {
+	room_id: string,
+	event_id: string,
+}) => Promise<ReactionGroup[]>;
     reactionShortcodes: (params: {
 	room_id: string,
 	event_id: string,
@@ -3832,10 +3868,16 @@ export type Rpc = {
     listThreads: (params: {
 	room_id: string,
 	from?: string | null,
+	participated?: boolean,
 }) => Promise<{
 	roots: TimelineItemView[],
 	next_batch: string | null,
 }>;
+    threadReplies: (params: {
+	room_id: string,
+	root_event_id: string,
+	limit?: number | null,
+}) => Promise<ThreadReplyView[]>;
     eventSource: (params: {
 	room_id: string,
 	event_id: string,
@@ -3975,6 +4017,9 @@ export type RpcMethods = {
   'account.search_user_directory': Rpc['account']['searchUserDirectory'];
   'account.dismissed_invites': Rpc['account']['dismissedInvites'];
   'account.set_invite_dismissed': Rpc['account']['setInviteDismissed'];
+  'account.thread_sidebar': Rpc['account']['threadSidebar'];
+  'account.set_thread_pin': Rpc['account']['setThreadPin'];
+  'account.set_thread_dismissed': Rpc['account']['setThreadDismissed'];
   'account.bookmarks': Rpc['account']['bookmarks'];
   'account.set_bookmark': Rpc['account']['setBookmark'];
   'account.media_preview_config': Rpc['account']['mediaPreviewConfig'];
@@ -4092,6 +4137,7 @@ export type RpcMethods = {
   'messages.end_poll': Rpc['messages']['endPoll'];
   'messages.send_gesture': Rpc['messages']['sendGesture'];
   'messages.url_preview': Rpc['messages']['urlPreview'];
+  'messages.event_reactions': Rpc['messages']['eventReactions'];
   'messages.reaction_shortcodes': Rpc['messages']['reactionShortcodes'];
   'messages.reaction_event_ids': Rpc['messages']['reactionEventIds'];
   'messages.redact_reaction': Rpc['messages']['redactReaction'];
@@ -4268,6 +4314,7 @@ export type RpcMethods = {
   'timeline.events': Rpc['timeline']['events'];
   'timeline.timestamp_to_event': Rpc['timeline']['timestampToEvent'];
   'timeline.list_threads': Rpc['timeline']['listThreads'];
+  'timeline.thread_replies': Rpc['timeline']['threadReplies'];
   'timeline.event_source': Rpc['timeline']['eventSource'];
   'timeline.unredacted_event': Rpc['timeline']['unredactedEvent'];
   'timeline.edit_history': Rpc['timeline']['editHistory'];
@@ -4328,6 +4375,9 @@ export function createRpc(call: RpcCall): Rpc {
       searchUserDirectory: (params) => call('account.search_user_directory', params) as ReturnType<Rpc['account']['searchUserDirectory']>,
       dismissedInvites: (params = {}) => call('account.dismissed_invites', params) as ReturnType<Rpc['account']['dismissedInvites']>,
       setInviteDismissed: (params) => call('account.set_invite_dismissed', params) as ReturnType<Rpc['account']['setInviteDismissed']>,
+      threadSidebar: (params = {}) => call('account.thread_sidebar', params) as ReturnType<Rpc['account']['threadSidebar']>,
+      setThreadPin: (params) => call('account.set_thread_pin', params) as ReturnType<Rpc['account']['setThreadPin']>,
+      setThreadDismissed: (params) => call('account.set_thread_dismissed', params) as ReturnType<Rpc['account']['setThreadDismissed']>,
       bookmarks: (params = {}) => call('account.bookmarks', params) as ReturnType<Rpc['account']['bookmarks']>,
       setBookmark: (params) => call('account.set_bookmark', params) as ReturnType<Rpc['account']['setBookmark']>,
       mediaPreviewConfig: (params) => call('account.media_preview_config', params) as ReturnType<Rpc['account']['mediaPreviewConfig']>,
@@ -4457,6 +4507,7 @@ export function createRpc(call: RpcCall): Rpc {
       endPoll: (params) => call('messages.end_poll', params) as ReturnType<Rpc['messages']['endPoll']>,
       sendGesture: (params) => call('messages.send_gesture', params) as ReturnType<Rpc['messages']['sendGesture']>,
       urlPreview: (params) => call('messages.url_preview', params) as ReturnType<Rpc['messages']['urlPreview']>,
+      eventReactions: (params) => call('messages.event_reactions', params) as ReturnType<Rpc['messages']['eventReactions']>,
       reactionShortcodes: (params) => call('messages.reaction_shortcodes', params) as ReturnType<Rpc['messages']['reactionShortcodes']>,
       reactionEventIds: (params) => call('messages.reaction_event_ids', params) as ReturnType<Rpc['messages']['reactionEventIds']>,
       redactReaction: (params) => call('messages.redact_reaction', params) as ReturnType<Rpc['messages']['redactReaction']>,
@@ -4655,6 +4706,7 @@ export function createRpc(call: RpcCall): Rpc {
       events: (params) => call('timeline.events', params) as ReturnType<Rpc['timeline']['events']>,
       timestampToEvent: (params) => call('timeline.timestamp_to_event', params) as ReturnType<Rpc['timeline']['timestampToEvent']>,
       listThreads: (params) => call('timeline.list_threads', params) as ReturnType<Rpc['timeline']['listThreads']>,
+      threadReplies: (params) => call('timeline.thread_replies', params) as ReturnType<Rpc['timeline']['threadReplies']>,
       eventSource: (params) => call('timeline.event_source', params) as ReturnType<Rpc['timeline']['eventSource']>,
       unredactedEvent: (params) => call('timeline.unredacted_event', params) as ReturnType<Rpc['timeline']['unredactedEvent']>,
       editHistory: (params) => call('timeline.edit_history', params) as ReturnType<Rpc['timeline']['editHistory']>,

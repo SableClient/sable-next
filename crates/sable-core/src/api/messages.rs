@@ -29,7 +29,7 @@ use crate::outgoing::sticker_info;
 use crate::outgoing::{gif_content, location_content, message_content, reply_to, thread_reply};
 use crate::protocol::{
     AttachmentInfoView, ComposerContent, ComposerPill, GestureView, ImageSourcePackReferenceView,
-    ImageSourcePackView, MessageKind, PackImageInfoView, PerMessageProfileView,
+    ImageSourcePackView, MessageKind, PackImageInfoView, PerMessageProfileView, ReactionGroup,
     ReactionShortcodeView, RpcCode, RpcError, ScheduledMessageView, SubscriptionId, UrlPreviewView,
 };
 use crate::{Core, ResultExt, view};
@@ -63,6 +63,7 @@ domain! {
     end_poll,
     send_gesture,
     url_preview,
+    event_reactions,
     reaction_shortcodes,
     reaction_event_ids,
     redact_reaction,
@@ -1205,6 +1206,23 @@ impl Handler for RememberStickerParams {
 
     async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
         core.remember_sticker(&self.key, self.sync).await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct EventReactionsParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+}
+
+impl Handler for EventReactionsParams {
+    type Ok = Vec<ReactionGroup>;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Vec<ReactionGroup>, RpcError> {
+        core.event_reactions(&self.room_id, &self.event_id).await
     }
 }
 

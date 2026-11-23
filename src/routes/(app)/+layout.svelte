@@ -24,6 +24,10 @@
   import { OpenRoomSearch, provideOpenRoomSearch } from '#lib/features/room/room-panels.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
+  import {
+    provideThreadSidebar,
+    ThreadSidebar,
+  } from '#lib/features/sidebar/thread-sidebar.svelte.js';
   import { provideRecentReactions, RecentReactions } from '#lib/emoji/recents.svelte.js';
   import { provideStickerHistory, StickerHistory } from '#lib/emoji/sticker-history.svelte.js';
   import { EventItems, provideEventItems } from '#lib/features/room/messages/event-items.svelte.js';
@@ -184,6 +188,8 @@
   onDestroy(() => stopSearchPeers?.());
   const roomList = new RoomList(core);
   provideRoomList(roomList);
+  const threadSidebar = new ThreadSidebar(core);
+  provideThreadSidebar(threadSidebar);
   $effect(() => {
     roomList.setOptions(roomListOptions());
   });
@@ -989,6 +995,7 @@
       dismissedInvites.start(core);
       presenceSharing.start(core);
       presenceOverride.start(core);
+      threadSidebar.start();
       dmSpaces.start(core);
       spaceNotifications.start(core);
       mediaPreviewSettings.start(core);
@@ -1003,6 +1010,7 @@
       dismissedInvites.stop();
       presenceSharing.stop();
       presenceOverride.stop();
+      threadSidebar.stop();
       dmSpaces.stop();
       spaceNotifications.stop();
       mediaPreviewSettings.stop();

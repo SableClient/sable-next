@@ -200,7 +200,10 @@
     ) {
       return;
     }
-    if (link.pathname === pathname) {
+    if (
+      link.pathname === pathname &&
+      new URL(link.href).searchParams.get('thread') === page.url.searchParams.get('thread')
+    ) {
       event.preventDefault();
       setOpen(false);
       return;

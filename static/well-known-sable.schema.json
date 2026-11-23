@@ -417,6 +417,11 @@
           "type": "boolean",
           "default": true
         },
+        "showActiveThreadsInSidebar": {
+          "title": "Show recent threads in the sidebar",
+          "type": "boolean",
+          "default": true
+        },
         "hour24Clock": {
           "title": "24-hour clock",
           "type": "boolean",
@@ -1289,6 +1294,11 @@
         },
         "showSpaceEvents": {
           "title": "Show today’s events in spaces",
+          "type": "boolean",
+          "default": true
+        },
+        "showActiveThreadsInSidebar": {
+          "title": "Show recent threads in the sidebar",
           "type": "boolean",
           "default": true
         },

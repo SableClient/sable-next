@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, UserId};
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, UserId};
 use sable_model::truncate::truncate_graphemes;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -12,7 +12,7 @@ use serde_with::{DefaultOnError, serde_as};
 use crate::Core;
 use crate::ResultExt;
 use crate::api::packs::ListOk;
-use crate::protocol::{ReactionShortcodeView, RpcCode, RpcError};
+use crate::protocol::{ReactionGroup, ReactionShortcodeView, RpcCode, RpcError};
 use crate::widgets::RelationsFilter;
 
 const MAX_SHORTCODE_BYTES: usize = 100;
@@ -85,19 +85,13 @@ impl Core {
         }
     }
 
-    /// Every `m.reaction` event `sender` sent to `event_id` with `key`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the relations cannot be fetched or pagination does not advance.
-    pub(crate) async fn reaction_event_ids(
+    async fn reaction_relations(
         &self,
         room_id: &OwnedRoomId,
         event_id: &OwnedEventId,
-        key: &str,
-        sender: &UserId,
-    ) -> Result<Vec<OwnedEventId>, RpcError> {
-        let mut found = Vec::new();
+        context: &'static str,
+    ) -> Result<Vec<Value>, RpcError> {
+        let mut events = Vec::new();
         let mut seen_pages = HashSet::new();
         let mut from: Option<String> = None;
         loop {
@@ -115,23 +109,57 @@ impl Core {
                     },
                 )
                 .await?;
-            for event in &page.chunk {
-                if let Some(id) = reaction_id(event, event_id, key, sender)
-                    && !found.contains(&id)
-                {
-                    found.push(id);
-                }
-            }
+            events.extend(page.chunk);
             let Some(next) = page.next_batch else {
-                return Ok(found);
+                return Ok(events);
             };
             if !seen_pages.insert(next.clone()) {
-                return Err(
-                    self.failed("reaction_event_ids", "reaction pagination did not advance")
-                );
+                return Err(self.failed(context, "reaction pagination did not advance"));
             }
             from = Some(next);
         }
+    }
+
+    /// Every `m.reaction` event `sender` sent to `event_id` with `key`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the relations cannot be fetched or pagination does not advance.
+    pub(crate) async fn reaction_event_ids(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: &OwnedEventId,
+        key: &str,
+        sender: &UserId,
+    ) -> Result<Vec<OwnedEventId>, RpcError> {
+        let mut found = Vec::new();
+        for event in self
+            .reaction_relations(room_id, event_id, "reaction_event_ids")
+            .await?
+        {
+            if let Some(id) = reaction_id(&event, event_id, key, sender)
+                && !found.contains(&id)
+            {
+                found.push(id);
+            }
+        }
+        Ok(found)
+    }
+
+    /// Grouped `m.reaction` events targeting `event_id`, fetched from relations.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the relations cannot be fetched or pagination does not advance.
+    pub(crate) async fn event_reactions(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: &OwnedEventId,
+    ) -> Result<Vec<ReactionGroup>, RpcError> {
+        let events = self
+            .reaction_relations(room_id, event_id, "event_reactions")
+            .await?;
+        Ok(group_reactions(&events, event_id))
     }
 
     /// MSC4027 custom-image reactions, which the timeline's reaction groups omit.
@@ -190,20 +218,52 @@ impl Core {
     }
 }
 
+fn reaction_annotation<'a>(event: &'a Value, target: &EventId) -> Option<(&'a str, &'a str)> {
+    if event.get("type")?.as_str()? != "m.reaction" {
+        return None;
+    }
+    let relation = event.get("content")?.get("m.relates_to")?;
+    (relation.get("rel_type")?.as_str()? == "m.annotation"
+        && relation.get("event_id")?.as_str()? == target)
+        .then(|| {
+            Some((
+                event.get("sender")?.as_str()?,
+                relation.get("key")?.as_str()?,
+            ))
+        })?
+}
+
 fn reaction_id(
     event: &Value,
     target: &EventId,
     key: &str,
     sender: &UserId,
 ) -> Option<OwnedEventId> {
-    if event.get("type")?.as_str()? != "m.reaction" || event.get("sender")?.as_str()? != sender {
-        return None;
+    let (ev_sender, ev_key) = reaction_annotation(event, target)?;
+    (ev_sender == sender && ev_key == key).then(|| event.get("event_id")?.as_str()?.parse().ok())?
+}
+
+fn group_reactions(events: &[Value], target: &EventId) -> Vec<ReactionGroup> {
+    let mut groups: Vec<ReactionGroup> = Vec::new();
+    for event in events {
+        let Some((sender, key)) = reaction_annotation(event, target) else {
+            continue;
+        };
+        let Ok(sender) = OwnedUserId::try_from(sender) else {
+            continue;
+        };
+        if let Some(group) = groups.iter_mut().find(|group| group.key == key) {
+            if !group.senders.contains(&sender) {
+                group.senders.push(sender);
+            }
+        } else {
+            groups.push(ReactionGroup {
+                key: key.to_owned(),
+                senders: vec![sender],
+            });
+        }
     }
-    let relation = event.get("content")?.get("m.relates_to")?;
-    (relation.get("rel_type")?.as_str()? == "m.annotation"
-        && relation.get("event_id")?.as_str()? == target
-        && relation.get("key")?.as_str()? == key)
-        .then(|| event.get("event_id")?.as_str()?.parse().ok())?
+    groups
 }
 
 fn shortcodes(events: &[TimelineEvent], target: &EventId) -> Vec<ReactionShortcodeView> {
@@ -244,7 +304,31 @@ mod tests {
     use matrix_sdk::ruma::{event_id, serde::Raw, user_id};
     use serde_json::json;
 
-    use super::{can_annotate, is_redacted, shortcodes};
+    use super::{can_annotate, group_reactions, is_redacted, shortcodes};
+
+    #[test]
+    fn group_reactions_preserves_order_and_deduplicates_senders() {
+        let rx = |ty, sender, target, key| {
+            json!({
+                "type": ty,
+                "sender": sender,
+                "content": { "m.relates_to": { "rel_type": "m.annotation", "event_id": target, "key": key } }
+            })
+        };
+        let events = [
+            rx("m.reaction", "@alice:example.org", "$target", "👍"),
+            rx("m.reaction", "@alice:example.org", "$target", "👍"),
+            rx("m.reaction", "@bob:example.org", "$target", "🎉"),
+            rx("m.reaction", "@bob:example.org", "$other", "🚀"),
+            rx("m.room.message", "@bob:example.org", "$target", "🤖"),
+        ];
+        let groups = group_reactions(&events, event_id!("$target"));
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].key, "👍");
+        assert_eq!(groups[0].senders, [user_id!("@alice:example.org")]);
+        assert_eq!(groups[1].key, "🎉");
+        assert_eq!(groups[1].senders, [user_id!("@bob:example.org")]);
+    }
 
     #[test]
     fn annotation_targets_are_checked_by_relation_type() {

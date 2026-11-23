@@ -37,7 +37,7 @@
   }
 </script>
 
-{#if room || roomList.settled || !page.url.searchParams.has('event')}
+{#if room || roomList.settled || (!page.url.searchParams.has('event') && !page.url.searchParams.has('thread'))}
   {#if !roomTimeline && room?.room_kind === 'forum'}
     <ForumPage {roomId} />
   {:else if !roomTimeline && room?.room_kind === 'calendar'}

@@ -16,6 +16,7 @@ import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
+import ThreadIcon from 'phosphor-svelte/lib/ScribbleLoopIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
@@ -113,6 +114,13 @@ export const appearanceCategory: SettingsCategory = {
       section: 'sidebar',
       icon: CalendarBlankIcon,
       name: 'settings.showSpaceEvents',
+      type: 'boolean',
+    },
+    {
+      key: 'showActiveThreadsInSidebar',
+      section: 'sidebar',
+      icon: ThreadIcon,
+      name: 'settings.showActiveThreadsInSidebar',
       type: 'boolean',
     },
     {

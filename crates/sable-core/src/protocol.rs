@@ -2104,6 +2104,15 @@ pub struct EditVersionView {
     pub html: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ThreadReplyView {
+    pub event_id: String,
+    pub sender: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub timestamp: u64,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct ThreadSummaryView {
@@ -2113,6 +2122,15 @@ pub struct ThreadSummaryView {
     /// fallback like a reply preview. Absent for a local echo or an unloaded
     /// event.
     pub latest_event_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typegen", specta(optional, type = Option<specta_typescript::Number>))]
+    pub latest_timestamp: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typegen", specta(optional))]
+    pub latest_sender: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "typegen", specta(optional))]
+    pub current_user_participated: Option<bool>,
     pub latest_body: Option<String>,
     /// What the latest reply was when it has no body to show.
     pub latest_fallback: Option<ReplyFallbackView>,
@@ -3371,4 +3389,20 @@ pub struct BookmarkView {
     pub event_ts: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub bookmarked_ts: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ThreadRefView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ThreadSidebarView {
+    pub pins: Vec<ThreadRefView>,
+    pub dismissed: Vec<ThreadRefView>,
 }

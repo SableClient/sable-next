@@ -1,8 +1,43 @@
 import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
+import { COLD_BOOT_TIMEOUT } from './pages/AppShell';
 
 test.use({ storageState: SIGNED_OUT, viewport: { width: 900, height: 800 }, hasTouch: true });
+
+test('personal pins and recent participated threads open directly from the room tree', async ({
+  page,
+  installRoomCore,
+}) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await installRoomCore('thread_discovery');
+  await page.goto('/space/!alpha%3Aexample.test/!room%3Aexample.test');
+  await expect(page.locator('.timeline-viewport:not(.initial)')).toBeVisible({
+    timeout: COLD_BOOT_TIMEOUT,
+  });
+
+  const nav = page.getByRole('navigation', { name: en.nav.primary });
+  await expect(nav.getByRole('treeitem', { name: /Release follow-up/ })).toBeVisible();
+  await expect(
+    nav.getByRole('treeitem', { name: /Archived discussion|Welcome thread/ })
+  ).toHaveCount(0);
+
+  await page
+    .locator('.room-header')
+    .getByRole('button', { name: /^Threads/ })
+    .click();
+  const archived = page.getByRole('listitem').filter({ hasText: 'Archived discussion' });
+  await archived.getByRole('button', { name: en.timeline.threadPin }).click();
+  const pinned = nav.getByRole('treeitem', { name: 'Archived discussion' });
+  await expect(pinned).toBeVisible();
+
+  await pinned.click();
+  const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });
+  await expect(thread).toBeVisible();
+  await expect(thread.getByRole('heading', { name: 'Archived discussion' })).toBeVisible();
+  await thread.getByRole('button', { name: en.timeline.threadUnpin }).click();
+  await expect(pinned).toHaveCount(0);
+});
 
 test('the thread screen keeps the timeline and the composer inside the viewport', async ({
   app,

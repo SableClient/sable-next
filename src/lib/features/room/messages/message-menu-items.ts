@@ -23,7 +23,7 @@ import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 import ShareIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
 import StealIcon from 'phosphor-svelte/lib/StickerIcon';
-import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
+import ThreadIcon from 'phosphor-svelte/lib/ScribbleLoopIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 

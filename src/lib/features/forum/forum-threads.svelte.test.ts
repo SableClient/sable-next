@@ -28,6 +28,7 @@ function fixture(items: TimelineItemView[], listed: TimelineItemView[]) {
     main: { unread: 0, notifying: 0, highlight: 0, receipt_event_id: null },
     server_notifications: 0,
     server_highlights: 0,
+    unthreaded_receipt_timestamp: null,
     threads: [],
   });
   core.rpc.timeline.listThreads.mockResolvedValue({ roots: listed, next_batch: null });
@@ -75,6 +76,9 @@ test('an older redacted thread stays hidden through discovery refresh and reopen
     thread_summary: {
       num_replies: 2,
       latest_event_id: '$reply',
+      latest_timestamp: null,
+      latest_sender: null,
+      current_user_participated: null,
       latest_body: 'Old reply',
       latest_fallback: null,
     },

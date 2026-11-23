@@ -32,6 +32,7 @@ export type RoomCoreMode =
   | 'direct'
   | 'room_name_overflow'
   | 'thread_links'
+  | 'thread_discovery'
   | 'thread_error'
   | 'loading'
   | 'error'
@@ -292,7 +293,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     const joinedRooms: RoomListItemView[] =
       workerMode === 'voice'
         ? [room, secondRoom, invitedRoom, voiceRoom]
-        : workerMode === 'spaces'
+        : workerMode === 'spaces' || workerMode === 'thread_discovery'
           ? [room, secondRoom, invitedRoom, alphaSpace, betaSpace, gammaSpace]
           : workerMode === 'tombstoned'
             ? [room, secondRoom, invitedRoom, tombstonedRoom, successorRoom]
@@ -624,6 +625,60 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       username: 'loud',
     };
     let activePort: FakePort | null = null;
+    let threadSidebar: {
+      pins: { room_id: string; event_id: string }[];
+      dismissed: { room_id: string; event_id: string }[];
+    } = { pins: [], dismissed: [] };
+    function updateThreadSidebar(
+      roomId: string,
+      eventId: string,
+      key: 'pins' | 'dismissed',
+      enabled: boolean
+    ) {
+      const other = key === 'pins' ? 'dismissed' : 'pins';
+      const keep = (entry: { room_id: string; event_id: string }) =>
+        entry.room_id !== roomId || entry.event_id !== eventId;
+      threadSidebar = {
+        ...threadSidebar,
+        [key]: enabled
+          ? [...threadSidebar[key].filter(keep), { room_id: roomId, event_id: eventId }]
+          : threadSidebar[key].filter(keep),
+        [other]: enabled ? threadSidebar[other].filter(keep) : threadSidebar[other],
+      };
+      return threadSidebar;
+    }
+    const discoveryThreads: TimelineItemView[] = (() => {
+      if (workerMode !== 'thread_discovery') return [];
+      const seed = timelineItems('General')[0];
+      const day = 24 * 60 * 60 * 1000;
+      return [
+        { id: 'release', text: 'Release follow-up', age: 9, replyAge: 0 },
+        { id: 'archive', text: 'Archived discussion', age: 14, replyAge: 12 },
+        { id: 'welcome', text: 'Welcome thread', age: 1, replyAge: 1 },
+      ].map(({ id, text, age, replyAge }): TimelineItemView => ({
+        ...seed,
+        id,
+        event_id: `$${id}:example.test`,
+        timestamp: Date.now() - age * day,
+        content: {
+          kind: 'message',
+          body: text,
+          html: text,
+          msgtype: 'text',
+          edited: false,
+          jumbo: null,
+        },
+        thread_summary: {
+          num_replies: 2,
+          latest_event_id: `$${id}-reply:example.test`,
+          latest_timestamp: Date.now() - replyAge * day,
+          latest_sender: id === 'release' ? '@bob:example.test' : '@alice:example.test',
+          current_user_participated: id !== 'welcome',
+          latest_body: id === 'release' ? 'Ready to ship' : 'A reply',
+          latest_fallback: null,
+        },
+      }));
+    })();
 
     function fakeSections(rooms: readonly RoomListItemView[]): RoomSectionsUpdate {
       const listed = rooms.filter(
@@ -667,7 +722,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           section('direct', listed.filter(direct), invited.filter(direct)),
           ...rooms
             .filter((entry) => entry.room_kind === 'space')
-            .map((space) => section(space.room_id, [], [])),
+            .map((space) =>
+              section(
+                space.room_id,
+                workerMode === 'thread_discovery' && space === alphaSpace ? [room] : [],
+                []
+              )
+            ),
         ],
         removed: [],
         badges: rooms
@@ -675,7 +736,20 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           .map((entry) => ({ room_id: entry.room_id, counts: entry.counts })),
         quiet_rooms: [],
         app_badge: null,
-        room_spaces: null,
+        room_spaces:
+          workerMode === 'thread_discovery'
+            ? [
+                {
+                  room_id: room.room_id,
+                  joined: true,
+                  levels: [[alphaSpace.room_id]],
+                  root_name: 'Alpha',
+                  parent: null,
+                  containing: [alphaSpace.room_id],
+                  descendants: [],
+                },
+              ]
+            : null,
       };
     }
 
@@ -782,6 +856,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           return [...items.slice(60), ...arrivals];
         case 'forward_history':
           return items.slice(0, 5);
+        case 'thread_discovery':
+          return roomName === 'General' && items.length >= 2
+            ? [...items.slice(0, -2), discoveryThreads[0], items[items.length - 1]]
+            : items;
         default:
           return items;
       }
@@ -1072,6 +1150,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         saveOnboarding();
         return null;
       },
+      'account.thread_sidebar': () => threadSidebar,
+      'account.set_thread_pin': ({ room_id, event_id, pinned }) =>
+        updateThreadSidebar(room_id, event_id, 'pins', pinned),
+      'account.set_thread_dismissed': ({ room_id, event_id, dismissed }) =>
+        updateThreadSidebar(room_id, event_id, 'dismissed', dismissed),
       'account.sealed_data': (params) => ({
         content: accountData.get(params.event_type) ?? null,
         state: 'plain',
@@ -1132,6 +1215,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       'messages.bulk_redact': () => 0,
       'messages.delete_thread': () => null,
+      'messages.event_reactions': (params) =>
+        workerMode === 'thread_discovery'
+          ? params.event_id === '$release:example.test'
+            ? [{ key: '🚨', senders: ['@bob:example.test'] }]
+            : params.event_id === '$release-reply:example.test'
+              ? [{ key: '✅', senders: ['@bob:example.test'] }]
+              : []
+          : [],
       'messages.reaction_shortcodes': () => [],
       'messages.reaction_event_ids': () => [],
       'messages.redact_reaction': () => null,
@@ -1388,7 +1479,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         delayed_events: false,
         rtc_transports: 'none',
       }),
-      'calls.support': () => ({ has_focus: false, can_join: false }),
+      'calls.support': () => ({
+        has_focus: workerMode === 'thread_discovery',
+        can_join: workerMode === 'thread_discovery',
+      }),
       'calls.turn_server': () => ({
         username: 'e2e',
         password: 'e2e',
@@ -1457,6 +1551,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           redactable: false,
           visibility: 'always',
         };
+        if (workerMode === 'thread_discovery' && focus.kind === 'thread') {
+          return {
+            subscription,
+            items: discoveryThreads.filter((root) => root.event_id === focus.root_event_id),
+            aggregations: [],
+          };
+        }
         return {
           subscription,
           items: unreadContext
@@ -1644,8 +1745,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         return { direction: params.direction, reached_end: reachedEnd };
       },
       'timeline.event_items': (params) => {
-        const room = rooms.get(params.room_id);
-        const items = room ? timelineItems(room.name ?? '') : [];
+        const candidateRoom = rooms.get(params.room_id);
+        const items = [
+          ...(candidateRoom ? timelineItems(candidateRoom.name ?? '') : []),
+          ...(params.room_id === room.room_id ? discoveryThreads : []),
+        ];
         return params.event_ids.flatMap((eventId) =>
           items.filter((candidate) => candidate.event_id === eventId)
         );
@@ -1655,10 +1759,29 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         main: { unread: 0, notifying: 0, highlight: 0, receipt_event_id: null },
         server_notifications: 0,
         server_highlights: 0,
-        threads: [],
+        unthreaded_receipt_timestamp: null,
+        threads:
+          workerMode === 'thread_discovery'
+            ? [
+                {
+                  root_event_id: '$release:example.test',
+                  unread: 2,
+                  notifying: 0,
+                  highlight: 0,
+                  receipt_event_id: '$previous:example.test',
+                },
+              ]
+            : [],
       }),
       'timeline.timestamp_to_event': () => null,
-      'timeline.list_threads': () => ({ roots: [], next_batch: null }),
+      'timeline.list_threads': ({ room_id, participated }) => ({
+        roots:
+          room_id === room.room_id
+            ? discoveryThreads.filter((root) => !participated || root.id !== 'welcome')
+            : [],
+        next_batch: null,
+      }),
+      'timeline.thread_replies': () => [],
       'timeline.event_source': (params) => {
         if (params.event_id === '$missing:example.test') throw new Error('event not found');
         return {

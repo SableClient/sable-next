@@ -43,6 +43,7 @@ accepts the same settings except those marked deployment only.
 - `tintRoomIcons` (Theme vector room icons): `true` or `false`. Default `false`.
 - `showBridgeBadges` (Show the bridged network on room icons): `true` or `false`. Default `true`.
 - `showSpaceEvents` (Show today’s events in spaces): `true` or `false`. Default `true`.
+- `showActiveThreadsInSidebar` (Show recent threads in the sidebar): `true` or `false`. Default `true`.
 
 ## Timeline
 

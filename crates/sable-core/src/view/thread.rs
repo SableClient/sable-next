@@ -1,8 +1,8 @@
 use sable_model::text::visible_name;
 
-use matrix_sdk::ruma::OwnedEventId;
 use matrix_sdk::ruma::events::room::message::{MessageType, RoomMessageEventContent};
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
+use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, OwnedEventId};
 use matrix_sdk_ui::timeline::{
     EmbeddedEvent, MsgLikeContent, MsgLikeKind, TimelineDetails, TimelineEventItemId,
     TimelineItemContent,
@@ -13,7 +13,7 @@ use serde_with::{DefaultOnError, serde_as};
 use crate::matrix_html::{PreviewEmote, preview_body, preview_emotes};
 use sable_model::event_preview::VERIFICATION_REQUEST_MSGTYPE;
 
-use crate::protocol::{ReplyFallbackView, ReplyView, ThreadSummaryView};
+use crate::protocol::{ReplyFallbackView, ReplyView, ThreadReplyView, ThreadSummaryView};
 
 use super::content::formatted_body;
 use super::media::gallery_filenames;
@@ -78,20 +78,26 @@ pub(super) fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
 pub(super) fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
     let summary = msg_like(content)?.thread_summary.as_ref()?;
 
-    let (latest_event_id, (latest_body, latest_fallback, _)) = match &summary.latest_event {
-        TimelineDetails::Ready(event) => (
-            match &event.identifier {
-                TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
-                TimelineEventItemId::TransactionId(_) => None,
-            },
-            embedded_reply_preview(event),
-        ),
-        _ => (None, (None, None, Vec::new())),
-    };
+    let (latest_event_id, latest_timestamp, latest_sender, (latest_body, latest_fallback, _)) =
+        match &summary.latest_event {
+            TimelineDetails::Ready(event) => (
+                match &event.identifier {
+                    TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
+                    TimelineEventItemId::TransactionId(_) => None,
+                },
+                Some(event.timestamp.0.into()),
+                Some(event.sender.to_string()),
+                embedded_reply_preview(event),
+            ),
+            _ => (None, None, None, (None, None, Vec::new())),
+        };
 
     Some(ThreadSummaryView {
         num_replies: summary.num_replies,
         latest_event_id,
+        latest_timestamp,
+        latest_sender,
+        current_user_participated: None,
         latest_body,
         latest_fallback,
     })
@@ -102,14 +108,64 @@ pub(super) fn merge_thread_summary(
     bundled: Option<ThreadSummaryView>,
 ) -> Option<ThreadSummaryView> {
     match (local, bundled) {
-        (Some(local), Some(bundled)) if bundled.num_replies > local.num_replies => {
+        (Some(local), Some(bundled)) => {
+            let (latest_event_id, latest_body, latest_fallback) = if local.latest_event_id.is_some()
+            {
+                (
+                    local.latest_event_id,
+                    local.latest_body,
+                    local.latest_fallback,
+                )
+            } else {
+                (
+                    bundled.latest_event_id,
+                    bundled.latest_body,
+                    bundled.latest_fallback,
+                )
+            };
             Some(ThreadSummaryView {
-                num_replies: bundled.num_replies,
-                ..local
+                num_replies: local.num_replies.max(bundled.num_replies),
+                latest_event_id,
+                latest_timestamp: local.latest_timestamp.or(bundled.latest_timestamp),
+                latest_sender: local.latest_sender.or(bundled.latest_sender),
+                current_user_participated: local
+                    .current_user_participated
+                    .or(bundled.current_user_participated),
+                latest_body,
+                latest_fallback,
             })
         }
         (local, bundled) => local.or(bundled),
     }
+}
+
+pub(crate) fn thread_reply(raw: &serde_json::Value) -> Option<ThreadReplyView> {
+    let obj = raw.as_object()?;
+    if matches!(
+        obj.get("type").and_then(serde_json::Value::as_str),
+        Some("m.reaction" | "m.room.redaction")
+    ) {
+        return None;
+    }
+    if let Some(rel) = obj
+        .get("content")
+        .and_then(|c| c.get("m.relates_to"))
+        .and_then(serde_json::Value::as_object)
+        && (rel.get("key").is_some_and(|v| !v.is_null())
+            || rel
+                .get("rel_type")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|rel_type| rel_type != "m.thread"))
+    {
+        return None;
+    }
+    let ts: MilliSecondsSinceUnixEpoch =
+        serde::Deserialize::deserialize(obj.get("origin_server_ts")?).ok()?;
+    Some(ThreadReplyView {
+        event_id: obj.get("event_id")?.as_str()?.to_owned(),
+        sender: obj.get("sender")?.as_str()?.to_owned(),
+        timestamp: ts.0.into(),
+    })
 }
 
 #[serde_as]
@@ -127,6 +183,8 @@ struct BundledRelationsIn {
 struct BundledThreadIn {
     #[serde_as(deserialize_as = "DefaultOnError")]
     count: Option<u64>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    current_user_participated: Option<bool>,
     #[serde_as(as = "ObjectOrDefault")]
     latest_event: Option<BundledReplyIn>,
 }
@@ -137,6 +195,10 @@ struct BundledThreadIn {
 struct BundledReplyIn {
     #[serde_as(deserialize_as = "DefaultOnError")]
     event_id: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    origin_server_ts: Option<MilliSecondsSinceUnixEpoch>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    sender: Option<String>,
     #[serde_as(as = "ObjectOnly")]
     content: Option<BundledReplyContentIn>,
 }
@@ -203,6 +265,9 @@ pub(super) fn bundled_thread_summary(unsigned: &serde_json::Value) -> Option<Thr
     Some(ThreadSummaryView {
         num_replies: count,
         latest_event_id: latest.event_id,
+        latest_timestamp: latest.origin_server_ts.map(|ts| ts.0.into()),
+        latest_sender: latest.sender,
+        current_user_participated: summary.current_user_participated,
         latest_body,
         latest_fallback: verification.then_some(ReplyFallbackView::VerificationRequest),
     })
@@ -403,8 +468,11 @@ mod tests {
             "m.relations": {
                 "m.thread": {
                     "count": 3,
+                    "current_user_participated": true,
                     "latest_event": {
                         "event_id": "$reply:example.org",
+                        "origin_server_ts": 1_700_000_005_000_u64,
+                        "sender": "@bob:example.org",
                         "content": { "body": "Latest reply" }
                     }
                 }
@@ -417,6 +485,9 @@ mod tests {
             summary.latest_event_id.as_deref(),
             Some("$reply:example.org")
         );
+        assert_eq!(summary.latest_timestamp, Some(1_700_000_005_000));
+        assert_eq!(summary.latest_sender.as_deref(), Some("@bob:example.org"));
+        assert_eq!(summary.current_user_participated, Some(true));
         assert_eq!(summary.latest_body.as_deref(), Some("Latest reply"));
     }
 
@@ -471,20 +542,44 @@ mod tests {
 
     #[test]
     fn merge_prefers_the_larger_bundled_count_and_keeps_local_preview() {
-        let view = |num_replies, latest: &str| ThreadSummaryView {
+        let view = |num_replies, latest: Option<&str>| ThreadSummaryView {
             num_replies,
-            latest_event_id: Some(latest.to_owned()),
+            latest_event_id: latest.map(ToOwned::to_owned),
+            latest_timestamp: None,
+            latest_sender: None,
+            current_user_participated: None,
             latest_body: None,
             latest_fallback: None,
         };
-        let merged = merge_thread_summary(Some(view(0, "$local")), Some(view(5, "$bundled")))
-            .expect("summary");
+        let merged = merge_thread_summary(
+            Some(view(0, Some("$local"))),
+            Some(view(5, Some("$bundled"))),
+        )
+        .expect("summary");
         assert_eq!(merged.num_replies, 5);
         assert_eq!(merged.latest_event_id.as_deref(), Some("$local"));
-        let merged = merge_thread_summary(Some(view(7, "$local")), Some(view(5, "$bundled")))
-            .expect("summary");
+        let merged = merge_thread_summary(
+            Some(view(7, Some("$local"))),
+            Some(view(5, Some("$bundled"))),
+        )
+        .expect("summary");
         assert_eq!(merged.num_replies, 7);
-        assert!(merge_thread_summary(None, Some(view(2, "$b"))).is_some());
+        assert!(merge_thread_summary(None, Some(view(2, Some("$b")))).is_some());
+
+        let bundled = ThreadSummaryView {
+            num_replies: 2,
+            latest_event_id: Some("$bundled".to_owned()),
+            latest_timestamp: Some(42),
+            latest_sender: Some("@bob:example.org".to_owned()),
+            current_user_participated: Some(true),
+            latest_body: Some("Latest".to_owned()),
+            latest_fallback: None,
+        };
+        let fallback = merge_thread_summary(Some(view(1, None)), Some(bundled)).expect("summary");
+        assert_eq!(fallback.latest_event_id.as_deref(), Some("$bundled"));
+        assert_eq!(fallback.latest_body.as_deref(), Some("Latest"));
+        assert_eq!(fallback.latest_timestamp, Some(42));
+        assert_eq!(fallback.latest_sender.as_deref(), Some("@bob:example.org"));
     }
 
     #[test]
@@ -507,5 +602,49 @@ mod tests {
             bundled_thread_summary(&json!({ "m.relations": { "m.thread": { "count": 3 } } }))
                 .is_none()
         );
+    }
+
+    #[test]
+    fn thread_reply_filters_aggregations_and_extracts_fields() {
+        let reply = json!({
+            "event_id": "$r1",
+            "sender": "@bob:example.org",
+            "origin_server_ts": 1_700_000_000_000_u64,
+            "type": "m.room.message",
+            "content": { "m.relates_to": { "rel_type": "m.thread", "event_id": "$root" } }
+        });
+        assert_eq!(
+            thread_reply(&reply),
+            Some(ThreadReplyView {
+                event_id: "$r1".to_owned(),
+                sender: "@bob:example.org".to_owned(),
+                timestamp: 1_700_000_000_000,
+            })
+        );
+
+        for raw in [
+            json!({
+                "event_id": "$rx",
+                "sender": "@bob:example.org",
+                "origin_server_ts": 100,
+                "type": "m.reaction",
+                "content": { "m.relates_to": { "rel_type": "m.annotation", "key": "👍" } }
+            }),
+            json!({
+                "event_id": "$del",
+                "sender": "@bob:example.org",
+                "origin_server_ts": 100,
+                "type": "m.room.redaction"
+            }),
+            json!({
+                "event_id": "$ed",
+                "sender": "@bob:example.org",
+                "origin_server_ts": 100,
+                "type": "m.room.message",
+                "content": { "m.relates_to": { "rel_type": "m.replace", "event_id": "$r1" } }
+            }),
+        ] {
+            assert_eq!(thread_reply(&raw), None);
+        }
     }
 }
