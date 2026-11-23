@@ -36,7 +36,7 @@ outputs = ['node_modules/.pnpm/lock.yaml']
 [tasks.knope]
 description = "Run Knope, the changelog and release tool"
 run = "node scripts/release/knope.mjs"
-tools = { "github:knope-dev/knope" = { version = "0.23.2", version_prefix = "knope/v" } }
+tools = { "github:knope-dev/knope" = { version = "0.24.0", version_prefix = "knope/v" } }
 
 [tasks."knope:document-change"]
 description = "Document a change with Knope"
@@ -81,7 +81,7 @@ run = [
   { task = "check:settings-changes" },
   "cargo deny check",
 ]
-tools = { "github:bnjbvr/cargo-machete" = "0.9.2", "aqua:EmbarkStudios/cargo-deny" = "0.20.2" }
+tools = { "github:bnjbvr/cargo-machete" = "v0.10.1", "aqua:EmbarkStudios/cargo-deny" = "0.21.0" }
 
 [tasks."check:android"]
 description = "Lint the app crate for Android, with the NDK from tauri:setup:android"
@@ -117,13 +117,13 @@ run = [
   "cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test",
 ]
 raw = true
-tools = { "github:nextest-rs/nextest" = { version = "0.9.151", version_prefix = "cargo-nextest-" } }
+tools = { "github:nextest-rs/nextest" = { version = "0.9.152", version_prefix = "cargo-nextest-" } }
 
 [tasks.mutants]
 description = "Mutation-test Rust code, e.g. `mise run mutants -- --file crates/sable-core/src/messages.rs`"
 run = "cargo mutants --test-tool nextest --all-features"
 raw = true
-tools = { "cargo:cargo-mutants" = "27.1.0", "github:nextest-rs/nextest" = { version = "0.9.151", version_prefix = "cargo-nextest-" } }
+tools = { "cargo:cargo-mutants" = "27.1.0", "github:nextest-rs/nextest" = { version = "0.9.152", version_prefix = "cargo-nextest-" } }
 
 [tasks.doc]
 description = "Build Rust documentation with warnings denied"
