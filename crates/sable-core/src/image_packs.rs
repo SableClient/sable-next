@@ -711,37 +711,17 @@ impl Core {
                 return;
             }
         };
-        for event in events {
-            let Ok(value) = event.deserialize_as_unchecked::<serde_json::Value>() else {
-                continue;
-            };
-            let event_type = value
-                .get("type")
-                .and_then(|t| t.as_str())
-                .unwrap_or_default();
-            let Some(content) = value.get("content").filter(|content| {
-                [ROOM_EMOTES, ROOM_IMAGE_PACK].contains(&event_type)
-                    && content.as_object().is_some_and(|map| !map.is_empty())
-            }) else {
-                continue;
-            };
-            let state_key = value
-                .get("state_key")
-                .and_then(|k| k.as_str())
-                .unwrap_or_default();
-            let Ok(body) = Raw::new(content).map(Raw::cast_unchecked) else {
-                continue;
-            };
-            let request = ruma::api::client::state::send_state_event::v3::Request::new_raw(
-                to.to_owned(),
-                StateEventType::from(event_type),
-                state_key.to_owned(),
-                body,
-            );
-            if let Err(error) = client.send(request).await {
-                tracing::warn!(room = %to, event_type, %error, "image pack not copied to the upgraded room");
-            }
-        }
+        let events = events
+            .iter()
+            .filter_map(|event| event.deserialize_as_unchecked().ok())
+            .collect();
+        crate::rooms::copy_state(
+            client,
+            to,
+            &[ROOM_EMOTES.into(), ROOM_IMAGE_PACK.into()],
+            events,
+        )
+        .await;
     }
 
     async fn room_pack_state(

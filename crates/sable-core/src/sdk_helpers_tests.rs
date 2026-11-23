@@ -5203,3 +5203,91 @@ async fn a_room_created_in_a_space_names_it_as_its_canonical_parent() {
         })
     );
 }
+
+#[tokio::test]
+async fn an_upgraded_room_keeps_its_place_in_the_spaces_it_was_in() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let state = |kind: &str, key: &str, content: serde_json::Value| {
+        Raw::new(&json!({
+            "type": kind, "state_key": key, "sender": "@example:localhost",
+            "event_id": format!("${kind}{key}"), "origin_server_ts": 1, "content": content
+        }))
+        .unwrap()
+        .cast_unchecked()
+    };
+    let listed = json!({ "via": ["localhost"], "order": "a", "suggested": true });
+    let space = JoinedRoomBuilder::new(room_id!("!space:localhost"))
+        .add_state_event(state(
+            "m.room.create",
+            "",
+            json!({ "type": "m.space", "room_version": "11" }),
+        ))
+        .add_state_event(state(
+            "m.room.power_levels",
+            "",
+            json!({ "state_default": 50, "users": { "@example:localhost": 100 } }),
+        ))
+        .add_state_event(state("m.space.child", "!old:localhost", listed.clone()));
+    server.sync_room(&client, space).await;
+    let parent = json!({ "via": ["localhost"], "canonical": true });
+    let old = JoinedRoomBuilder::new(room_id!("!old:localhost")).add_state_event(state(
+        "m.space.parent",
+        "!space:localhost",
+        parent.clone(),
+    ));
+    server.sync_room(&client, old).await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/rooms/!old:localhost/upgrade"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "replacement_room": "!new:localhost" })),
+        )
+        .mount(server.server())
+        .await;
+    let put = |room: &str, kind: &str, key: &str, body: &serde_json::Value| {
+        Mock::given(method("PUT"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{room}/state/{kind}/{key}"
+            )))
+            .and(wiremock::matchers::body_json(body))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$sent" })))
+            .expect(1)
+    };
+    put(
+        "!new:localhost",
+        "m.space.parent",
+        "!space:localhost",
+        &parent,
+    )
+    .mount(server.server())
+    .await;
+    put(
+        "!space:localhost",
+        "m.space.child",
+        "!new:localhost",
+        &listed,
+    )
+    .mount(server.server())
+    .await;
+    put(
+        "!space:localhost",
+        "m.space.child",
+        "!old:localhost",
+        &json!({}),
+    )
+    .mount(server.server())
+    .await;
+    let core = core(&server, client).await;
+
+    let replacement = crate::api::rooms::UpgradeParams {
+        room_id: room_id!("!old:localhost").to_owned(),
+        new_version: "11".to_owned(),
+        additional_creators: Vec::new(),
+    }
+    .run(&core)
+    .await
+    .unwrap();
+
+    assert_eq!(replacement, "!new:localhost");
+}

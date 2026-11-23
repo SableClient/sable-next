@@ -14,6 +14,7 @@ use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::push::get_pushrules_all;
 use matrix_sdk::ruma::api::client::space::{SpaceHierarchyRoomsChunk, get_hierarchy};
+use matrix_sdk::ruma::api::client::state::send_state_event;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::directory::{Filter, PublicRoomsChunk, RoomTypeFilter};
 use matrix_sdk::ruma::events::StateEventType;
@@ -412,6 +413,75 @@ impl Core {
             EncryptionState::Encrypted => Ok(true),
             EncryptionState::NotEncrypted => Ok(false),
             EncryptionState::Unknown => Err(RpcCode::Unavailable.into()),
+        }
+    }
+
+    /// Synapse carries neither side of a space link across an upgrade and the
+    /// spec leaves it to MSC4168, so the replacement claims the old room's
+    /// spaces and each space we manage lists it in the old room's place. Best
+    /// effort, and harmless to repeat where the homeserver already did it.
+    pub(crate) async fn carry_space_links(&self, client: &Client, old: &RoomId, new: &RoomId) {
+        if let Some(room) = client.get_room(old) {
+            match self
+                .with_open_stores(async || room.get_state_events(StateEventType::SpaceParent).await)
+                .await
+            {
+                Ok(parents) => {
+                    let parents = parents
+                        .into_iter()
+                        .filter_map(|event| match event {
+                            RawAnySyncOrStrippedState::Sync(raw) => {
+                                raw.deserialize_as_unchecked().ok()
+                            }
+                            RawAnySyncOrStrippedState::Stripped(_) => None,
+                        })
+                        .collect();
+                    copy_state(client, new, &[StateEventType::SpaceParent], parents).await;
+                }
+                Err(error) => {
+                    tracing::warn!(room = %old, %error, "space parents not read for the upgraded room");
+                }
+            }
+        }
+
+        let Some(me) = client.user_id() else {
+            return;
+        };
+        for space in client.joined_space_rooms() {
+            let Ok(Some(mut child)) = self
+                .space_child_content(&space, old, "carry_space_links")
+                .await
+            else {
+                continue;
+            };
+            let managed = space
+                .power_levels()
+                .await
+                .is_ok_and(|levels| levels.user_can_send_state(me, StateEventType::SpaceChild));
+            if !managed {
+                continue;
+            }
+            // The replacement has no other server in it yet.
+            child.via = vec![me.server_name().to_owned()];
+            let space_id = space.room_id().to_owned();
+            let listed = self
+                .send_state(space_id.clone(), "m.space.child", new.as_str(), &child)
+                .await;
+            let moved = match listed {
+                Ok(_) => self
+                    .send_state(
+                        space_id.clone(),
+                        "m.space.child",
+                        old.as_str(),
+                        &serde_json::Map::new(),
+                    )
+                    .await
+                    .map(drop),
+                Err(error) => Err(error),
+            };
+            if let Err(error) = moved {
+                tracing::warn!(space = %space_id, ?error, "space listing not moved to the upgraded room");
+            }
         }
     }
 
@@ -826,6 +896,43 @@ impl Core {
             })
             .and_then(matrix_sdk_ui::timeline::EventTimelineItem::local_echo_send_handle)
             .ok_or_else(|| RpcCode::UnknownLocalEcho.into())
+    }
+}
+
+/// Sends the non-empty content of each event of `types` as the same state in `to`. Best effort.
+pub(crate) async fn copy_state(
+    client: &Client,
+    to: &RoomId,
+    types: &[StateEventType],
+    events: Vec<serde_json::Value>,
+) {
+    for value in events {
+        let (Some(event_type), Some(state_key)) = (
+            value.get("type").and_then(serde_json::Value::as_str),
+            value.get("state_key").and_then(serde_json::Value::as_str),
+        ) else {
+            continue;
+        };
+        let event_type = StateEventType::from(event_type);
+        if !types.contains(&event_type) {
+            continue;
+        }
+        let Some(Ok(content)) = value
+            .get("content")
+            .filter(|content| content.as_object().is_some_and(|map| !map.is_empty()))
+            .map(ruma::serde::Raw::new)
+        else {
+            continue;
+        };
+        let request = send_state_event::v3::Request::new_raw(
+            to.to_owned(),
+            event_type.clone(),
+            state_key.to_owned(),
+            content.cast_unchecked(),
+        );
+        if let Err(error) = client.send(request).await {
+            tracing::warn!(room = %to, %event_type, state_key, %error, "state not copied to the upgraded room");
+        }
     }
 }
 

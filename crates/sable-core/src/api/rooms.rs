@@ -717,6 +717,8 @@ impl Handler for UpgradeParams {
             .or_failed(core, "upgrade_room")?;
         core.copy_room_packs(&client, &old_room, &response.replacement_room)
             .await;
+        core.carry_space_links(&client, &old_room, &response.replacement_room)
+            .await;
         core.copy_presence_hint(&old_room, &response.replacement_room)
             .await;
         core.carry_presence_sharing(&old_room, &response.replacement_room)
