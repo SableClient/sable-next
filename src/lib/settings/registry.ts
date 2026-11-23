@@ -48,6 +48,11 @@ export interface SettingsContext {
 
 export type SettingsGate = (context: SettingsContext) => boolean;
 
+export function settingShown(setting: SettingsTargetDefinition, preferences: Preferences): boolean {
+  const when = setting.shownWhen;
+  return when === undefined || preferences[when.key] === when.value;
+}
+
 export function settingsContext(core: {
   oauthMetadata: unknown;
   qrGrantSupported: boolean;
@@ -64,13 +69,14 @@ export interface SettingsTargetDefinition {
   description?: string;
   /** Left out entirely where the platform has nothing for it to show. */
   supported?: SettingsGate;
+  shownWhen?: { key: SelectPreference; value: string };
   terms?: readonly string[];
 }
 
 interface BaseSetting extends SettingsTargetDefinition {
   section: string;
-  /** Rendered disabled until this preference is on, or holds `value`. */
-  gatedBy?: BooleanPreference | { key: SelectPreference; value: string };
+  /** Rendered disabled until this preference is on. */
+  gatedBy?: BooleanPreference;
   /** The feature behind this setting does not exist yet; shown disabled. */
   unavailable?: true;
   /** Rendered disabled unless the homeserver advertises this unstable feature. */

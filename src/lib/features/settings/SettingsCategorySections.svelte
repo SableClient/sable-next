@@ -12,7 +12,12 @@
   import { panelsFor } from './category-panels.js';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
-  import { settingFocusId, settingsCategories, settingsContext } from '#lib/settings/registry.js';
+  import {
+    settingFocusId,
+    settingShown,
+    settingsCategories,
+    settingsContext,
+  } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import {
     isLockedPreference,
@@ -35,7 +40,10 @@
 
   const items = $derived(
     category.items.filter(
-      (setting) => setting.supported?.(context) !== false && setting.panel === undefined
+      (setting) =>
+        setting.supported?.(context) !== false &&
+        setting.panel === undefined &&
+        settingShown(setting, preferences)
     )
   );
 
@@ -60,16 +68,13 @@
 
   /** A gate this platform never renders would disable its dependants forever. */
   function gated(setting: SettingDefinition): boolean {
-    const gate = setting.gatedBy;
-    if (gate === undefined) return false;
-    if (typeof gate === 'string') return shown.has(gate) && !preferences[gate];
-    return shown.has(gate.key) && preferences[gate.key] !== gate.value;
+    return (
+      setting.gatedBy !== undefined && shown.has(setting.gatedBy) && !preferences[setting.gatedBy]
+    );
   }
 
   function gateName(setting: SettingDefinition): string {
-    const gate = setting.gatedBy;
-    const key = typeof gate === 'object' ? gate.key : gate;
-    return supportedSettings.find((item) => item.key === key)?.name ?? '';
+    return supportedSettings.find((item) => item.key === setting.gatedBy)?.name ?? '';
   }
 
   let serverFeatures = $state.raw<readonly string[] | null>(null);

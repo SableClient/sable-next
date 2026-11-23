@@ -121,7 +121,7 @@ export const composerCategory: SettingsCategory = {
       name: 'settings.matrixLinkCustom',
       type: 'text',
       placeholder: 'settings.matrixLinkCustomPlaceholder',
-      gatedBy: { key: 'matrixLinkSelector', value: 'custom' },
+      shownWhen: { key: 'matrixLinkSelector', value: 'custom' },
     },
     {
       key: 'linkMscReferences',
