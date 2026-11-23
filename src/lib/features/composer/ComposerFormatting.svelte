@@ -26,6 +26,7 @@
   import type { Component } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
+  import { inlineSign } from '#lib/language.svelte.js';
   import { formatBinding } from '#lib/ui/shortcuts/binding.js';
   import { bindingFor } from '#lib/ui/shortcuts/bindings.svelte.js';
   import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
@@ -96,7 +97,7 @@
     if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
     if (bar.scrollWidth <= bar.clientWidth) return;
     event.preventDefault();
-    bar.scrollLeft += event.deltaY;
+    bar.scrollLeft += inlineSign() * event.deltaY;
   }
 </script>
 
