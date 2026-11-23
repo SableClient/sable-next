@@ -1249,13 +1249,13 @@
           if (openRoomId) backToRoomList();
         },
         'navigation.nextUnread': () => {
-          const unread = unreadRoomsByPriority(roomList.rooms, openRoomId, roomList.unreadFor);
+          const unread = unreadRoomsByPriority(roomList.rooms, openRoomId, roomList.badgeUnreadFor);
           const target = unread[0];
           if (!target) return;
           jumpToRoom(target.room_id);
         },
         'navigation.cycleNextUnread': () => {
-          const target = unreadRoomAtOffset(roomList.rooms, openRoomId, 1, roomList.unreadFor);
+          const target = unreadRoomAtOffset(roomList.rooms, openRoomId, 1, roomList.badgeUnreadFor);
           if (target) jumpToRoom(target.room_id);
         },
         'navigation.focusComposer': () => {
@@ -1277,7 +1277,12 @@
           cycleRegion(-1);
         },
         'navigation.cyclePreviousUnread': () => {
-          const target = unreadRoomAtOffset(roomList.rooms, openRoomId, -1, roomList.unreadFor);
+          const target = unreadRoomAtOffset(
+            roomList.rooms,
+            openRoomId,
+            -1,
+            roomList.badgeUnreadFor
+          );
           if (target) jumpToRoom(target.room_id);
         },
       },

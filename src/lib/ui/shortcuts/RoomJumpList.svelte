@@ -137,7 +137,11 @@
               >
               {#if parent}<span class="parent">{parent}</span>{/if}
             </span>
-            <UnreadBadge counts={roomList.unreadFor(room)} dm={room.is_direct} aria-hidden="true" />
+            <UnreadBadge
+              counts={roomList.badgeUnreadFor(room)}
+              dm={room.is_direct}
+              aria-hidden="true"
+            />
           </button>
         </li>
       {/each}

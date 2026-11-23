@@ -25,7 +25,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => ({
     rooms: mocks.rooms,
-    unreadFor: () => undefined,
+    badgeUnreadFor: () => undefined,
     whenListed: () => Promise.resolve(),
     byId: (roomId: string) => mocks.rooms.find((room) => room.room_id === roomId),
   }),
