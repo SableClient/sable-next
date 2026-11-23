@@ -227,6 +227,16 @@ pub fn removable_account_store(base_store_id: &str, store_id: &str) -> bool {
         })
 }
 
+/// An empty folder, such as one prepared for a bind mount, is free to take.
+#[cfg(not(target_family = "wasm"))]
+pub(crate) async fn store_holds_data(store_id: &str) -> std::io::Result<bool> {
+    match tokio::fs::read_dir(store_id).await {
+        Ok(mut entries) => Ok(entries.next_entry().await?.is_some()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
 impl Credentials {
     #[must_use]
     pub fn tokens(&self) -> matrix_sdk::SessionTokens {

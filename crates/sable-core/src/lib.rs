@@ -679,7 +679,7 @@ impl Core {
         )]
         let mut allocated = updated.allocate_account(&self.store_id);
         #[cfg(not(target_family = "wasm"))]
-        while tokio::fs::try_exists(&allocated.1)
+        while session::store_holds_data(&allocated.1)
             .await
             .or_failed(self, "allocate_account_store")?
         {
@@ -1157,6 +1157,11 @@ mod tests {
         );
         let leftover = session::account_store_id(base_store.to_str().unwrap(), "a1");
         std::fs::create_dir_all(std::path::Path::new(&leftover).join("store")).unwrap();
+        std::fs::write(
+            std::path::Path::new(&leftover).join("store/matrix-sdk-crypto.sqlite3"),
+            b"keys",
+        )
+        .unwrap();
 
         let (account_id, _) = core.allocate_account().await.unwrap();
 
@@ -1165,6 +1170,24 @@ mod tests {
         let stored: serde_json::Value =
             serde_json::from_slice(bytes.lock().await.as_deref().unwrap()).unwrap();
         assert_eq!(stored["next_account_id"], 3);
+    }
+
+    #[tokio::test]
+    async fn an_allocated_account_takes_an_empty_folder_at_its_place() {
+        let base = tempfile::tempdir().unwrap();
+        let base_store = base.path().join("store");
+        let (core, _events) = Core::new(
+            base_store.to_str().unwrap(),
+            Box::new(store::MemorySessionStore::default()),
+        );
+        let prepared = session::account_store_id(base_store.to_str().unwrap(), "a1");
+        std::fs::create_dir_all(&prepared).unwrap();
+
+        let (account_id, store_id) = core.allocate_account().await.unwrap();
+
+        assert_eq!(account_id, "a1");
+        assert_eq!(store_id, prepared);
+        assert!(std::path::Path::new(&prepared).exists());
     }
 
     #[tokio::test]
