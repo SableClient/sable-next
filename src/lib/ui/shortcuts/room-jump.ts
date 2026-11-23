@@ -1,5 +1,5 @@
 import type { RoomListItemView } from '#src/generated/protocol';
-import { hasUnread, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
+import { hasUnread, type RoomUnread } from '#lib/rooms/unread.js';
 
 import { fuzzyFilter } from './fuzzy.js';
 
@@ -61,7 +61,7 @@ export function parentSpaceNames(rooms: readonly RoomListItemView[]): Map<string
 export function unreadRoomsByPriority(
   rooms: readonly RoomListItemView[],
   excludeRoomId: string | null,
-  unreadFor: RoomUnread = roomUnread
+  unreadFor: RoomUnread
 ): RoomListItemView[] {
   return rooms
     .map((room) => ({ room, counts: unreadFor(room) }))
@@ -74,7 +74,7 @@ export function unreadRoomAtOffset(
   rooms: readonly RoomListItemView[],
   currentRoomId: string | null,
   direction: 1 | -1,
-  unreadFor: RoomUnread = roomUnread
+  unreadFor: RoomUnread
 ): RoomListItemView | null {
   const current = rooms.findIndex((room) => room.room_id === currentRoomId);
   const start = current === -1 && direction === -1 ? rooms.length : current;

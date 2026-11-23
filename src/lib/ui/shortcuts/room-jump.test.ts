@@ -9,6 +9,7 @@ import {
   unreadRoomAtOffset,
   unreadRoomsByPriority,
 } from './room-jump';
+import { roomUnread } from '#lib/rooms/unread.js';
 import { roomView } from '#lib/test-support/room-views.js';
 
 function room(overrides: Partial<RoomListItemView> & { room_id: string }): RoomListItemView {
@@ -63,7 +64,7 @@ test('unreadRoomsByPriority drops read rooms and the excluded room', () => {
     room({ room_id: '!c:example.org', unread: 1 }),
   ];
 
-  expect(unreadRoomsByPriority(rooms, '!c:example.org').map((r) => r.room_id)).toEqual([
+  expect(unreadRoomsByPriority(rooms, '!c:example.org', roomUnread).map((r) => r.room_id)).toEqual([
     '!b:example.org',
   ]);
 });
@@ -74,7 +75,7 @@ test('unreadRoomsByPriority ranks highlights above plain unread counts', () => {
     room({ room_id: '!b:example.org', unread: 1, highlight: 1 }),
   ];
 
-  expect(unreadRoomsByPriority(rooms, null).map((r) => r.room_id)).toEqual([
+  expect(unreadRoomsByPriority(rooms, null, roomUnread).map((r) => r.room_id)).toEqual([
     '!b:example.org',
     '!a:example.org',
   ]);
@@ -86,7 +87,7 @@ test('unreadRoomsByPriority breaks a highlight tie on unread count', () => {
     room({ room_id: '!b:example.org', unread: 5, highlight: 1 }),
   ];
 
-  expect(unreadRoomsByPriority(rooms, null).map((r) => r.room_id)).toEqual([
+  expect(unreadRoomsByPriority(rooms, null, roomUnread).map((r) => r.room_id)).toEqual([
     '!b:example.org',
     '!a:example.org',
   ]);
@@ -99,10 +100,18 @@ test('unread navigation skips read rooms and wraps in both directions', () => {
     room({ room_id: '!c:example.org', unread: 2 }),
   ];
 
-  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1)?.room_id).toBe('!c:example.org');
-  expect(unreadRoomAtOffset(rooms, '!c:example.org', 1)?.room_id).toBe('!a:example.org');
-  expect(unreadRoomAtOffset(rooms, '!c:example.org', -1)?.room_id).toBe('!a:example.org');
-  expect(unreadRoomAtOffset(rooms, '!a:example.org', -1)?.room_id).toBe('!c:example.org');
+  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1, roomUnread)?.room_id).toBe(
+    '!c:example.org'
+  );
+  expect(unreadRoomAtOffset(rooms, '!c:example.org', 1, roomUnread)?.room_id).toBe(
+    '!a:example.org'
+  );
+  expect(unreadRoomAtOffset(rooms, '!c:example.org', -1, roomUnread)?.room_id).toBe(
+    '!a:example.org'
+  );
+  expect(unreadRoomAtOffset(rooms, '!a:example.org', -1, roomUnread)?.room_id).toBe(
+    '!c:example.org'
+  );
 });
 
 test('unread navigation starts from the current room after it becomes read', () => {
@@ -111,11 +120,17 @@ test('unread navigation starts from the current room after it becomes read', () 
     room({ room_id: '!b:example.org', unread: 1 }),
     room({ room_id: '!c:example.org', unread: 1 }),
   ];
-  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1)?.room_id).toBe('!b:example.org');
+  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1, roomUnread)?.room_id).toBe(
+    '!b:example.org'
+  );
   rooms[1] = room({ room_id: '!b:example.org' });
 
-  expect(unreadRoomAtOffset(rooms, '!b:example.org', 1)?.room_id).toBe('!c:example.org');
-  expect(unreadRoomAtOffset(rooms, '!b:example.org', -1)?.room_id).toBe('!a:example.org');
+  expect(unreadRoomAtOffset(rooms, '!b:example.org', 1, roomUnread)?.room_id).toBe(
+    '!c:example.org'
+  );
+  expect(unreadRoomAtOffset(rooms, '!b:example.org', -1, roomUnread)?.room_id).toBe(
+    '!a:example.org'
+  );
 });
 
 test('unread navigation includes rooms marked unread and direct messages', () => {
@@ -124,7 +139,9 @@ test('unread navigation includes rooms marked unread and direct messages', () =>
     room({ room_id: '!b:example.org', marked_unread: true, is_direct: true }),
   ];
 
-  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1)?.room_id).toBe('!b:example.org');
+  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1, roomUnread)?.room_id).toBe(
+    '!b:example.org'
+  );
 });
 
 test('unread navigation skips spaces and rooms that are not joined', () => {
@@ -135,7 +152,7 @@ test('unread navigation skips spaces and rooms that are not joined', () => {
     room({ room_id: '!joined:example.org', unread: 1 }),
   ];
 
-  expect(unreadRoomAtOffset(rooms, null, 1)?.room_id).toBe('!joined:example.org');
+  expect(unreadRoomAtOffset(rooms, null, 1, roomUnread)?.room_id).toBe('!joined:example.org');
 });
 
 test('unread navigation starts at either end when no room is open', () => {
@@ -144,15 +161,15 @@ test('unread navigation starts at either end when no room is open', () => {
     room({ room_id: '!b:example.org', unread: 1 }),
   ];
 
-  expect(unreadRoomAtOffset(rooms, null, 1)?.room_id).toBe('!a:example.org');
-  expect(unreadRoomAtOffset(rooms, null, -1)?.room_id).toBe('!b:example.org');
+  expect(unreadRoomAtOffset(rooms, null, 1, roomUnread)?.room_id).toBe('!a:example.org');
+  expect(unreadRoomAtOffset(rooms, null, -1, roomUnread)?.room_id).toBe('!b:example.org');
 });
 
 test('unread navigation stays put when no other room is unread', () => {
   const rooms = [room({ room_id: '!a:example.org', unread: 1 })];
 
-  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1)).toBeNull();
-  expect(unreadRoomAtOffset([], null, -1)).toBeNull();
+  expect(unreadRoomAtOffset(rooms, '!a:example.org', 1, roomUnread)).toBeNull();
+  expect(unreadRoomAtOffset([], null, -1, roomUnread)).toBeNull();
 });
 
 test('parseJumpQuery reads the type prefix off the query', () => {

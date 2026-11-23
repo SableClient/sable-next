@@ -21,6 +21,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { roomUnread } from '#lib/rooms/unread.js';
 import { roomView } from '#lib/test-support/room-views.js';
 import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
@@ -40,6 +41,7 @@ test('a closed folder shows its icon', async () => {
     NavigationRail,
     {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      unreadFor: roomUnread,
       layout: [
         {
           kind: 'folder',

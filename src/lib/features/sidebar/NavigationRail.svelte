@@ -15,7 +15,7 @@
   import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { addUnread } from '#lib/rooms/spaces.js';
   import type { UnreadCount } from '#lib/rooms/unread.js';
-  import { NO_UNREAD, roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
+  import { NO_UNREAD, type RoomUnread } from '#lib/rooms/unread.js';
   import {
     folderName,
     mergeSpaces,
@@ -96,7 +96,7 @@
     unspacedUnread?: UnreadCount;
     directRooms?: readonly RoomListItemView[];
     directUnread?: UnreadCount;
-    unreadFor?: RoomUnread;
+    unreadFor: RoomUnread;
     mobile?: boolean;
     compact?: boolean;
     onNavigate?: (href: string) => void;
@@ -126,7 +126,7 @@
     unspacedUnread = NO_UNREAD,
     directRooms = [],
     directUnread = NO_UNREAD,
-    unreadFor = roomUnread,
+    unreadFor,
     mobile = false,
     compact = false,
     onNavigate,

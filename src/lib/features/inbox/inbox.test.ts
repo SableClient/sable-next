@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { BookmarkView, InboxItemView, RoomListItemView } from '#src/generated/protocol';
 
-import { NO_UNREAD, type RoomUnread } from '#lib/rooms/unread.js';
+import { NO_UNREAD, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
 import { roomView } from '#lib/test-support/room-views.js';
 
 import {
@@ -148,8 +148,8 @@ test('a space never notifies, and neither does a room we have left', () => {
     room({ room_id: '!left', state: 'left', highlight: 4 }),
   ];
 
-  expect(notifications(rooms, 'all')).toEqual([]);
-  expect(countNotifications(rooms)).toBe(0);
+  expect(notifications(rooms, 'all', roomUnread)).toEqual([]);
+  expect(countNotifications(rooms, roomUnread)).toBe(0);
 });
 
 test('notifications keep the order of the rooms they are given', () => {
@@ -174,7 +174,8 @@ test('notifications keep the order of the rooms they are given', () => {
 
   const ordered = notifications(
     [dated('!old', 10), dated('!none', null), dated('!new', 20)],
-    'all'
+    'all',
+    roomUnread
   );
   expect(ordered.map((each) => each.room_id)).toEqual(['!old', '!none', '!new']);
 });
@@ -275,17 +276,21 @@ test('a hand-marked room reaches the inbox with no count of its own', () => {
   const marked = room({ room_id: '!marked', marked_unread: true });
   const quiet = room({ room_id: '!quiet' });
 
-  expect(notifications([marked, quiet], 'all').map((entry) => entry.room_id)).toEqual(['!marked']);
-  expect(countNotifications([marked])).toBe(0);
-  expect(hasMarkedUnread([marked])).toBe(true);
-  expect(hasMarkedUnread([quiet])).toBe(false);
+  expect(notifications([marked, quiet], 'all', roomUnread).map((entry) => entry.room_id)).toEqual([
+    '!marked',
+  ]);
+  expect(countNotifications([marked], roomUnread)).toBe(0);
+  expect(hasMarkedUnread([marked], roomUnread)).toBe(true);
+  expect(hasMarkedUnread([quiet], roomUnread)).toBe(false);
 });
 
 test('a marked direct chat shows under the direct filter', () => {
   const marked = room({ room_id: '!dm', is_direct: true, marked_unread: true });
 
-  expect(notifications([marked], 'direct').map((entry) => entry.room_id)).toEqual(['!dm']);
-  expect(notifications([marked], 'mentions')).toEqual([]);
+  expect(notifications([marked], 'direct', roomUnread).map((entry) => entry.room_id)).toEqual([
+    '!dm',
+  ]);
+  expect(notifications([marked], 'mentions', roomUnread)).toEqual([]);
 });
 
 test('a channel on the mentions default still shows unread in All, but not the badge', () => {

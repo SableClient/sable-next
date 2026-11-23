@@ -9,7 +9,7 @@ import type {
 import { DAY_MS, startOfDay } from '#lib/day.js';
 import { formatTime } from '#lib/ui/date-time.js';
 import { currentLocale } from '#lib/i18n.js';
-import { hasUnread, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
+import { hasUnread, type RoomUnread } from '#lib/rooms/unread.js';
 import type { UnreadCount } from '#lib/rooms/unread.js';
 
 export type NotificationFilter = InboxFilter;
@@ -83,7 +83,7 @@ function matchesFilter(
 export function notifications(
   rooms: readonly RoomListItemView[],
   filter: NotificationFilter,
-  unreadFor: RoomUnread = roomUnread
+  unreadFor: RoomUnread
 ): RoomListItemView[] {
   return rooms.filter((room) => {
     if (room.state !== 'joined' || room.room_kind === 'space') return false;
@@ -93,7 +93,7 @@ export function notifications(
 
 export function countNotifications(
   rooms: readonly RoomListItemView[],
-  unreadFor: RoomUnread = roomUnread
+  unreadFor: RoomUnread
 ): number {
   return rooms
     .filter((room) => room.state === 'joined' && room.room_kind !== 'space')
@@ -103,7 +103,7 @@ export function countNotifications(
 export function countNotificationsElsewhere(
   rooms: readonly RoomListItemView[],
   roomId: string,
-  unreadFor: RoomUnread = roomUnread
+  unreadFor: RoomUnread
 ): number {
   return countNotifications(
     rooms.filter((room) => room.room_id !== roomId),
@@ -124,7 +124,7 @@ export function unlistedNotifications(
 
 export function hasMarkedUnread(
   rooms: readonly RoomListItemView[],
-  unreadFor: RoomUnread = roomUnread
+  unreadFor: RoomUnread
 ): boolean {
   return rooms.some(
     (room) =>
