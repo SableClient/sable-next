@@ -10,6 +10,7 @@ import type {
 } from '#src/generated/protocol';
 
 import { roomView } from '#lib/test-support/room-views.js';
+import { reactiveToggle } from '#lib/test-support/toggle.svelte.js';
 
 const core = vi.hoisted((): Record<string, unknown> => ({}));
 
@@ -27,7 +28,9 @@ vi.mock('../room/messages/event-items.svelte.js', async (importOriginal) => ({
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
   useRoomList: () => ({
-    rooms,
+    get rooms() {
+      return allRooms.on ? rooms : rooms.slice(0, 1);
+    },
     byId: (roomId: string) => rooms.find((room) => room.room_id === roomId),
     labelFor: (roomId: string) => rooms.find((room) => room.room_id === roomId)?.name ?? roomId,
   }),
@@ -39,12 +42,14 @@ function room(overrides: Partial<RoomListItemView>): RoomListItemView {
   return roomView({ room_id: '!id:example.org', encrypted: false, ...overrides });
 }
 
+const allRooms = reactiveToggle();
 const rooms = [
   room({ room_id: '!general:example.org', name: 'General' }),
   room({ room_id: '!random:example.org', name: 'Random' }),
 ];
 
 async function mount() {
+  allRooms.on = true;
   let onEvent: ((event: CoreEvent) => void) | undefined;
   const messages = vi.fn().mockResolvedValue({ hits: [], older: null });
   Object.assign(core, {
@@ -494,4 +499,21 @@ test('a starter filter begins a filter and offers its values', async () => {
 
   await expect.element(field).toHaveFocus();
   await expect.element(screen.getByRole('listbox')).toBeVisible();
+});
+
+test('Enter accepts a shown suggestion after the arrowed one drops out of the list', async () => {
+  const { field, chips } = await mount();
+
+  await userEvent.fill(field.element(), 'in:');
+  await userEvent.keyboard('{ArrowUp}');
+  await expect
+    .element(field)
+    .toHaveAttribute('aria-activedescendant', expect.stringMatching(/-1$/));
+  allRooms.on = false;
+  await expect
+    .element(field)
+    .toHaveAttribute('aria-activedescendant', expect.stringMatching(/-0$/));
+
+  await userEvent.keyboard('{Enter}');
+  await expect.element(chips).toHaveTextContent('in: General');
 });

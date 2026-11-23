@@ -142,6 +142,7 @@
           )
         : []
   );
+  let active = $derived(Math.min(activeSuggestion, Math.max(0, suggestions.length - 1)));
   let suggestionHighlighted = $derived(showingRecent || enterAccepts(search.query, navigated));
   let input = $state<HTMLInputElement>();
   let results = $state<HTMLElement>();
@@ -375,23 +376,23 @@
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      activeSuggestion = suggestionHighlighted ? (activeSuggestion + 1) % suggestions.length : 0;
+      activeSuggestion = suggestionHighlighted ? (active + 1) % suggestions.length : 0;
       navigated = true;
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       activeSuggestion = suggestionHighlighted
-        ? (activeSuggestion - 1 + suggestions.length) % suggestions.length
+        ? (active - 1 + suggestions.length) % suggestions.length
         : suggestions.length - 1;
       navigated = true;
     } else if (event.key === 'Tab') {
       if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
       if (field.draft.trim() === '' && !navigated) return;
       event.preventDefault();
-      accept(suggestions[activeSuggestion]);
+      accept(suggestions[active]);
     } else if (event.key === 'Enter') {
       event.preventDefault();
       if (showingRecent || enterAccepts(search.query, navigated)) {
-        accept(suggestions[activeSuggestion]);
+        accept(suggestions[active]);
         return;
       }
       suggestionsOpen = false;
@@ -548,7 +549,7 @@
             aria-controls={suggestions.length > 0 ? listboxId : undefined}
             aria-autocomplete="list"
             aria-activedescendant={suggestions.length > 0 && suggestionHighlighted
-              ? `${listboxId}-${String(activeSuggestion)}`
+              ? `${listboxId}-${String(active)}`
               : undefined}
             placeholder={field.chips.length > 0
               ? ''
@@ -588,7 +589,7 @@
                 ? i18n.t('search.recentSearches')
                 : i18n.t('search.suggestions')}
               {suggestions}
-              active={suggestionHighlighted ? activeSuggestion : -1}
+              active={suggestionHighlighted ? active : -1}
               onSelect={accept}
             />
           </div>
