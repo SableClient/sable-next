@@ -8,7 +8,7 @@
   import { DeviceVerification } from '#lib/core/device-verification.svelte.js';
   import { IdentityReset } from '#lib/core/identity-reset.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
+  import { openAccountManagementUrl } from '#lib/platform/account-management.js';
   import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
@@ -109,7 +109,7 @@
 
   function approve(): void {
     if (!reset.approvalUrl) return;
-    void openExternalAuthUrl(reset.approvalUrl);
+    void openAccountManagementUrl(reset.approvalUrl);
     void runReset(() => reset.awaitApproval());
   }
 </script>

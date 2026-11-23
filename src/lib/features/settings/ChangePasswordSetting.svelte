@@ -2,7 +2,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import PasswordField from '#lib/features/auth/shared/PasswordField.svelte';
   import { i18n } from '#lib/i18n.js';
-  import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
+  import { openAccountManagementUrl } from '#lib/platform/account-management.js';
   import { isCoreError } from '#src/transport';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -88,7 +88,7 @@
         title={i18n.t('settings.changePassword')}
         description={i18n.t('settings.changePasswordManageHint')}
       >
-        <Button onclick={() => void openExternalAuthUrl(accountManagementUrl)}>
+        <Button onclick={() => void openAccountManagementUrl(accountManagementUrl)}>
           {i18n.t('settings.changePasswordManage')}
         </Button>
       </SettingsRow>

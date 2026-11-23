@@ -3,7 +3,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { IdentityReset } from '#lib/core/identity-reset.svelte.js';
-  import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
+  import { openAccountManagementUrl } from '#lib/platform/account-management.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -36,7 +36,7 @@
 
   function approve(): void {
     if (!reset.approvalUrl) return;
-    void openExternalAuthUrl(reset.approvalUrl);
+    void openAccountManagementUrl(reset.approvalUrl);
     void reset.awaitApproval();
   }
 

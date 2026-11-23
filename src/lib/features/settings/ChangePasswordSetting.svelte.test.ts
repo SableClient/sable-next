@@ -2,15 +2,20 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 import type { OAuthMetadataView, Rpc } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/platform/external-auth.js', () => ({
   openExternalAuthUrl: vi.fn(() => Promise.resolve()),
 }));
+vi.mock('#lib/platform/external-links.js', () => ({
+  opensExternalUrls: vi.fn(() => false),
+  openExternalUrl: vi.fn(() => Promise.resolve()),
+}));
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
+import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
 import { CoreError } from '#src/transport';
 import ChangePasswordSetting from './ChangePasswordSetting.svelte';
 
@@ -88,4 +93,22 @@ test('an OIDC account gets the management link and no form', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Manage password' }));
   expect(openExternalAuthUrl).toHaveBeenCalledWith('https://id.example.org/account');
   expect(passwordChangeEnabled).not.toHaveBeenCalled();
+});
+
+test('native apps manage the password in the system browser that holds the account session', async () => {
+  vi.mocked(opensExternalUrls).mockReturnValue(true);
+  onTestFinished(() => {
+    vi.mocked(opensExternalUrls).mockReturnValue(false);
+  });
+  vi.mocked(openExternalAuthUrl).mockClear();
+  Object.assign(baseCore, {
+    oauthMetadata: {
+      account_management_uri: 'https://id.example.org/account',
+    } as OAuthMetadataView,
+  });
+  render(ChangePasswordSetting);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Manage password' }));
+  expect(openExternalUrl).toHaveBeenCalledWith('https://id.example.org/account');
+  expect(openExternalAuthUrl).not.toHaveBeenCalled();
 });

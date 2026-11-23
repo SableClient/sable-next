@@ -4,7 +4,7 @@
   import { redirectAfterLogout } from '#lib/auth/logout-redirect.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
+  import { openAccountManagementUrl } from '#lib/platform/account-management.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
@@ -47,7 +47,7 @@
         password: password || null,
       });
       if (managementUrl) {
-        await openExternalAuthUrl(managementUrl);
+        await openAccountManagementUrl(managementUrl);
         open = false;
         return;
       }

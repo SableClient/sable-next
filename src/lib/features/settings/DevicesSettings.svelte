@@ -13,11 +13,9 @@
   import { CoreError, isCoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
   import { formatDate, formatTime } from '#lib/ui/date-time.js';
-  import {
-    openExternalAuthUrl,
-    openExternalAuthWindow,
-    type ExternalAuthWindow,
-  } from '#lib/platform/external-auth.js';
+  import { openExternalAuthWindow, type ExternalAuthWindow } from '#lib/platform/external-auth.js';
+  import { openAccountManagementUrl } from '#lib/platform/account-management.js';
+  import { opensExternalUrls } from '#lib/platform/external-links.js';
   import { i18n, t } from '#lib/i18n.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -182,7 +180,7 @@
       });
       if (managementUrl) {
         if (authWindow) await authWindow.navigate(managementUrl);
-        else await openExternalAuthUrl(managementUrl);
+        else await openAccountManagementUrl(managementUrl);
       } else {
         await refresh();
       }
@@ -226,7 +224,7 @@
           device_id: deviceId,
           password: accountManagementUrl ? null : bulkPassword || null,
         });
-        if (managementUrl) await openExternalAuthUrl(managementUrl);
+        if (managementUrl) await openAccountManagementUrl(managementUrl);
       } catch (cause) {
         console.warn('[sable settings] device removal failed', cause);
         failed.push(deviceName(devices.find((device) => device.device_id === deviceId)));
@@ -246,6 +244,10 @@
   function beginRemoval(deviceId: string): void {
     if (!accountManagementUrl) {
       deleting = deviceId;
+      return;
+    }
+    if (opensExternalUrls()) {
+      void removeDevice(deviceId);
       return;
     }
 

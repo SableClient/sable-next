@@ -2,7 +2,7 @@
 
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 
 import {
   type CoreEvent,
@@ -17,6 +17,10 @@ vi.mock('#lib/core/context.js');
 vi.mock('#lib/platform/external-auth.js', () => ({
   openExternalAuthUrl: vi.fn(() => Promise.resolve()),
   openExternalAuthWindow: vi.fn(),
+}));
+vi.mock('#lib/platform/external-links.js', () => ({
+  opensExternalUrls: vi.fn(() => false),
+  openExternalUrl: vi.fn(() => Promise.resolve()),
 }));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
@@ -43,6 +47,7 @@ Object.assign(baseCore, { rpc: { encryption } });
 import { CoreError } from '#src/transport';
 import DevicesSettings from './DevicesSettings.svelte';
 import { openExternalAuthUrl, openExternalAuthWindow } from '#lib/platform/external-auth.js';
+import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
 
 const status: EncryptionStatusView = {
   verification: 'verified',
@@ -169,6 +174,31 @@ test('device removal opens account management without asking for a password', as
   });
   expect(encryption.deleteDevice).toHaveBeenCalledWith({ device_id: 'DEV1', password: null });
   expect(screen.queryByLabelText('Password (if required)')).not.toBeInTheDocument();
+});
+
+test('native apps remove an account-managed device in the system browser, like the dashboard', async () => {
+  const url = 'https://id.example.org/account?action=org.matrix.device_delete&device_id=DEV1';
+  vi.mocked(opensExternalUrls).mockReturnValue(true);
+  onTestFinished(() => {
+    vi.mocked(opensExternalUrls).mockReturnValue(false);
+  });
+  vi.mocked(openExternalAuthWindow).mockClear();
+  vi.mocked(openExternalAuthUrl).mockClear();
+  encryption.deleteDevice.mockResolvedValue(url);
+  const user = await renderDevices([own, other1, other2], 'https://id.example.org/account');
+
+  await user.click(screen.getByRole('button', { name: 'Options for Phone' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Remove' }));
+  await vi.waitFor(() => {
+    expect(openExternalUrl).toHaveBeenCalledWith(url);
+  });
+
+  await signOutOthers(user);
+  await vi.waitFor(() => {
+    expect(openExternalUrl).toHaveBeenCalledTimes(3);
+  });
+  expect(openExternalAuthWindow).not.toHaveBeenCalled();
+  expect(openExternalAuthUrl).not.toHaveBeenCalled();
 });
 
 test('reports which devices failed instead of a blanket success', async () => {
