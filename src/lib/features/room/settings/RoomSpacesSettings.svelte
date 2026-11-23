@@ -10,6 +10,7 @@
   import { joinRoom } from '#lib/core/api/rooms.js';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { listsRoom } from '#lib/rooms/spaces.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -52,7 +53,7 @@
           .filter(
             (space) =>
               space.room_kind === 'space' &&
-              space.space_children.some((child) => child.room_id === roomId)
+              space.space_children.some((child) => child.room_id === roomId && listsRoom(child))
           )
           .map((space) => space.room_id)
   );

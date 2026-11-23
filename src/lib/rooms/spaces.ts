@@ -2,9 +2,15 @@ import type {
   NotificationModeView,
   RoomSpacesView,
   RoomListItemView,
+  SpaceChildEdge,
 } from '#src/generated/protocol';
 
 import type { UnreadCount } from './unread.js';
+
+/** An edge without a route is a delisting, unless it is private; mirrors `SpaceChildEdge::lists_room`. */
+export function listsRoom(edge: SpaceChildEdge): boolean {
+  return edge.private || edge.via.length > 0;
+}
 
 export function addUnread(left: UnreadCount, right: UnreadCount): UnreadCount {
   return {

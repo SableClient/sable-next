@@ -1,14 +1,11 @@
 import type { RoomListItemView, Rpc } from '#src/generated/protocol';
+import { listsRoom } from '#lib/rooms/spaces.js';
 
 export function claimedRoomIds(rooms: readonly RoomListItemView[]): Set<string> {
   return new Set(
     rooms
       .filter(isActiveSpace)
-      .flatMap((space) =>
-        space.space_children
-          .filter((child) => child.private || child.via.length > 0)
-          .map((child) => child.room_id)
-      )
+      .flatMap((space) => space.space_children.filter(listsRoom).map((child) => child.room_id))
   );
 }
 
