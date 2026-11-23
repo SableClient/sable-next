@@ -63,16 +63,32 @@ fn scrub_text(value: &str) -> String {
         })
 }
 
-const TAGGED_FIELDS: &[&str] = &["context", "cause", "age"];
+/// Fields with few values, searchable as tags, shared with the web app so a
+/// failure reads the same from either.
+static TAGGED_FIELDS: std::sync::LazyLock<Vec<&'static str>> = std::sync::LazyLock::new(|| {
+    serde_json::from_str(include_str!(
+        "../../src/lib/observability/tagged-fields.json"
+    ))
+    .unwrap_or_default()
+});
 
 fn tag_fields(event: &mut Event<'static>) {
     let Some(sentry::protocol::Context::Other(fields)) = event.contexts.get("Rust Tracing Fields")
     else {
         return;
     };
+    // Written the way `tracing`'s own `tags.` fields are: a flag or a count as its text.
     let tags: Vec<_> = TAGGED_FIELDS
         .iter()
-        .filter_map(|key| Some(((*key).to_owned(), fields.get(*key)?.as_str()?.to_owned())))
+        .filter_map(|key| {
+            let value = match fields.get(*key)? {
+                serde_json::Value::String(text) => text.clone(),
+                serde_json::Value::Bool(flag) => flag.to_string(),
+                serde_json::Value::Number(number) => number.to_string(),
+                _ => return None,
+            };
+            Some(((*key).to_owned(), value))
+        })
         .collect();
     event.tags.extend(tags);
 }
@@ -650,6 +666,46 @@ mod tests {
         for field in ["WithheldBySender", "later", "Enabled"] {
             assert!(utd.contains(field), "{field} missing from {utd}");
         }
+    }
+
+    #[test]
+    fn a_decryption_failure_is_tagged_with_the_fields_the_web_tags() {
+        let transport = record(|| {
+            tracing::warn!(
+                target: "sable_core::utd",
+                reported = true,
+                cause = "Unknown",
+                age = "before_this_device",
+                own_identity_trusted = true,
+                same_homeserver = false,
+                backup = "Enabled",
+                backup_lookup = "imported",
+                account_cross_signed = true,
+                device_cross_signed = false,
+                megolm_session = "c1d4ace413de",
+                "unable to decrypt a message"
+            );
+        });
+        let envelopes = transport.0.lock().unwrap();
+        let event = envelopes.iter().find_map(sentry::Envelope::event).unwrap();
+        let tags: Vec<_> = event
+            .tags
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
+        assert_eq!(
+            tags,
+            [
+                ("account_cross_signed", "true"),
+                ("age", "before_this_device"),
+                ("backup", "Enabled"),
+                ("backup_lookup", "imported"),
+                ("cause", "Unknown"),
+                ("device_cross_signed", "false"),
+                ("own_identity_trusted", "true"),
+                ("same_homeserver", "false"),
+            ]
+        );
     }
 
     #[test]

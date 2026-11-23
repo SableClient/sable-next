@@ -17,6 +17,9 @@ import {
   wasmLogFields,
   wasmLogLevel,
 } from '../lib/observability/wasm-log.js';
+// Fields with few values, searchable as tags. The rest, identifiers included, stay in context.
+// The native shell tags the same ones.
+import TAGGED_FIELDS from '../lib/observability/tagged-fields.json';
 import { readText, writeText } from '../lib/platform/local-json.js';
 import { deleteAccountWebStorage, resetWebStorage } from '../lib/platform/session-storage.js';
 
@@ -27,19 +30,6 @@ function isStorageFailure(line: string): boolean {
     line
   );
 }
-
-/** Fields with few values, searchable as tags. The rest, identifiers included, stay in context. */
-const TAGGED_FIELDS = [
-  'context',
-  'cause',
-  'age',
-  'own_identity_trusted',
-  'same_homeserver',
-  'backup',
-  'backup_lookup',
-  'account_cross_signed',
-  'device_cross_signed',
-];
 
 function reportCoreError(line: string): void {
   const fingerprint = wasmErrorFingerprint(line);
