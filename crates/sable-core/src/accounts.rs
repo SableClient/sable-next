@@ -165,7 +165,7 @@ impl Core {
             return Ok(Some(session));
         }
 
-        let stale = self.drop_stale_sign_ins().await?;
+        let stale = self.mark_stale_sign_ins().await?;
         let accounts = self.accounts().await?;
         let Some(account_id) = accounts.active_account_id else {
             return Ok(None);
@@ -424,7 +424,7 @@ impl Core {
         store_id: &str,
         persisted: &PersistedSession,
         reauth: Option<&PersistedAccount>,
-    ) -> Result<Vec<PersistedAccount>, RpcError> {
+    ) -> Result<Vec<String>, RpcError> {
         let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
         let Some(registry) = accounts.as_ref() else {
@@ -441,12 +441,14 @@ impl Core {
         }
         let mut updated = registry.clone();
         let user_id = persisted.credentials.user_id();
-        let replaced: Vec<_> = updated
-            .accounts
-            .extract_if(.., |account| {
-                account.account_id != account_id && account.session.credentials.user_id() == user_id
-            })
-            .collect();
+        let mut replaced = Vec::new();
+        for account in &mut updated.accounts {
+            if account.account_id != account_id && account.session.credentials.user_id() == user_id
+            {
+                account.needs_reauth = true;
+                replaced.push(account.account_id.clone());
+            }
+        }
         let account = PersistedAccount {
             account_id: account_id.to_owned(),
             store_id: store_id.to_owned(),
@@ -462,8 +464,8 @@ impl Core {
             .await
             .or_failed(self, "persist_save")?;
         self.invalidate_account_client(account_id).await;
-        for account in &replaced {
-            self.invalidate_account_client(&account.account_id).await;
+        for account_id in &replaced {
+            self.invalidate_account_client(account_id).await;
         }
         *accounts = Some(updated);
         Ok(replaced)
@@ -933,50 +935,93 @@ impl Core {
         Ok(())
     }
 
-    async fn drop_stale_sign_ins(&self) -> Result<Vec<PersistedAccount>, RpcError> {
+    async fn mark_stale_sign_ins(&self) -> Result<Vec<String>, RpcError> {
         self.accounts().await?;
         let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
         let Some(registry) = accounts.as_ref() else {
-            return Err(self.failed("drop_stale_sign_ins", "account registry is not initialized"));
+            return Err(self.failed("mark_stale_sign_ins", "account registry is not initialized"));
         };
         let mut updated = registry.clone();
-        let stale = updated.drop_stale_sign_ins();
+        let stale = updated.mark_stale_sign_ins();
         if stale.is_empty() {
             return Ok(stale);
         }
         self.write_registry(&updated)
             .await
-            .or_failed(self, "drop_stale_sign_ins")?;
+            .or_failed(self, "mark_stale_sign_ins")?;
         *accounts = Some(updated);
-        for account in &stale {
-            self.invalidate_account_client(&account.account_id).await;
+        for account_id in &stale {
+            self.invalidate_account_client(account_id).await;
         }
         Ok(stale)
     }
 
-    /// Runs once the replacing session holds `store_id`, so no replaced store is still open.
-    async fn retire_replaced(&self, replaced: &[PersistedAccount], store_id: &str) {
-        let base = session::base_client(store_id);
-        for replaced in replaced {
-            self.forget_login_tokens(Some(&replaced.account_id)).await;
-            let Some(base) = &base else {
-                tracing::error!("could not carry room keys: the new client is gone");
-                return;
-            };
-            match crate::store_disposal::carry_room_keys(&replaced.store_id, base).await {
+    /// Runs once the replacing session holds `store_id`, so no replaced store is still open. A
+    /// replaced account that cannot be retired stays waiting, and the next restore retries it.
+    async fn retire_replaced(&self, replaced: &[String], store_id: &str) {
+        if replaced.is_empty() {
+            return;
+        }
+        let Some(base) = session::base_client(store_id) else {
+            tracing::error!("could not retire the replaced accounts: the new client is gone");
+            return;
+        };
+        for account_id in replaced {
+            if let Err(error) = self.retire_account(account_id, Some(&base)).await {
+                tracing::warn!(account_id, ?error, "a replaced account waits to be retired");
+            }
+        }
+    }
+
+    /// The account leaves the registry only once nothing of it is left behind. `successor` takes
+    /// the room keys only this account's store holds.
+    async fn retire_account(
+        &self,
+        account_id: &str,
+        successor: Option<&matrix_sdk_base::BaseClient>,
+    ) -> Result<(), RpcError> {
+        let Some(account) = self
+            .accounts()
+            .await?
+            .accounts
+            .into_iter()
+            .find(|account| account.account_id == account_id)
+        else {
+            return Ok(());
+        };
+        self.invalidate_account_client(account_id).await;
+        if let Some(successor) = successor {
+            match crate::store_disposal::carry_room_keys(&account.store_id, successor).await {
                 Ok(imported) => tracing::info!(imported, "carried room keys to the new device"),
                 // Nothing in the old store can be read anymore.
                 Err(crate::store::StoreError::KeyMissing) => {}
-                Err(error) => {
-                    tracing::error!("could not carry room keys to the new device: {error}");
-                    continue;
-                }
-            }
-            if let Err(error) = self.discard_account_store(&replaced.store_id).await {
-                tracing::error!(?error, "could not discard the replaced account store");
+                Err(error) => return Err(self.failed_with("retire_account_room_keys", &error)),
             }
         }
+        self.forget_login_tokens(Some(account_id)).await;
+        if let Err(error) = self.discard_account_store(&account.store_id).await {
+            self.mark_account_needs_reauth(Some(account_id), true)
+                .await?;
+            return Err(error);
+        }
+        let _guard = self.session_store_lock.lock().await;
+        let mut accounts = self.accounts.lock().await;
+        let Some(registry) = accounts.as_ref() else {
+            return Err(self.failed("retire_account", "account registry is not initialized"));
+        };
+        let mut updated = registry.clone();
+        updated
+            .accounts
+            .retain(|account| account.account_id != account_id);
+        if updated.active_account_id.as_deref() == Some(account_id) {
+            updated.active_account_id = None;
+        }
+        self.write_registry(&updated)
+            .await
+            .or_failed(self, "retire_account_save")?;
+        *accounts = Some(updated);
+        Ok(())
     }
 
     pub(crate) async fn discard_account_store(&self, store_id: &str) -> Result<(), RpcError> {
@@ -2971,6 +3016,95 @@ mod regression_tests {
         assert_eq!(accounts[0].account_id, "newer");
         assert!(!std::path::Path::new(&first.store_id).exists());
         assert!(std::path::Path::new(&newer.store_id).exists());
+        core.shutdown().await;
+    }
+
+    /// Another sign-in of `first`'s user, on its own device and store.
+    fn other_sign_in(core: &Core, first: &PersistedAccount, account_id: &str) -> PersistedAccount {
+        let mut persisted = serde_json::to_value(&first.session).unwrap();
+        persisted["credentials"]["device_id"] = format!("{account_id}-device").into();
+        persisted["credentials"]["access_token"] = format!("{account_id}-token").into();
+        let account = PersistedAccount {
+            account_id: account_id.to_owned(),
+            store_id: session::account_store_id(&core.store_id, account_id),
+            session: serde_json::from_value(persisted).unwrap(),
+            ..first.clone()
+        };
+        std::fs::create_dir_all(std::path::Path::new(&account.store_id).join("store")).unwrap();
+        account
+    }
+
+    #[tokio::test]
+    async fn a_stale_sign_in_stays_until_a_started_session_retires_it() {
+        let (_server, _base, core, first, _events) = restorable_core().await;
+        let stale = other_sign_in(&core, &first, "stale");
+        let mut registry = core.accounts().await.unwrap();
+        registry.accounts.insert(0, stale.clone());
+        registry.active_account_id = None;
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+
+        assert!(core.restore().await.unwrap().is_none());
+
+        let accounts = core.accounts().await.unwrap().accounts;
+        assert!(accounts.iter().any(|account| account.account_id == "stale"));
+        assert!(std::path::Path::new(&stale.store_id).exists());
+
+        let mut registry = core.accounts().await.unwrap();
+        registry.active_account_id = Some("first".to_owned());
+        *core.accounts.lock().await = Some(registry);
+        assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+
+        let accounts = core.list_accounts().await.unwrap();
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].account_id, "first");
+        assert!(!std::path::Path::new(&stale.store_id).exists());
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn a_stale_sign_in_whose_room_keys_cannot_be_carried_stays_registered() {
+        let (_server, _base, core, first, _events) = restorable_core().await;
+        let stale = other_sign_in(&core, &first, "stale");
+        std::fs::write(
+            std::path::Path::new(&stale.store_id).join("store/matrix-sdk-crypto.sqlite3"),
+            b"not a database",
+        )
+        .unwrap();
+        let mut registry = core.accounts().await.unwrap();
+        registry.accounts.insert(0, stale.clone());
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+
+        assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+
+        let accounts = core.accounts().await.unwrap().accounts;
+        let kept = accounts
+            .iter()
+            .find(|account| account.account_id == "stale")
+            .expect("the stale sign-in waits for a later retry");
+        assert!(kept.needs_reauth);
+        assert!(std::path::Path::new(&stale.store_id).exists());
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn a_new_sign_in_keeps_the_one_it_replaces_until_it_is_retired() {
+        let (_server, _base, core, first, _events) = restorable_core().await;
+        core.accounts().await.unwrap();
+        let newer = other_sign_in(&core, &first, "newer");
+
+        core.persist(&newer.account_id, &newer.store_id, &newer.session, None)
+            .await
+            .unwrap();
+
+        let accounts = core.accounts().await.unwrap().accounts;
+        let replaced = accounts
+            .iter()
+            .find(|account| account.account_id == "first")
+            .expect("the replaced sign-in stays until its session is retired");
+        assert!(replaced.needs_reauth);
+        assert!(std::path::Path::new(&first.store_id).exists());
         core.shutdown().await;
     }
 

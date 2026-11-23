@@ -185,9 +185,10 @@ impl AccountRegistry {
         }
     }
 
-    /// Keeps each user's latest usable sign-in. Sign-ins are appended, so the last entry is the
-    /// latest, and one waiting for reauthentication only stays when the user has no other.
-    pub fn drop_stale_sign_ins(&mut self) -> Vec<PersistedAccount> {
+    /// Keeps each user's latest usable sign-in and returns the others, marked to wait until they
+    /// are retired. Sign-ins are appended, so the last entry is the latest, and one waiting for
+    /// reauthentication only stays when the user has no other.
+    pub fn mark_stale_sign_ins(&mut self) -> Vec<String> {
         let (waiting, usable): (Vec<_>, Vec<_>) = self
             .accounts
             .iter()
@@ -202,16 +203,17 @@ impl AccountRegistry {
                 )
             })
             .collect();
-        let stale: Vec<_> = self
-            .accounts
-            .extract_if(.., |account| {
-                latest.get(&account.session.credentials.user_id()) != Some(&account.account_id)
-            })
-            .collect();
-        if let Some(active) = &self.active_account_id
-            && let Some(dropped) = stale.iter().find(|account| &account.account_id == active)
-        {
-            self.active_account_id = latest.get(&dropped.session.credentials.user_id()).cloned();
+        let mut stale = Vec::new();
+        for account in &mut self.accounts {
+            let user_id = account.session.credentials.user_id();
+            if latest.get(&user_id) == Some(&account.account_id) {
+                continue;
+            }
+            account.needs_reauth = true;
+            if self.active_account_id.as_ref() == Some(&account.account_id) {
+                self.active_account_id = latest.get(&user_id).cloned();
+            }
+            stale.push(account.account_id.clone());
         }
         stale
     }
@@ -1368,20 +1370,19 @@ mod tests {
         .unwrap();
         let (mut registry, _) = AccountRegistry::from_bytes(&bytes, "base").unwrap();
 
-        let stale: Vec<_> = registry
-            .drop_stale_sign_ins()
-            .into_iter()
-            .map(|account| account.account_id)
-            .collect();
+        let stale = registry.mark_stale_sign_ins();
 
         assert_eq!(stale, ["a1", "a3"]);
-        let kept: Vec<_> = registry
+        let usable: Vec<_> = registry
             .accounts
             .iter()
+            .filter(|account| !account.needs_reauth)
             .map(|account| account.account_id.as_str())
             .collect();
-        assert_eq!(kept, ["a2", "a4", "a5"]);
+        assert_eq!(usable, ["a2", "a5"]);
+        assert_eq!(registry.accounts.len(), 5);
         assert_eq!(registry.active_account_id.as_deref(), Some("a2"));
+        assert_eq!(registry.mark_stale_sign_ins(), ["a1", "a3"]);
     }
 
     #[cfg(not(target_family = "wasm"))]
