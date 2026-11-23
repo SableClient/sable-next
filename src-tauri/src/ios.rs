@@ -753,12 +753,21 @@ pub(crate) fn relayout_on_keyboard_hide(window: &tauri::WebviewWindow) {
     // SAFETY: UIKit notification names are immutable constants initialized when the framework loads
     let name = unsafe { UIKeyboardDidHideNotification };
     observe_notification(name, move || {
-        let _ = window.with_webview(|webview| {
-            // SAFETY: with_webview runs on the main thread and inner() is the live WKWebView
-            let webview: &AnyObject = unsafe { &*webview.inner().cast::<AnyObject>() };
-            // SAFETY: setNeedsLayout takes no arguments and returns void
-            let _: () = unsafe { msg_send![webview, setNeedsLayout] };
+        let window = window.clone();
+        // Dropping the webview resigns first responder and posts this notification synchronously
+        // while tauri holds its window map, so with_webview has to wait for the next main loop turn.
+        let block = RcBlock::new(move || {
+            let _ = window.with_webview(|webview| {
+                // SAFETY: with_webview runs on the main thread and inner() is the live WKWebView
+                let webview: &AnyObject = unsafe { &*webview.inner().cast::<AnyObject>() };
+                // SAFETY: setNeedsLayout takes no arguments and returns void
+                let _: () = unsafe { msg_send![webview, setNeedsLayout] };
+            });
         });
+        // SAFETY: +mainQueue returns the non-nil main NSOperationQueue
+        let queue: &AnyObject = unsafe { msg_send![objc2::class!(NSOperationQueue), mainQueue] };
+        // SAFETY: addOperationWithBlock: takes a block returning void, copies it and runs it later on the main queue
+        let _: () = unsafe { msg_send![queue, addOperationWithBlock: &*block] };
     });
 }
 
