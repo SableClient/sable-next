@@ -56,6 +56,26 @@ test('a bridged GIF pauses while the window is inactive and resumes after', asyn
   expect(play).toHaveBeenCalledOnce();
 });
 
+test('a GIF that arrives while the window is inactive pauses once it starts', async () => {
+  preferences.pauseAnimationsWhenInactive = true;
+  let focused = false;
+  vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
+  const video = await mountGif('mxc://example.org/gif-arrives-inactive');
+  await flushed();
+  const pause = vi.spyOn(video, 'pause');
+  const play = vi.spyOn(video, 'play').mockResolvedValue(undefined);
+
+  vi.spyOn(video, 'paused', 'get').mockReturnValue(false);
+  video.dispatchEvent(new Event('play'));
+  await flushed();
+  expect(pause).toHaveBeenCalledOnce();
+
+  focused = true;
+  window.dispatchEvent(new Event('focus'));
+  await flushed();
+  expect(play).toHaveBeenCalledOnce();
+});
+
 test('a GIF the user paused stays paused when the window comes back', async () => {
   preferences.pauseAnimationsWhenInactive = true;
   let focused = true;

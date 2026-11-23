@@ -78,12 +78,16 @@
   let videoElement = $state<HTMLVideoElement>();
   let heldForFocus = false;
 
+  function holdForFocus(element: HTMLVideoElement): void {
+    if (element.paused) return;
+    element.pause();
+    heldForFocus = true;
+  }
+
   $effect(() => {
     if (!videoElement || !video.autoplay) return;
     if (animationsPaused()) {
-      if (videoElement.paused) return;
-      videoElement.pause();
-      heldForFocus = true;
+      holdForFocus(videoElement);
     } else if (heldForFocus) {
       heldForFocus = false;
       void videoElement.play().catch(() => {});
@@ -268,6 +272,9 @@
       height={height ?? undefined}
       style:aspect-ratio={aspectRatio}
       aria-label={mediaLabel}
+      onplay={(event) => {
+        if (video.autoplay && animationsPaused()) holdForFocus(event.currentTarget);
+      }}
       onerror={() => {
         unsupportedUrl = url;
       }}
