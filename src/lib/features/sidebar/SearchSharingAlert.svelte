@@ -10,6 +10,10 @@
   import type { SearchSharingView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.ts';
   import { i18n } from '#lib/i18n.ts';
+  import { followSettingsLink } from '#lib/features/settings/settings-navigation.js';
+  import { isNativeMobile } from '#lib/platform/os.js';
+  import { searchPeerPauseKey } from '#lib/search/search-peer-pause.js';
+  import { settingFocusId } from '#lib/settings/registry.js';
 
   export function priorityProvider() {
     const core = useCoreClient();
@@ -117,6 +121,14 @@
   const device = $derived(
     named?.name ?? named?.device_id ?? i18n.t('settings.searchTransferAlert.anotherDevice')
   );
+  // Retrying cannot start while sharing is paused, so the pause reason replaces it.
+  const pause = $derived(
+    sharing.state === 'idle' && sharing.outcome === 'failed' ? sharing.pause : null
+  );
+
+  function openMeteredSetting(event: MouseEvent): void {
+    followSettingsLink(event, 'timeline', settingFocusId('searchUnmeteredOnly'), true);
+  }
 </script>
 
 <AlertBanner icon={priority.icon} tone={priority.level === 'warning' ? 'warning' : 'neutral'}>
@@ -154,6 +166,8 @@
         {i18n.t('settings.searchTransferAlert.body.connecting', { device })}
       {:else if sharing.state === 'waiting'}
         {i18n.t('settings.searchTransferAlert.body.waiting', { device })}
+      {:else if pause}
+        {i18n.t(searchPeerPauseKey(pause))}
       {:else if sharing.state === 'idle' && sharing.outcome === 'failed'}
         {i18n.t('settings.searchTransferAlert.body.failed')}
       {:else if sharing.state === 'idle'}
@@ -170,7 +184,11 @@
         {i18n.t('common.dismiss')}
       </Button>
     {/if}
-    {#if sharing.state === 'idle' && sharing.outcome === 'failed'}
+    {#if pause === 'metered' && isNativeMobile()}
+      <Button variant="secondary" size="small" onclick={openMeteredSetting}>
+        {i18n.t('nav.settings')}
+      </Button>
+    {:else if sharing.state === 'idle' && sharing.outcome === 'failed' && !pause}
       <Button variant="secondary" size="small" onclick={retry}>
         {i18n.t('common.retry')}
       </Button>

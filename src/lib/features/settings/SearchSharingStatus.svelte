@@ -10,6 +10,7 @@
     watchSearchPeerConnections,
     type SearchPeerConnection,
   } from '#lib/search/search-peer-diagnostics.js';
+  import { searchPeerPauseKey } from '#lib/search/search-peer-pause.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -97,9 +98,7 @@
     if (!sharing) return '';
     if (!preferences.searchSharing) return i18n.t('settings.searchPeerHint');
     if (!supported) return i18n.t('settings.searchPeerUnsupported');
-    if (sharing.pause === 'offline') return i18n.t('settings.searchPeerPausedOffline');
-    if (sharing.pause === 'metered') return i18n.t('settings.searchPeerPausedMetered');
-    if (sharing.pause === 'background') return i18n.t('settings.searchPeerPausedBackground');
+    if (sharing.pause) return i18n.t(searchPeerPauseKey(sharing.pause));
     if (sharing.state === 'discovering') return i18n.t('settings.searchPeerDiscovering');
     if (sharing.state === 'waiting') return i18n.t('settings.searchPeerWaiting', { device });
     if (sharing.state === 'connecting') return i18n.t('settings.searchPeerConnecting', { device });

@@ -3285,6 +3285,7 @@
     "searchPeerUnsupported": "This browser cannot connect directly to your other devices.",
     "searchPeerPausedOffline": "Paused while offline.",
     "searchPeerPausedMetered": "Paused on cellular or Low Data Mode. Turn off the unmetered network setting to copy anyway.",
+    "searchPeerPausedMeteredNetwork": "Paused on a cellular or data saver connection.",
     "searchPeerPausedBackground": "Paused while Sable is in the background.",
     "searchPeerDiscovering": "Asking your other devices how much they have indexed…",
     "searchPeerWaiting": "{{device}} is copying with another device. Asking again shortly…",
