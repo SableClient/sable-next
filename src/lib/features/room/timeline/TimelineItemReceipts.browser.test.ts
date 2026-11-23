@@ -205,6 +205,28 @@ test('an emote-only message keeps the badge on its bottom edge', async () => {
   expect(receipted.badge.height).toBeLessThanOrEqual(30);
 });
 
+for (const code of ['let x = 1;\n', '    nested();\n']) {
+  test(`a collapsed code block keeps the badge beside it (${JSON.stringify(code)})`, async () => {
+    await page.viewport(600, 780);
+    const base = item('code', 'code');
+    await mountItem({
+      ...base,
+      content: {
+        ...base.content,
+        html: `<pre><code>${code.repeat(30)}</code></pre>`,
+      } as TimelineItemView['content'],
+      read_by: TWO_READERS,
+    });
+
+    const row = document.querySelector('[data-item-id="code"]');
+    const block = row?.querySelector('.code-block')?.getBoundingClientRect();
+    const badge = row?.querySelector('.read-receipt-stack')?.getBoundingClientRect();
+    if (!block || !badge) throw new Error('no code block or badge');
+    expect(badge.top).toBeLessThan(block.bottom);
+    expect(badge.left).toBeGreaterThanOrEqual(block.right);
+  });
+}
+
 test('a short receipted bubble keeps its text on one line', async () => {
   await page.viewport(390, 780);
   await mountItem(item('receipted', 'miam miam', { read_by: TWO_READERS }), { layout: 'bubble' });
