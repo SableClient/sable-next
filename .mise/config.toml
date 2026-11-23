@@ -80,9 +80,14 @@ run = [
   "cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings",
   { task = "check:types" },
   { task = "check:settings-changes" },
-  "cargo deny check",
+  { task = "check:deny" },
 ]
-tools = { "github:bnjbvr/cargo-machete" = "v0.10.1", "aqua:EmbarkStudios/cargo-deny" = "0.21.0" }
+tools = { "github:bnjbvr/cargo-machete" = "v0.10.1" }
+
+[tasks."check:deny"]
+description = "Check the dependency policy with cargo-deny"
+run = "cargo-deny --config .cargo/deny.toml check"
+tools = { "aqua:EmbarkStudios/cargo-deny" = "0.21.0" }
 
 [tasks."check:android"]
 description = "Lint the app crate for Android, with the NDK from tauri:setup:android"
