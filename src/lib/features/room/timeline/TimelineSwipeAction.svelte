@@ -17,7 +17,7 @@
   class={['swipe-action', { armed }]}
   aria-hidden="true"
   style:width={`${String(offset)}px`}
-  style:transform={`translateX(${String(offset)}px)`}
+  style:transform={`translateX(calc(${String(offset)}px * var(--inline-sign)))`}
 >
   {#if edit}
     <PencilSimpleIcon weight="bold" />
@@ -34,12 +34,11 @@
     bottom: 0;
     color: var(--sec-main);
     display: flex;
+    inset-inline-end: 0;
     justify-content: center;
     overflow: hidden;
     pointer-events: none;
     position: absolute;
-    /* stylelint-disable-next-line csstools/use-logical -- swipe gestures stay physical */
-    right: 0;
     top: 0;
   }
 

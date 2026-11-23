@@ -357,7 +357,7 @@
     style:--timeline-emote-align={defaultEmoteSize ? 'bottom' : undefined}
     style:transform={row.swipe.offset === 0
       ? undefined
-      : `translateX(${String(-row.swipe.offset)}px)`}
+      : `translateX(calc(${String(-row.swipe.offset)}px * var(--inline-sign)))`}
     style:transition={row.swipe.dragging ? 'none' : undefined}
     onpointerdown={row.pointerDown}
     onpointermove={row.press.move}

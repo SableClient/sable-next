@@ -1,4 +1,4 @@
-import { currentDirection, inlineSide } from '#lib/language.svelte.js';
+import { inlineSide, inlineSign } from '#lib/language.svelte.js';
 
 import { MOTION_MS, motionMs } from './motion.js';
 import {
@@ -16,10 +16,6 @@ interface SwipeBackOptions {
 }
 
 /** Pages leave toward the inline end, and `offset` is the drag distance that way. */
-function inlineSign(): 1 | -1 {
-  return currentDirection() === 'rtl' ? -1 : 1;
-}
-
 export class SwipeBack {
   offset = $state(0);
   swiping = $state(false);

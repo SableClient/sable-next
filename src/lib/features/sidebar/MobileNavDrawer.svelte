@@ -12,7 +12,7 @@
   import UserQuickTools from '#lib/features/sidebar/UserQuickTools.svelte';
   import { providePageMeta } from '#lib/core/page-meta.js';
   import { HorizontalSwipe } from '#lib/ui/horizontal-swipe.svelte.js';
-  import { currentDirection } from '#lib/language.svelte.js';
+  import { inlineSign } from '#lib/language.svelte.js';
   import { AppLayout } from '#lib/ui/app-layout.svelte.js';
   import {
     backToRoomList,
@@ -32,7 +32,7 @@
 
   let position = $state<number | undefined>();
   const swipe = new HorizontalSwipe();
-  let sign = $derived(currentDirection() === 'rtl' ? -1 : 1);
+  let sign = $derived(inlineSign());
   let swipeWidth = 0;
   let cancelSettle: (() => void) | undefined;
   let cancelRoute: (() => void) | undefined;

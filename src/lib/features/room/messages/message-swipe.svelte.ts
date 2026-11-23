@@ -1,3 +1,4 @@
+import { inlineSign } from '#lib/language.svelte.js';
 import { hapticFeedback } from '#lib/platform/haptics.js';
 import { startSwipeGesture, updateSwipeGesture, type SwipeGesture } from '#lib/ui/swipe-gesture.js';
 
@@ -43,12 +44,13 @@ export class MessageSwipe {
       }
       if (update.mode !== 'horizontal') return;
 
-      // Rightward belongs to the nav drawer, and keeps the touch even if it turns back.
-      if (update.distanceX > 0) {
+      // Toward the inline end belongs to the nav drawer, and keeps the touch even if it turns back.
+      const distanceX = inlineSign() * update.distanceX;
+      if (distanceX > 0) {
         this.#release(false);
         return;
       }
-      if (update.distanceX === 0) {
+      if (distanceX === 0) {
         this.offset = 0;
         this.#arm('none');
         return;
@@ -57,8 +59,8 @@ export class MessageSwipe {
       const canEdit = this.#options.canEdit();
       if (event.cancelable) event.preventDefault();
       this.dragging = true;
-      this.offset = swipeOffset(update.distanceX, this.#width, canEdit);
-      this.#arm(swipeAction(update.distanceX, this.#width, canEdit));
+      this.offset = swipeOffset(distanceX, this.#width, canEdit);
+      this.#arm(swipeAction(distanceX, this.#width, canEdit));
     };
 
     const end = (): void => {

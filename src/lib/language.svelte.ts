@@ -10,6 +10,11 @@ export function currentDirection(): 'ltr' | 'rtl' {
   return direction;
 }
 
+/** 1 when the inline end is on the right, -1 in right-to-left layouts. */
+export function inlineSign(): 1 | -1 {
+  return direction === 'rtl' ? -1 : 1;
+}
+
 export function inlineSide<Side extends string>(side: Side): Side {
   if (direction === 'ltr') return side;
   if (side === 'left') return 'right' as Side;

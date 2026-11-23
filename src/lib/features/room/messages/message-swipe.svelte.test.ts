@@ -1,5 +1,6 @@
+import { setCurrentLanguage } from '#lib/language.svelte.js';
 import { hapticFeedback } from '#lib/platform/haptics.js';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { editThreshold, replyThreshold } from './message-swipe';
 import { MessageSwipe } from './message-swipe.svelte.js';
@@ -17,6 +18,10 @@ beforeEach(() => {
   node = document.createElement('div');
   Object.defineProperty(node, 'clientWidth', { value: WIDTH, configurable: true });
   document.body.append(node);
+});
+
+afterEach(() => {
+  setCurrentLanguage('en', 'ltr');
 });
 
 function fire(type: string, x: number, y = 0): Event {
@@ -217,4 +222,24 @@ test('feedback fires only when an action threshold changes, not on movement or r
   expect(hapticFeedback).toHaveBeenLastCalledWith('medium');
   fire('touchend', 0);
   expect(hapticFeedback).toHaveBeenCalledTimes(2);
+});
+
+test('right-to-left layouts reply on a rightward drag and leave leftward to the nav drawer', async () => {
+  setCurrentLanguage('ar', 'rtl');
+  const { swipe, onReply } = await harness();
+
+  fire('touchstart', 0);
+  const toDrawer = fire('touchmove', -PAST_REPLY);
+  expect(toDrawer.defaultPrevented).toBe(false);
+  expect(swipe.offset).toBe(0);
+  fire('touchend', 0);
+  expect(onReply).not.toHaveBeenCalled();
+
+  fire('touchstart', 0);
+  const toReply = fire('touchmove', PAST_REPLY);
+  expect(toReply.defaultPrevented).toBe(true);
+  expect(swipe.action).toBe('reply');
+  expect(swipe.offset).toBeGreaterThan(0);
+  fire('touchend', 0);
+  expect(onReply).toHaveBeenCalledOnce();
 });
