@@ -15,6 +15,7 @@ const MIN_STEM_OVERLAP = 4;
 const MIN_STEM_RATIO = [3, 5];
 const WINDOW_RADIUS = 90;
 const WORD = /[\p{L}\p{N}]+/gu;
+const UNSPACED = /[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/u;
 
 type Range = [number, number];
 
@@ -89,8 +90,10 @@ function phraseRanges(body: string, phrase: string): Range[] {
 }
 
 function matchRanges(body: string, terms: readonly string[]): Range[] {
-  const words = terms.filter((term) => term.trim() !== '' && !/\s/.test(term.trim()));
-  const phrases = terms.filter((term) => /\s/.test(term.trim()));
+  const words = terms.filter(
+    (term) => term.trim() !== '' && !/\s/.test(term.trim()) && !UNSPACED.test(term)
+  );
+  const phrases = terms.filter((term) => /\s/.test(term.trim()) || UNSPACED.test(term));
   const ranges = phrases.flatMap((phrase) => phraseRanges(body, phrase));
 
   for (const match of body.matchAll(WORD)) {

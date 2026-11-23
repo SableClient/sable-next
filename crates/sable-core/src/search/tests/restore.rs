@@ -78,43 +78,6 @@ async fn test_chinese_search_survives_restore() {
 }
 
 #[async_test]
-async fn test_pending_chinese_reindex() {
-    crate::search::tokenize::load_bundled_chinese();
-    let room = room_id!("!pending-chinese:localhost").to_owned();
-    let mut room_index = crate::search::RoomIndex::new();
-    room_index.upsert(document(
-        "pending",
-        "稍后搜索中文消息",
-        "@kris:localhost",
-        1_000,
-        None,
-        Vec::new(),
-    ));
-    // Simulate indexing before the dictionary is available.
-    room_index.index = crate::search::inverted::InvertedIndex::with_capacity(0);
-    room_index
-        .chinese_pending
-        .extend(room_index.documents.keys().copied());
-    let revision = room_index.revision;
-    let mut index = MessageIndex::new();
-    index.rooms.insert(room.clone(), room_index);
-    assert!(index.chinese_pending());
-    assert_eq!(
-        found(&index, "搜索", &crate::search::IndexFilter::default()),
-        Vec::<String>::new()
-    );
-
-    index.refresh_chinese().await;
-
-    assert!(!index.chinese_pending());
-    assert_eq!(index.revision(&room), revision);
-    assert_eq!(
-        found(&index, "搜索", &crate::search::IndexFilter::default()),
-        ["$pending"]
-    );
-}
-
-#[async_test]
 async fn test_a_restored_index_lists_media_without_the_event_cache() {
     let room = ruma::RoomId::parse("!pictures:localhost").expect("room id");
     let mut index = MessageIndex::new();

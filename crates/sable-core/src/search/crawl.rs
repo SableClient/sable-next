@@ -663,7 +663,6 @@ impl Core {
         let index = self.search_index.lock().await;
         let documents = index.stored_documents();
         let full = index.is_full();
-        let chinese_pending = index.chinese_pending();
         drop(index);
 
         let progress = self.search_crawl.lock().await;
@@ -683,7 +682,7 @@ impl Core {
 
         let state = if stopped {
             SearchCoverageState::Stopped
-        } else if rooms_pending > 0 || chinese_pending {
+        } else if rooms_pending > 0 {
             SearchCoverageState::Indexing
         } else if rooms_failed > 0 || rooms_blind > 0 {
             SearchCoverageState::Partial

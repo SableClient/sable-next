@@ -149,3 +149,15 @@ test('a body that fits the window is never clipped, wherever the match sits', ()
   expect(snippet.clippedEnd).toBe(false);
   expect(snippet.segments.map((segment) => segment.text).join('')).toBe(body);
 });
+
+test('a Japanese or Chinese term inside an unspaced sentence is marked', () => {
+  const marked = (body: string, terms: string[]) =>
+    highlightSegments(body, terms)
+      .filter((segment) => segment.match)
+      .map((segment) => segment.text);
+
+  expect(marked('日本語で検索を使う', ['検索'])).toEqual(['検索']);
+  expect(marked('ありがとうございます', ['ありがとう'])).toEqual(['ありがとう']);
+  expect(marked('今天我们讨论中文搜索功能', ['搜索'])).toEqual(['搜索']);
+  expect(marked('メロンとソーセージ', ['メッセージ'])).toEqual([]);
+});

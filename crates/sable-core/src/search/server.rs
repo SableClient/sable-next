@@ -18,7 +18,7 @@ use matrix_sdk::ruma::{
 };
 
 use super::IndexFilter;
-use super::tokenize::{tokenize, tokenize_query};
+use super::tokenize;
 use super::{ContextLine, Hit, edited_or_own_event_id, indexable_body, replacement_of};
 use crate::Core;
 use crate::messages::latest_valid_replacement;
@@ -291,13 +291,6 @@ fn latest_body(message: &OriginalSyncRoomMessageEvent) -> Option<String> {
     Some(indexable_body(edit.new_content.msgtype.body()))
 }
 
-fn matches_query(query: &str, body: &str) -> bool {
-    let terms = tokenize(body);
-    tokenize_query(query)
-        .iter()
-        .all(|wanted| terms.iter().any(|term| term.starts_with(wanted.as_ref())))
-}
-
 /// A search result that matched on an edit stands for the message it replaces, but only
 /// once that edit is the replaced message's latest valid one.
 struct Candidate {
@@ -316,7 +309,7 @@ fn hit_from(result: &SearchResult, room_id: &OwnedRoomId, query: &str) -> Option
     };
     if edited
         .as_ref()
-        .is_some_and(|body| !matches_query(query, body))
+        .is_some_and(|body| !tokenize::matches(query, body))
     {
         return None;
     }

@@ -8249,6 +8249,7 @@ dependencies = [
  "tracing",
  "tracing-error",
  "tracing-subscriber",
+ "unicode-normalization",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",

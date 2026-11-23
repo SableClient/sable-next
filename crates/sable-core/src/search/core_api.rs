@@ -2,7 +2,6 @@ use crate::api::search::SearchOrder;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
 
 use futures_util::{StreamExt, stream};
 use matrix_sdk::RoomState;
@@ -34,29 +33,8 @@ impl Core {
             dictionary::ensure(&self.store_id).await.map_err(|error| {
                 crate::errors::coded("search_dictionary", RpcCode::Unavailable, &error)
             })?;
-            self.search_index.lock().await.refresh_chinese().await;
         }
         Ok(())
-    }
-
-    fn watch_search_dictionary(self: &Arc<Self>) {
-        let core = self.clone();
-        self.track_session_task(
-            spawn(async move {
-                loop {
-                    core.wait_until_active().await;
-                    let pending = core.search_index.lock().await.chinese_pending();
-                    if pending
-                        && core.search_crawl_active()
-                        && dictionary::ensure(&core.store_id).await.is_ok()
-                    {
-                        core.search_index.lock().await.refresh_chinese().await;
-                    }
-                    matrix_sdk::sleep::sleep(Duration::from_secs(10)).await;
-                }
-            })
-            .abort_on_drop(),
-        );
     }
 
     pub(crate) async fn search_messages(
@@ -632,7 +610,6 @@ impl Core {
 
                 core.watch_search_crawl(&client);
                 core.watch_search_persist(&client);
-                core.watch_search_dictionary();
 
                 loop {
                     let room_id = match updates.recv().await {

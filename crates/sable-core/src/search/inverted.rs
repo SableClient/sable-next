@@ -86,43 +86,75 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         }
         let documents = self.lengths.len() as f64;
         let average_length = self.total_length as f64 / documents;
-        let mut terms = tokenize::tokenize_query(query);
-        terms.sort_unstable();
-        terms.dedup();
+        let mut groups = tokenize::tokenize_query(query);
+        for group in &mut groups {
+            group.sort_unstable();
+            group.dedup();
+        }
+        groups.sort_unstable();
+        groups.dedup();
 
         let mut scores: HashMap<K, f64> = HashMap::new();
         let mut live = Vec::new();
-        for term in &terms {
-            let mut best: HashMap<K, f64> = HashMap::new();
-            for (list, edits) in self.expand(term, expand) {
-                live.clear();
-                live.extend(
-                    list.iter()
-                        .filter_map(|&(key, count)| Some((key, count, *self.lengths.get(&key)?))),
-                );
-                let frequency = live.len() as f64;
-                let idf = (1.0 + (documents - frequency + 0.5) / (frequency + 0.5)).ln();
-                let boost = if edits == 0 {
-                    1.0
-                } else {
-                    (1.0 + 1.0 / (1.0 + edits as f64)).ln()
-                };
-                for &(key, count, length) in &live {
-                    let count = f64::from(count);
-                    let saturated = ((BM25_K1 + 1.0) * count)
-                        / (BM25_K1 * (1.0 - BM25_B + BM25_B * f64::from(length) / average_length)
-                            + count);
-                    let score = saturated * idf * boost;
-                    best.entry(key)
-                        .and_modify(|current| *current = current.max(score))
-                        .or_insert(score);
-                }
+        for group in &groups {
+            let mut matched: Option<HashMap<K, f64>> = None;
+            for term in group {
+                let best = self.term_scores(term, expand, documents, average_length, &mut live);
+                matched = Some(match matched {
+                    None => best,
+                    Some(mut matched) => {
+                        matched.retain(|key, score| {
+                            best.get(key).map(|extra| *score += extra).is_some()
+                        });
+                        matched
+                    }
+                });
             }
-            for (key, score) in best {
+            for (key, score) in matched.into_iter().flatten() {
                 *scores.entry(key).or_default() += score;
             }
         }
         scores.into_iter().collect()
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "counts stay far below 2^52 and only feed a ranking score"
+    )]
+    fn term_scores(
+        &self,
+        term: &str,
+        expand: bool,
+        documents: f64,
+        average_length: f64,
+        live: &mut Vec<(K, u32, u32)>,
+    ) -> HashMap<K, f64> {
+        let mut best: HashMap<K, f64> = HashMap::new();
+        for (list, edits) in self.expand(term, expand) {
+            live.clear();
+            live.extend(
+                list.iter()
+                    .filter_map(|&(key, count)| Some((key, count, *self.lengths.get(&key)?))),
+            );
+            let frequency = live.len() as f64;
+            let idf = (1.0 + (documents - frequency + 0.5) / (frequency + 0.5)).ln();
+            let boost = if edits == 0 {
+                1.0
+            } else {
+                (1.0 + 1.0 / (1.0 + edits as f64)).ln()
+            };
+            for &(key, count, length) in live.iter() {
+                let count = f64::from(count);
+                let saturated = ((BM25_K1 + 1.0) * count)
+                    / (BM25_K1 * (1.0 - BM25_B + BM25_B * f64::from(length) / average_length)
+                        + count);
+                let score = saturated * idf * boost;
+                best.entry(key)
+                    .and_modify(|current| *current = current.max(score))
+                    .or_insert(score);
+            }
+        }
+        best
     }
 
     /// Without `expand` a term finds only the words that stem onto it. Chinese
@@ -204,6 +236,52 @@ mod tests {
         crate::search::tokenize::load_bundled_chinese();
         let index = index(&["検索を使う", "検討します", "索引です"]);
         assert_eq!(ranked(&index, "検索"), [0]);
+    }
+
+    #[test]
+    fn test_a_japanese_word_is_found_across_a_chinese_dictionary_word() {
+        crate::search::tokenize::load_bundled_chinese();
+        let index = index(&["東京都庁に行く", "京都に行く"]);
+        assert_eq!(ranked(&index, "東京"), [0]);
+    }
+
+    #[test]
+    fn test_a_japanese_word_does_not_match_text_sharing_only_some_of_its_pairs() {
+        crate::search::tokenize::load_bundled_chinese();
+        let hiragana = index(&[
+            "ありがとうございます",
+            "ありとあらゆる手段",
+            "とうとう終わった",
+        ]);
+        assert_eq!(ranked(&hiragana, "ありがとう"), [0]);
+
+        let katakana = index(&["メッセージを送る", "メロンとソーセージ"]);
+        assert_eq!(ranked(&katakana, "メッセージ"), [0]);
+    }
+
+    #[test]
+    fn test_a_japanese_compound_split_by_the_chinese_dictionary_stays_whole() {
+        crate::search::tokenize::load_bundled_chinese();
+        let japanese = index(&["日本語を勉強する", "日本と英語", "英語を話す"]);
+        assert_eq!(ranked(&japanese, "日本語"), [0]);
+
+        let tokyo = index(&["東京都に住む", "東の京都"]);
+        assert_eq!(ranked(&tokyo, "東京都"), [0]);
+    }
+
+    #[test]
+    fn test_an_unvoiced_kana_does_not_match_its_voiced_form() {
+        crate::search::tokenize::load_bundled_chinese();
+        let index = index(&["か", "が"]);
+        assert_eq!(ranked(&index, "か"), [0]);
+        assert_eq!(ranked(&index, "が"), [1]);
+    }
+
+    #[test]
+    fn test_separate_chinese_words_in_one_query_each_add_to_the_score() {
+        crate::search::tokenize::load_bundled_chinese();
+        let index = index(&["中文搜索功能", "中文消息", "天气"]);
+        assert_eq!(ranked(&index, "中文功能"), [0, 1]);
     }
 
     #[test]

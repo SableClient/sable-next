@@ -13,7 +13,7 @@ use super::{
     CHANGES_BEFORE_FLUSH, CLASSIFIED_OVERHEAD, DISK_BUDGET, DOCUMENT_OVERHEAD,
     DOCUMENTS_PER_RESTORE_YIELD, EVENTS_PER_INGEST_YIELD, HYDRATE_BATCH, INITIAL_DOCUMENTS,
     IndexFilter, MEMORY_BUDGET, RETIRED_KEYS_BEFORE_VACUUM, TICKS_BEFORE_FLUSH, crawl,
-    edited_or_own_event_id, is_redacted, now_ms, redacted_event_id, tokenize,
+    edited_or_own_event_id, is_redacted, now_ms, redacted_event_id,
 };
 use crate::messages::{raw_content, valid_replacements};
 use crate::protocol::{RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView};
@@ -58,7 +58,6 @@ pub(super) struct RoomIndex {
     pub(super) pending_replacements: HashMap<OwnedEventId, HashMap<OwnedEventId, TimelineEvent>>,
     pub(super) floor: u64,
     pub(super) rederive_from: u64,
-    pub(super) chinese_pending: HashSet<DocKey>,
 }
 
 impl RoomIndex {
@@ -95,7 +94,6 @@ impl RoomIndex {
             pending_replacements: HashMap::new(),
             floor: 0,
             rederive_from: 0,
-            chinese_pending: HashSet::new(),
         }
     }
 
@@ -257,7 +255,6 @@ impl RoomIndex {
             return;
         };
         for (ts, key) in self.keys_in(start, end) {
-            self.chinese_pending.remove(&key);
             if let Some(document) = self.documents.remove(&key) {
                 self.key_of.remove(&document.event_id);
                 self.bytes = self.bytes.saturating_sub(document_bytes(&document));
@@ -517,8 +514,6 @@ impl RoomIndex {
         if let Some(edit) = &document.edit_id {
             self.edits.insert(edit.clone(), document.event_id.clone());
         }
-        let chinese_pending =
-            !tokenize::chinese_ready() && tokenize::contains_chinese(&document.body);
         if let Some(&key) = self.key_of.get(&document.event_id)
             && let Some(indexed) = self.documents.get_mut(&key)
             && indexed.body == document.body
@@ -548,9 +543,6 @@ impl RoomIndex {
         let folded = document.body.to_lowercase();
         self.index.add_document(key, &document.body);
         self.key_of.insert(document.event_id.clone(), key);
-        if chinese_pending {
-            self.chinese_pending.insert(key);
-        }
         self.by_age.insert((document.origin_server_ts, key));
         let document = Document { folded, ..document };
         self.bytes += document_bytes(&document);
@@ -618,7 +610,6 @@ impl RoomIndex {
         let Some(key) = self.key_of.remove(event_id) else {
             return;
         };
-        self.chinese_pending.remove(&key);
         let ts = self.documents.remove(&key).map_or(0, |document| {
             self.by_age.remove(&(document.origin_server_ts, key));
             self.bytes = self.bytes.saturating_sub(document_bytes(&document));
@@ -718,26 +709,6 @@ impl<'index> Ranked<'index> {
 }
 
 impl MessageIndex {
-    pub(super) fn chinese_pending(&self) -> bool {
-        self.rooms
-            .values()
-            .any(|room| !room.chinese_pending.is_empty())
-    }
-
-    pub(super) async fn refresh_chinese(&mut self) {
-        if !tokenize::chinese_ready() {
-            return;
-        }
-        for room in self
-            .rooms
-            .values_mut()
-            .filter(|room| !room.chinese_pending.is_empty())
-        {
-            room.build_index().await;
-            room.chinese_pending.clear();
-        }
-    }
-
     pub(super) async fn build_indexes(&mut self, filter: &IndexFilter) {
         for (room_id, room) in &mut self.rooms {
             if room.index.is_deferred() && Self::in_scope(filter, room_id) {

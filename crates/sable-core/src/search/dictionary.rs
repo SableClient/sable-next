@@ -63,7 +63,7 @@ pub(super) async fn ensure(store_id: &str) -> Result<(), StoreError> {
         }
         Err(error) => {
             *retry = Some(web_time::Instant::now());
-            tracing::warn!(%error, "Chinese search dictionary is unavailable; indexing will retry");
+            tracing::warn!(%error, "Chinese search dictionary is unavailable; search will retry");
             Err(error)
         }
     }

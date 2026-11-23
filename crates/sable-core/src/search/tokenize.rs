@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use charabia::{Script, Token, TokenKind, Tokenize};
 use jieba_rs::Jieba;
 use rust_stemmers::{Algorithm, Stemmer};
+use unicode_normalization::UnicodeNormalization;
 
 pub(super) static CHINESE: std::sync::OnceLock<Jieba> = std::sync::OnceLock::new();
 
@@ -15,18 +16,38 @@ static TAMIL: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Ta
 
 const MAX_TERM_CHARS: usize = 256;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Side {
-    Document,
-    Query,
-}
-
+/// Chinese and Japanese are indexed as overlapping pairs of characters, plus
+/// the last character of each run, so a one character query still finds it.
+/// The pairs depend only on the text, never on how a dictionary would cut it.
 pub(crate) fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
-    tokenize_with(text, CHINESE.get(), Side::Document)
+    let mut terms = Vec::new();
+    for token in text
+        .tokenize()
+        .filter(|token| token.kind == TokenKind::Word)
+    {
+        if token.script == Script::Cj {
+            let characters = normalized(&token);
+            terms.extend(pairs(&characters));
+            terms.extend(characters.last().map(|last| Cow::Owned(last.to_string())));
+        } else {
+            push_term(&mut terms, &token);
+        }
+    }
+    terms
 }
 
-pub(crate) fn tokenize_query(text: &str) -> Vec<Cow<'static, str>> {
-    tokenize_with(text, CHINESE.get(), Side::Query)
+/// A query is a list of words, and a document matches a word only when it
+/// holds every term of it.
+pub(crate) fn tokenize_query(text: &str) -> Vec<Vec<Cow<'static, str>>> {
+    tokenize_query_with(text, CHINESE.get())
+}
+
+pub(crate) fn matches(query: &str, body: &str) -> bool {
+    let terms = tokenize(body);
+    tokenize_query(query)
+        .iter()
+        .flatten()
+        .all(|wanted| terms.iter().any(|term| term.starts_with(wanted.as_ref())))
 }
 
 pub(super) fn chinese_ready() -> bool {
@@ -43,69 +64,78 @@ pub(super) fn contains_chinese(text: &str) -> bool {
         .any(|character| Script::from(character) == Script::Cj)
 }
 
-fn tokenize_with(text: &str, dictionary: Option<&Jieba>, side: Side) -> Vec<Cow<'static, str>> {
-    let mut terms = Vec::new();
+fn tokenize_query_with(text: &str, dictionary: Option<&Jieba>) -> Vec<Vec<Cow<'static, str>>> {
+    let mut groups = Vec::new();
     for token in text
         .tokenize()
         .filter(|token| token.kind == TokenKind::Word)
     {
         if token.script == Script::Cj {
-            let Some(dictionary) = dictionary else {
-                continue;
-            };
             // Segment the original text: normalization can change dictionary spellings.
-            let original = text
+            let run = text
                 .get(token.byte_start..token.byte_end)
                 .unwrap_or_default();
-            let mut singles = Vec::new();
-            for word in dictionary.cut_for_search(original, false) {
-                let single = word.word.chars().count() == 1;
-                let mut found = false;
-                for token in word
-                    .word
+            for word in dictionary_words(run, dictionary) {
+                let characters: Vec<char> = word
                     .tokenize()
                     .filter(|token| token.kind == TokenKind::Word)
-                {
-                    let term = limit_term(stem(&token));
-                    if term.is_empty() {
-                        continue;
-                    }
-                    if single {
-                        found = true;
-                        singles.push(term);
-                    } else {
-                        terms.push(Cow::Owned(term));
-                    }
-                }
-                if !found {
-                    push_pairs(&mut terms, &mut singles, side);
+                    .flat_map(|token| normalized(&token))
+                    .collect();
+                let group: Vec<_> = if characters.len() == 1 {
+                    characters
+                        .iter()
+                        .map(|single| Cow::Owned(single.to_string()))
+                        .collect()
+                } else {
+                    pairs(&characters).collect()
+                };
+                if !group.is_empty() {
+                    groups.push(group);
                 }
             }
-            push_pairs(&mut terms, &mut singles, side);
         } else {
+            let mut terms = Vec::new();
             push_term(&mut terms, &token);
+            if !terms.is_empty() {
+                groups.push(terms);
+            }
         }
     }
-    terms
+    groups
 }
 
-/// The Chinese dictionary cuts text it has no words for, Japanese above all,
-/// into single characters, and a query of single characters matches any word
-/// that starts with one of them. A run of them is indexed as overlapping
-/// pairs instead. A document also keeps the last character, which starts no
-/// pair, so a one character query still finds it.
-fn push_pairs(terms: &mut Vec<Cow<'static, str>>, singles: &mut Vec<String>, side: Side) {
-    if singles.len() == 1 {
-        terms.extend(singles.drain(..).map(Cow::Owned));
-        return;
+/// The Chinese dictionary splits a run into the words it knows. A single
+/// character it leaves over usually belongs to a word it does not know,
+/// Japanese above all, so it stays joined to its neighbours.
+fn dictionary_words<'text>(run: &'text str, dictionary: Option<&Jieba>) -> Vec<&'text str> {
+    let Some(dictionary) = dictionary else {
+        return vec![run];
+    };
+    let mut words = Vec::new();
+    let (mut start, mut end) = (0, 0);
+    let mut joined = false;
+    for word in dictionary.cut(run, false) {
+        let single = word.word.chars().count() == 1;
+        if end > start && !single && !joined {
+            words.extend(run.get(start..end));
+            start = end;
+        }
+        end = word.byte_end;
+        joined = single;
     }
-    for pair in singles.windows(2) {
-        terms.push(Cow::Owned(pair.concat()));
-    }
-    if side == Side::Document {
-        terms.extend(singles.pop().map(Cow::Owned));
-    }
-    singles.clear();
+    words.extend(run.get(start..end).filter(|word| !word.is_empty()));
+    words
+}
+
+/// Recomposed so a voiced kana stays one character apart from its unvoiced form.
+fn normalized(token: &Token<'_>) -> Vec<char> {
+    token.lemma().nfc().collect()
+}
+
+fn pairs(characters: &[char]) -> impl Iterator<Item = Cow<'static, str>> + '_ {
+    characters
+        .windows(2)
+        .map(|pair| Cow::Owned(pair.iter().collect()))
 }
 
 fn push_term(terms: &mut Vec<Cow<'static, str>>, token: &Token<'_>) {
@@ -143,7 +173,7 @@ fn stemmer_for(script: Script) -> Option<&'static Stemmer> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_TERM_CHARS, tokenize, tokenize_query};
+    use super::{MAX_TERM_CHARS, tokenize};
 
     fn terms(text: &str) -> Vec<String> {
         super::load_bundled_chinese();
@@ -151,12 +181,8 @@ mod tests {
     }
 
     fn finds(query: &str, document: &str) -> bool {
-        let document = terms(document);
-        tokenize_query(query).iter().all(|wanted| {
-            document
-                .iter()
-                .any(|term| term.starts_with(wanted.as_ref()))
-        })
+        super::load_bundled_chinese();
+        super::matches(query, document)
     }
 
     #[test]
@@ -166,6 +192,15 @@ mod tests {
         assert!(!finds("検索", "検討します"));
         assert!(!finds("検索", "索引です"));
         assert!(!finds("ありがとう", "日本語検索が失敗"));
+    }
+
+    #[test]
+    fn test_japanese_matches_ignore_chinese_dictionary_boundaries() {
+        assert!(finds("東京", "東京都庁に行く"));
+        assert!(finds("日本語", "日本語を勉強する"));
+        assert!(!finds("日本語", "日本と英語"));
+        assert!(!finds("東京都", "東の京都"));
+        assert!(!finds("か", "が"));
     }
 
     #[test]
@@ -206,34 +241,30 @@ mod tests {
             "今天我们一起讨论中文搜索功能，然后测试加密房间里的消息索引。",
             "今天我們一起討論中文搜索功能，然後測試加密房間裡的消息索引。",
         ] {
-            let document = terms(sentence);
             for query in ["中文", "搜索", "功能", "加密", "消息", "索引"] {
-                let query_terms = terms(query);
-                assert_ne!(query_terms, Vec::<String>::new());
                 assert!(
-                    query_terms.iter().all(|term| document.contains(term)),
-                    "{query:?} tokenized to {query_terms:?}, which the document {document:?} cannot match"
+                    finds(query, sentence),
+                    "{query:?} does not find {sentence:?}"
                 );
             }
+            assert!(!finds("天气", sentence));
         }
     }
 
     #[test]
-    fn test_missing_chinese_dictionary_keeps_latin_terms() {
-        let document = super::Side::Document;
+    fn test_a_query_without_the_chinese_dictionary_keeps_a_run_whole() {
         assert_eq!(
-            super::tokenize_with("deploy 中文搜索", None, document),
-            ["deploy"]
-        );
-        assert_eq!(
-            super::tokenize_with("中文搜索", None, document),
-            Vec::<&str>::new()
+            super::tokenize_query_with("deploy 中文搜索", None),
+            [vec!["deploy"], vec!["中文", "文搜", "搜索"]]
         );
     }
 
     #[test]
     fn test_mixed_chinese_and_latin() {
-        assert_eq!(terms("搜索 Search 部署"), ["搜索", "search", "部署"]);
+        assert_eq!(
+            terms("搜索 Search 部署"),
+            ["搜索", "索", "search", "部署", "署"]
+        );
     }
 
     #[test]
