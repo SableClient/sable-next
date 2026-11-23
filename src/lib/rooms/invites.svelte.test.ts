@@ -5,9 +5,13 @@ import type { RoomListItemView } from '#src/generated/protocol';
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { goto } from '#lib/test-support/app-navigation.js';
-vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('$app/paths', () => ({
+  resolve: (path: string, params: Record<string, string> = {}) =>
+    path.replace('/(app)', '').replace(/\[(\w+)\]/g, (_, key: string) => params[key] ?? key),
+}));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { roomView } from '#lib/test-support/room-views.js';
 import { InviteActions, isDeclining } from './invites.svelte.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
@@ -21,8 +25,13 @@ const room = {
   is_direct: false,
 } as RoomListItemView;
 
-function actions(commands: Record<string, unknown>): InviteActions {
-  return new InviteActions({ commands, rpc: { rooms: commands } } as unknown as CoreClient);
+function actions(
+  commands: Record<string, unknown>,
+  rooms: readonly RoomListItemView[] = []
+): InviteActions {
+  return new InviteActions({ commands, rpc: { rooms: commands } } as unknown as CoreClient, {
+    rooms,
+  });
 }
 
 test('a join the server rejects raises a toast and releases the room', async () => {
@@ -81,6 +90,39 @@ test('an accepted invitation raises nothing', async () => {
   await answers.accept(room);
 
   expect(toasts.items).toEqual([]);
+});
+
+test('an accepted invitation opens where the room list files the room', async () => {
+  const space = roomView({
+    room_id: '!space:example.org',
+    room_kind: 'space',
+    space_children: [
+      {
+        room_id: room.room_id,
+        via: ['example.org'],
+        order: null,
+        suggested: false,
+        origin_server_ts: 0,
+        private: false,
+      },
+    ],
+  });
+  const answers = actions({ join: vi.fn(() => Promise.resolve(room.room_id)) }, [space, room]);
+  goto.mockClear();
+
+  await answers.accept(room);
+
+  expect(goto).toHaveBeenCalledWith('/space/!space%3Aexample.org/!room%3Aexample.org');
+});
+
+test('an accepted space invitation opens the space, which picks its own page', async () => {
+  const space = { ...room, room_id: '!space:example.org', room_kind: 'space' } as RoomListItemView;
+  const answers = actions({ join: vi.fn(() => Promise.resolve(space.room_id)) }, [space]);
+  goto.mockClear();
+
+  await answers.accept(space);
+
+  expect(goto).toHaveBeenCalledWith('/space/!space%3Aexample.org');
 });
 
 test('accepting all joins every invite without leaving the page and reports failures once', async () => {

@@ -352,7 +352,7 @@
     await roomList.whenListed(roomId, NOTIFIED_ROOM_WAIT_MS);
     const invite = roomList.rooms.find((room) => room.room_id === roomId);
     if (invite?.state !== 'invited') return;
-    const answers = new InviteActions(core);
+    const answers = new InviteActions(core, roomList);
     if (outcome === 'accept') await answers.accept(invite);
     else answers.decline(invite);
   }

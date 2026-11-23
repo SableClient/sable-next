@@ -40,7 +40,7 @@
 
   const roomList = useRoomList();
   const core = useCoreClient();
-  const answers = new InviteActions(core);
+  const answers = new InviteActions(core, roomList);
   const names = new DisplayNames(core);
   $effect(() => core.onProfileChanged(names.forget));
   const triage = new InviteTriage(core);

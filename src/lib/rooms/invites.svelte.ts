@@ -7,6 +7,7 @@ import { resolve } from '$app/paths';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { joinRoom } from '#lib/core/api/rooms.js';
 import { t } from '#lib/i18n.js';
+import { roomSectionPath } from '#lib/rooms/permalink.js';
 import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
@@ -20,7 +21,10 @@ export class InviteActions {
   /** Rendered from, so the set has to be reactive. */
   private readonly answering = new SvelteSet<string>();
 
-  constructor(private readonly core: CoreClient) {}
+  constructor(
+    private readonly core: CoreClient,
+    private readonly roomList: { readonly rooms: readonly RoomListItemView[] }
+  ) {}
 
   isAnswering(roomId: string): boolean {
     return this.answering.has(roomId);
@@ -29,8 +33,12 @@ export class InviteActions {
   async accept(room: RoomListItemView): Promise<void> {
     await this.answer(room, async () => {
       const roomId = await joinRoom(this.core.rpc, room.room_id);
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomHref() resolves the route itself
-      await goto(roomHref(room, roomId));
+      const path =
+        room.room_kind === 'space'
+          ? resolve('/(app)/space/[spaceId]', { spaceId: roomPathParamFromId(roomId) })
+          : roomSectionPath(this.roomList.rooms, roomId);
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- both routes are resolved above
+      await goto(path);
     });
   }
 
@@ -138,11 +146,4 @@ export class InviteActions {
       this.answering.delete(room.room_id);
     }
   }
-}
-
-function roomHref(room: RoomListItemView, roomId: string): string {
-  const param = roomPathParamFromId(roomId);
-  if (room.room_kind === 'space') return resolve('/(app)/space/[spaceId]', { spaceId: param });
-  if (room.is_direct) return resolve('/(app)/direct/[roomId]', { roomId: param });
-  return resolve('/(app)/rooms/[roomId]', { roomId: param });
 }

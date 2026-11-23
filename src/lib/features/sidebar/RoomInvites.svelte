@@ -10,6 +10,7 @@
   import { inviter } from '#lib/features/inbox/inbox.js';
   import { i18n } from '#lib/i18n.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -21,7 +22,8 @@
 
   let { invites, collapsed = false }: Props = $props();
   const core = useCoreClient();
-  const answers = new InviteActions(core);
+  const roomList = useRoomList();
+  const answers = new InviteActions(core, roomList);
   const names = new DisplayNames(core);
   $effect(() => core.onProfileChanged(names.forget));
   const headingId = $props.id();
