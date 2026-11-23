@@ -212,6 +212,22 @@ test('install skips the model cache on the desktop custom scheme', async () => {
   expect(open).not.toHaveBeenCalled();
 });
 
+test('activation leaves the Cache API alone on the desktop custom scheme', async () => {
+  mocks.location.protocol = 'sable-app:';
+  const keys = vi.fn().mockRejectedValue(new Error('unsupported scheme'));
+  let pending: Promise<unknown> | undefined;
+  vi.stubGlobal('caches', { keys });
+
+  mocks.handlers.get('activate')?.({
+    waitUntil: (work: Promise<unknown>) => {
+      pending = work;
+    },
+  } as unknown as PushEvent);
+  await pending;
+
+  expect(keys).not.toHaveBeenCalled();
+});
+
 test('pushes load the model without Cache API on the desktop custom scheme', async () => {
   mocks.location.protocol = 'sable-app:';
   const match = vi.fn().mockRejectedValue(new Error('unsupported scheme'));

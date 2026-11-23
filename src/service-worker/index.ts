@@ -97,6 +97,7 @@ worker.addEventListener('install', (event) => {
 });
 
 worker.addEventListener('activate', (event) => {
+  if (!supportsModelCache()) return;
   event.waitUntil(
     caches
       .keys()
