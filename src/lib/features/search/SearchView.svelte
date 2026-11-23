@@ -146,7 +146,7 @@
   let input = $state<HTMLInputElement>();
   let results = $state<HTMLElement>();
 
-  let terms = $derived(search.terms);
+  let phrases = $derived(search.parsed.phrases);
 
   onMount(() => {
     void core.refreshSearchCoverage().then(() => {
@@ -689,7 +689,7 @@
               {#each group.hits as hit (hit.event_id)}
                 <SearchHitRow
                   {hit}
-                  {terms}
+                  terms={[...hit.matched, ...phrases]}
                   {senders}
                   {userId}
                   roomLabel={label}

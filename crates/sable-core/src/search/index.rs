@@ -1766,7 +1766,7 @@ pub(super) fn newest_chunks_within(
 
 /// Date orders have no score to sink a loose match, so only relevance takes
 /// prefixes and typos.
-const fn expands(order: SearchOrder) -> bool {
+pub(crate) const fn expands(order: SearchOrder) -> bool {
     matches!(order, SearchOrder::Rank)
 }
 

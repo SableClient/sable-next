@@ -10,10 +10,6 @@ function platformSegmenter(): WordSegmenter | undefined {
     : undefined;
 }
 
-export function isUnspaced(word: string): boolean {
-  return UNSPACED.test(word);
-}
-
 /**
  * The words of a search query. Chinese and Japanese are cut where the
  * platform's word segmenter says; without one, each space-separated part is
@@ -27,7 +23,7 @@ export function queryWords(
     .split(/\s+/)
     .filter((part) => part !== '')
     .flatMap((part) =>
-      segmenter && isUnspaced(part)
+      segmenter && UNSPACED.test(part)
         ? Array.from(segmenter.segment(part))
             .filter((segment) => segment.isWordLike)
             .map((segment) => segment.segment)

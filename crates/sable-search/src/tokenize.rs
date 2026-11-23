@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ops::Range;
 use std::sync::LazyLock;
 
 use charabia::{Script, Token, TokenKind, Tokenize};
@@ -13,32 +14,41 @@ static TAMIL: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Ta
 
 const MAX_TERM_CHARS: usize = 256;
 
-/// Chinese and Japanese are indexed as overlapping pairs of characters, plus
-/// the last character of each run, so a one character query still finds it.
+/// Each term comes with the bytes of `text` its word spans. Chinese and
+/// Japanese are indexed as overlapping pairs of characters, plus the last
+/// character of each run, so a one character query still finds it.
 #[must_use]
-pub fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
+pub(crate) fn tokenize(text: &str) -> Vec<(Cow<'static, str>, Range<usize>)> {
     let mut terms = Vec::new();
     for token in text
         .tokenize()
         .filter(|token| token.kind == TokenKind::Word)
     {
+        let word = token.byte_start..token.byte_end;
         if token.script == Script::Cj {
             let characters = normalized(&token);
-            terms.extend(pairs(&characters));
-            terms.extend(characters.last().map(|last| Cow::Owned(last.to_string())));
+            terms.extend(pairs(&characters).map(|pair| (pair, word.clone())));
+            terms.extend(
+                characters
+                    .last()
+                    .map(|last| (Cow::Owned(last.to_string()), word.clone())),
+            );
         } else {
-            push_term(&mut terms, &token);
+            terms.extend(term(&token).map(|term| (term, word)));
         }
     }
     terms
 }
 
-/// A query is a list of words, and a document matches a word only when it
-/// holds every term of it. Chinese and Japanese are cut where `words`, the
-/// query as the platform's word segmenter split it, says; a run they do not
-/// cover stays one word.
+/// A query is a list of words, each spelled as it was typed, and a document
+/// matches a word only when it holds every term of it. Chinese and Japanese
+/// are cut where `words`, the query as the platform's word segmenter split it,
+/// says; a run they do not cover stays one word.
 #[must_use]
-pub fn tokenize_query(text: &str, words: &[String]) -> Vec<Vec<Cow<'static, str>>> {
+pub(crate) fn tokenize_query<'text>(
+    text: &'text str,
+    words: &[String],
+) -> Vec<(&'text str, Vec<Cow<'static, str>>)> {
     let mut groups = Vec::new();
     for token in text
         .tokenize()
@@ -64,43 +74,21 @@ pub fn tokenize_query(text: &str, words: &[String]) -> Vec<Vec<Cow<'static, str>
                     pairs(&characters).collect()
                 };
                 if !group.is_empty() {
-                    groups.push(group);
+                    groups.push((word, group));
                 }
             }
         } else {
-            let mut terms = Vec::new();
-            push_term(&mut terms, &token);
-            if !terms.is_empty() {
-                groups.push(terms);
-            }
+            let typed = text
+                .get(token.byte_start..token.byte_end)
+                .unwrap_or_default();
+            groups.extend(term(&token).map(|term| (typed, vec![term])));
         }
     }
     groups
 }
 
 #[must_use]
-pub fn matches(query: &str, words: &[String], body: &str) -> bool {
-    let terms = tokenize(body);
-    tokenize_query(query, words)
-        .iter()
-        .flatten()
-        .all(|wanted| terms.iter().any(|term| term.starts_with(wanted.as_ref())))
-}
-
-/// The Chinese and Japanese words of a query as [`tokenize_query`] cuts them,
-/// spelled as the query was typed.
-#[must_use]
-pub fn unspaced_words(text: &str, words: &[String]) -> Vec<String> {
-    text.tokenize()
-        .filter(|token| token.kind == TokenKind::Word && token.script == Script::Cj)
-        .filter_map(|token| text.get(token.byte_start..token.byte_end))
-        .flat_map(|run| segmented(run, words))
-        .map(str::to_owned)
-        .collect()
-}
-
-#[must_use]
-pub fn contains_chinese(text: &str) -> bool {
+pub(crate) fn contains_chinese(text: &str) -> bool {
     text.chars()
         .any(|character| Script::from(character) == Script::Cj)
 }
@@ -143,11 +131,9 @@ fn pairs(characters: &[char]) -> impl Iterator<Item = Cow<'static, str>> + '_ {
         .map(|pair| Cow::Owned(pair.iter().collect()))
 }
 
-fn push_term(terms: &mut Vec<Cow<'static, str>>, token: &Token<'_>) {
+fn term(token: &Token<'_>) -> Option<Cow<'static, str>> {
     let term = limit_term(stem(token));
-    if !term.is_empty() {
-        terms.push(Cow::Owned(term));
-    }
+    (!term.is_empty()).then_some(Cow::Owned(term))
 }
 
 fn limit_term(mut term: String) -> String {
@@ -178,6 +164,8 @@ fn stemmer_for(script: Script) -> Option<&'static Stemmer> {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::{MAX_TERM_CHARS, tokenize, tokenize_query};
 
     fn words(words: &[&str]) -> Vec<String> {
@@ -185,11 +173,21 @@ mod tests {
     }
 
     fn terms(text: &str) -> Vec<String> {
-        tokenize(text).into_iter().map(Into::into).collect()
+        tokenize(text)
+            .into_iter()
+            .map(|(term, _)| term.into())
+            .collect()
+    }
+
+    fn query_terms(text: &str, words: &[String]) -> Vec<Vec<Cow<'static, str>>> {
+        tokenize_query(text, words)
+            .into_iter()
+            .map(|(_, terms)| terms)
+            .collect()
     }
 
     fn finds(query: &str, document: &str) -> bool {
-        super::matches(query, &[], document)
+        crate::inverted::matched_words(query, &[], document, false).is_some()
     }
 
     #[test]
@@ -261,7 +259,7 @@ mod tests {
     #[test]
     fn test_a_query_without_words_keeps_a_run_whole() {
         assert_eq!(
-            tokenize_query("deploy 中文搜索", &[]),
+            query_terms("deploy 中文搜索", &[]),
             [vec!["deploy"], vec!["中文", "文搜", "搜索"]]
         );
     }
@@ -269,47 +267,47 @@ mod tests {
     #[test]
     fn test_a_query_is_cut_where_its_words_say() {
         assert_eq!(
-            tokenize_query(
+            query_terms(
                 "deploy 中文搜索功能",
                 &words(&["deploy", "中文", "搜索功能"])
             ),
             [vec!["deploy"], vec!["中文"], vec!["搜索", "索功", "功能"]]
         );
         assert_eq!(
-            tokenize_query("東京都", &words(&["東京", "東京都"])),
+            query_terms("東京都", &words(&["東京", "東京都"])),
             [vec!["東京", "京都"]]
         );
     }
 
     #[test]
-    fn test_the_unspaced_words_are_the_pieces_the_query_is_cut_into() {
-        assert_eq!(
-            super::unspaced_words(
-                "deploy 東京都 日本語勉強",
-                &words(&["deploy", "東京", "都", "日本語", "勉強"])
-            ),
-            ["東京都", "日本語", "勉強"]
-        );
-        assert_eq!(super::unspaced_words("中文搜索", &[]), ["中文搜索"]);
+    fn test_each_query_word_keeps_its_spelling() {
+        let typed: Vec<&str> = tokenize_query(
+            "Deploy 東京都 日本語勉強",
+            &words(&["Deploy", "東京", "都", "日本語", "勉強"]),
+        )
+        .into_iter()
+        .map(|(typed, _)| typed)
+        .collect();
+        assert_eq!(typed, ["Deploy", "東京都", "日本語", "勉強"]);
     }
 
     #[test]
     fn test_a_character_left_over_stays_joined_to_its_neighbours() {
         assert_eq!(
-            tokenize_query("東京都", &words(&["東京", "都"])),
+            query_terms("東京都", &words(&["東京", "都"])),
             [vec!["東京", "京都"]]
         );
         assert_eq!(
-            tokenize_query("ラーメン屋さん", &words(&["ラーメン", "屋", "さん"])),
+            query_terms("ラーメン屋さん", &words(&["ラーメン", "屋", "さん"])),
             [vec!["ラー", "ーメ", "メン", "ン屋", "屋さ", "さん"]]
         );
-        assert_eq!(tokenize_query("猫", &words(&["猫"])), [vec!["猫"]]);
+        assert_eq!(query_terms("猫", &words(&["猫"])), [vec!["猫"]]);
     }
 
     #[test]
     fn test_words_that_do_not_cover_a_run_keep_it_whole() {
         assert_eq!(
-            tokenize_query("中文搜索", &words(&["中文"])),
+            query_terms("中文搜索", &words(&["中文"])),
             [vec!["中文", "文搜", "搜索"]]
         );
     }

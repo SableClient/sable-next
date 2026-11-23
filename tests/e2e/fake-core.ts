@@ -510,6 +510,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               sender: item.sender ?? '',
               origin_server_ts: item.timestamp,
               score: 1,
+              matched: [],
               context_before: [],
               context_after: [],
             }))
@@ -1316,7 +1317,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'session.known_rooms': () => [],
       'session.integration_manager_terms': () => [],
       'session.integration_manager_url': () => 'https://integrations.example.test/index.html',
-      'search.messages': (params) => ({ hits: searchHits(params), older: null, words: [] }),
+      'search.messages': (params) => ({ hits: searchHits(params), older: null }),
       'search.peer_start': () => null,
       'rtc.signal': () => null,
       'rtc.close': () => null,

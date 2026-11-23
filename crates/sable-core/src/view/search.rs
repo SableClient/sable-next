@@ -16,7 +16,7 @@ pub async fn prime_display_names(diffs: &[eyeball_im::VectorDiff<RoomListItem>])
     futures_util::future::join_all(missing).await;
 }
 
-pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {
+pub(crate) fn search_hit_view(hit: crate::search::Hit, matched: Vec<String>) -> SearchHitView {
     SearchHitView {
         room_id: hit.room_id,
         event_id: hit.event_id,
@@ -24,6 +24,7 @@ pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {
         sender: hit.sender,
         origin_server_ts: hit.origin_server_ts,
         score: hit.score,
+        matched,
         context_before: hit.before.into_iter().map(search_context_view).collect(),
         context_after: hit.after.into_iter().map(search_context_view).collect(),
     }

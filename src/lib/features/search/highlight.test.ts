@@ -2,6 +2,11 @@ import { expect, test } from 'vitest';
 
 import { highlightSegments, snippetAround } from './highlight';
 
+const marked = (body: string, terms: string[]) =>
+  highlightSegments(body, terms)
+    .filter((segment) => segment.match)
+    .map((segment) => segment.text);
+
 test('no terms leaves the body in one unmatched segment', () => {
   expect(highlightSegments('the deploy broke', [])).toEqual([
     { text: 'the deploy broke', match: false },
@@ -36,39 +41,10 @@ test('phrase metacharacters are matched literally', () => {
   ]);
 });
 
-test('a misspelling of the term is marked', () => {
-  const segments = highlightSegments('please deligate this, it was deligated', ['delegate']);
-  expect(segments.filter((segment) => segment.match).map((segment) => segment.text)).toEqual([
-    'deligate',
-    'deligated',
-  ]);
-});
-
-test('short words, words with digits and a different first letter are not typo matches', () => {
-  for (const [body, term] of [
-    ['the cot', 'cat'],
-    ['ticket1402', 'ticket1420'],
-    ['selegate', 'delegate'],
-  ]) {
-    expect(highlightSegments(body, [term])).toEqual([{ text: body, match: false }]);
-  }
-});
-
 test('a term that does not occur leaves the body whole', () => {
   expect(highlightSegments('nothing here', ['absent'])).toEqual([
     { text: 'nothing here', match: false },
   ]);
-});
-
-test('a stemmed hit is still marked', () => {
-  const marked = (body: string, terms: string[]) =>
-    highlightSegments(body, terms)
-      .filter((segment) => segment.match)
-      .map((segment) => segment.text);
-
-  expect(marked('the deployed build', ['deploy'])).toEqual(['deployed']);
-  expect(marked('the deploy build', ['deployed'])).toEqual(['deploy']);
-  expect(marked('deployment pipeline', ['deploy'])).toEqual(['deployment']);
 });
 
 test('a two-letter term does not match every word sharing its prefix', () => {
@@ -128,18 +104,6 @@ test('a phrase and a loose term both mark without overlapping', () => {
   ).toEqual(['deploy broke', 'pipeline']);
 });
 
-test('a term does not mark a much longer word that merely starts with it', () => {
-  const marked = (body: string, terms: string[]) =>
-    highlightSegments(body, terms)
-      .filter((segment) => segment.match)
-      .map((segment) => segment.text);
-
-  expect(marked('a java runtime', ['javascript'])).toEqual([]);
-  expect(marked('the category list', ['cat'])).toEqual([]);
-  expect(marked('a theory of there', ['the'])).toEqual([]);
-  expect(marked('deployment pipeline', ['deploy'])).toEqual(['deployment']);
-});
-
 test('a body that fits the window is never clipped, wherever the match sits', () => {
   const body = `${'x'.repeat(96)} needle`;
   const snippet = snippetAround(body, ['needle']);
@@ -151,14 +115,16 @@ test('a body that fits the window is never clipped, wherever the match sits', ()
 });
 
 test('a Japanese or Chinese term inside an unspaced sentence is marked', () => {
-  const marked = (body: string, terms: string[]) =>
-    highlightSegments(body, terms)
-      .filter((segment) => segment.match)
-      .map((segment) => segment.text);
-
   expect(marked('日本語で検索を使う', ['検索'])).toEqual(['検索']);
   expect(marked('ありがとうございます', ['ありがとう'])).toEqual(['ありがとう']);
   expect(marked('今天我们讨论中文搜索功能', ['搜索'])).toEqual(['搜索']);
   expect(marked('メロンとソーセージ', ['メッセージ'])).toEqual([]);
   expect(marked('日本語を勉強する', ['日本語', '勉強'])).toEqual(['日本語', '勉強']);
+});
+
+test('only the words the core matched are marked', () => {
+  expect(marked('please deligate this', ['delegate'])).toEqual([]);
+  expect(marked('please deligate this', ['deligate'])).toEqual(['deligate']);
+  expect(marked('the category list', ['category'])).toEqual(['category']);
+  expect(marked('Rustを使う', ['Rust'])).toEqual(['Rust']);
 });

@@ -23,7 +23,7 @@ pub(crate) use server::ServerSearch;
 pub(crate) use sharing::SearchSharing;
 
 use crate::now_ms;
-use sable_search::{inverted, tokenize};
+use sable_search::inverted;
 use std::time::Duration;
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -36,7 +36,7 @@ use matrix_sdk::ruma::{OwnedEventId, OwnedUserId};
 use self::document::{Document, indexable_body, replacement_of};
 #[cfg(test)]
 use self::index::RoomIndex;
-pub(crate) use self::index::{ContextLine, Hit, MessageIndex};
+pub(crate) use self::index::{ContextLine, Hit, MessageIndex, expands};
 
 const EVENTS_PER_INGEST_YIELD: usize = 16;
 const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;

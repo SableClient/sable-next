@@ -8,6 +8,8 @@ const BM25_K1: f64 = 1.2;
 const BM25_B: f64 = 0.75;
 const MAX_TYPO_EXPANSIONS: usize = 50;
 
+type Postings<K> = [(K, u32)];
+
 pub struct InvertedIndex<K> {
     postings: BTreeMap<Box<str>, Vec<(K, u32)>>,
     lengths: HashMap<K, u32>,
@@ -43,7 +45,7 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         }
         let terms = tokenize::tokenize(text);
         let mut counts: HashMap<&str, u32> = HashMap::with_capacity(terms.len());
-        for term in &terms {
+        for (term, _) in &terms {
             *counts.entry(term.as_ref()).or_default() += 1;
         }
         let length = u32::try_from(terms.len()).unwrap_or(u32::MAX);
@@ -89,11 +91,14 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         }
         let documents = self.lengths.len() as f64;
         let average_length = self.total_length as f64 / documents;
-        let mut groups = tokenize::tokenize_query(query, words);
-        for group in &mut groups {
-            group.sort_unstable();
-            group.dedup();
-        }
+        let mut groups: Vec<_> = tokenize::tokenize_query(query, words)
+            .into_iter()
+            .map(|(_, mut group)| {
+                group.sort_unstable();
+                group.dedup();
+                group
+            })
+            .collect();
         groups.sort_unstable();
         groups.dedup();
 
@@ -133,7 +138,7 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         live: &mut Vec<(K, u32, u32)>,
     ) -> HashMap<K, f64> {
         let mut best: HashMap<K, f64> = HashMap::new();
-        for (list, edits) in self.expand(term, expand) {
+        for (_, list, edits) in self.expand(term, expand) {
             live.clear();
             live.extend(
                 list.iter()
@@ -163,12 +168,12 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
     /// Without `expand` a term finds only the words that stem onto it. Chinese
     /// and Japanese keep their prefixes: one character has to reach the pair
     /// it was indexed in.
-    fn expand(&self, term: &str, expand: bool) -> Vec<(&[(K, u32)], usize)> {
+    fn expand(&self, term: &str, expand: bool) -> Vec<(&str, &Postings<K>, usize)> {
         if !expand && !tokenize::contains_chinese(term) {
             return self
                 .postings
-                .get(term)
-                .map(|list| (list.as_slice(), 0))
+                .get_key_value(term)
+                .map(|(word, list)| (word.as_ref(), list.as_slice(), 0))
                 .into_iter()
                 .collect();
         }
@@ -189,19 +194,65 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         for (word, list) in candidates {
             let word_chars = word.chars().count();
             if word.starts_with(term) {
-                prefixed.push((list.as_slice(), word_chars - term_chars));
+                prefixed.push((word.as_ref(), list.as_slice(), word_chars - term_chars));
             } else if typos > 0 && word_chars.abs_diff(term_chars) <= typos {
                 let edits = strsim::osa_distance(term, word);
                 if edits <= typos {
-                    misspelled.push((list.as_slice(), edits));
+                    misspelled.push((word.as_ref(), list.as_slice(), edits));
                 }
             }
         }
-        misspelled.sort_by_key(|(_, edits)| *edits);
+        misspelled.sort_by_key(|(_, _, edits)| *edits);
         misspelled.truncate(MAX_TYPO_EXPANSIONS);
         prefixed.extend(misspelled);
         prefixed
     }
+}
+
+/// The words of `body` the index would find it by, spelled as `body` writes
+/// them, or `None` when the index would not find it. A Chinese or Japanese
+/// word is spelled as the query typed it.
+#[must_use]
+pub fn matched_words(
+    query: &str,
+    words: &[String],
+    body: &str,
+    expand: bool,
+) -> Option<Vec<String>> {
+    let mut index = InvertedIndex::with_capacity(1);
+    index.add_document((), body);
+    let terms = tokenize::tokenize(body);
+    let mut found = false;
+    let mut matched = Vec::new();
+    for (typed, group) in tokenize::tokenize_query(query, words) {
+        let expansions: Vec<_> = group
+            .iter()
+            .map(|term| index.expand(term, expand))
+            .collect();
+        if expansions.iter().any(Vec::is_empty) {
+            continue;
+        }
+        found = true;
+        if tokenize::contains_chinese(typed) {
+            matched.push(typed.to_owned());
+            continue;
+        }
+        let stems: HashSet<&str> = expansions
+            .iter()
+            .flatten()
+            .map(|(stem, ..)| *stem)
+            .collect();
+        matched.extend(
+            terms
+                .iter()
+                .filter(|(term, _)| stems.contains(term.as_ref()))
+                .filter_map(|(_, word)| body.get(word.clone()))
+                .map(str::to_owned),
+        );
+    }
+    matched.sort_unstable();
+    matched.dedup();
+    found.then_some(matched)
 }
 
 /// Words with digits stay exact so ticket1420 never matches ticket1402.
@@ -218,7 +269,7 @@ fn allowed_typos(term: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{InvertedIndex, allowed_typos};
+    use super::{InvertedIndex, allowed_typos, matched_words};
 
     fn index(bodies: &[&str]) -> InvertedIndex<u32> {
         let mut index = InvertedIndex::with_capacity(bodies.len());
@@ -412,5 +463,57 @@ mod tests {
     fn test_every_query_term_adds_to_the_score() {
         let index = index(&["deploy failed", "deploy worked"]);
         assert_eq!(ranked(&index, "deploy failed"), [0, 1]);
+    }
+
+    #[test]
+    fn test_the_words_a_document_matched_are_spelled_as_written() {
+        assert_eq!(
+            matched_words("delegate dep", &[], "Please DELIGATE the Deployment", true),
+            Some(vec!["DELIGATE".to_owned(), "Deployment".to_owned()])
+        );
+        assert_eq!(
+            matched_words("deploy", &[], "it deployed, then the deploy café", false),
+            Some(vec!["deploy".to_owned(), "deployed".to_owned()])
+        );
+        assert_eq!(
+            matched_words("cafe", &[], "un Café crème", false),
+            Some(vec!["Café".to_owned()])
+        );
+        assert_eq!(
+            matched_words("rust", &[], "Rustを使う", false),
+            Some(vec!["Rust".to_owned()])
+        );
+        assert_eq!(
+            matched_words("東京 deploy", &["東京".to_owned()], "東京都庁に行く", false),
+            Some(vec!["東京".to_owned()])
+        );
+    }
+
+    #[test]
+    fn test_one_document_matches_as_the_index_finds_it() {
+        let bodies = [
+            "please deligate this",
+            "the deployment pipeline",
+            "deploy failed",
+            "東京都庁に行く",
+            "the cat sat",
+        ];
+        let index = index(&bodies);
+        for query in ["delegate", "dep", "deploy failed", "cot", "東京", "mute"] {
+            for expand in [true, false] {
+                let mut found: Vec<u32> = index
+                    .query(query, &[], expand)
+                    .into_iter()
+                    .map(|hit| hit.0)
+                    .collect();
+                found.sort_unstable();
+                let matched: Vec<u32> = (0..)
+                    .zip(bodies)
+                    .filter(|(_, body)| matched_words(query, &[], body, expand).is_some())
+                    .map(|(key, _)| key)
+                    .collect();
+                assert_eq!(found, matched, "{query:?} expanded: {expand}");
+            }
+        }
     }
 }

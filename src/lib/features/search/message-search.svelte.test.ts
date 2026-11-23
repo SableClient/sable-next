@@ -22,6 +22,7 @@ function hit(eventId: string): SearchHitView {
     sender: '@kris:example.org',
     origin_server_ts: 1_700_000_000_000,
     score: 1,
+    matched: [],
     context_before: [],
     context_after: [],
   };
@@ -29,10 +30,9 @@ function hit(eventId: string): SearchHitView {
 
 function page(
   hits: SearchHitView[],
-  older: string | null = null,
-  words: string[] = []
-): { hits: SearchHitView[]; older: string | null; words: string[] } {
-  return { hits, older, words };
+  older: string | null = null
+): { hits: SearchHitView[]; older: string | null } {
+  return { hits, older };
 }
 
 function coverage(
@@ -574,30 +574,4 @@ test('a Japanese query is sent with the words the platform cut it into', async (
   expect(messages).toHaveBeenLastCalledWith(
     expect.objectContaining({ older: 'cold-cursor', words: ['日本語', '勉強'] })
   );
-});
-
-test('highlighting uses the words the core matched, not the raw segments', async () => {
-  vi.stubGlobal('Intl', {
-    ...Intl,
-    Segmenter: class {
-      segment(text: string): { segment: string; isWordLike: boolean }[] {
-        return (text === '東京都' ? ['東京', '都'] : [text]).map((segment) => ({
-          segment,
-          isWordLike: true,
-        }));
-      }
-    },
-  });
-  const messages = vi.fn().mockResolvedValue(page([hit('$tokyo')], null, ['東京都']));
-  const { core } = coreReturning(messages);
-  const search = new MessageSearch(core, () => directory);
-  search.query = 'deploy 東京都';
-  search.schedule();
-  await vi.advanceTimersByTimeAsync(500);
-
-  expect(messages).toHaveBeenCalledWith(
-    expect.objectContaining({ words: ['deploy', '東京', '都'] })
-  );
-  expect(search.terms).toEqual(['deploy', '東京都']);
-  vi.unstubAllGlobals();
 });

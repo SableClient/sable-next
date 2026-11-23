@@ -3,4 +3,4 @@
 
 pub mod inverted;
 pub mod phrase;
-pub mod tokenize;
+mod tokenize;

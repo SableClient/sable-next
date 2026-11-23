@@ -13,80 +13,20 @@ export interface Snippet {
   clippedEnd: boolean;
 }
 
-const MIN_STEM_OVERLAP = 4;
-const MIN_STEM_RATIO = [3, 5];
 const WINDOW_RADIUS = 90;
-const WORD = /[\p{L}\p{N}]+/gu;
+const SPACED_LETTER = `(?!${UNSPACED.source})[\\p{L}\\p{N}]`;
 
 type Range = [number, number];
 
-function sharesStem(word: string, term: string): boolean {
-  const left = word.toLocaleLowerCase();
-  const right = term.toLocaleLowerCase();
-  if (left === right) return true;
-
-  const shorter = left.length < right.length ? left : right;
-  const longer = left.length < right.length ? right : left;
-  const [low, high] = MIN_STEM_RATIO;
-
-  return (
-    shorter.length >= MIN_STEM_OVERLAP &&
-    shorter.length * high >= longer.length * low &&
-    longer.startsWith(shorter)
-  );
-}
-
-// Keep in sync with allowed_typos in crates/sable-search/src/inverted.rs.
-function allowedTypos(term: readonly string[]): number {
-  if (term.some((character) => /\p{N}/u.test(character)) || term.length < 5) return 0;
-  return term.length < 9 ? 1 : 2;
-}
-
-function osaDistance(left: readonly string[], right: readonly string[]): number {
-  const rows = Array.from({ length: left.length + 1 }, (_, row) =>
-    Array.from({ length: right.length + 1 }, (_, column) => (row === 0 ? column : row))
-  );
-  for (let row = 1; row <= left.length; row++) {
-    for (let column = 1; column <= right.length; column++) {
-      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
-      rows[row][column] = Math.min(
-        rows[row - 1][column] + 1,
-        rows[row][column - 1] + 1,
-        rows[row - 1][column - 1] + cost
-      );
-      if (
-        row > 1 &&
-        column > 1 &&
-        left[row - 1] === right[column - 2] &&
-        left[row - 2] === right[column - 1]
-      ) {
-        rows[row][column] = Math.min(rows[row][column], rows[row - 2][column - 2] + 1);
-      }
-    }
-  }
-  return rows[left.length][right.length];
-}
-
-function nearlyMatches(word: string, term: string): boolean {
-  const left = Array.from(word.toLocaleLowerCase());
-  const right = Array.from(term.toLocaleLowerCase());
-  const budget = allowedTypos(right);
-  if (budget === 0 || left[0] !== right[0]) return false;
-  if (osaDistance(left, right) <= budget) return true;
-
-  const [low, high] = MIN_STEM_RATIO;
-  return (
-    left.length > right.length &&
-    right.length * high >= left.length * low &&
-    osaDistance(left.slice(0, right.length), right) <= budget
-  );
-}
-
-function phraseRanges(body: string, phrase: string): Range[] {
+function phraseRanges(body: string, phrase: string, whole = false): Range[] {
   const escaped = escapeStringRegexp(phrase.trim());
   if (escaped === '') return [];
 
-  const pattern = new RegExp(escaped.replace(/\s+/g, '\\s+'), 'giu');
+  const source = escaped.replace(/\s+/g, '\\s+');
+  const pattern = new RegExp(
+    whole ? `(?<!${SPACED_LETTER})${source}(?!${SPACED_LETTER})` : source,
+    'giu'
+  );
   return [...body.matchAll(pattern)].map((match) => [match.index, match.index + match[0].length]);
 }
 
@@ -95,13 +35,10 @@ function matchRanges(body: string, terms: readonly string[]): Range[] {
     (term) => term.trim() !== '' && !/\s/.test(term.trim()) && !UNSPACED.test(term)
   );
   const phrases = terms.filter((term) => /\s/.test(term.trim()) || UNSPACED.test(term));
-  const ranges = phrases.flatMap((phrase) => phraseRanges(body, phrase));
-
-  for (const match of body.matchAll(WORD)) {
-    if (words.some((term) => sharesStem(match[0], term) || nearlyMatches(match[0], term))) {
-      ranges.push([match.index, match.index + match[0].length]);
-    }
-  }
+  const ranges = [
+    ...phrases.flatMap((phrase) => phraseRanges(body, phrase)),
+    ...words.flatMap((word) => phraseRanges(body, word, true)),
+  ];
 
   ranges.sort((left, right) => left[0] - right[0] || left[1] - right[1]);
 

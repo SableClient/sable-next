@@ -46,7 +46,7 @@ const rooms = [
 
 async function mount() {
   let onEvent: ((event: CoreEvent) => void) | undefined;
-  const messages = vi.fn().mockResolvedValue({ hits: [], older: null, words: [] });
+  const messages = vi.fn().mockResolvedValue({ hits: [], older: null });
   Object.assign(core, {
     session: { user_id: '@me:example.org' },
     searchCoverageUnavailable: false,
@@ -87,6 +87,7 @@ function hit(eventId: string): SearchHitView {
     sender: '@alice:example.org',
     origin_server_ts: 1700000000000,
     score: 1,
+    matched: [],
     context_before: [],
     context_after: [],
   };
@@ -309,10 +310,9 @@ test('a pagination error keeps results visible and retries the failed page', asy
     .mockResolvedValueOnce({
       hits: Array.from({ length: 30 }, (_, index) => hit(`$first${index}`)),
       older: null,
-      words: [],
     })
     .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValue({ hits: [hit('$next')], older: null, words: [] });
+    .mockResolvedValue({ hits: [hit('$next')], older: null });
   await userEvent.fill(field.element(), 'deploy');
   const rows = screen.getByRole('group', { name: /^search\.openResultFrom/ });
   await expect.element(rows).toHaveLength(30);
@@ -327,8 +327,8 @@ test('a pagination error keeps results visible and retries the failed page', asy
 test('indexing updates refresh an unchanged search', async () => {
   const { screen, field, messages, emitCoverage } = await mount();
   messages
-    .mockResolvedValueOnce({ hits: [], older: null, words: [] })
-    .mockResolvedValue({ hits: [hit('$indexed')], older: null, words: [] });
+    .mockResolvedValueOnce({ hits: [], older: null })
+    .mockResolvedValue({ hits: [hit('$indexed')], older: null });
   await userEvent.fill(field.element(), 'deploy');
   await expect.element(screen.getByRole('status')).toHaveTextContent('search.empty');
   emitCoverage({ documents: 1, rooms_pending: 0, rooms_failed: 0, state: 'complete' });
@@ -337,6 +337,16 @@ test('indexing updates refresh an unchanged search', async () => {
     .toHaveLength(1);
   await expect.element(field).toHaveValue('deploy');
   expect(messages).toHaveBeenCalledTimes(2);
+});
+
+test('a result marks the words the core matched it on', async () => {
+  const { screen, field, messages } = await mount();
+  messages.mockResolvedValue({
+    hits: [{ ...hit('$category'), body: 'the category list', matched: ['category'] }],
+    older: null,
+  });
+  await userEvent.fill(field.element(), 'cat');
+  await expect.element(screen.getByRole('mark')).toHaveTextContent('category');
 });
 
 test('accepting a suggestion closes the list instead of reopening it', async () => {

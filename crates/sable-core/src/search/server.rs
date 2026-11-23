@@ -17,9 +17,10 @@ use matrix_sdk::ruma::{
     EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedUserId, UInt,
 };
 
-use super::IndexFilter;
-use super::tokenize;
-use super::{ContextLine, Hit, edited_or_own_event_id, indexable_body, replacement_of};
+use super::{
+    ContextLine, Hit, IndexFilter, edited_or_own_event_id, expands, indexable_body, inverted,
+    replacement_of,
+};
 use crate::Core;
 use crate::messages::latest_valid_replacement;
 
@@ -154,9 +155,13 @@ impl Core {
             cursor.exhausted = cursor.next_batch.is_none();
 
             for result in &events.results {
-                let Some(Candidate { mut hit, edit }) =
-                    hit_from(result, query.room_id, query.query, &query.filter.words)
-                else {
+                let Some(Candidate { mut hit, edit }) = hit_from(
+                    result,
+                    query.room_id,
+                    query.query,
+                    &query.filter.words,
+                    expands(query.order),
+                ) else {
                     continue;
                 };
                 if seen.contains(&hit.event_id) {
@@ -303,6 +308,7 @@ fn hit_from(
     room_id: &OwnedRoomId,
     query: &str,
     words: &[String],
+    expand: bool,
 ) -> Option<Candidate> {
     let original = room_message(result.result.as_ref()?)?;
     let (edit, edited) = match replacement_of(&original) {
@@ -314,7 +320,7 @@ fn hit_from(
     };
     if edited
         .as_ref()
-        .is_some_and(|body| !tokenize::matches(query, words, body))
+        .is_some_and(|body| inverted::matched_words(query, words, body, expand).is_none())
     {
         return None;
     }
@@ -386,7 +392,7 @@ mod tests {
     }
 
     fn hit_from(result: &SearchResult, query: &str) -> Option<crate::search::Hit> {
-        candidate_from(result, &plain_room(), query, &[]).map(|candidate| candidate.hit)
+        candidate_from(result, &plain_room(), query, &[], true).map(|candidate| candidate.hit)
     }
 
     #[test]
@@ -459,6 +465,21 @@ mod tests {
         let hit = hit_from(&result, "mea").expect("a hit");
         assert_eq!(hit.event_id, "$original");
         assert_eq!(hit.body, "omg mea is doing great work");
+    }
+
+    #[test]
+    fn test_an_edited_original_matches_with_the_local_typo_rule() {
+        let result = edited_original("please deligate this");
+
+        assert!(hit_from(&result, "delegate").is_some());
+    }
+
+    #[test]
+    fn test_an_edited_original_matches_a_prefix_only_where_the_local_index_would() {
+        let result = edited_original("omg mea is doing deployment work");
+
+        assert!(candidate_from(&result, &plain_room(), "dep", &[], true).is_some());
+        assert!(candidate_from(&result, &plain_room(), "dep", &[], false).is_none());
     }
 
     #[test]

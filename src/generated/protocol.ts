@@ -1782,6 +1782,8 @@ export type SearchHitView = {
 	sender: string,
 	origin_server_ts: number,
 	score: number,
+	/**  Words of `body` to highlight. */
+	matched: string[],
 	context_before: SearchContextView[],
 	context_after: SearchContextView[],
 };
@@ -3660,11 +3662,6 @@ export type Rpc = {
 }) => Promise<{
 	hits: SearchHitView[],
 	older: string | null,
-	/**
-	 *  The Chinese and Japanese words the query was matched by, spelled as it
-	 *  was typed, for highlighting.
-	 */
-	words: string[],
 }>;
     coverage: (params?: Record<string, never>) => Promise<SearchCoverageView>;
     metrics: (params?: Record<string, never>) => Promise<SearchMetricsView>;

@@ -930,6 +930,8 @@ pub struct SearchHitView {
     pub origin_server_ts: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub score: f64,
+    /// Words of `body` to highlight.
+    pub matched: Vec<String>,
     pub context_before: Vec<SearchContextView>,
     pub context_after: Vec<SearchContextView>,
 }

@@ -1006,7 +1006,6 @@ async fn test_the_words_of_a_search_request_split_its_query() {
 
     assert_eq!(split.hits.len(), 1);
     assert_eq!(split.hits[0].event_id, event_id!("$study"));
-    assert_eq!(split.words, ["日本語", "勉強"]);
+    assert_eq!(split.hits[0].matched, ["勉強", "日本語"]);
     assert!(whole.hits.is_empty());
-    assert_eq!(whole.words, ["日本語勉強"]);
 }

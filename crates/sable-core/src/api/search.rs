@@ -91,9 +91,6 @@ pub struct MessagesParams {
 pub struct MessagesOk {
     pub hits: Vec<SearchHitView>,
     pub older: Option<String>,
-    /// The Chinese and Japanese words the query was matched by, spelled as it
-    /// was typed, for highlighting.
-    pub words: Vec<String>,
 }
 
 impl Handler for MessagesParams {
@@ -110,7 +107,6 @@ impl Handler for MessagesParams {
             older,
             words,
         } = self;
-        let unspaced = sable_search::tokenize::unspaced_words(&query, &words);
         let filter = crate::search::IndexFilter {
             words,
             ..crate::search::IndexFilter::try_from(filter)?
@@ -132,10 +128,22 @@ impl Handler for MessagesParams {
             (hits, older)
         };
 
+        let expand = crate::search::expands(order);
         Ok(MessagesOk {
-            hits: hits.into_iter().map(view::search_hit_view).collect(),
+            hits: hits
+                .into_iter()
+                .map(|hit| {
+                    let matched = sable_search::inverted::matched_words(
+                        &query,
+                        &filter.words,
+                        &hit.body,
+                        expand,
+                    )
+                    .unwrap_or_default();
+                    view::search_hit_view(hit, matched)
+                })
+                .collect(),
             older,
-            words: unspaced,
         })
     }
 }
