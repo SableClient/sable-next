@@ -117,7 +117,8 @@ abstract class WryActivity : AppCompatActivity() {
             ActivityResultContracts.RequestMultiplePermissions(),
         ) { isGranted ->
             permissionListener?.let { listener ->
-                val allGranted = isGranted.values.all { it }
+                // An interrupted request returns no results, which is a cancellation.
+                val allGranted = isGranted.isNotEmpty() && isGranted.values.all { it }
                 listener(allGranted)
             }
         }

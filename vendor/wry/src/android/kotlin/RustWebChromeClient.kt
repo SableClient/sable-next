@@ -375,12 +375,17 @@ class RustWebChromeClient(private val activity: WryActivity, private val webView
       return false
     }
     takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageFileUri)
-    activity.launchActivityForResult(takePictureIntent) { result ->
-      var res: Array<Uri?>? = null
-      if (result?.resultCode == Activity.RESULT_OK) {
-        res = arrayOf(imageFileUri)
+    try {
+      activity.launchActivityForResult(takePictureIntent) { result ->
+        var res: Array<Uri?>? = null
+        if (result?.resultCode == Activity.RESULT_OK) {
+          res = arrayOf(imageFileUri)
+        }
+        filePathCallback.onReceiveValue(res)
       }
-      filePathCallback.onReceiveValue(res)
+    } catch (e: SecurityException) {
+      // The camera permission can be revoked after it was checked.
+      return false
     }
     return true
   }
@@ -390,12 +395,17 @@ class RustWebChromeClient(private val activity: WryActivity, private val webView
     if (takeVideoIntent.resolveActivity(activity.packageManager) == null) {
       return false
     }
-    activity.launchActivityForResult(takeVideoIntent) { result ->
-      var res: Array<Uri?>? = null
-      if (result?.resultCode == Activity.RESULT_OK) {
-        res = arrayOf(result.data!!.data)
+    try {
+      activity.launchActivityForResult(takeVideoIntent) { result ->
+        var res: Array<Uri?>? = null
+        if (result?.resultCode == Activity.RESULT_OK) {
+          res = arrayOf(result.data!!.data)
+        }
+        filePathCallback.onReceiveValue(res)
       }
-      filePathCallback.onReceiveValue(res)
+    } catch (e: SecurityException) {
+      // The camera permission can be revoked after it was checked.
+      return false
     }
     return true
   }
