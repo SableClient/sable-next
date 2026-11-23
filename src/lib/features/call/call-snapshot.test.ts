@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('@sentry/sveltekit', () => ({}));
 
@@ -13,6 +13,7 @@ const session = {
   encryptsMedia: true,
   listenOnly: false,
   deviceError: null,
+  deviceErrorName: null,
   inputMode: 'voice-activity',
   microphoneEnabled: true,
   deafened: false,
@@ -32,6 +33,10 @@ const session = {
     unreachableBackends: ['sfu.example.org'],
   },
 } as unknown as CallSession;
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 test('a call snapshot carries counts and allowlisted codes, never who or where', async () => {
   const snapshot = await collectCallSnapshot(session);
@@ -55,4 +60,51 @@ test('a held snapshot is attached to one report only', async () => {
   holdCallSnapshot(await collectCallSnapshot(session));
   expect(takeCallSnapshot()).toBeDefined();
   expect(takeCallSnapshot()).toBeUndefined();
+});
+
+test('a call snapshot counts devices without naming them', async () => {
+  vi.stubGlobal('navigator', {
+    mediaDevices: {
+      enumerateDevices: () =>
+        Promise.resolve([
+          { deviceId: 'mic-id', kind: 'audioinput', label: 'Studio microphone' },
+          { deviceId: 'speaker-id', kind: 'audiooutput', label: 'Desk speakers' },
+          { deviceId: 'headset-id', kind: 'audiooutput', label: 'Headset' },
+        ]),
+    },
+    permissions: { query: () => Promise.resolve({ state: 'granted' }) },
+  });
+
+  const snapshot = await collectCallSnapshot(session);
+
+  expect(snapshot.devices).toEqual({
+    audioinput: 1,
+    audiooutput: 2,
+    videoinput: 0,
+    labelled: true,
+    microphonePermission: 'granted',
+    lastError: null,
+  });
+  expect(JSON.stringify(snapshot)).not.toMatch(/-id|Studio|Desk|Headset/);
+});
+
+test('a call snapshot reports an unanswerable microphone permission as unknown', async () => {
+  vi.stubGlobal('navigator', {
+    mediaDevices: {
+      enumerateDevices: () => Promise.resolve([{ deviceId: '', kind: 'audioinput', label: '' }]),
+    },
+    permissions: {
+      query: () => {
+        throw new TypeError('microphone is not a permission');
+      },
+    },
+  });
+
+  const snapshot = await collectCallSnapshot(session);
+
+  expect(snapshot.devices).toMatchObject({
+    audioinput: 0,
+    labelled: false,
+    microphonePermission: 'unknown',
+  });
 });

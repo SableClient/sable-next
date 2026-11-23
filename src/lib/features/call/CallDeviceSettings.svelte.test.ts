@@ -115,6 +115,54 @@ test('shows why microphone access failed', async () => {
   expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
 });
 
+test.each([
+  {
+    name: 'access is granted but the microphone stays unnamed',
+    devices: [{ deviceId: 'microphone', kind: 'audioinput', label: '' }],
+    message: 'settings.callDevicesUnnamed',
+  },
+  {
+    name: 'there is no microphone at all',
+    devices: [],
+    message: 'settings.callDevicesNoMicrophone',
+  },
+])('says so when $name after allowing access', async ({ devices, message }) => {
+  const enumerateDevices = vi.fn(() => Promise.resolve(devices));
+  const getUserMedia = vi.fn(() => Promise.resolve({ getTracks: () => [] }));
+  const mediaDevices = Object.assign(new EventTarget(), { enumerateDevices, getUserMedia });
+  vi.stubGlobal('navigator', { mediaDevices });
+  const user = userEvent.setup();
+
+  render(CallDeviceSettings);
+  await waitFor(() => {
+    expect(enumerateDevices).toHaveBeenCalledOnce();
+  });
+  expect(screen.queryByText(message)).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'settings.callDevicesAllow' }));
+
+  expect(await screen.findByText(message)).toBeInTheDocument();
+});
+
+test('keeps the allow button busy while the access prompt is open', async () => {
+  const enumerateDevices = vi.fn(() => Promise.resolve([]));
+  const access = Promise.withResolvers<{ getTracks: () => [] }>();
+  const getUserMedia = vi.fn(() => access.promise);
+  const mediaDevices = Object.assign(new EventTarget(), { enumerateDevices, getUserMedia });
+  vi.stubGlobal('navigator', { mediaDevices });
+  const user = userEvent.setup();
+
+  render(CallDeviceSettings);
+  const allow = await screen.findByRole('button', { name: 'settings.callDevicesAllow' });
+  await user.click(allow);
+
+  expect(allow).toBeDisabled();
+  expect(allow).toHaveAttribute('aria-busy', 'true');
+  access.resolve({ getTracks: () => [] });
+  await waitFor(() => {
+    expect(allow).toBeEnabled();
+  });
+});
+
 test('plays the microphone test through the output device and restarts it on new settings', async () => {
   const enumerateDevices = vi.fn(() =>
     Promise.resolve([

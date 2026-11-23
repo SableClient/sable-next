@@ -2826,6 +2826,8 @@
     "callDevicesPermission": "Allow microphone access to name your devices.",
     "callDevicesAllow": "Allow access",
     "callDevicesFailed": "Microphone access failed: {{reason}}",
+    "callDevicesNoMicrophone": "No microphone was found. Check that one is connected and that the system's sound service is running.",
+    "callDevicesUnnamed": "Access was granted, but the system still does not name your microphones.",
     "callDevicesUnsupported": "This platform does not let the app choose devices.",
     "callOutputVolume": "Output volume",
     "callMicTest": "Test microphone",

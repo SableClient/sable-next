@@ -2,6 +2,7 @@ import { callDebug } from './call-debug.svelte.js';
 import type { CallSession } from './call-session.svelte.js';
 import { averageBitrate, readVideoStats } from './call-stats';
 import { safeCallCode } from './call-telemetry';
+import { listCallDevices, supportsDeviceSelection } from './devices';
 
 const BITRATE_SAMPLE_MS = 500;
 
@@ -51,6 +52,26 @@ async function videoStats(rooms: CallSession['rooms']) {
   });
 }
 
+async function deviceSummary(lastError: string | null) {
+  if (!supportsDeviceSelection()) return undefined;
+  const { devices, denied } = await listCallDevices();
+  const count = (kind: MediaDeviceKind) => devices.filter((device) => device.kind === kind).length;
+  let microphonePermission: PermissionState | 'unknown';
+  try {
+    microphonePermission = (await navigator.permissions.query({ name: 'microphone' })).state;
+  } catch {
+    microphonePermission = 'unknown';
+  }
+  return {
+    audioinput: count('audioinput'),
+    audiooutput: count('audiooutput'),
+    videoinput: count('videoinput'),
+    labelled: !denied,
+    microphonePermission,
+    lastError,
+  };
+}
+
 // Counts and enums only. Identities, user ids, backend ids and raw error text stay out,
 // since the snapshot leaves the device with a bug report.
 export async function collectCallSnapshot(session: CallSession) {
@@ -90,6 +111,7 @@ export async function collectCallSnapshot(session: CallSession) {
     unreachableBackends: transport.unreachableBackends?.length ?? 0,
     quality,
     mode: callDebug.current,
+    devices: await deviceSummary(session.deviceErrorName),
     video: await videoStats(session.rooms),
   };
 }

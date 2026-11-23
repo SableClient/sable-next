@@ -26,11 +26,19 @@
   let devices = $state.raw<CallDevice[]>([]);
   let denied = $state(false);
   let unlockError = $state<string | null>(null);
+  let unlocking = $state(false);
+  let unlocked = $state(false);
   let level = $state(0);
   let testing = $state(false);
 
   const supported = supportsDeviceSelection();
   const SYSTEM_DEFAULT = 'system';
+
+  const missingMicrophone = $derived.by(() => {
+    if (!unlocked || unlockError) return null;
+    if (devices.some((device) => device.kind === 'audioinput' && device.label !== '')) return null;
+    return denied ? 'settings.callDevicesUnnamed' : 'settings.callDevicesNoMicrophone';
+  });
 
   const optionsFor = (kind: MediaDeviceKind) => [
     { value: SYSTEM_DEFAULT, label: i18n.t('settings.callDeviceSystemDefault') },
@@ -86,8 +94,11 @@
   });
 
   async function unlock(): Promise<void> {
+    unlocking = true;
     unlockError = await unlockCallDevices();
     await refresh();
+    unlocking = false;
+    unlocked = true;
   }
 </script>
 
@@ -95,16 +106,23 @@
   {#if !supported}
     <Alert variant="info">{i18n.t('settings.callDevicesUnsupported')}</Alert>
   {:else}
-    {#if denied || devices.length === 0}
+    {#if denied || devices.length === 0 || missingMicrophone}
       <Alert variant="info">
         <p>{i18n.t('settings.callDevicesPermission')}</p>
         <div>
-          <Button variant="secondary" size="small" onclick={() => void unlock()}>
+          <Button
+            variant="secondary"
+            size="small"
+            loading={unlocking}
+            onclick={() => void unlock()}
+          >
             {i18n.t('settings.callDevicesAllow')}
           </Button>
         </div>
         {#if unlockError}
           <p>{i18n.t('settings.callDevicesFailed', { reason: unlockError })}</p>
+        {:else if missingMicrophone}
+          <p>{i18n.t(missingMicrophone)}</p>
         {/if}
       </Alert>
     {/if}

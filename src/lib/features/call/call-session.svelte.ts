@@ -135,6 +135,7 @@ export class CallSession {
   watchedScreenShareIds = $state.raw<string[]>([]);
   views = $state(0);
   deviceError = $state<CallDeviceError | null>(null);
+  deviceErrorName: string | null = null;
   listenOnly = $state(false);
   #deviceErrorTimer: ReturnType<typeof setTimeout> | undefined;
   choosingScreenAudio = $state(false);
@@ -531,6 +532,7 @@ export class CallSession {
     clearTimeout(this.#deviceErrorTimer);
     this.#deviceErrorTimer = undefined;
     this.deviceError = null;
+    this.deviceErrorName = null;
   }
 
   async #device(kind: CallDeviceError, action: () => Promise<void> | undefined): Promise<boolean> {
@@ -552,6 +554,7 @@ export class CallSession {
         return false;
       this.clearDeviceError();
       this.deviceError = error instanceof ScreenAudioError ? 'screenAudio' : kind;
+      this.deviceErrorName = error instanceof Error ? error.name : null;
       this.#deviceErrorTimer = setTimeout(() => {
         this.clearDeviceError();
       }, DEVICE_ERROR_TIMEOUT_MS);
