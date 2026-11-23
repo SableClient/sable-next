@@ -399,7 +399,8 @@ class RustWebChromeClient(private val activity: WryActivity, private val webView
       activity.launchActivityForResult(takeVideoIntent) { result ->
         var res: Array<Uri?>? = null
         if (result?.resultCode == Activity.RESULT_OK) {
-          res = arrayOf(result.data!!.data)
+          // A camera app can report success without returning the video.
+          res = result.data?.data?.let { arrayOf<Uri?>(it) }
         }
         filePathCallback.onReceiveValue(res)
       }
@@ -429,11 +430,13 @@ class RustWebChromeClient(private val activity: WryActivity, private val webView
       activity.launchActivityForResult(intent) { result ->
         val res: Array<Uri?>?
         val resultIntent = result?.data
-        if (result?.resultCode == Activity.RESULT_OK && resultIntent!!.clipData != null) {
-          val numFiles = resultIntent.clipData!!.itemCount
+        // A picker can report success without returning an intent; parseResult then yields null.
+        val clipData = resultIntent?.clipData
+        if (result?.resultCode == Activity.RESULT_OK && clipData != null) {
+          val numFiles = clipData.itemCount
           res = arrayOfNulls(numFiles)
           for (i in 0 until numFiles) {
-            res[i] = resultIntent.clipData!!.getItemAt(i).uri
+            res[i] = clipData.getItemAt(i).uri
           }
         } else {
           res = FileChooserParams.parseResult(
