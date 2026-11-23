@@ -6,6 +6,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import { memberName } from '#lib/rooms/member-listing.js';
+  import { matrixLinkHost } from '#lib/rooms/matrix-link.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -168,7 +169,7 @@
     for (const parameter of command.parameters) {
       if (parameter.schema.schema_type === 'array') addEntry(parameter.key);
     }
-    const result = buildInvocation(command, values, prefix);
+    const result = buildInvocation(command, values, prefix, matrixLinkHost());
     if (result.kind === 'invalid') {
       errors = result.errors;
       const [first] = Object.keys(result.errors);

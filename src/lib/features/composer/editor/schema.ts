@@ -2,12 +2,10 @@ import { DOMParser, Schema, type Node as ProseMirrorNode, type ParseRule } from 
 
 import { splitVia } from '#lib/rooms/join-address.js';
 import { mentionUri } from '#lib/model/model.js';
-import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
+import { MATRIX_TO, knownLinkPrefixes, parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
 import { canonicalDatetime, isOpaqueMatrixColor, utcFallbackLabel } from '../time-markup';
 
-export const matrixTo = 'https://matrix.to/#/';
-const mentionPrefixes = [matrixTo, 'https://link.sable.moe/#/'];
 const mentionSchemes = ['matrix:u/', 'matrix:r/', 'matrix:roomid/'];
 
 const notExplicit = ':not([data-mx-link]):not([data-org\\.matrix\\.msc4550\\.link])';
@@ -18,7 +16,7 @@ const HEADING_LEVELS = [1, 2, 3, 4, 5, 6];
 
 /** A room id is not routable without `via`; an alias resolves on its own. */
 export function mentionHref(userId: string, via: readonly string[]): string {
-  return mentionUri(userId, via) ?? `${matrixTo}${userId}`;
+  return mentionUri(userId, via) ?? `${MATRIX_TO}${userId}`;
 }
 
 export function emoticonLabel(
@@ -214,28 +212,21 @@ export const composerSchema = new Schema({
       attrs: { userId: {}, name: {}, via: { default: [] as string[] } },
       parseDOM: [
         {
-          tag: [
-            ...mentionPrefixes.flatMap((prefix) =>
-              ['@', '#', '!'].map((sigil) => `a[href^="${prefix}${sigil}"]${notExplicit}`)
-            ),
-            ...mentionSchemes.map((scheme) => `a[href^="${scheme}"]${notExplicit}`),
-          ].join(', '),
+          // The link hosts follow a preference, so they are matched here rather than in the selector.
+          tag: `a[href]${notExplicit}`,
           priority: 60,
           getAttrs: (dom) => {
             const { href, via } = splitVia(dom.getAttribute('href') ?? '');
-            if (href.startsWith('matrix:')) {
-              const link = parseMatrixLink(href);
-              if (link?.kind === 'user')
-                return { userId: link.user_id, name: dom.textContent, via };
-              if (link?.kind === 'room')
-                return { userId: link.room_id, name: dom.textContent, via };
+            if (
+              ![...mentionSchemes, ...knownLinkPrefixes()].some((known) => href.startsWith(known))
+            ) {
               return false;
             }
-            return {
-              userId: decodeURIComponent(href.slice(href.indexOf('#/') + 2)),
-              name: dom.textContent,
-              via,
-            };
+            // A link to one event stays a link: a mention would drop the event.
+            const link = parseMatrixLink(href);
+            if (link?.kind === 'user') return { userId: link.user_id, name: dom.textContent, via };
+            if (link?.kind === 'room') return { userId: link.room_id, name: dom.textContent, via };
+            return false;
           },
         },
       ],

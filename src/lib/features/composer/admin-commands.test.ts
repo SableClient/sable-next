@@ -111,7 +111,12 @@ test('a catalog command is written back as the text continuwuity parses', () => 
   );
   if (!reset) throw new Error('users reset-password is missing from the catalog');
 
-  const result = buildInvocation(reset, draftsFromText(reset, '--logout bob'), '!admin ');
+  const result = buildInvocation(
+    reset,
+    draftsFromText(reset, '--logout bob'),
+    '!admin ',
+    'matrix.to'
+  );
   expect(result.kind === 'built' && result.body).toBe('!admin users reset-password --logout bob');
 });
 

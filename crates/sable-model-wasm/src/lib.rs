@@ -111,13 +111,16 @@ pub fn parse_search_query(input: &str) -> Result<String, JsError> {
 }
 
 #[wasm_bindgen(js_name = parseMatrixLink)]
-pub fn parse_matrix_link(href: &str) -> Result<String, JsError> {
-    json(&matrix_link::parse_matrix_link(href))
+pub fn parse_matrix_link(href: &str, link_host: Option<String>) -> Result<String, JsError> {
+    json(&matrix_link::parse_matrix_link(href, link_host.as_deref()))
 }
 
 #[wasm_bindgen(js_name = parseJoinAddress)]
-pub fn parse_join_address(input: &str) -> Result<String, JsError> {
-    json(&matrix_link::parse_join_address(input))
+pub fn parse_join_address(input: &str, link_host: Option<String>) -> Result<String, JsError> {
+    json(&matrix_link::parse_join_address(
+        input,
+        link_host.as_deref(),
+    ))
 }
 
 #[wasm_bindgen(js_name = mentionUri)]
@@ -152,11 +155,17 @@ pub fn drafts_from_text(command: &str, args: &str) -> Result<String, JsError> {
 }
 
 #[wasm_bindgen(js_name = buildInvocation)]
-pub fn build_invocation(command: &str, drafts: &str, prefix: &str) -> Result<String, JsError> {
+pub fn build_invocation(
+    command: &str,
+    drafts: &str,
+    prefix: &str,
+    link_host: Option<String>,
+) -> Result<String, JsError> {
     json(&bot_commands::build_invocation(
         &decode::<BotCommand>(command)?,
         &decode::<ArgumentDrafts>(drafts)?,
         prefix,
+        link_host.as_deref(),
     ))
 }
 
@@ -250,15 +259,30 @@ pub fn slash_command_names() -> Result<String, JsError> {
 }
 
 #[wasm_bindgen(js_name = parseSlash)]
-pub fn parse_slash(body: &str, formatted: Option<String>, now_ms: f64) -> Result<String, JsError> {
-    json(&slash::parse_slash(body, formatted.as_deref(), now_ms))
+pub fn parse_slash(
+    body: &str,
+    formatted: Option<String>,
+    now_ms: f64,
+    link_host: Option<String>,
+) -> Result<String, JsError> {
+    json(&slash::parse_slash(
+        body,
+        formatted.as_deref(),
+        now_ms,
+        link_host.as_deref(),
+    ))
 }
 
 #[wasm_bindgen(js_name = markdownToContent)]
-pub fn markdown_to_content(markdown: &str, pills: &str) -> Result<String, JsError> {
+pub fn markdown_to_content(
+    markdown: &str,
+    pills: &str,
+    link_host: Option<String>,
+) -> Result<String, JsError> {
     json(&markdown::markdown_to_content(
         markdown,
         &decode::<Vec<ComposerPill>>(pills)?,
+        link_host.as_deref(),
     ))
 }
 

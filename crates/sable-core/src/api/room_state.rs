@@ -82,7 +82,7 @@ pub struct SetTopicParams {
 }
 
 pub(crate) fn topic_content(topic: &str) -> RoomTopicEventContent {
-    match sable_model::markdown::markdown_to_content(topic, &[]).formatted_body {
+    match sable_model::markdown::markdown_to_content(topic, &[], None).formatted_body {
         Some(html) => RoomTopicEventContent::html(topic, html),
         None => RoomTopicEventContent::new(topic.to_owned()),
     }

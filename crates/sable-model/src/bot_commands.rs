@@ -610,7 +610,7 @@ struct RoomInput {
     via: Option<Vec<String>>,
 }
 
-fn room_input(input: &str) -> Option<RoomInput> {
+fn room_input(input: &str, link_host: Option<&str>) -> Option<RoomInput> {
     if is_identifier(input, '!', false) {
         return Some(RoomInput {
             room_id: input.to_owned(),
@@ -621,7 +621,7 @@ fn room_input(input: &str) -> Option<RoomInput> {
     }
     let split = split_via(input);
     let via = (!split.via.is_empty()).then_some(split.via);
-    match parse_matrix_link(&split.href)? {
+    match parse_matrix_link(&split.href, link_host)? {
         MatrixLink::Room { room_id } if room_id.starts_with('!') => Some(RoomInput {
             room_id,
             event_id: None,
@@ -645,7 +645,7 @@ fn room_reference_from(kind: RoomReferenceKind, room: RoomInput) -> LiteralValue
     })
 }
 
-fn primitive(kind: PrimitiveType, input: &str) -> Option<LiteralValue> {
+fn primitive(kind: PrimitiveType, input: &str, link_host: Option<&str>) -> Option<LiteralValue> {
     match kind {
         PrimitiveType::String => Some(LiteralValue::Text(input.to_owned())),
         PrimitiveType::Integer => integer(input).map(LiteralValue::Integer),
@@ -654,7 +654,7 @@ fn primitive(kind: PrimitiveType, input: &str) -> Option<LiteralValue> {
             if is_identifier(input, '@', true) {
                 return Some(LiteralValue::Text(input.to_owned()));
             }
-            match parse_matrix_link(input)? {
+            match parse_matrix_link(input, link_host)? {
                 MatrixLink::User { user_id } => Some(LiteralValue::Text(user_id)),
                 _ => None,
             }
@@ -666,21 +666,21 @@ fn primitive(kind: PrimitiveType, input: &str) -> Option<LiteralValue> {
             if is_identifier(input, '#', true) {
                 return Some(LiteralValue::Text(input.to_owned()));
             }
-            match parse_matrix_link(&split_via(input).href)? {
+            match parse_matrix_link(&split_via(input).href, link_host)? {
                 MatrixLink::Room { room_id } if room_id.starts_with('#') => {
                     Some(LiteralValue::Text(room_id))
                 }
                 _ => None,
             }
         }
-        PrimitiveType::RoomId => room_input(input)
+        PrimitiveType::RoomId => room_input(input, link_host)
             .filter(|room| room.event_id.is_none())
             .map(|room| room_reference_from(RoomReferenceKind::RoomId, room)),
         PrimitiveType::EventId => {
             if is_identifier(input, '$', false) {
                 return Some(LiteralValue::Text(input.to_owned()));
             }
-            room_input(input)
+            room_input(input, link_host)
                 .filter(|room| room.event_id.is_some())
                 .map(|room| room_reference_from(RoomReferenceKind::EventId, room))
         }
@@ -701,9 +701,9 @@ pub fn literal_label(value: &LiteralValue) -> String {
     }
 }
 
-fn scalar(schema: &ScalarSchema, input: &str) -> Option<LiteralValue> {
+fn scalar(schema: &ScalarSchema, input: &str, link_host: Option<&str>) -> Option<LiteralValue> {
     match schema {
-        ScalarSchema::Primitive { primitive: kind } => primitive(*kind, input),
+        ScalarSchema::Primitive { primitive: kind } => primitive(*kind, input, link_host),
         ScalarSchema::Literal { value } => {
             (literal_label(value).to_lowercase() == input.to_lowercase()).then(|| value.clone())
         }
@@ -712,18 +712,19 @@ fn scalar(schema: &ScalarSchema, input: &str) -> Option<LiteralValue> {
 
 /// Literals are tried before primitives, so `all` picks the literal over a
 /// string that would also accept it.
-fn coerce_item(schema: &ItemSchema, input: &str) -> Option<LiteralValue> {
+fn coerce_item(schema: &ItemSchema, input: &str, link_host: Option<&str>) -> Option<LiteralValue> {
     let trimmed = trim(input);
     if trimmed.is_empty() {
         return None;
     }
     match schema {
-        ItemSchema::Primitive { primitive: kind } => primitive(*kind, trimmed),
+        ItemSchema::Primitive { primitive: kind } => primitive(*kind, trimmed, link_host),
         ItemSchema::Literal { value } => scalar(
             &ScalarSchema::Literal {
                 value: value.clone(),
             },
             trimmed,
+            link_host,
         ),
         ItemSchema::Union { variants } => variants
             .iter()
@@ -733,7 +734,7 @@ fn coerce_item(schema: &ItemSchema, input: &str) -> Option<LiteralValue> {
                     .iter()
                     .filter(|variant| !matches!(variant, ScalarSchema::Literal { .. })),
             )
-            .find_map(|variant| scalar(variant, trimmed)),
+            .find_map(|variant| scalar(variant, trimmed, link_host)),
     }
 }
 
@@ -955,6 +956,7 @@ pub fn build_invocation(
     command: &BotCommand,
     drafts: &ArgumentDrafts,
     prefix: &str,
+    link_host: Option<&str>,
 ) -> InvocationResult {
     let mut arguments = Map::new();
     let mut errors = BTreeMap::new();
@@ -986,7 +988,7 @@ pub fn build_invocation(
             };
             let Some(values) = entries
                 .iter()
-                .map(|entry| coerce_item(&item, entry))
+                .map(|entry| coerce_item(&item, entry, link_host))
                 .collect::<Option<Vec<_>>>()
             else {
                 errors.insert(key, ArgumentError::Invalid);
@@ -1016,7 +1018,7 @@ pub fn build_invocation(
             }
             continue;
         }
-        let Some(value) = coerce_item(&item, input) else {
+        let Some(value) = coerce_item(&item, input, link_host) else {
             errors.insert(key, ArgumentError::Invalid);
             continue;
         };
@@ -1137,7 +1139,8 @@ mod tests {
     fn an_invocation_carries_typed_arguments_and_a_body_line() {
         let command = ban();
         let drafts = drafts_from_text(&command, "!room:example.org 60 @a:x");
-        let InvocationResult::Built { invocation, body } = build_invocation(&command, &drafts, "/")
+        let InvocationResult::Built { invocation, body } =
+            build_invocation(&command, &drafts, "/", None)
         else {
             panic!("expected a built invocation");
         };
@@ -1159,7 +1162,8 @@ mod tests {
     fn missing_and_invalid_arguments_are_reported_per_key() {
         let command = ban();
         let drafts = drafts_from_text(&command, "not-a-room six");
-        let InvocationResult::Invalid { errors } = build_invocation(&command, &drafts, "/") else {
+        let InvocationResult::Invalid { errors } = build_invocation(&command, &drafts, "/", None)
+        else {
             panic!("expected errors");
         };
         assert_eq!(errors.get("target_room"), Some(&ArgumentError::Invalid));
@@ -1217,7 +1221,7 @@ mod tests {
         ] {
             let drafts = drafts_from_text(&command, input);
             let InvocationResult::Built { invocation, body } =
-                build_invocation(&command, &drafts, "/")
+                build_invocation(&command, &drafts, "/", None)
             else {
                 panic!("rejected event argument: {input}");
             };
@@ -1234,7 +1238,8 @@ mod tests {
             "!room:example.org",
         ] {
             let drafts = [("event".to_owned(), ArgumentDraft::Text(input.to_owned()))].into();
-            let InvocationResult::Invalid { errors } = build_invocation(&command, &drafts, "/")
+            let InvocationResult::Invalid { errors } =
+                build_invocation(&command, &drafts, "/", None)
             else {
                 panic!("accepted invalid event argument: {input}");
             };
@@ -1244,6 +1249,33 @@ mod tests {
                 "{input}"
             );
         }
+    }
+
+    #[test]
+    fn a_permalink_on_the_picked_link_host_fills_a_room_argument() {
+        let command = parse_bot_command(
+            "@b:x",
+            None,
+            None,
+            &json!({
+                "command": "room",
+                "parameters": [{"key": "room", "schema": {"schema_type": "primitive", "type": "room_id"}}]
+            }),
+        )
+        .unwrap();
+        let drafts = drafts_from_text(
+            &command,
+            "https://links.example.org/#/!room:example.org?via=a.example",
+        );
+        let InvocationResult::Built { invocation, .. } =
+            build_invocation(&command, &drafts, "/", Some("links.example.org"))
+        else {
+            panic!("rejected a permalink on the picked link host");
+        };
+        assert_eq!(
+            invocation.arguments["room"],
+            json!({"type": "room_id", "id": "!room:example.org", "via": ["a.example"]})
+        );
     }
 
     #[test]
@@ -1371,7 +1403,7 @@ mod tests {
             let drafts =
                 super::ArgumentDrafts::from([("to".into(), ArgumentDraft::Text(typed.into()))]);
             let InvocationResult::Built { invocation, .. } =
-                build_invocation(&command, &drafts, "/")
+                build_invocation(&command, &drafts, "/", None)
             else {
                 panic!("built");
             };

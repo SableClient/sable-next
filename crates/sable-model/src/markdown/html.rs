@@ -45,13 +45,10 @@ fn mark_element(mark: &Mark) -> Element {
         Mark::Color(value) => ("span", vec![("data-mx-color", value.clone())]),
         Mark::BgColor(value) => ("span", vec![("data-mx-bg-color", value.clone())]),
         Mark::Spoiler => ("span", vec![("data-mx-spoiler", String::new())]),
-        Mark::Link(href) => {
-            let mut attrs = vec![("href", href.clone())];
-            if parse_matrix_link(href).is_some() {
-                attrs.push((MSC4550_LINK, String::new()));
-            }
-            ("a", attrs)
-        }
+        Mark::Link(href) => (
+            "a",
+            vec![("href", href.clone()), (MSC4550_LINK, String::new())],
+        ),
     };
     Element {
         tag,
@@ -253,16 +250,19 @@ fn text_content(nodes: &[Node], out: &mut String) {
     }
 }
 
-/// A link labelled with its own address is an ordinary link.
-fn drop_redundant_link_markers(nodes: &mut [Node]) {
+/// Only a Matrix link labelled with something other than its own address is
+/// marked as a link rather than a pill.
+fn drop_redundant_link_markers(nodes: &mut [Node], link_host: Option<&str>) {
     for node in nodes {
         if let Node::Element(element) = node {
-            drop_redundant_link_markers(&mut element.children);
+            drop_redundant_link_markers(&mut element.children, link_host);
             if element.tag == "a" && element.attrs.iter().any(|(name, _)| *name == MSC4550_LINK) {
                 let mut text = String::new();
                 text_content(&element.children, &mut text);
                 let href = element.attrs.iter().find(|(name, _)| *name == "href");
-                if href.is_some_and(|(_, href)| *href == text) {
+                if href.is_none_or(|(_, href)| {
+                    *href == text || parse_matrix_link(href, link_host).is_none()
+                }) {
                     element.attrs.retain(|(name, _)| *name != MSC4550_LINK);
                 }
             }
@@ -387,9 +387,10 @@ pub(super) fn html(
     blocks: &[Block<Vec<Inline>>],
     pills: &[ComposerPill],
     receiver_formats: impl Fn(&str) -> bool,
+    link_host: Option<&str>,
 ) -> String {
     let mut nodes = block_nodes(blocks, pills);
-    drop_redundant_link_markers(&mut nodes);
+    drop_redundant_link_markers(&mut nodes, link_host);
     each_text(&mut nodes, false, false, &mut |text, pre, _| {
         if pre || !text.contains("  ") {
             return None;

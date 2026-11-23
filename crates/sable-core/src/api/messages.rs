@@ -92,6 +92,7 @@ impl Handler for MarkdownToContentParams {
         std::future::ready(Ok(sable_model::markdown::markdown_to_content(
             &self.markdown,
             &self.pills,
+            None,
         )))
     }
 }

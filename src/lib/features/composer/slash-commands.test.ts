@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { expect, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 
 import { CoreError } from '#src/transport';
 
@@ -26,6 +26,7 @@ import {
 } from './slash-commands';
 
 import { testPersona } from '#lib/personas/persona.ts';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import { memberView } from '#lib/test-support/room-views.js';
 
 function fakeCommands() {
@@ -136,8 +137,8 @@ function context(
 }
 
 test('plain text is not a command', () => {
-  expect(parseSlash('hello')).toEqual({ kind: 'none' });
-  expect(parseSlash('and/or')).toEqual({ kind: 'none' });
+  expect(parseSlash('hello', null, 'matrix.to')).toEqual({ kind: 'none' });
+  expect(parseSlash('and/or', null, 'matrix.to')).toEqual({ kind: 'none' });
 });
 
 test('/bugreport opens the report flow', async () => {
@@ -150,7 +151,10 @@ test('/bugreport opens the report flow', async () => {
 });
 
 test('a doubled slash escapes a message that starts with one', async () => {
-  expect(parseSlash('//me is literal')).toEqual({ kind: 'literal', body: '/me is literal' });
+  expect(parseSlash('//me is literal', null, 'matrix.to')).toEqual({
+    kind: 'literal',
+    body: '/me is literal',
+  });
 
   await expect(runSlash('//me is literal', context(fakeCommands()))).resolves.toEqual({
     kind: 'message',
@@ -161,7 +165,7 @@ test('a doubled slash escapes a message that starts with one', async () => {
 });
 
 test('the command name is matched without regard to case', () => {
-  const parsed = parseSlash('/ME waves');
+  const parsed = parseSlash('/ME waves', null, 'matrix.to');
 
   expect(parsed).toMatchObject({ kind: 'command', name: 'me' });
 });
@@ -382,6 +386,21 @@ test('/join takes an address and its routing servers', async () => {
     address: '#room:example.org',
     via: ['other.org'],
   });
+});
+
+test('/join takes a link on the custom link host', async () => {
+  preferences.matrixLinkSelector = 'custom';
+  preferences.matrixLinkCustom = 'links.example.org';
+  onTestFinished(() => {
+    preferences.matrixLinkSelector = 'sable';
+    preferences.matrixLinkCustom = '';
+  });
+  const commands = fakeCommands();
+
+  await expect(
+    runSlash('/join https://links.example.org/#/!abc:example.org?via=one.org', context(commands))
+  ).resolves.toEqual({ kind: 'done' });
+  expect(commands.joinRoom).toHaveBeenCalledWith({ address: '!abc:example.org', via: ['one.org'] });
 });
 
 test('/join hands a knock room over to the ask to join page', async () => {

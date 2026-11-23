@@ -271,7 +271,7 @@ test('the markdown body and the html body describe the same blocks', () => {
       const message = serializeComposer(source);
       if (message.formatted === null) return;
       expect(
-        blockSkeleton(markdownToContent(message.body, []).formatted_body ?? ''),
+        blockSkeleton(markdownToContent(message.body, [], 'matrix.to').formatted_body ?? ''),
         JSON.stringify(message)
       ).toBe(blockSkeleton(message.formatted));
     }),

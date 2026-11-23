@@ -24,11 +24,11 @@ import {
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { CoreError } from '#src/transport';
 import { sleep } from '#lib/sleep.js';
+import { knownLinkPrefixes } from '#lib/rooms/matrix-link.js';
 
 export type CapabilityApproval = (requested: Set<Capability>) => Promise<Set<Capability>>;
 
 const REDACTION_EVENT_TYPE = 'm.room.redaction';
-const MATRIX_LINK_PREFIXES = ['https://link.sable.moe/#/', 'https://matrix.to/#/'];
 const TURN_REFRESH_FRACTION = 0.9;
 const TURN_MIN_REFRESH_MS = 30_000;
 
@@ -334,7 +334,7 @@ export class SableWidgetDriver extends WidgetDriver {
   }
 
   override async navigate(uri: string): Promise<void> {
-    const prefix = MATRIX_LINK_PREFIXES.find((prefix) => uri.startsWith(prefix));
+    const prefix = knownLinkPrefixes().find((prefix) => uri.startsWith(prefix));
     if (!prefix) throw new Error('Invalid Matrix URI');
     await this.#navigate(uri.slice(prefix.length));
   }

@@ -135,7 +135,8 @@ test('a spoiler stays hidden in the preview', () => {
 test('a formatted spoiler uses one placeholder while separate spoilers stay separate', () => {
   const { body, formatted_body: html } = markdownToContent(
     '||this is a *huge* spoiler|| and ||another||',
-    []
+    [],
+    'matrix.to'
   );
 
   expect(

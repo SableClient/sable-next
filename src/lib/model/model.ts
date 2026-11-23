@@ -130,12 +130,12 @@ export function searchOperators(): SearchOperator[] {
   return JSON.parse(wasm.searchOperators()) as SearchOperator[];
 }
 
-export function parseMatrixLink(href: string): MatrixLink | null {
-  return JSON.parse(wasm.parseMatrixLink(href)) as MatrixLink | null;
+export function parseMatrixLink(href: string, linkHost: string): MatrixLink | null {
+  return JSON.parse(wasm.parseMatrixLink(href, linkHost)) as MatrixLink | null;
 }
 
-export function parseJoinAddress(input: string): JoinAddress | null {
-  return JSON.parse(wasm.parseJoinAddress(input)) as JoinAddress | null;
+export function parseJoinAddress(input: string, linkHost: string): JoinAddress | null {
+  return JSON.parse(wasm.parseJoinAddress(input, linkHost)) as JoinAddress | null;
 }
 
 export function mentionUri(id: string, via: readonly string[]): string | undefined {
@@ -164,10 +164,11 @@ export function draftsFromText(command: BotCommand, args: string): ArgumentDraft
 export function buildInvocation(
   command: BotCommand,
   drafts: ArgumentDrafts,
-  prefix = '/'
+  prefix: string,
+  linkHost: string
 ): InvocationResult {
   return JSON.parse(
-    wasm.buildInvocation(JSON.stringify(command), JSON.stringify(drafts), prefix)
+    wasm.buildInvocation(JSON.stringify(command), JSON.stringify(drafts), prefix, linkHost)
   ) as InvocationResult;
 }
 
@@ -231,10 +232,11 @@ export function slashCommandNames(): string[] {
 
 export function parseSlash(
   body: string,
-  formatted: string | null = null,
+  formatted: string | null,
+  linkHost: string,
   now = Date.now()
 ): SlashParse {
-  return JSON.parse(wasm.parseSlash(body, formatted ?? undefined, now)) as SlashParse;
+  return JSON.parse(wasm.parseSlash(body, formatted ?? undefined, now, linkHost)) as SlashParse;
 }
 
 export function pronounSets(text: string): PronounView[] {
@@ -634,9 +636,12 @@ export function reactionKey(content: unknown): string | null {
 
 export function markdownToContent(
   markdown: string,
-  pills: readonly ComposerPill[]
+  pills: readonly ComposerPill[],
+  linkHost: string
 ): ComposerContent {
-  return JSON.parse(wasm.markdownToContent(markdown, JSON.stringify(pills))) as ComposerContent;
+  return JSON.parse(
+    wasm.markdownToContent(markdown, JSON.stringify(pills), linkHost)
+  ) as ComposerContent;
 }
 
 export function markdownToDoc(markdown: string, pills: readonly ComposerPill[]): unknown {

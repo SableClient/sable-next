@@ -1,9 +1,18 @@
 import { Fragment, Slice, type Node as ProseMirrorNode } from 'prosemirror-model';
 
+import { knownLinkPrefixes } from '#lib/rooms/matrix-link.js';
+
 import { composerSchema } from './schema';
 
-const USER_ID =
-  /(^|[\s(])(?:https:\/\/(?:link\.sable\.moe|matrix\.to)\/#\/)?(@[\w.=\-/+]+:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?::\d{1,5})?)(?![\w:])/gu;
+function userIdPattern(): RegExp {
+  const prefixes = knownLinkPrefixes()
+    .map((prefix) => prefix.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'))
+    .join('|');
+  return new RegExp(
+    `(^|[\\s(])(?:${prefixes})?(@[\\w.=\\-/+]+:[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*(?::\\d{1,5})?)(?![\\w:])`,
+    'gu'
+  );
+}
 
 export type MentionName = (userId: string) => string | null;
 
@@ -26,7 +35,7 @@ function splitText(node: ProseMirrorNode, name: MentionName): ProseMirrorNode[] 
 
   const parts: ProseMirrorNode[] = [];
   let at = 0;
-  for (const match of text.matchAll(USER_ID)) {
+  for (const match of text.matchAll(userIdPattern())) {
     const start = match.index + match[1].length;
     const userId = match[2];
     if (start > at) parts.push(composerSchema.text(text.slice(at, start), marks));

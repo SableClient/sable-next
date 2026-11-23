@@ -353,7 +353,11 @@ fn typed_source(typed: &str) -> String {
 }
 
 #[must_use]
-pub fn markdown_to_content(markdown: &str, pills: &[ComposerPill]) -> ComposerContent {
+pub fn markdown_to_content(
+    markdown: &str,
+    pills: &[ComposerPill],
+    link_host: Option<&str>,
+) -> ComposerContent {
     let typed = line_feeds(markdown);
     let body =
         trim(&fill_pills(&typed, pills, ComposerPill::text).replace('\u{a0}', " ")).to_owned();
@@ -371,7 +375,7 @@ pub fn markdown_to_content(markdown: &str, pills: &[ComposerPill]) -> ComposerCo
     let mentions = mentions(&typed, pills, &linked);
 
     let plain = plain_text(&linked).is_some_and(|text| text == body) && !receiver_formats(&body);
-    let formatted_body = (!plain).then(|| html::html(&linked, pills, receiver_formats));
+    let formatted_body = (!plain).then(|| html::html(&linked, pills, receiver_formats, link_host));
     let body = match formatted_body.as_deref() {
         Some(formatted) if formatted.contains("data-mx-spoiler") => {
             crate::html::preview_body(&body, Some(formatted))
@@ -398,6 +402,7 @@ pub fn topic_to_html(topic: &str) -> String {
         &[Block::Paragraph(topic_inlines(nodes))],
         &[],
         receiver_formats,
+        None,
     )
 }
 
@@ -536,7 +541,7 @@ mod tests {
             ("> quote", Some("<blockquote><p>quote</p></blockquote>")),
         ];
         for &(markdown, formatted) in cases {
-            let content = markdown_to_content(markdown, &[]);
+            let content = markdown_to_content(markdown, &[], None);
             assert_eq!(content.body, markdown);
             assert_eq!(content.formatted_body.as_deref(), formatted, "{markdown}");
         }
@@ -559,7 +564,7 @@ mod tests {
             ),
         ] {
             let source = format!("||this is a {markdown} spoiler||");
-            let content = markdown_to_content(&source, &[]);
+            let content = markdown_to_content(&source, &[], None);
             assert_eq!(
                 content.formatted_body,
                 Some(format!(
@@ -573,13 +578,13 @@ mod tests {
 
     #[test]
     fn a_spoiler_is_hidden_from_the_plain_body_and_other_text_kept() {
-        let content = markdown_to_content("the ||butler **did**|| it", &[]);
+        let content = markdown_to_content("the ||butler **did**|| it", &[], None);
         assert_eq!(content.body, "the [Spoiler] it");
         assert_eq!(
             content.formatted_body.as_deref(),
             Some("the <span data-mx-spoiler=\"\">butler <strong>did</strong></span> it")
         );
-        let plain = markdown_to_content("no **secret** here", &[]);
+        let plain = markdown_to_content("no **secret** here", &[], None);
         assert_eq!(plain.body, "no **secret** here");
     }
 
@@ -605,7 +610,7 @@ mod tests {
                 format!("<blockquote>{}{}</blockquote>", p(&s("one")), p(&s("two"))),
             ),
         ] {
-            let content = markdown_to_content(markdown, &[]);
+            let content = markdown_to_content(markdown, &[], None);
             assert_eq!(content.formatted_body, Some(formatted), "{markdown}");
             assert!(
                 !content.body.contains("one"),
@@ -619,7 +624,7 @@ mod tests {
             "||one\n\ntwo ||",
             "||one\n\n# two||",
         ] {
-            let html = markdown_to_content(markdown, &[])
+            let html = markdown_to_content(markdown, &[], None)
                 .formatted_body
                 .unwrap_or_default();
             assert!(!html.contains("data-mx-spoiler"), "{markdown}: {html}");
@@ -629,7 +634,7 @@ mod tests {
     #[test]
     fn a_table_can_end_a_paragraph() {
         for markdown in ["a | b\n|-|-|", "a | b\\\n|-|-|", "text\n| a |\n|---|"] {
-            let html = markdown_to_content(markdown, &[])
+            let html = markdown_to_content(markdown, &[], None)
                 .formatted_body
                 .unwrap_or_default();
             assert!(html.contains("<table>"), "{markdown}: {html}");
@@ -642,7 +647,7 @@ mod tests {
             "> | a |\n> | - |\n> | b |",
             "* * x\n\n    | a |\n    | - |\n    | b |",
         ] {
-            let html = markdown_to_content(markdown, &[]).formatted_body;
+            let html = markdown_to_content(markdown, &[], None).formatted_body;
             assert!(html.unwrap_or_default().contains("<table>"), "{markdown}");
         }
     }
@@ -650,13 +655,13 @@ mod tests {
     #[test]
     fn an_escaped_ampersand_in_a_title_keeps_its_entity() {
         assert_eq!(
-            markdown_to_content("![a](mxc://a.b/c \"\\&amp; \\\\\")", &[])
+            markdown_to_content("![a](mxc://a.b/c \"\\&amp; \\\\\")", &[], None)
                 .formatted_body
                 .as_deref(),
             Some("<img src=\"mxc://a.b/c\" alt=\"a\" title=\"&amp;amp; \\\">")
         );
         assert_eq!(
-            markdown_to_content("[a](javascript:\\&amp;)", &[]).body,
+            markdown_to_content("[a](javascript:\\&amp;)", &[], None).body,
             "[a](javascript:\\&amp;)"
         );
     }
@@ -664,13 +669,13 @@ mod tests {
     #[test]
     fn a_backslash_before_a_pipe_stays_in_its_cell() {
         assert_eq!(
-            markdown_to_content("| `\\\\|!` |\n| - |", &[])
+            markdown_to_content("| `\\\\|!` |\n| - |", &[], None)
                 .formatted_body
                 .as_deref(),
             Some("<table><tbody><tr><th><code>\\|!</code></th></tr></tbody></table>")
         );
         assert_eq!(
-            markdown_to_content("`a\\\\|b` c", &[])
+            markdown_to_content("`a\\\\|b` c", &[], None)
                 .formatted_body
                 .as_deref(),
             Some("<code>a\\\\|b</code> c")
@@ -679,9 +684,13 @@ mod tests {
 
     #[test]
     fn a_title_that_is_a_backslash_ends_at_its_quote() {
-        let html = markdown_to_content("![a](mxc://a.b/c \"\\\\\") ![b](mxc://a.b/d \"e\")", &[])
-            .formatted_body
-            .unwrap_or_default();
+        let html = markdown_to_content(
+            "![a](mxc://a.b/c \"\\\\\") ![b](mxc://a.b/d \"e\")",
+            &[],
+            None,
+        )
+        .formatted_body
+        .unwrap_or_default();
         assert_eq!(
             html,
             "<img src=\"mxc://a.b/c\" alt=\"a\" title=\"\\\"> <img src=\"mxc://a.b/d\" alt=\"b\" title=\"e\">"
@@ -691,11 +700,15 @@ mod tests {
     #[test]
     fn a_list_marker_alone_is_an_empty_item() {
         assert_eq!(
-            markdown_to_content("1.", &[]).formatted_body.as_deref(),
+            markdown_to_content("1.", &[], None)
+                .formatted_body
+                .as_deref(),
             Some("<ol><li></li></ol>")
         );
         assert_eq!(
-            markdown_to_content("-", &[]).formatted_body.as_deref(),
+            markdown_to_content("-", &[], None)
+                .formatted_body
+                .as_deref(),
             Some("<ul><li></li></ul>")
         );
     }
@@ -703,12 +716,12 @@ mod tests {
     #[test]
     fn an_entity_inside_a_spoiler_keeps_the_spoiler() {
         assert_eq!(
-            markdown_to_content("||a &amp; b||", &[])
+            markdown_to_content("||a &amp; b||", &[], None)
                 .formatted_body
                 .as_deref(),
             Some("<span data-mx-spoiler=\"\">a &amp; b</span>")
         );
-        let written = markdown_to_content("&#124;&#124;a&#124;&#124;", &[]).formatted_body;
+        let written = markdown_to_content("&#124;&#124;a&#124;&#124;", &[], None).formatted_body;
         assert!(!written.unwrap_or_default().contains("data-mx-spoiler"));
     }
 
@@ -719,7 +732,7 @@ mod tests {
             "* ~~~\n\n  x",
             "> > * ]\n> >   ~~~) a~~",
         ] {
-            let html = markdown_to_content(markdown, &[])
+            let html = markdown_to_content(markdown, &[], None)
                 .formatted_body
                 .unwrap_or_default();
             assert!(html.contains("<pre>"), "{markdown}: {html}");
@@ -733,7 +746,7 @@ mod tests {
             url: "mxc://example.org/wave".to_owned(),
             body: None,
         }];
-        let content = markdown_to_content("**hey** \u{fffc}", &pills);
+        let content = markdown_to_content("**hey** \u{fffc}", &pills, None);
         assert_eq!(content.body, "**hey** :wave:");
         assert_eq!(
             content.formatted_body.as_deref(),
@@ -751,7 +764,7 @@ mod tests {
             body: None,
         }];
         for source in ["*\u{fffc}*", "_\u{fffc}_", "***\u{fffc}***"] {
-            let content = markdown_to_content(source, &pills);
+            let content = markdown_to_content(source, &pills, None);
             assert_eq!(
                 content.formatted_body.as_deref(),
                 Some(
@@ -771,13 +784,13 @@ mod tests {
     #[test]
     fn a_mention_in_code_is_text_and_does_not_notify() {
         let pills = [mention("@a:b")];
-        let content = markdown_to_content("`\u{fffc}` x", &pills);
+        let content = markdown_to_content("`\u{fffc}` x", &pills, None);
         assert_eq!(
             content.formatted_body.as_deref(),
             Some("<code>@a:b</code> x")
         );
         assert_eq!(content.mentions.user_ids, Vec::<String>::new());
-        let content = markdown_to_content("```\n\u{fffc}\n```", &pills);
+        let content = markdown_to_content("```\n\u{fffc}\n```", &pills, None);
         assert_eq!(content.mentions.user_ids, Vec::<String>::new());
     }
 
@@ -788,7 +801,7 @@ mod tests {
             alt: "cat".to_owned(),
             title: String::new(),
         }];
-        let content = markdown_to_content("see \u{fffc}", &pills);
+        let content = markdown_to_content("see \u{fffc}", &pills, None);
         assert_eq!(content.body, "see cat");
         assert_eq!(
             content.formatted_body.as_deref(),
@@ -798,12 +811,12 @@ mod tests {
 
     #[test]
     fn a_placeholder_without_a_pill_stays_text_in_both_bodies() {
-        let plain = markdown_to_content("a\u{fffc}b", &[]);
+        let plain = markdown_to_content("a\u{fffc}b", &[], None);
         assert_eq!(
             (plain.body.as_str(), plain.formatted_body),
             ("a\u{fffc}b", None)
         );
-        let marked = markdown_to_content("**a**\u{fffc}`\u{fffc}`\n```\n\u{fffc}\n```", &[]);
+        let marked = markdown_to_content("**a**\u{fffc}`\u{fffc}`\n```\n\u{fffc}\n```", &[], None);
         assert_eq!(
             marked.formatted_body.as_deref(),
             Some(
@@ -815,19 +828,19 @@ mod tests {
     #[test]
     fn math_is_data_mx_maths() {
         assert_eq!(
-            markdown_to_content("so $x^2$ holds", &[])
+            markdown_to_content("so $x^2$ holds", &[], None)
                 .formatted_body
                 .as_deref(),
             Some("so <span data-mx-maths=\"x^2\"><code>x^2</code></span> holds")
         );
         assert_eq!(
-            markdown_to_content("$$\\int f\n$$", &[])
+            markdown_to_content("$$\\int f\n$$", &[], None)
                 .formatted_body
                 .as_deref(),
             Some("<div data-mx-maths=\"\\int f\"><code>\\int f</code></div>")
         );
         assert_eq!(
-            markdown_to_content("costs $5 and $6", &[]).formatted_body,
+            markdown_to_content("costs $5 and $6", &[], None).formatted_body,
             None
         );
     }
@@ -836,7 +849,7 @@ mod tests {
     fn prices_code_and_escapes_are_not_math() {
         for text in ["costs $5 and $6", "`$x$`", "\\$x$", "$ x$", "$x $", "$$x"] {
             assert!(
-                !markdown_to_content(text, &[])
+                !markdown_to_content(text, &[], None)
                     .formatted_body
                     .is_some_and(|html| html.contains("data-mx-maths")),
                 "{text}"
@@ -849,7 +862,8 @@ mod tests {
         assert_eq!(
             markdown_to_content(
                 "[$[fg.color=f00 a]$[fg.color=0f0 b]c](https://example.org)",
-                &[]
+                &[],
+                None
             )
             .formatted_body
             .as_deref(),
@@ -861,7 +875,7 @@ mod tests {
 
     #[test]
     fn a_function_and_math_share_a_message() {
-        let content = markdown_to_content("$[fg.color=f00 a]$[bg.color=000 b] $x$", &[]);
+        let content = markdown_to_content("$[fg.color=f00 a]$[bg.color=000 b] $x$", &[], None);
         assert_eq!(
             content.formatted_body.as_deref(),
             Some(
@@ -874,7 +888,7 @@ mod tests {
     #[test]
     fn math_in_backticks_is_read() {
         for (markdown, latex) in [("$`a\\`$", "a\\"), ("$`x`$5", "x"), ("$`a~b`$", "a~b")] {
-            let html = markdown_to_content(markdown, &[])
+            let html = markdown_to_content(markdown, &[], None)
                 .formatted_body
                 .unwrap_or_default();
             assert!(
@@ -882,14 +896,14 @@ mod tests {
                 "{markdown}: {html}"
             );
         }
-        let cell = markdown_to_content("| $a\\|b$ |\n| - |", &[]).formatted_body;
+        let cell = markdown_to_content("| $a\\|b$ |\n| - |", &[], None).formatted_body;
         assert!(cell.unwrap_or_default().contains("data-mx-maths=\"a|b\""));
     }
 
     #[test]
     fn math_holds_any_character() {
         assert_eq!(
-            markdown_to_content("so $😀 + \u{1d7d8}$ holds", &[])
+            markdown_to_content("so $😀 + \u{1d7d8}$ holds", &[], None)
                 .formatted_body
                 .as_deref(),
             Some(
@@ -901,7 +915,7 @@ mod tests {
     #[test]
     fn typed_private_use_characters_are_never_markers() {
         let typed = "a\u{E000}b\u{E001}c\u{E002}d $x$ e\u{E000}1;\u{E002}";
-        let content = markdown_to_content(typed, &[]);
+        let content = markdown_to_content(typed, &[], None);
         assert_eq!(content.body, typed);
         assert_eq!(
             content.formatted_body.as_deref(),
@@ -909,7 +923,10 @@ mod tests {
                 "a\u{E000}b\u{E001}c\u{E002}d <span data-mx-maths=\"x\"><code>x</code></span> e\u{E000}1;\u{E002}"
             )
         );
-        assert_eq!(markdown_to_content("\u{E000}", &[]).formatted_body, None);
+        assert_eq!(
+            markdown_to_content("\u{E000}", &[], None).formatted_body,
+            None
+        );
     }
 
     #[test]
@@ -917,8 +934,8 @@ mod tests {
         let runs: String = (1..280).map(|run| "`".repeat(run) + " ").collect();
         let lines = format!("$$\n{}", "x\n".repeat(200_000));
         let started = std::time::Instant::now();
-        assert_eq!(markdown_to_content(&runs, &[]).body, runs.trim());
-        assert_eq!(markdown_to_content(&lines, &[]).body, lines.trim());
+        assert_eq!(markdown_to_content(&runs, &[], None).body, runs.trim());
+        assert_eq!(markdown_to_content(&lines, &[], None).body, lines.trim());
         assert!(started.elapsed() < std::time::Duration::from_secs(5));
     }
 
@@ -947,16 +964,31 @@ mod tests {
             "HTTPS://example.org/a_b_c",
             "été https://example.org/a_b_c",
         ] {
-            let content = markdown_to_content(typed, &[]);
+            let content = markdown_to_content(typed, &[], None);
             assert_eq!(content.body, typed);
             let html = content.formatted_body.unwrap_or_default();
             assert!(!html.contains("<em>"), "{html}");
             assert!(!html.contains('\\'), "{html}");
         }
         assert_eq!(
-            markdown_to_content("`https://example.org/a_b_c`", &[]).formatted_body,
+            markdown_to_content("`https://example.org/a_b_c`", &[], None).formatted_body,
             Some("<code>https://example.org/a_b_c</code>".to_owned())
         );
+    }
+
+    #[test]
+    fn a_labelled_link_on_the_picked_link_host_is_marked_as_a_link() {
+        let html = |link_host| {
+            markdown_to_content(
+                "[Alice](https://links.example.org/#/@alice:example.org)",
+                &[],
+                link_host,
+            )
+            .formatted_body
+            .unwrap_or_default()
+        };
+        assert!(html(Some("links.example.org")).contains("data-org.matrix.msc4550.link"));
+        assert!(!html(None).contains("data-org.matrix.msc4550.link"));
     }
 
     #[test]
@@ -971,7 +1003,7 @@ mod tests {
             serde_json::from_str(include_str!("../fixtures/markdown.json")).expect("the corpus");
         let mut failures = Vec::new();
         for case in &cases {
-            let content = markdown_to_content(&case.markdown, &case.pills);
+            let content = markdown_to_content(&case.markdown, &case.pills, None);
             let expected = ComposerContent {
                 body: case.body.clone(),
                 formatted_body: case.formatted_body.clone(),

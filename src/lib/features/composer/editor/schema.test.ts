@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 
 import { DOMParser, DOMSerializer, type Node as ProseMirrorNode } from 'prosemirror-model';
-import { expect, test } from 'vitest';
+import { expect, onTestFinished, test } from 'vitest';
+
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { composerSchema } from './schema';
 
@@ -51,6 +53,48 @@ test.each(['link.sable.moe', 'matrix.to'])(
     });
   }
 );
+
+test('an anchor on the custom link host becomes a mention when pasted', () => {
+  preferences.matrixLinkSelector = 'custom';
+  preferences.matrixLinkCustom = 'links.example.org';
+  onTestFinished(() => {
+    preferences.matrixLinkSelector = 'sable';
+    preferences.matrixLinkCustom = '';
+  });
+
+  const doc = parse('<p><a href="https://links.example.org/#/@alice:example.org">Alice</a></p>');
+
+  expect(doc.firstChild?.firstChild?.type).toBe(mention);
+  expect(doc.firstChild?.firstChild?.attrs.userId).toBe('@alice:example.org');
+});
+
+test.each(['link.sable.moe', 'matrix.to'])(
+  'a %s link to one event stays a link when pasted',
+  (host) => {
+    const href = `https://${host}/#/!room:example.org/$event?via=example.org`;
+    const doc = parse(`<p><a href="${href}">see this</a></p>`);
+
+    expect(doc.firstChild?.firstChild?.type.name).toBe('text');
+    expect(doc.firstChild?.firstChild?.marks[0]?.attrs.href).toBe(href);
+  }
+);
+
+test('a percent-encoded mention is read like a plain one', () => {
+  const doc = parse('<p><a href="https://matrix.to/#/%40one%3Aexample.org">Member One</a></p>');
+
+  expect(doc.firstChild?.firstChild?.attrs).toEqual({
+    userId: '@one:example.org',
+    name: 'Member One',
+    via: [],
+  });
+});
+
+test('a plain link is not a mention', () => {
+  const doc = parse('<p><a href="https://example.org/#/@alice:example.org">Alice</a></p>');
+
+  expect(doc.firstChild?.firstChild?.isText).toBe(true);
+  expect(doc.firstChild?.firstChild?.marks.map((mark) => mark.type.name)).toEqual(['link']);
+});
 
 test('a room permalink with via servers keeps them out of the room id', () => {
   const doc = parse(
@@ -231,10 +275,4 @@ test('an explicit Sable link keeps its marker on serialise', () => {
   });
   expect(mentions).toBe(0);
   expect(html(doc)).toContain('data-org.matrix.msc4550.link');
-});
-
-test('a bare Sable link is not marked explicit on serialise', () => {
-  const href = 'https://link.sable.moe/#/!room:example.org/$event';
-  const doc = parse(`<a href="${href}">${href}</a>`);
-  expect(html(doc)).not.toContain('msc4550');
 });

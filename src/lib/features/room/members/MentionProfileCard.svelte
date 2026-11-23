@@ -36,7 +36,8 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { mentionUri } from '#lib/model/model.js';
-  import { matrixLinkHost, type PermalinkFormat } from '#lib/rooms/permalink.js';
+  import { matrixLinkHost } from '#lib/rooms/matrix-link.js';
+  import type { PermalinkFormat } from '#lib/rooms/permalink.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { formatNowInZone } from '#lib/ui/date-time.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';

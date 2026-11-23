@@ -29,10 +29,17 @@ pub struct ViaSplit {
     pub via: Vec<String>,
 }
 
+/// `link_host` is the host the user picked to share links on, read like matrix.to.
 #[must_use]
-pub fn parse_matrix_link(href: &str) -> Option<MatrixLink> {
-    let normalized = href
-        .strip_prefix("https://link.sable.moe/#/")
+pub fn parse_matrix_link(href: &str, link_host: Option<&str>) -> Option<MatrixLink> {
+    let normalized = ["link.sable.moe"]
+        .into_iter()
+        .chain(link_host)
+        .find_map(|host| {
+            href.strip_prefix("https://")?
+                .strip_prefix(host)?
+                .strip_prefix("/#/")
+        })
         .map(|fragment| format!("https://matrix.to/#/{fragment}"));
     let href = normalized.as_deref().unwrap_or(href);
     let path = href.split(['?', '#']).next().unwrap_or(href);
@@ -141,7 +148,7 @@ fn is_room_address(input: &str) -> bool {
 
 /// A room address or a link naming a room, with the servers it routes through.
 #[must_use]
-pub fn parse_join_address(input: &str) -> Option<JoinAddress> {
+pub fn parse_join_address(input: &str, link_host: Option<&str>) -> Option<JoinAddress> {
     let trimmed = input.trim_matches(is_space);
     if trimmed.is_empty() {
         return None;
@@ -153,7 +160,7 @@ pub fn parse_join_address(input: &str) -> Option<JoinAddress> {
         });
     }
     let split = split_via(trimmed);
-    let address = match parse_matrix_link(&split.href)? {
+    let address = match parse_matrix_link(&split.href, link_host)? {
         MatrixLink::User { .. } => return None,
         MatrixLink::Room { room_id } | MatrixLink::Event { room_id, .. } => room_id,
     };
@@ -198,7 +205,7 @@ mod tests {
     #[test]
     fn a_join_address_is_an_id_an_alias_or_a_link_to_a_room() {
         let address =
-            |input: &str| parse_join_address(input).map(|found| (found.address, found.via));
+            |input: &str| parse_join_address(input, None).map(|found| (found.address, found.via));
         assert_eq!(
             address(" #lobby:example.org "),
             Some(("#lobby:example.org".to_owned(), Vec::new()))
@@ -220,7 +227,7 @@ mod tests {
             "matrix:u/alice:example.org?action=chat&org.example.label=a%26b&user=other",
         ] {
             assert_eq!(
-                parse_matrix_link(href),
+                parse_matrix_link(href, None),
                 Some(MatrixLink::User {
                     user_id: "@alice:example.org".to_owned()
                 }),
@@ -232,7 +239,7 @@ mod tests {
     #[test]
     fn a_join_address_keeps_via_out_of_every_room_form() {
         let address =
-            |input: &str| parse_join_address(input).map(|found| (found.address, found.via));
+            |input: &str| parse_join_address(input, None).map(|found| (found.address, found.via));
         let via = |servers: &[&str]| servers.iter().map(|server| (*server).to_owned()).collect();
         let v12 = "!dIz4NfOB_FDBH4ktZeSqqTfPEcBwm4KnNTnJptVRDko";
 
@@ -305,7 +312,7 @@ mod tests {
                 room("!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI"),
             ),
         ] {
-            assert_eq!(parse_matrix_link(href), Some(expected), "{href}");
+            assert_eq!(parse_matrix_link(href, None), Some(expected), "{href}");
         }
     }
 
@@ -319,10 +326,13 @@ mod tests {
         ] {
             let sable = format!("https://link.sable.moe/#/{fragment}");
             let legacy = format!("https://matrix.to/#/{fragment}");
-            let expected = parse_matrix_link(&legacy);
+            let expected = parse_matrix_link(&legacy, None);
             assert!(expected.is_some(), "{legacy}");
-            assert_eq!(parse_matrix_link(&sable), expected, "{sable}");
-            assert_eq!(parse_join_address(&sable), parse_join_address(&legacy));
+            assert_eq!(parse_matrix_link(&sable, None), expected, "{sable}");
+            assert_eq!(
+                parse_join_address(&sable, None),
+                parse_join_address(&legacy, None)
+            );
         }
         for href in [
             "https://link.sable.moe/#/",
@@ -334,8 +344,38 @@ mod tests {
             "https://link.sable.moe:8443/#/@alice:example.org",
             "http://link.sable.moe/#/@alice:example.org",
         ] {
-            assert_eq!(parse_matrix_link(href), None, "{href}");
+            assert_eq!(parse_matrix_link(href, None), None, "{href}");
         }
+    }
+
+    #[test]
+    fn a_custom_link_host_reads_like_matrix_to() {
+        let host = Some("links.example.org");
+        for fragment in [
+            "@alice:example.org",
+            "!room:example.org/$event?via=a.example",
+        ] {
+            let custom = format!("https://links.example.org/#/{fragment}");
+            let legacy = format!("https://matrix.to/#/{fragment}");
+            assert!(parse_matrix_link(&legacy, None).is_some(), "{legacy}");
+            assert_eq!(
+                parse_matrix_link(&custom, host),
+                parse_matrix_link(&legacy, None),
+                "{custom}"
+            );
+            assert_eq!(parse_matrix_link(&custom, None), None, "{custom}");
+        }
+        assert_eq!(
+            parse_join_address(
+                "https://links.example.org/#/!room:example.org?via=a.example",
+                host
+            ),
+            parse_join_address("https://matrix.to/#/!room:example.org?via=a.example", None)
+        );
+        assert_eq!(
+            parse_matrix_link("https://links.example.org.evil/#/@alice:example.org", host),
+            None
+        );
     }
 
     #[test]
@@ -354,7 +394,7 @@ mod tests {
                 event("!somewhere:example.org", "$event"),
             ),
         ] {
-            assert_eq!(parse_matrix_link(href), Some(expected), "{href}");
+            assert_eq!(parse_matrix_link(href, None), Some(expected), "{href}");
         }
     }
 
@@ -370,7 +410,7 @@ mod tests {
             "https://matrix.to/#/alice:example.org",
             "https://matrix.to/#/%E0%A4%A",
         ] {
-            assert_eq!(parse_matrix_link(href), None, "{href}");
+            assert_eq!(parse_matrix_link(href, None), None, "{href}");
         }
     }
 
@@ -408,7 +448,7 @@ mod tests {
                 user("@alice:example.org"),
             ),
         ] {
-            assert_eq!(parse_matrix_link(href), Some(expected), "{href}");
+            assert_eq!(parse_matrix_link(href, None), Some(expected), "{href}");
         }
     }
 
@@ -428,14 +468,17 @@ mod tests {
             "https://matrix.to:8443/#/!room:example.org",
             "http://matrix.to/#/!room:example.org",
         ] {
-            assert_eq!(parse_matrix_link(href), None, "{href}");
+            assert_eq!(parse_matrix_link(href, None), None, "{href}");
         }
     }
 
     #[test]
     fn ruma_accepts_optional_path_slashes() {
         for href in ["matrix:/u/alice:example.org", "matrix:u/alice:example.org/"] {
-            assert_eq!(parse_matrix_link(href), Some(user("@alice:example.org")));
+            assert_eq!(
+                parse_matrix_link(href, None),
+                Some(user("@alice:example.org"))
+            );
         }
     }
 
@@ -447,10 +490,13 @@ mod tests {
             "https://matrix.to/#/@alice",
             "https://matrix.to/#/@alice?action=chat",
         ] {
-            assert_eq!(parse_matrix_link(href), None, "{href}");
+            assert_eq!(parse_matrix_link(href, None), None, "{href}");
         }
         assert_eq!(
-            parse_matrix_link("https://matrix.to/#/!room:example.org?action=join&via=a.example"),
+            parse_matrix_link(
+                "https://matrix.to/#/!room:example.org?action=join&via=a.example",
+                None
+            ),
             Some(room("!room:example.org"))
         );
     }
@@ -465,7 +511,7 @@ mod tests {
             "MATRIX:roomid/opaque#reserved?via=wrong.example"
         );
         assert_eq!(split.via, ["a.example", "b.example"]);
-        assert_eq!(parse_matrix_link(&split.href), Some(room("!opaque")));
+        assert_eq!(parse_matrix_link(&split.href, None), Some(room("!opaque")));
         assert_eq!(
             split_via("matrix:roomid/opaque#reserved?via=wrong.example").via,
             Vec::<String>::new()

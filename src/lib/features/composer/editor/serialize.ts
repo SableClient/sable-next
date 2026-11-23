@@ -13,6 +13,7 @@ import {
 
 import type { OutgoingMentions } from '#lib/core/client.svelte.js';
 import { markdownToContent, markdownToDoc, receiverFormats } from '#lib/model/model.js';
+import { matrixLinkHost } from '#lib/rooms/matrix-link.js';
 import type {
   ComposerContent,
   ComposerPill,
@@ -696,7 +697,11 @@ function spliceAtoms(node: ProseMirrorNode, atoms: ProseMirrorNode[]): ProseMirr
 export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   const imageSourcePacks = imageSourcePacksOf(doc);
   const { source, pills } = markdownSourceOf(doc);
-  const { body, formatted_body: formatted, mentions } = markdownToContent(source, pills);
+  const {
+    body,
+    formatted_body: formatted,
+    mentions,
+  } = markdownToContent(source, pills, matrixLinkHost());
   return {
     body,
     formatted,

@@ -4,7 +4,7 @@ import type { MatrixLink, RoomPreviewView } from '#src/generated/protocol';
 import { fireEvent, render, screen, type RenderResult } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 
 const roomList = vi.hoisted(() => ({
   rooms: [] as { room_id: string; canonical_alias: string | null; name: string | null }[],
@@ -89,6 +89,30 @@ test.each(['link.sable.moe', 'matrix.to'])(
     document.removeEventListener('click', onDocumentClick);
   }
 );
+
+test('opens links on the custom link host through the room-level handler', async () => {
+  preferences.matrixLinkSelector = 'custom';
+  preferences.matrixLinkCustom = 'links.example.org';
+  onTestFinished(() => {
+    preferences.matrixLinkSelector = 'sable';
+    preferences.matrixLinkCustom = '';
+  });
+  const onMatrixLink = vi.fn();
+  render(FormattedBody, {
+    props: {
+      html: '<a href="https://links.example.org/#/!room:example.org/$event">Message</a>',
+      onMatrixLink,
+    },
+  });
+  await tick();
+
+  await user.click(link());
+
+  expect(onMatrixLink).toHaveBeenCalledWith(
+    { kind: 'event', room_id: '!room:example.org', event_id: '$event' },
+    expect.any(HTMLAnchorElement)
+  );
+});
 
 test.each([
   '<a href="matrix:u/ana:example.org">Ana</a>',
@@ -244,7 +268,8 @@ test.each(['click', 'keyboard'] as const)(
   async (input) => {
     const { formatted_body: html } = markdownToContent(
       '||this is a *huge* spoiler|| and ||another||',
-      []
+      [],
+      'matrix.to'
     );
     render(FormattedBody, { html: html ?? '' });
     await tick();

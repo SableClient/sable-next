@@ -1,7 +1,40 @@
 import type { MatrixLink } from '#src/generated/protocol';
 
+import { parseMatrixLink as parseLink } from '#lib/model/model.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 export type { MatrixLink };
-export { parseMatrixLink } from '#lib/model/model.js';
+
+export const MATRIX_TO = 'https://matrix.to/#/';
+const SABLE_LINK = 'https://link.sable.moe/#/';
+
+function customLinkHost(value: string): string | null {
+  try {
+    return new URL(`https://${value.trim().replace(/^https?:\/\//i, '')}`).host || null;
+  } catch {
+    return null;
+  }
+}
+
+export function matrixLinkHost(): string {
+  switch (preferences.matrixLinkSelector) {
+    case 'sable':
+      return 'link.sable.moe';
+    case 'custom':
+      return customLinkHost(preferences.matrixLinkCustom) ?? 'matrix.to';
+    default:
+      return 'matrix.to';
+  }
+}
+
+/** Every host the app reads as a Matrix link, including the one it writes links with. */
+export function knownLinkPrefixes(): string[] {
+  return [...new Set([MATRIX_TO, SABLE_LINK, `https://${matrixLinkHost()}/#/`])];
+}
+
+export function parseMatrixLink(href: string): MatrixLink | null {
+  return parseLink(href, matrixLinkHost());
+}
 
 /** matrix.to queries live inside the fragment; matrix: queries precede it. */
 export function matrixLinkParameters(href: string): URLSearchParams {

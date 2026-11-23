@@ -680,9 +680,9 @@ fn acl(args: &str) -> Option<SlashInvocation> {
     })
 }
 
-fn address(args: &str, knock: bool) -> Option<SlashInvocation> {
+fn address(args: &str, knock: bool, link_host: Option<&str>) -> Option<SlashInvocation> {
     let (first, rest) = first_and_rest(args);
-    let target = parse_join_address(first)?;
+    let target = parse_join_address(first, link_host)?;
     Some(if knock {
         SlashInvocation::Knock {
             address: target.address,
@@ -759,6 +759,7 @@ fn invocation(
     args: &str,
     formatted: Option<&str>,
     now_ms: f64,
+    link_host: Option<&str>,
 ) -> Option<SlashInvocation> {
     use SlashInvocation as I;
     match name {
@@ -776,8 +777,8 @@ fn invocation(
         "shrug" => Some(decorated(name, SHRUG, args, formatted)),
         "tableflip" => Some(decorated(name, TABLEFLIP, args, formatted)),
         "unflip" => Some(decorated(name, UNFLIP, args, formatted)),
-        "join" => address(args, false),
-        "knock" => address(args, true),
+        "join" => address(args, false, link_host),
+        "knock" => address(args, true, link_host),
         "leave" => no_arguments(args, I::Leave),
         "invite" => match target_user(args)? {
             (user_id, None) => Some(I::Invite { user_id }),
@@ -838,9 +839,15 @@ fn invocation(
 }
 
 /// `formatted` is the composer's HTML for the whole line, which commands that
-/// send a message keep; `now_ms` anchors `/delete -past`.
+/// send a message keep; `now_ms` anchors `/delete -past`; `link_host` is the
+/// link host the user picked, read like matrix.to.
 #[must_use]
-pub fn parse_slash(body: &str, formatted: Option<&str>, now_ms: f64) -> SlashParse {
+pub fn parse_slash(
+    body: &str,
+    formatted: Option<&str>,
+    now_ms: f64,
+    link_host: Option<&str>,
+) -> SlashParse {
     let Some(command) = body.strip_prefix('/') else {
         return SlashParse::None;
     };
@@ -855,7 +862,7 @@ pub fn parse_slash(body: &str, formatted: Option<&str>, now_ms: f64) -> SlashPar
         return SlashParse::Unknown { name };
     }
     let developer_only = DEVELOPER_COMMANDS.contains(&name.as_str());
-    match invocation(&name, args, formatted, now_ms) {
+    match invocation(&name, args, formatted, now_ms, link_host) {
         Some(invocation) => SlashParse::Command {
             name,
             developer_only,
@@ -877,11 +884,11 @@ mod tests {
     const NOW: f64 = 1_000_000_000.0;
 
     fn parse(body: &str) -> SlashParse {
-        parse_slash(body, None, NOW)
+        parse_slash(body, None, NOW, None)
     }
 
     fn invoked_with(body: &str, formatted: Option<&str>) -> SlashInvocation {
-        match parse_slash(body, formatted, NOW) {
+        match parse_slash(body, formatted, NOW, None) {
             SlashParse::Command { invocation, .. } => invocation,
             other => panic!("{body} parsed as {other:?}"),
         }
@@ -893,6 +900,26 @@ mod tests {
 
     fn is_usage(body: &str) -> bool {
         matches!(parse(body), SlashParse::Usage { .. })
+    }
+
+    #[test]
+    fn join_reads_a_link_on_the_picked_link_host() {
+        assert_eq!(
+            parse_slash(
+                "/join https://links.example.org/#/!room:example.org?via=a.example",
+                None,
+                NOW,
+                Some("links.example.org"),
+            ),
+            SlashParse::Command {
+                name: "join".to_owned(),
+                developer_only: false,
+                invocation: SlashInvocation::Join {
+                    address: "!room:example.org".to_owned(),
+                    via: vec!["a.example".to_owned()],
+                },
+            }
+        );
     }
 
     #[test]
@@ -926,7 +953,7 @@ mod tests {
     #[test]
     fn the_name_ignores_case_and_speech_keeps_the_composer_html() {
         assert_eq!(
-            parse_slash("/ME waves", Some("  /me <b>waves</b>"), NOW),
+            parse_slash("/ME waves", Some("  /me <b>waves</b>"), NOW, None),
             SlashParse::Command {
                 name: "me".to_owned(),
                 developer_only: false,

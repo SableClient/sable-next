@@ -36,6 +36,7 @@
   import { outgoingPersona } from '#lib/personas/outgoing-persona.js';
   import { personaSpaces } from './persona-spaces.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { matrixLinkHost } from '#lib/rooms/matrix-link.js';
   import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
@@ -726,7 +727,7 @@
     if (!doc) return null;
     const text = commandTextOf(doc).trim();
     if (admin && text.startsWith(adminPrefix)) return text;
-    return parseSlash(text).kind === 'unknown' ? text : null;
+    return parseSlash(text, null, matrixLinkHost()).kind === 'unknown' ? text : null;
   }
 
   async function typedBotCommand(text: string): Promise<boolean> {
@@ -758,7 +759,7 @@
       return true;
     }
     const drafts = draftsFromText(matched.command, matched.args);
-    const result = buildInvocation(matched.command, drafts, typed.prefix);
+    const result = buildInvocation(matched.command, drafts, typed.prefix, matrixLinkHost());
     if (result.kind === 'built') {
       if (!(await sendBotCommand(matched.command, result.body, result.invocation))) {
         restore();

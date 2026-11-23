@@ -10,11 +10,14 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { mentionUri } from '#lib/model/model.js';
 import { splitVia } from '#lib/rooms/join-address.js';
-import { matrixLinkAction, matrixLinkParameters, parseMatrixLink } from '#lib/rooms/matrix-link.js';
+import {
+  matrixLinkAction,
+  matrixLinkHost,
+  matrixLinkParameters,
+  parseMatrixLink,
+} from '#lib/rooms/matrix-link.js';
 
 import { findRoomByPathId, roomPathParam, roomPathParamFromId } from './room-list.svelte';
-
-import { preferences } from '#lib/settings/preferences.svelte.js';
 
 let sidebarOrder: readonly string[] = [];
 
@@ -134,25 +137,6 @@ export async function joinVia(
   const own = core.session ? serverNameOf(core.session.user_id) : undefined;
   if (parentId === null || via.some((server) => server !== own)) return [...via];
   return [...via, ...(await core.rpc.rooms.viaServers({ room_id: parentId }))];
-}
-
-function customLinkHost(value: string): string | null {
-  try {
-    return new URL(`https://${value.trim().replace(/^https?:\/\//i, '')}`).host || null;
-  } catch {
-    return null;
-  }
-}
-
-export function matrixLinkHost(): string {
-  switch (preferences.matrixLinkSelector) {
-    case 'sable':
-      return 'link.sable.moe';
-    case 'custom':
-      return customLinkHost(preferences.matrixLinkCustom) ?? 'matrix.to';
-    default:
-      return 'matrix.to';
-  }
 }
 
 export function matrixToUrl(target: LinkTarget, eventId?: string | null): string {

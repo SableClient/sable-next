@@ -1,6 +1,7 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { sendMessage } from '#lib/core/api/messages.svelte.js';
 import { buildInvocation } from '#lib/model/model.js';
+import { matrixLinkHost } from '#lib/rooms/matrix-link.js';
 
 import type { PolicyAction } from './meowlnir-policies.js';
 
@@ -26,7 +27,7 @@ export async function sendMeowlnirCommand(
     .botCommands({ room_id: managementRoomId })
     .catch(() => []);
   const described = commands.find((command) => command.command === name);
-  const built = described ? buildInvocation(described, args, '!') : null;
+  const built = described ? buildInvocation(described, args, '!', matrixLinkHost()) : null;
   if (described && built?.kind === 'built') {
     await sendMessage(core.rpc, managementRoomId, built.body, {
       mentions: [described.sender],

@@ -1,5 +1,6 @@
-import { expect, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import { CoreError, transportFailure } from '#src/transport';
 import { SableWidgetDriver } from './widget-driver.js';
 
@@ -200,6 +201,20 @@ test.each(['link.sable.moe', 'matrix.to'])('navigates with the %s fragment', asy
     'Invalid Matrix URI'
   );
   expect(navigate).toHaveBeenCalledTimes(1);
+});
+
+test('navigates with the fragment of the custom link host', async () => {
+  preferences.matrixLinkSelector = 'custom';
+  preferences.matrixLinkCustom = 'links.example.org';
+  onTestFinished(() => {
+    preferences.matrixLinkSelector = 'sable';
+    preferences.matrixLinkCustom = '';
+  });
+  const navigate = vi.fn().mockResolvedValue(undefined);
+  const driver = driverWith({}, navigate);
+
+  await driver.navigate('https://links.example.org/#/!room%3Aexample.org?via=example.org');
+  expect(navigate).toHaveBeenCalledWith('!room%3Aexample.org?via=example.org');
 });
 
 test('keeps the TURN credentials fresh until the widget stops watching', async () => {

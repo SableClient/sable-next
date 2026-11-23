@@ -253,14 +253,19 @@ test.each([
   );
 });
 
-test('a link the app generates parses back to what it named', () => {
-  const url = matrixToUrl({ roomId: '!somewhere:example.org', via: ['elsewhere.ca'] }, '$event');
-  expect(parseMatrixLink(url)).toEqual({
-    kind: 'event',
-    room_id: '!somewhere:example.org',
-    event_id: '$event',
-  });
-});
+test.each(['sable', 'matrix', 'custom'] as const)(
+  'a link the app generates on the %s host parses back to what it named',
+  (selector) => {
+    preferences.matrixLinkSelector = selector;
+    preferences.matrixLinkCustom = 'links.example.org';
+    const url = matrixToUrl({ roomId: '!somewhere:example.org', via: ['elsewhere.ca'] }, '$event');
+    expect(parseMatrixLink(url)).toEqual({
+      kind: 'event',
+      room_id: '!somewhere:example.org',
+      event_id: '$event',
+    });
+  }
+);
 
 test('a message permalink is a matrix: URI that parses back to the event', () => {
   const uri = matrixEventUri('!room:example.org', '$event', ['a.example']);

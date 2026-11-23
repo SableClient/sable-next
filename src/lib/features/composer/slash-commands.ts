@@ -12,7 +12,8 @@ import { knockRoom, openDirectMessage } from '#lib/core/api/rooms.js';
 import type { E2eePolicy } from '#lib/deployment/e2ee-policy.js';
 import { setMemberLook } from '#lib/core/api/members.js';
 import { joinOrOfferKnock } from '#lib/rooms/join-or-knock.js';
-import { parseMatrixLink, parseSlash } from '#lib/model/model.js';
+import { parseSlash } from '#lib/model/model.js';
+import { matrixLinkHost, parseMatrixLink } from '#lib/rooms/matrix-link.js';
 import { currentFix } from '#lib/platform/geolocation.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -576,9 +577,13 @@ function spellMentions(body: string, formatted: string | null | undefined): stri
 }
 
 export async function runSlash(body: string, context: SlashContext): Promise<SlashResult> {
-  let parsed = parseSlash(body, context.formatted ?? null);
+  let parsed = parseSlash(body, context.formatted ?? null, matrixLinkHost());
   if (parsed.kind === 'usage') {
-    const retried = parseSlash(spellMentions(body, context.formatted), context.formatted ?? null);
+    const retried = parseSlash(
+      spellMentions(body, context.formatted),
+      context.formatted ?? null,
+      matrixLinkHost()
+    );
     if (retried.kind !== 'usage') parsed = retried;
   }
 
