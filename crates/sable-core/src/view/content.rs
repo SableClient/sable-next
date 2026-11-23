@@ -392,6 +392,16 @@ fn unparsed_message_like(event_type: &str, raw: &RawFields) -> TimelineItemConte
     }
 }
 
+fn sticker_content(sticker: &StickerEventContent) -> TimelineItemContentView {
+    TimelineItemContentView::Sticker {
+        body: sticker.body.clone(),
+        source: media_source(&sticker.source.clone().into()),
+        mime: sticker.info.mimetype.clone(),
+        width: sticker.info.width.map(u64::from),
+        height: sticker.info.height.map(u64::from),
+    }
+}
+
 pub(super) fn content(
     content: &TimelineItemContent,
     profile: Option<&PerMessageProfileView>,
@@ -423,14 +433,7 @@ pub(super) fn content(
             },
             MsgLikeKind::Sticker(sticker) => {
                 let forwarded = forwarded_sticker(raw).or_else(|| forwarded_fallback_sticker(raw));
-                let sticker = forwarded.as_ref().unwrap_or_else(|| sticker.content());
-                TimelineItemContentView::Sticker {
-                    body: sticker.body.clone(),
-                    source: serde_json::to_string(&sticker.source).unwrap_or_default(),
-                    mime: sticker.info.mimetype.clone(),
-                    width: sticker.info.width.map(u64::from),
-                    height: sticker.info.height.map(u64::from),
-                }
+                sticker_content(forwarded.as_ref().unwrap_or_else(|| sticker.content()))
             }
             MsgLikeKind::Poll(state) => TimelineItemContentView::Poll {
                 poll: poll(state, own_user_id),
@@ -524,6 +527,19 @@ mod tests {
 
     use crate::protocol::TimelineVisibility;
     use crate::view::raw::RawFields;
+
+    #[test]
+    fn plain_stickers_use_a_bare_media_uri() {
+        let sticker = serde_json::from_value::<StickerEventContent>(json!({
+            "body": "Sticker",
+            "info": { "w": 2500, "h": 2500, "mimetype": "image/png" },
+            "url": "mxc://example.org/sticker",
+        }))
+        .unwrap();
+
+        let view = serde_json::to_value(sticker_content(&sticker)).unwrap();
+        assert_eq!(view["source"], "mxc://example.org/sticker");
+    }
 
     #[test]
     fn supported_forwards_render_the_nested_original_content() {
