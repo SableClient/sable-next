@@ -1,4 +1,4 @@
-use charabia::Script;
+use crate::tokenize::is_unspaced;
 
 /// A match may not start or end inside a word, so `mute` skips `mutex`.
 #[must_use]
@@ -19,11 +19,7 @@ fn joined(left: Option<char>, right: Option<char>) -> bool {
 
 /// Scripts written without spaces have no word edge to respect.
 fn spaced_letter(character: char) -> bool {
-    character.is_alphanumeric()
-        && !matches!(
-            Script::from(character),
-            Script::Cj | Script::Thai | Script::Khmer | Script::Myanmar
-        )
+    character.is_alphanumeric() && !is_unspaced(character)
 }
 
 #[cfg(test)]

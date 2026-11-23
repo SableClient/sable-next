@@ -122,6 +122,11 @@ test('a Japanese or Chinese term inside an unspaced sentence is marked', () => {
   expect(marked('日本語を勉強する', ['日本語', '勉強'])).toEqual(['日本語', '勉強']);
 });
 
+test('a Thai or Lao term inside an unspaced sentence is marked', () => {
+  expect(marked('ไปไหน', ['ไหน'])).toEqual(['ไหน']);
+  expect(marked('ສະບາຍດີ', ['ບາຍ'])).toEqual(['ບາຍ']);
+});
+
 test('only the words the core matched are marked', () => {
   expect(marked('please deligate this', ['delegate'])).toEqual([]);
   expect(marked('please deligate this', ['deligate'])).toEqual(['deligate']);

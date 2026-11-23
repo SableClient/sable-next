@@ -14,8 +14,8 @@ static TAMIL: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Ta
 
 const MAX_TERM_CHARS: usize = 256;
 
-/// Each term comes with the bytes of `text` its word spans. Chinese and
-/// Japanese are indexed as overlapping pairs of characters, plus the last
+/// Each term comes with the bytes of `text` its word spans. A script written
+/// without spaces is indexed as overlapping pairs of characters, plus the last
 /// character of each run, so a one character query still finds it.
 #[must_use]
 pub(crate) fn tokenize(text: &str) -> Vec<(Cow<'static, str>, Range<usize>)> {
@@ -25,7 +25,7 @@ pub(crate) fn tokenize(text: &str) -> Vec<(Cow<'static, str>, Range<usize>)> {
         .filter(|token| token.kind == TokenKind::Word)
     {
         let word = token.byte_start..token.byte_end;
-        if token.script == Script::Cj {
+        if unspaced(text, &token) {
             let characters = normalized(&token);
             terms.extend(pairs(&characters).map(|pair| (pair, word.clone())));
             terms.extend(
@@ -41,9 +41,9 @@ pub(crate) fn tokenize(text: &str) -> Vec<(Cow<'static, str>, Range<usize>)> {
 }
 
 /// A query is a list of words, each spelled as it was typed, and a document
-/// matches a word only when it holds every term of it. Chinese and Japanese
-/// are cut where `words`, the query as the platform's word segmenter split it,
-/// says; a run they do not cover stays one word.
+/// matches a word only when it holds every term of it. A script written
+/// without spaces is cut where `words`, the query as the platform's word
+/// segmenter split it, says; a run they do not cover stays one word.
 #[must_use]
 pub(crate) fn tokenize_query<'text>(
     text: &'text str,
@@ -54,7 +54,7 @@ pub(crate) fn tokenize_query<'text>(
         .tokenize()
         .filter(|token| token.kind == TokenKind::Word)
     {
-        if token.script == Script::Cj {
+        if unspaced(text, &token) {
             // Cut the original text: the words are spelled as the query was typed.
             let run = text
                 .get(token.byte_start..token.byte_end)
@@ -87,10 +87,37 @@ pub(crate) fn tokenize_query<'text>(
     groups
 }
 
+/// Chinese characters, Japanese kana, Thai, Lao, Myanmar and Khmer, as charabia
+/// tells them apart. `UNSPACED` in src/lib/features/search/query-words.ts
+/// mirrors it.
 #[must_use]
-pub(crate) fn contains_chinese(text: &str) -> bool {
-    text.chars()
-        .any(|character| Script::from(character) == Script::Cj)
+pub(crate) fn is_unspaced(character: char) -> bool {
+    matches!(
+        Script::from(character),
+        Script::Cj | Script::Thai | Script::Khmer | Script::Myanmar
+    ) || is_lao(character)
+        || is_myanmar_extended(character)
+}
+
+/// charabia only knows the main Myanmar block; these are Myanmar Extended-B and Extended-A.
+const fn is_myanmar_extended(character: char) -> bool {
+    matches!(character, '\u{A9E0}'..='\u{A9FF}' | '\u{AA60}'..='\u{AA7F}')
+}
+
+/// charabia has no script for Lao.
+const fn is_lao(character: char) -> bool {
+    matches!(character, '\u{0E80}'..='\u{0EFF}')
+}
+
+#[must_use]
+pub(crate) fn contains_unspaced(text: &str) -> bool {
+    text.chars().any(is_unspaced)
+}
+
+/// Judged on the text as written, like the query words the client segments.
+fn unspaced(text: &str, token: &Token<'_>) -> bool {
+    text.get(token.byte_start..token.byte_end)
+        .is_some_and(contains_unspaced)
 }
 
 /// Cuts a run into the longest words that start where the previous one ended.
@@ -238,6 +265,38 @@ mod tests {
     #[test]
     fn test_a_script_without_spaces_still_yields_terms() {
         assert_ne!(terms("สวัสดี"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_thai_lao_myanmar_and_khmer_words_are_found_inside_a_run() {
+        assert!(finds("ครับ", "สวัสดีครับ"));
+        assert!(!finds("ครับ", "สวัสดีค่ะ"));
+        assert!(finds("ບາຍ", "ສະບາຍດີ"));
+        assert!(finds("បាទ", "សួស្តីបាទ"));
+        assert!(finds("ဂလာ", "မင်္ဂလာပါ"));
+    }
+
+    #[test]
+    fn test_a_run_that_starts_with_a_number_is_still_cut_into_pairs() {
+        assert!(finds("会議", "2024年の会議"));
+        assert!(finds("บาท", "100บาท"));
+    }
+
+    #[test]
+    fn test_the_unspaced_scripts_are_the_ones_the_client_segments() {
+        let fixture = include_str!("../tests/fixtures/unspaced.txt");
+        for line in fixture.lines() {
+            let mut characters = line.split(' ');
+            let unspaced = characters.next() == Some("unspaced");
+            for character in characters.flat_map(str::chars) {
+                assert_eq!(
+                    super::is_unspaced(character),
+                    unspaced,
+                    "U+{:04X}",
+                    u32::from(character)
+                );
+            }
+        }
     }
 
     #[test]

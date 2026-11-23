@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { queryWords } from './query-words';
+import { queryWords, UNSPACED } from './query-words';
 
 // Cuts the way ICU 78 cuts these strings.
 const CUTS: Record<string, string[]> = {
@@ -35,4 +37,28 @@ test('without Intl.Segmenter each space-separated part is one word', () => {
   vi.stubGlobal('Intl', { ...Intl, Segmenter: undefined });
 
   expect(queryWords('日本語勉強 deploy')).toEqual(['日本語勉強', 'deploy']);
+});
+
+test('the scripts without spaces are the ones the index cuts by', () => {
+  const [unspaced = [], spaced = []] = readFileSync(
+    'crates/sable-search/tests/fixtures/unspaced.txt',
+    'utf8'
+  )
+    .trim()
+    .split('\n')
+    .map((line) => line.split(' ').slice(1));
+
+  expect(unspaced.filter((character) => !UNSPACED.test(character))).toEqual([]);
+  expect(spaced.filter((character) => UNSPACED.test(character))).toEqual([]);
+});
+
+test('a Thai query is sent as the segments the segmenter finds', () => {
+  const thai = {
+    segment: () => [
+      { segment: 'สวัสดี', isWordLike: true },
+      { segment: 'ครับ', isWordLike: true },
+    ],
+  };
+
+  expect(queryWords('สวัสดีครับ', thai)).toEqual(['สวัสดี', 'ครับ']);
 });

@@ -165,11 +165,11 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
         best
     }
 
-    /// Without `expand` a term finds only the words that stem onto it. Chinese
-    /// and Japanese keep their prefixes: one character has to reach the pair
-    /// it was indexed in.
+    /// Without `expand` a term finds only the words that stem onto it. A script
+    /// written without spaces keeps its prefixes: one character has to reach
+    /// the pair it was indexed in.
     fn expand(&self, term: &str, expand: bool) -> Vec<(&str, &Postings<K>, usize)> {
-        if !expand && !tokenize::contains_chinese(term) {
+        if !expand && !tokenize::contains_unspaced(term) {
             return self
                 .postings
                 .get_key_value(term)
@@ -210,8 +210,8 @@ impl<K: Copy + Eq + Hash> InvertedIndex<K> {
 }
 
 /// The words of `body` the index would find it by, spelled as `body` writes
-/// them, or `None` when the index would not find it. A Chinese or Japanese
-/// word is spelled as the query typed it.
+/// them, or `None` when the index would not find it. A word in a script
+/// written without spaces is spelled as the query typed it.
 #[must_use]
 pub fn matched_words(
     query: &str,
@@ -233,7 +233,7 @@ pub fn matched_words(
             continue;
         }
         found = true;
-        if tokenize::contains_chinese(typed) {
+        if tokenize::contains_unspaced(typed) {
             matched.push(typed.to_owned());
             continue;
         }
