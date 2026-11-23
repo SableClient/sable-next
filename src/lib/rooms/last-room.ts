@@ -35,7 +35,7 @@ export function restoredRoomPath(
   if (room && section === HOME_SECTION && showHome) {
     return resolve('/(app)/home/[roomId]', { roomId: roomPathParam(room, rooms) });
   }
-  if (room && !room.is_direct) {
+  if (room) {
     const space = rooms.find(
       (entry) =>
         entry.room_id === section &&

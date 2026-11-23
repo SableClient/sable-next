@@ -169,7 +169,7 @@
   import { unreadRoomAtOffset, unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
   import { markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
   import { hasUnread } from '#lib/rooms/unread.js';
-  import { roomAtOffset } from '#lib/features/sidebar/visible-rooms.svelte.js';
+  import { roomAtOffset, visibleRoomSection } from '#lib/features/sidebar/visible-rooms.svelte.js';
   import { playSound, type NotificationSound } from '#lib/features/notifications/sound.js';
   import MediaViewerHost from '#lib/ui/media/MediaViewerHost.svelte';
   import ZooAlertControls from '#lib/features/sidebar/ZooAlertControls.svelte';
@@ -1148,19 +1148,11 @@
 
   const gotoWithComposerFocus = trackRouteFocus();
 
-  function activeRoomSection(): string | null {
-    const home = resolve('/(app)/home');
-    if (page.url.pathname === home || page.url.pathname.startsWith(`${home}/`)) {
-      return HOME_SECTION;
-    }
-    return findRoomByPathId(roomList.rooms, page.params.spaceId)?.room_id ?? null;
-  }
-
   function jumpToRoom(roomId: string, focusComposer = false): void {
     const path = restoredRoomPath(
       roomList.rooms,
       roomId,
-      activeRoomSection(),
+      visibleRoomSection(),
       preferences.showHome,
       (spaceId) => roomList.section(spaceId)?.descendants ?? []
     );

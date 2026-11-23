@@ -89,7 +89,9 @@ import {
   treeLink,
   treeRoom,
 } from '#lib/test-support/room-sections.js';
+import { restoredRoomPath } from '#lib/rooms/last-room.js';
 import RoomNavHarness from './RoomNavHarness.test.svelte';
+import { visibleRoomSection } from './visible-rooms.svelte.js';
 
 const realObserver = globalThis.IntersectionObserver;
 
@@ -499,6 +501,45 @@ test('home links a room to its own section when enabled', async () => {
 
   await mountNav();
   expect(row('Plain')).toHaveAttribute('href', '/home/!plain%3Aexample.org');
+});
+
+test('room switching keys land where the shown rows link, even off a room page', async () => {
+  const child = makeRoom({ room_id: '!child:example.org', name: 'Child' });
+  const dm = makeRoom({ room_id: '!dm:example.org', name: 'Chat', is_direct: true });
+  const edge = (roomId: string) => ({
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 1,
+    suggested: false,
+    private: false,
+  });
+  const space = makeRoom({
+    room_id: '!space:example.org',
+    name: 'Space',
+    room_kind: 'space',
+    space_children: [edge(child.room_id), { ...edge(dm.room_id), private: true }],
+  });
+  roomsFixture.rooms = [space, child, dm];
+  const rooms = [child.room_id, dm.room_id];
+  listSections(sectionView('home', { rooms }), sectionView(space.room_id, { rooms }));
+  const jumpPath = (roomId: string) =>
+    restoredRoomPath(roomsFixture.rooms, roomId, visibleRoomSection(), true, () => rooms);
+
+  setPreference('showHome', true);
+  visit('/inbox');
+  const home = await mountNav();
+  expect(row('Child')).toHaveAttribute('href', '/home/!child%3Aexample.org');
+  expect(row('Chat')).toHaveAttribute('href', '/home/!dm%3Aexample.org');
+  expect(jumpPath(child.room_id)).toBe(row('Child').getAttribute('href'));
+  expect(jumpPath(dm.room_id)).toBe(row('Chat').getAttribute('href'));
+  home.unmount();
+
+  visit('/space/!space%3Aexample.org', { spaceId: space.room_id });
+  await mountNav();
+  expect(row('Chat')).toHaveAttribute('href', '/space/!space%3Aexample.org/!dm%3Aexample.org');
+  expect(jumpPath(child.room_id)).toBe(row('Child').getAttribute('href'));
+  expect(jumpPath(dm.room_id)).toBe(row('Chat').getAttribute('href'));
 });
 
 test('explore links rooms to their sections when Home is disabled', async () => {

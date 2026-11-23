@@ -6,6 +6,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { HOME_SECTION } from '#lib/rooms/last-room.js';
   import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
   import {
     findRoomByPathId,
@@ -397,7 +398,10 @@
     )
   );
   $effect(() => {
-    publishVisibleRoomOrder(sectionRooms.map((row) => row.roomId));
+    publishVisibleRoomOrder(
+      sectionRooms.map((row) => row.roomId),
+      section === 'home' ? HOME_SECTION : activeSpaceId
+    );
   });
   let calendarRooms = $derived(listedRooms(navSection?.calendars));
   let subspaces = $derived(
