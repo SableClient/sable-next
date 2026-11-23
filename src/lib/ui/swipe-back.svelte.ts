@@ -1,3 +1,5 @@
+import { currentDirection, inlineSide } from '#lib/language.svelte.js';
+
 import { MOTION_MS, motionMs } from './motion.js';
 import {
   finishSwipeGesture,
@@ -11,6 +13,11 @@ interface SwipeBackOptions {
   onDismiss: () => void;
   ignore?: string;
   slideOut?: boolean;
+}
+
+/** Pages leave toward the inline end, and `offset` is the drag distance that way. */
+function inlineSign(): 1 | -1 {
+  return currentDirection() === 'rtl' ? -1 : 1;
 }
 
 export class SwipeBack {
@@ -31,8 +38,8 @@ export class SwipeBack {
   }
 
   get transform(): string | undefined {
-    if (this.leaving) return 'translateX(100%)';
-    return this.offset > 0 ? `translateX(${String(this.offset)}px)` : undefined;
+    if (this.leaving) return `translateX(${String(inlineSign() * 100)}%)`;
+    return this.offset > 0 ? `translateX(${String(inlineSign() * this.offset)}px)` : undefined;
   }
 
   start = (event: TouchEvent): void => {
@@ -51,7 +58,7 @@ export class SwipeBack {
     if (!update || update.mode !== 'horizontal') return;
     event.stopPropagation();
     this.swiping = true;
-    this.offset = Math.max(0, update.distanceX);
+    this.offset = Math.max(0, inlineSign() * update.distanceX);
   };
 
   finish = (cancelled: boolean): void => {
@@ -60,10 +67,11 @@ export class SwipeBack {
     this.swiping = false;
     if (!active) return;
     const offset = this.offset;
-    const result = finishSwipeGesture(active, offset, cancelled);
+    const result = finishSwipeGesture(active, inlineSign() * offset, cancelled);
+    const direction = result.direction && inlineSide(result.direction);
     const dismissed =
       result.handled &&
-      (result.direction === 'right' ||
+      (direction === 'right' ||
         (result.direction === undefined && offset > this.#options.width() / 2));
     if (!dismissed) {
       this.#springBack();

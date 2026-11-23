@@ -7,6 +7,8 @@ vi.mock('./motion.js', () => ({
   motionMs: (duration: number) => (motion.reduced ? 0 : duration),
 }));
 
+import { setCurrentLanguage } from '#lib/language.svelte.js';
+
 import { SwipeBack } from './swipe-back.svelte';
 
 function touch(clientX: number, timeStamp: number, stopPropagation = vi.fn()): TouchEvent {
@@ -21,7 +23,7 @@ function touch(clientX: number, timeStamp: number, stopPropagation = vi.fn()): T
 
 function drag(swipe: SwipeBack, to: number, duration: number): void {
   swipe.start(touch(0, 0));
-  swipe.move(touch(10, 10));
+  swipe.move(touch(Math.sign(to) * 10, 10));
   swipe.move(touch(to, duration));
 }
 
@@ -99,5 +101,47 @@ describe('SwipeBack', () => {
     swipe.dismiss();
     vi.advanceTimersByTime(700);
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  describe('right-to-left', () => {
+    beforeEach(() => {
+      setCurrentLanguage('ar', 'rtl');
+    });
+
+    afterEach(() => {
+      setCurrentLanguage('en', 'ltr');
+    });
+
+    it('follows a leftward drag and slides out to the left', () => {
+      const onDismiss = vi.fn();
+      const swipe = new SwipeBack({ width: () => 400, onDismiss });
+      drag(swipe, -300, 2000);
+      expect(swipe.transform).toBe('translateX(-300px)');
+
+      swipe.finish(false);
+      expect(swipe.transform).toBe('translateX(-100%)');
+      vi.advanceTimersByTime(350);
+      expect(onDismiss).toHaveBeenCalledOnce();
+    });
+
+    it('dismisses a short leftward flick', () => {
+      const onDismiss = vi.fn();
+      const swipe = new SwipeBack({ width: () => 400, onDismiss, slideOut: false });
+      drag(swipe, -40, 50);
+      swipe.finish(false);
+
+      expect(onDismiss).toHaveBeenCalledOnce();
+    });
+
+    it('ignores a rightward drag', () => {
+      const onDismiss = vi.fn();
+      const swipe = new SwipeBack({ width: () => 400, onDismiss });
+      drag(swipe, 300, 2000);
+      expect(swipe.transform).toBeUndefined();
+
+      swipe.finish(false);
+      vi.advanceTimersByTime(350);
+      expect(onDismiss).not.toHaveBeenCalled();
+    });
   });
 });
