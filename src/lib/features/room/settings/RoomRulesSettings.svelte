@@ -46,12 +46,6 @@
   const notifyId = `${requireId}-notify`;
 
   let leaving = $state.raw<{ proceed: () => void; stay?: () => void } | null>(null);
-  holdUnsaved({
-    dirty: () => canEdit && !unavailable && dirty && leaving === null,
-    ask: (proceed, stay) => {
-      leaving = { proceed, stay };
-    },
-  });
 
   let roomId = $derived(room?.room_id ?? null);
   let canEdit = $derived(
@@ -98,6 +92,13 @@
   let dirty = $derived(
     textChanged || required !== savedRequired || delegate !== (saved.delegate_to ?? NO_DELEGATE)
   );
+  // After the awaited state, since a remounted page can mount before that state is assigned.
+  holdUnsaved({
+    dirty: () => canEdit && !unavailable && dirty && leaving === null,
+    ask: (proceed, stay) => {
+      leaving = { proceed, stay };
+    },
+  });
 
   let isSpace = $derived(room?.room_kind === 'space');
   let notice = $derived.by(() => {
