@@ -907,32 +907,10 @@ impl Core {
             return self.clear_persisted_session().await;
         };
         self.settle_retired_search(Some(account_id)).await;
-
-        let _guard = self.session_store_lock.lock().await;
-        let mut accounts = self.accounts.lock().await;
-        let Some(registry) = accounts.as_mut() else {
-            return Err(self.failed("remove_account", "account registry is not initialized"));
-        };
-        self.invalidate_account_client(account_id).await;
-        let store_id = registry
-            .accounts
-            .iter()
-            .find(|account| account.account_id == account_id)
-            .map(|account| account.store_id.clone());
-        registry
-            .accounts
-            .retain(|account| account.account_id != account_id);
-        if registry.active_account_id.as_deref() == Some(account_id) {
-            registry.active_account_id = None;
-        }
-        self.write_registry(registry)
-            .await
-            .or_failed(self, "logout_save_accounts")?;
-        self.forget_login_tokens(Some(account_id)).await;
-        if let Some(store_id) = store_id {
-            self.discard_account_store(&store_id).await?;
-        }
-        Ok(())
+        // Nothing opens the account again while its files go.
+        self.mark_account_needs_reauth(Some(account_id), false)
+            .await?;
+        self.retire_account(account_id, None).await
     }
 
     async fn mark_stale_sign_ins(&self) -> Result<Vec<String>, RpcError> {
@@ -1009,6 +987,7 @@ impl Core {
         }
         self.forget_login_tokens(Some(account_id)).await;
         if let Err(error) = self.discard_account_store(&account.store_id).await {
+            // The store may be half gone, so signing in again must not reuse its device.
             self.mark_account_needs_reauth(Some(account_id), true)
                 .await?;
             return Err(error);
@@ -3157,6 +3136,54 @@ mod regression_tests {
 
         assert_eq!(core.list_accounts().await.unwrap().len(), 1);
         server.server().verify().await;
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn an_account_whose_store_cannot_be_deleted_stays_listed_for_another_removal() {
+        use crate::api::session::RemoveAccountParams;
+        let (_server, _base, core, first, _events) = restorable_core().await;
+        let mut persisted = serde_json::to_value(&first.session).unwrap();
+        persisted["credentials"]["user_id"] = "@second:example.org".into();
+        let second = PersistedAccount {
+            session: serde_json::from_value(persisted).unwrap(),
+            ..other_sign_in(&core, &first, "second")
+        };
+        // Disposal refuses a store outside the allocated ones.
+        let unrelated = PersistedAccount {
+            store_id: format!("{}-elsewhere", core.store_id),
+            ..second.clone()
+        };
+        let mut registry = core.accounts().await.unwrap();
+        registry.upsert(unrelated);
+        core.save_login_tokens(&second).await.unwrap();
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+        let remove = || {
+            core.remove_inactive_account(RemoveAccountParams {
+                account_id: "second".to_owned(),
+            })
+        };
+
+        remove().await.unwrap_err();
+
+        let mut registry = core.accounts().await.unwrap();
+        let kept = registry
+            .accounts
+            .iter_mut()
+            .find(|account| account.account_id == "second")
+            .expect("an account whose store is left stays listed");
+        assert!(kept.needs_reauth);
+        kept.store_id.clone_from(&second.store_id);
+        *core.accounts.lock().await = Some(registry);
+        remove().await.unwrap();
+        let accounts = core.accounts().await.unwrap().accounts;
+        assert!(
+            accounts
+                .iter()
+                .all(|account| account.account_id != "second")
+        );
+        assert!(!std::path::Path::new(&second.store_id).exists());
         core.shutdown().await;
     }
 
