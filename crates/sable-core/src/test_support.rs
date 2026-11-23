@@ -46,6 +46,24 @@ pub(crate) async fn signed_in_core(
     (core, events)
 }
 
+#[cfg(not(target_family = "wasm"))]
+pub(crate) async fn wait_until_retired(core: &Core, account_id: &str) {
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while core
+            .accounts()
+            .await
+            .unwrap()
+            .accounts
+            .iter()
+            .any(|account| account.account_id == account_id)
+        {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the replaced sign-in is retired");
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct TestWriter(pub(crate) Arc<parking_lot::Mutex<Vec<u8>>>);
 

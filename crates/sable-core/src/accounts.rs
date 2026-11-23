@@ -215,7 +215,7 @@ impl Core {
             &lease,
         )
         .await?;
-        self.retire_replaced(&stale, &account.store_id).await;
+        self.retire_replaced(stale, &account.store_id);
 
         Ok(Some(info))
     }
@@ -512,11 +512,9 @@ impl Core {
             })
             .map(|account| account.session.credentials.device_id())
             .ok_or(RpcCode::NotLoggedIn)?;
-        let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
-        let account_id = account_id.to_owned();
-        let tokens = tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id))
+        let tokens = self
+            .read_login_tokens(account_id, device_id)
             .await
-            .or_failed(self, "reload_session_read")?
             .or_failed(self, "reload_session_read")?
             .map_err(|_| RpcCode::NotLoggedIn)?;
         if tokens.access_token.is_empty() {
@@ -639,18 +637,31 @@ impl Core {
         Ok(embedded)
     }
 
+    #[cfg(not(target_family = "wasm"))]
+    async fn read_login_tokens(
+        &self,
+        account_id: &str,
+        device_id: String,
+    ) -> Result<
+        Result<matrix_sdk::SessionTokens, crate::credentials::MissingTokens>,
+        crate::store::StoreError,
+    > {
+        let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
+        let account_id = account_id.to_owned();
+        tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id))
+            .await
+            .map_err(crate::store::StoreError::backend)?
+    }
+
     /// Returns whether the account must now sign in again.
     #[cfg(not(target_family = "wasm"))]
     pub(crate) async fn retire_unusable_login(
         &self,
         account: &PersistedAccount,
     ) -> Result<bool, RpcError> {
-        let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
-        let account_id = account.account_id.clone();
-        let device_id = account.session.credentials.device_id();
-        let tokens = tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id))
+        let tokens = self
+            .read_login_tokens(&account.account_id, account.session.credentials.device_id())
             .await
-            .or_failed(self, "reauth_login_tokens")?
             .or_failed(self, "reauth_login_tokens")?;
         let Err(missing) = tokens else {
             return Ok(false);
@@ -747,26 +758,22 @@ impl Core {
         #[cfg(not(target_family = "wasm"))]
         let persisted = {
             let mut persisted = persisted;
-            let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
-            let account_id = account.account_id.clone();
-            let device_id = persisted.credentials.device_id();
-            let tokens =
-                match tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id))
-                    .await
-                    .or_failed(self, "restore_login_tokens")?
-                    .or_failed(self, "restore_login_tokens")?
-                {
-                    Ok(tokens) => tokens,
-                    Err(missing) if missing.is_lost() => {
-                        self.sign_in_again(&account.account_id, missing).await?;
-                        return Err(RpcCode::NotLoggedIn.into());
-                    }
-                    Err(_) => {
-                        return Err(
-                            self.failed("restore_login_tokens", "saved login tokens are missing")
-                        );
-                    }
-                };
+            let tokens = match self
+                .read_login_tokens(&account.account_id, persisted.credentials.device_id())
+                .await
+                .or_failed(self, "restore_login_tokens")?
+            {
+                Ok(tokens) => tokens,
+                Err(missing) if missing.is_lost() => {
+                    self.sign_in_again(&account.account_id, missing).await?;
+                    return Err(RpcCode::NotLoggedIn.into());
+                }
+                Err(_) => {
+                    return Err(
+                        self.failed("restore_login_tokens", "saved login tokens are missing")
+                    );
+                }
+            };
             if tokens.access_token.is_empty() {
                 return Err(
                     self.failed("restore_login_tokens", "saved login access token is empty")
@@ -935,9 +942,11 @@ impl Core {
         Ok(stale)
     }
 
-    /// Runs once the replacing session holds `store_id`, so no replaced store is still open. A
-    /// replaced account that cannot be retired stays waiting, and the next restore retries it.
-    async fn retire_replaced(&self, replaced: &[String], store_id: &str) {
+    /// Runs once the replacing session holds `store_id`, so no replaced store is still open. The
+    /// old devices' sign-out waits on the server, so the session starts without it. A replaced
+    /// account that cannot be retired, or whose session ends first, stays waiting, and the next
+    /// restore retries it.
+    fn retire_replaced(self: &Arc<Self>, replaced: Vec<String>, store_id: &str) {
         if replaced.is_empty() {
             return;
         }
@@ -945,11 +954,21 @@ impl Core {
             tracing::error!("could not retire the replaced accounts: the new client is gone");
             return;
         };
-        for account_id in replaced {
-            if let Err(error) = self.retire_account(account_id, Some(&base)).await {
-                tracing::warn!(account_id, ?error, "a replaced account waits to be retired");
-            }
-        }
+        let core = self.clone();
+        self.track_session_task(
+            spawn(async move {
+                for account_id in &replaced {
+                    if let Err(error) = core.retire_account(account_id, Some(&base)).await {
+                        tracing::warn!(
+                            account_id,
+                            ?error,
+                            "a replaced account waits to be retired"
+                        );
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     /// The account leaves the registry only once nothing of it is left behind. `successor` takes
@@ -1013,21 +1032,29 @@ impl Core {
 
     /// Best effort: a device the server cannot be reached for stays signed in there.
     async fn log_out_replaced(&self, account: &PersistedAccount) {
-        #[cfg_attr(
-            target_family = "wasm",
-            expect(unused_mut, reason = "the web registry holds the tokens itself")
-        )]
-        let mut persisted = account.session.clone();
+        let persisted = account.session.clone();
         #[cfg(not(target_family = "wasm"))]
-        {
-            let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&self.store_id));
-            let account_id = account.account_id.clone();
-            let device_id = account.session.credentials.device_id();
-            match tokio::task::spawn_blocking(move || logins.read(&account_id, &device_id)).await {
-                Ok(Ok(Ok(tokens))) => persisted.credentials.set_tokens(tokens),
-                _ => return,
+        let persisted = {
+            let mut persisted = persisted;
+            match self
+                .read_login_tokens(&account.account_id, persisted.credentials.device_id())
+                .await
+            {
+                Ok(Ok(tokens)) => persisted.credentials.set_tokens(tokens),
+                Ok(Err(missing)) => {
+                    tracing::warn!(
+                        reason = missing.reason(),
+                        "the replaced device has no saved tokens to sign out with"
+                    );
+                    return;
+                }
+                Err(error) => {
+                    tracing::warn!("could not read the replaced device's tokens: {error}");
+                    return;
+                }
             }
-        }
+            persisted
+        };
         if persisted.credentials.tokens().access_token.is_empty() {
             return;
         }
@@ -1145,7 +1172,7 @@ impl Core {
             &lease,
         )
         .await?;
-        self.retire_replaced(&replaced, store_id).await;
+        self.retire_replaced(replaced, store_id);
         Ok(generation)
     }
 
@@ -1542,6 +1569,7 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::Co
 mod regression_tests {
     use crate::api::encryption::DeleteDeviceParams;
     use crate::session::{self, Credentials, PersistedAccount};
+    use crate::test_support::wait_until_retired;
     use std::sync::Arc;
 
     use matrix_sdk::{
@@ -2998,6 +3026,7 @@ mod regression_tests {
         *core.accounts.lock().await = Some(registry);
 
         assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+        wait_until_retired(&core, "stale").await;
 
         let accounts = core.list_accounts().await.unwrap();
         assert_eq!(accounts.len(), 1);
@@ -3028,6 +3057,7 @@ mod regression_tests {
         *core.accounts.lock().await = Some(registry);
 
         assert_eq!(core.restore().await.unwrap().unwrap().account_id, "newer");
+        wait_until_retired(&core, "first").await;
 
         let accounts = core.list_accounts().await.unwrap();
         assert_eq!(accounts.len(), 1);
@@ -3037,6 +3067,7 @@ mod regression_tests {
         core.shutdown().await;
     }
 
+    /// Replaced sign-ins retire in the background once the new session is up.
     /// Another sign-in of `first`'s user, on its own device and store.
     fn other_sign_in(core: &Core, first: &PersistedAccount, account_id: &str) -> PersistedAccount {
         let mut persisted = serde_json::to_value(&first.session).unwrap();
@@ -3072,6 +3103,7 @@ mod regression_tests {
         registry.active_account_id = Some("first".to_owned());
         *core.accounts.lock().await = Some(registry);
         assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+        wait_until_retired(&core, "stale").await;
 
         let accounts = core.list_accounts().await.unwrap();
         assert_eq!(accounts.len(), 1);
@@ -3089,12 +3121,16 @@ mod regression_tests {
             b"not a database",
         )
         .unwrap();
+        // Retired after the stale one, so its retirement shows the stale one's attempt is over.
+        let later = other_sign_in(&core, &first, "later");
         let mut registry = core.accounts().await.unwrap();
+        registry.accounts.insert(0, later);
         registry.accounts.insert(0, stale.clone());
         core.write_registry(&registry).await.unwrap();
         *core.accounts.lock().await = Some(registry);
 
         assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+        wait_until_retired(&core, "later").await;
 
         let accounts = core.accounts().await.unwrap().accounts;
         let kept = accounts
@@ -3133,9 +3169,53 @@ mod regression_tests {
         *core.accounts.lock().await = Some(registry);
 
         assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+        wait_until_retired(&core, "stale").await;
+        wait_until_retired(&core, "twin").await;
 
         assert_eq!(core.list_accounts().await.unwrap().len(), 1);
         server.server().verify().await;
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn restoring_does_not_wait_for_a_replaced_device_to_sign_out() {
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let (server, _base, core, first, _events) = restorable_core().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/logout"))
+            .respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(60)))
+            .mount(server.server())
+            .await;
+        let stale = other_sign_in(&core, &first, "stale");
+        let mut registry = core.accounts().await.unwrap();
+        registry.accounts.insert(0, stale.clone());
+        core.save_login_tokens(&stale).await.unwrap();
+        core.write_registry(&registry).await.unwrap();
+        *core.accounts.lock().await = Some(registry);
+
+        assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !server
+                .server()
+                .received_requests()
+                .await
+                .unwrap()
+                .iter()
+                .any(|request| request.url.path() == "/_matrix/client/v3/logout")
+            {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("the old device's sign-out reaches the server");
+
+        let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&core.store_id));
+        let device_id = stale.session.credentials.device_id();
+        assert!(matches!(logins.read("stale", &device_id), Ok(Ok(_))));
+        assert!(std::path::Path::new(&stale.store_id).exists());
         core.shutdown().await;
     }
 

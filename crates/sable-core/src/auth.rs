@@ -851,6 +851,7 @@ mod tests {
         let body: serde_json::Value = serde_json::from_slice(&login.body).unwrap();
         assert!(body.get("device_id").is_none());
         assert_eq!(body["initial_device_display_name"], "Acme Chat");
+        crate::test_support::wait_until_retired(&core, "a1").await;
         let accounts = core.accounts().await.unwrap();
         assert_eq!(accounts.accounts.len(), 1);
         assert_eq!(accounts.accounts[0].account_id, "a2");
@@ -1018,6 +1019,7 @@ mod tests {
         .await
         .unwrap();
 
+        crate::test_support::wait_until_retired(&core, "a1").await;
         let accounts = core.accounts().await.unwrap().accounts;
         let ids: Vec<_> = accounts.iter().map(|a| a.account_id.as_str()).collect();
         assert_eq!(ids, ["a2", "a3"]);

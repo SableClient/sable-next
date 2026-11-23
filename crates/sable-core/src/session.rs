@@ -398,6 +398,13 @@ pub async fn restore_authenticated_client(
     Ok(client)
 }
 
+fn persisted_server_builder(persisted: &PersistedSession) -> ClientBuilder {
+    persisted.resolved_homeserver.as_ref().map_or_else(
+        || apply_server(Client::builder(), &persisted.homeserver),
+        |url| crate::tls::apply_sdk(Client::builder()).homeserver_url(url.as_str()),
+    )
+}
+
 #[cfg(not(target_family = "wasm"))]
 pub(crate) async fn restore_notification_client(
     store_id: &str,
@@ -411,13 +418,14 @@ pub(crate) async fn restore_notification_client(
             tracing::error!(context = "notification_restore_crypto_store", "{error}");
             error
         })?;
-    let builder = persisted.resolved_homeserver.as_ref().map_or_else(
-        || apply_server(Client::builder(), &persisted.homeserver),
-        |url| crate::tls::apply_sdk(Client::builder()).homeserver_url(url.as_str()),
-    );
-    let client = build_account_client(builder, store_id, ClientRole::Notification, true)
-        .await
-        .backend()?;
+    let client = build_account_client(
+        persisted_server_builder(persisted),
+        store_id,
+        ClientRole::Notification,
+        true,
+    )
+    .await
+    .backend()?;
     // Fetching a push must not report the user online.
     client
         .set_presence(ruma::presence::PresenceState::Offline, None, false)
@@ -443,11 +451,11 @@ pub(crate) async fn restore_credentials(
 
 /// Signs a saved login out on the server without opening its store.
 pub(crate) async fn log_out(persisted: &PersistedSession) -> Result<(), CoreError> {
-    let builder = persisted.resolved_homeserver.as_ref().map_or_else(
-        || apply_server(Client::builder(), &persisted.homeserver),
-        |url| crate::tls::apply_sdk(Client::builder()).homeserver_url(url.as_str()),
-    );
-    let client = builder.handle_refresh_tokens().build().await.backend()?;
+    let client = persisted_server_builder(persisted)
+        .handle_refresh_tokens()
+        .build()
+        .await
+        .backend()?;
     restore_credentials_with(
         &client,
         persisted,
