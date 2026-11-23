@@ -54,6 +54,7 @@ const HAPPY_DOM_TESTS = [
   'src/lib/features/room/timeline/TimelineReadReceipt.svelte.test.ts',
   'src/lib/ui/long-press.svelte.test.ts',
   'src/lib/ui/scroll-hint.svelte.test.ts',
+  'src/lib/ui/overlay-scrollbar.svelte.test.ts',
   'src/lib/features/room/messages/message-swipe.svelte.test.ts',
   'src/lib/core/attachment-info.test.ts',
   'src/lib/ui/shortcuts/binding.test.ts',

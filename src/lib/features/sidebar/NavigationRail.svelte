@@ -38,6 +38,7 @@
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { overlayScrollbar } from '#lib/ui/overlay-scrollbar.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -299,6 +300,7 @@
   }
 
   let alertListPopoverAnchor = $state.raw<HTMLElement | null>(null);
+  let railThumb = $state.raw<HTMLElement>();
 
   let displayAnchor = $state.raw<CursorAnchor | null>(null);
   let displayOpen = $state(false);
@@ -861,13 +863,14 @@
   oncontextmenu={mouseContextMenu(openDisplayMenu)}
 >
   <div
-    class="rail-scroll"
+    class="rail-scroll scrollbar-hidden"
     role="tree"
     data-focus-region="spaces"
     aria-orientation="vertical"
     aria-label={i18n.t('nav.navigation')}
     {@attach mobile ? noAttachment : monitor}
     {@attach rovingFocus({ tree: true })}
+    {@attach overlayScrollbar(railThumb)}
   >
     <ul class="rail-stack" role="presentation">
       {#each [...items, ...directItems] as item (item.roomId ?? item.href)}
@@ -913,6 +916,7 @@
       </li>
     </ul>
   </div>
+  <div class="rail-thumb" aria-hidden="true" bind:this={railThumb}></div>
   {#if !mobile && compact}
     {#if alertListPopoverAnchor}
       <ResponsivePopover
@@ -1047,6 +1051,7 @@
     flex: 0 0 var(--navigation-rail-width);
     flex-direction: column;
     min-height: 0;
+    position: relative;
     -webkit-touch-callout: none;
     user-select: none;
     width: var(--navigation-rail-width);
@@ -1056,6 +1061,15 @@
     flex: 1;
     min-height: 0;
     overflow: hidden auto;
+  }
+
+  .rail-thumb {
+    background: var(--surface-container-line);
+    border-radius: var(--radius-pill);
+    inset-block-start: 0;
+    inset-inline-end: calc(var(--border-width) * 2);
+    position: absolute;
+    width: calc(0.5rem - var(--border-width) * 4);
   }
 
   .rail-separator {
