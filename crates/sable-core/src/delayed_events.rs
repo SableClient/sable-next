@@ -5,9 +5,11 @@ use matrix_sdk::{Client, HttpResult};
 use ruma::api::FeatureFlag;
 use ruma::api::client::delayed_events::update_delayed_event::UpdateAction;
 use ruma::api::client::delayed_events::{
-    DelayParameters, delayed_message_event, delayed_state_event, update_delayed_event,
+    DelayParameters, delayed_message_event, delayed_state_event, schedule_delayed_event,
+    update_delayed_event,
 };
-use ruma::events::{MessageLikeEventType, StateEventType};
+use ruma::events::sticky::StickyDurationMs;
+use ruma::events::{MessageLikeEventType, StateEventType, TimelineEventType};
 use ruma::exports::http;
 use ruma::serde::Raw;
 use ruma::{OwnedRoomId, TransactionId};
@@ -45,75 +47,6 @@ pub(crate) async fn support(client: &Client) -> HttpResult<DelayedEventsSupport>
     Ok(DelayedEventsSupport::from_features(
         &client.unstable_features().await?,
     ))
-}
-
-mod stable {
-    pub(super) mod send {
-        use ruma::api::{auth_scheme::AccessToken, request, response};
-        use ruma::metadata;
-        use ruma::{OwnedRoomId, OwnedTransactionId};
-        use serde_json::value::RawValue as RawJsonValue;
-
-        metadata! {
-            method: PUT,
-            rate_limited: true,
-            authentication: AccessToken,
-            history: {
-                stable("org.matrix.msc4140.stable") => "/_matrix/client/v3/rooms/{room_id}/delayed_event/{event_type}/{txn_id}",
-            }
-        }
-
-        #[request]
-        pub(crate) struct Request {
-            #[ruma_api(path)]
-            pub room_id: OwnedRoomId,
-            #[ruma_api(path)]
-            pub event_type: String,
-            #[ruma_api(path)]
-            pub txn_id: OwnedTransactionId,
-            #[ruma_api(query)]
-            #[serde(
-                rename = "org.matrix.msc4354.sticky_duration_ms",
-                skip_serializing_if = "Option::is_none"
-            )]
-            pub sticky_duration_ms: Option<u32>,
-            pub delay_ms: u64,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub state_key: Option<String>,
-            pub content: Box<RawJsonValue>,
-        }
-
-        #[response]
-        pub(crate) struct Response {
-            pub delay_id: String,
-        }
-    }
-
-    pub(super) mod update {
-        use ruma::api::client::delayed_events::update_delayed_event::UpdateAction;
-        use ruma::api::{auth_scheme::AccessToken, request, response};
-        use ruma::metadata;
-
-        metadata! {
-            method: POST,
-            rate_limited: true,
-            authentication: AccessToken,
-            history: {
-                stable("org.matrix.msc4140.stable") => "/_matrix/client/v1/delayed_events/{delay_id}/{action}",
-            }
-        }
-
-        #[request]
-        pub(crate) struct Request {
-            #[ruma_api(path)]
-            pub delay_id: String,
-            #[ruma_api(path)]
-            pub action: UpdateAction,
-        }
-
-        #[response]
-        pub(crate) struct Response {}
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -179,15 +112,15 @@ pub(crate) async fn send(
     } = event;
 
     if support.stable {
-        let request = stable::send::Request {
+        let mut request = schedule_delayed_event::v3::Request::new_raw(
+            TimelineEventType::from(event_type),
             room_id,
-            event_type,
-            txn_id: TransactionId::new(),
-            sticky_duration_ms,
-            delay_ms: u64::try_from(delay.as_millis()).unwrap_or(u64::MAX),
+            TransactionId::new(),
+            delay,
             state_key,
-            content,
-        };
+            Raw::from_json(content),
+        );
+        request.sticky_duration_ms = sticky_duration_ms.map(StickyDurationMs::new_clamped);
         return Ok(client.send(request).await?.delay_id);
     }
 
@@ -227,7 +160,7 @@ pub(crate) async fn update(
 ) -> HttpResult<()> {
     if support(client).await?.stable {
         client
-            .send(stable::update::Request { delay_id, action })
+            .send(update_delayed_event::v1::Request::new(delay_id, action))
             .await?;
     } else {
         client
@@ -313,16 +246,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_stable_server_carries_the_sticky_duration_as_a_query_parameter() {
+    async fn a_stable_server_carries_the_sticky_duration_in_the_body() {
         let (server, client) = client_with(json!({"org.matrix.msc4140.stable": true})).await;
         Mock::given(method("PUT"))
             .and(wiremock::matchers::path_regex(
                 r"^/_matrix/client/v3/rooms/!room:example.org/delayed_event/m.room.message/[^/]+$",
             ))
-            .and(query_param(
-                "org.matrix.msc4354.sticky_duration_ms",
-                "3600000",
-            ))
+            .and(body_json(json!({
+                "delay_ms": 5000,
+                "org.matrix.msc4354.sticky_duration_ms": 3_600_000,
+                "content": {"msgtype": "m.text", "body": "later"}
+            })))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({"delay_id": "d3"})))
             .expect(1)
             .mount(server.server())
