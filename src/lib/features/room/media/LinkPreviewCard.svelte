@@ -233,8 +233,12 @@
   }
 
   :global(.link-preview-image) {
+    aspect-ratio: var(--media-ratio);
+    contain: inline-size;
     display: block;
-    width: 100%;
+    margin: auto;
+    max-height: var(--timeline-media-max);
+    max-width: min(var(--timeline-media-max), 100%);
   }
 
   .link-preview-text {
