@@ -12,6 +12,7 @@ export function createRoom(rpc: Pick<Rpc, 'rooms'>, options: CreateRoomOptions):
     public: options.public ?? false,
     encrypted: options.encrypted ?? true,
     invite: [...(options.invite ?? [])],
+    additional_creators: [...(options.additional_creators ?? [])],
     parent_space: options.parent_space ?? null,
     alias: options.alias ?? null,
     room_version: options.room_version ?? null,

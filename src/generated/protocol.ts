@@ -3588,6 +3588,7 @@ export type Rpc = {
 	/**  Ignored for a space or a public room. */
 	encrypted: boolean,
 	invite: string[],
+	additional_creators?: string[],
 	/**  Adds an `m.space.child` edge from this space. */
 	parent_space?: string | null,
 	alias: string | null,

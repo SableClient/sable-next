@@ -5207,6 +5207,69 @@ async fn only_a_space_we_manage_routes_a_child_we_are_not_in() {
 }
 
 #[tokio::test]
+async fn room_creation_declares_and_invites_additional_creators() {
+    use matrix_sdk::ruma::user_id;
+    use wiremock::matchers::body_partial_json;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/createRoom"))
+        .and(body_partial_json(json!({
+            "room_version": "12",
+            "creation_content": {
+                "additional_creators": ["@bob:example.org", "@carol:example.org"],
+            },
+        })))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "room_id": "!new:example.org" })),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    core.run(crate::api::rooms::CreateParams {
+        name: Some("General".to_owned()),
+        topic: None,
+        kind: RoomKind::Text,
+        public: false,
+        encrypted: false,
+        invite: vec![
+            user_id!("@bob:example.org").to_owned(),
+            user_id!("@dana:example.org").to_owned(),
+        ],
+        additional_creators: vec![
+            user_id!("@bob:example.org").to_owned(),
+            user_id!("@carol:example.org").to_owned(),
+        ],
+        parent_space: None,
+        alias: None,
+        room_version: Some("12".to_owned()),
+        join_rule: None,
+        federate: true,
+        predecessor: None,
+    })
+    .await
+    .unwrap();
+
+    let requests = server.server().received_requests().await.unwrap();
+    let create = requests
+        .iter()
+        .find(|request| request.url.path().ends_with("/createRoom"))
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&create.body).unwrap();
+    assert_eq!(
+        body["invite"],
+        json!([
+            "@bob:example.org",
+            "@dana:example.org",
+            "@carol:example.org"
+        ])
+    );
+}
+
+#[tokio::test]
 async fn a_room_created_in_a_space_names_it_as_its_canonical_parent() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -5235,6 +5298,7 @@ async fn a_room_created_in_a_space_names_it_as_its_canonical_parent() {
         public: false,
         encrypted: false,
         invite: Vec::new(),
+        additional_creators: Vec::new(),
         parent_space: Some(space_id.to_owned()),
         alias: None,
         room_version: None,

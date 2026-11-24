@@ -408,6 +408,9 @@ pub struct CreateParams {
     pub encrypted: bool,
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub invite: Vec<OwnedUserId>,
+    #[serde(default)]
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub additional_creators: Vec<OwnedUserId>,
     /// Adds an `m.space.child` edge from this space.
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     #[serde(default)]
@@ -428,6 +431,7 @@ fn creation_content(
     room_type: Option<RoomType>,
     federate: bool,
     predecessor: Option<OwnedRoomId>,
+    additional_creators: &[OwnedUserId],
 ) -> serde_json::Value {
     let mut creation = serde_json::Map::new();
     if let Some(room_type) = room_type {
@@ -436,6 +440,12 @@ fn creation_content(
     creation.insert("m.federate".into(), federate.into());
     if let Some(room_id) = predecessor {
         creation.insert("predecessor".into(), serde_json::json!({ "room_id": room_id }));
+    }
+    if !additional_creators.is_empty() {
+        creation.insert(
+            "additional_creators".into(),
+            serde_json::json!(additional_creators),
+        );
     }
     creation.into()
 }
@@ -471,6 +481,11 @@ impl Handler for CreateParams {
             );
         }
         request.invite = self.invite;
+        for creator in &self.additional_creators {
+            if !request.invite.contains(creator) {
+                request.invite.push(creator.clone());
+            }
+        }
         request.room_alias_name = self.alias;
         request.room_version = self.room_version
             .map(RoomVersionId::try_from)
@@ -498,8 +513,17 @@ impl Handler for CreateParams {
         }
 
         let room_type = self.kind.as_room_type();
-        if room_type.is_some() || !self.federate || self.predecessor.is_some() {
-            let creation = creation_content(room_type, self.federate, self.predecessor);
+        if room_type.is_some()
+            || !self.federate
+            || self.predecessor.is_some()
+            || !self.additional_creators.is_empty()
+        {
+            let creation = creation_content(
+                room_type,
+                self.federate,
+                self.predecessor,
+                &self.additional_creators,
+            );
             request.creation_content = Some(
                 Raw::new(&creation)
                     .or_failed(core, "create_room_creation_content")?
@@ -1075,14 +1099,14 @@ mod creation_content_tests {
 
     #[test]
     fn omits_room_version() {
-        let value = creation_content(None, false, None);
+        let value = creation_content(None, false, None, &[]);
         assert_eq!(value, serde_json::json!({ "m.federate": false }));
     }
 
     #[test]
     fn carries_type_and_predecessor() {
         let room_id = OwnedRoomId::try_from("!old:example.org").unwrap();
-        let value = creation_content(Some(RoomType::Space), true, Some(room_id));
+        let value = creation_content(Some(RoomType::Space), true, Some(room_id), &[]);
         assert_eq!(
             value,
             serde_json::json!({
