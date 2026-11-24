@@ -6089,6 +6089,14 @@ async fn thread_actions_accept_linked_context_only_for_its_inferred_root() {
         .await
         .unwrap();
     assert!(timeline.is_threaded());
+    core.fetch_event_details(
+        &room_id.to_owned(),
+        &target.to_owned(),
+        Some(&root.to_owned()),
+        Some(result.subscription),
+    )
+    .await
+    .expect("the linked context holds the reply, which the thread's own timeline does not");
     assert!(matches!(
         core.subscribed_timeline(
             &room_id.to_owned(),

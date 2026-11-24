@@ -248,14 +248,22 @@ pub struct FetchEventDetailsParams {
     #[serde(default)]
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub thread_root: Option<OwnedEventId>,
+    /// The timeline showing the event, since a linked message's context is not the live one.
+    #[serde(default)]
+    pub subscription: Option<SubscriptionId>,
 }
 
 impl Handler for FetchEventDetailsParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.fetch_event_details(&self.room_id, &self.event_id, self.thread_root.as_ref())
-            .await
+        core.fetch_event_details(
+            &self.room_id,
+            &self.event_id,
+            self.thread_root.as_ref(),
+            self.subscription,
+        )
+        .await
     }
 }
 

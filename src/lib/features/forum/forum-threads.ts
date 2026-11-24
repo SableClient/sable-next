@@ -170,7 +170,8 @@ export function collectForumThreads(
   items: readonly TimelineItemView[],
   currentUserId: string | null,
   latestEvents: readonly TimelineItemView[] = [],
-  unreadByRoot: ReadonlyMap<string, boolean> = new Map()
+  unreadByRoot: ReadonlyMap<string, boolean> = new Map(),
+  listedReactions: ReadonlyMap<string, readonly ReactionGroup[]> = new Map()
 ): ForumThread[] {
   const roots = new Map<string, TimelineItemView>();
   const redacted = new Set(
@@ -178,8 +179,9 @@ export function collectForumThreads(
       .filter((item) => item.content.kind === 'redacted')
       .map((item) => item.event_id)
   );
-  // Roots listed by the server carry no reactions, so keep the ones the timeline saw.
-  const reactions = new Map<string, readonly ReactionGroup[]>();
+  // Roots listed by the server carry no reactions: `listedReactions` has theirs, and the
+  // timeline's are newer.
+  const reactions = new Map(listedReactions);
   for (const item of items) {
     if (item.event_id === null || redacted.has(item.event_id)) continue;
     if (item.reactions.length > 0) reactions.set(item.event_id, item.reactions);

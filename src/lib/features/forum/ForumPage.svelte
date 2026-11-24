@@ -168,6 +168,10 @@
   });
 
   $effect(() => {
+    forumThreads.loadListedReactions();
+  });
+
+  $effect(() => {
     void mediaPreviews.load(resolvedRoomId);
   });
 
@@ -271,6 +275,16 @@
     conversation.edit(thread.eventId, thread.preview, thread.html, thread.mediaCaption);
   }
 
+  function reactToPost(eventId: string, key: string): void {
+    conversation
+      .react(eventId, key)
+      .then(() => forumThreads.refreshReactions(eventId))
+      .catch((error: unknown) => {
+        console.warn('[sable forum] reacting to a post failed', error);
+        toasts.error(i18n.t('errors.actionFailed'));
+      });
+  }
+
   function deleteThread(eventId: string, reason: string | null): void {
     void core.rpc.messages
       .deleteThread({ room_id: resolvedRoomId, root_event_id: eventId, reason })
@@ -315,7 +329,7 @@
     },
     onDelete: deleteThread,
     get onReact() {
-      return permissions?.can_react === false ? undefined : conversation.toggleReaction;
+      return permissions?.can_react === false ? undefined : reactToPost;
     },
     onCopyLink: copyEventLink,
     get onPin() {
@@ -326,6 +340,8 @@
   holdOverlayBack(() => threadRootId !== null, closeThread);
 
   function closeThread(): void {
+    // A vote cast inside the post went through the thread's own timeline.
+    if (threadRootId !== null) void forumThreads.refreshReactions(threadRootId);
     threadRootId = null;
     threadEventId = null;
     openedLinkedThread = null;

@@ -1100,7 +1100,7 @@ test('a reply the SDK has not filled asks the core for its details once', async 
     session: { user_id: '@kris:example.org' },
     rpc: { timeline: { fetchEventDetails } },
   } as unknown as CoreClient;
-  const timeline = { items: [reply, filled] } as unknown as RoomTimeline;
+  const timeline = { items: [reply, filled], subscriptionId: 7 } as unknown as RoomTimeline;
   const conversation = new Conversation({
     core,
     personas: {} as PersonaStore,
@@ -1117,6 +1117,7 @@ test('a reply the SDK has not filled asks the core for its details once', async 
     room_id: ROOM,
     event_id: '$reply:example.org',
     thread_root: null,
+    subscription: 7,
   });
 });
 

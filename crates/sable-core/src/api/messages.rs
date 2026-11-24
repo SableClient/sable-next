@@ -618,34 +618,33 @@ impl Handler for ReactParams {
             }
         };
         let shortcode = reaction_shortcode(&key, shortcode.as_deref());
-        let added = if let Some(source) = image_source_pack_extra(&key, source_pack) {
+        let extra = if let Some(source) = image_source_pack_extra(&key, source_pack) {
+            extra_content(
+                message_extra_content(persona.as_ref()),
+                [
+                    (IMAGE_SOURCE_PACKS, Some(source)),
+                    (REACTION_SHORTCODE, shortcode),
+                    ("m.mentions", Some(empty_mentions())),
+                ],
+            )
+        } else {
+            extra_content(
+                message_extra_content(persona.as_ref()),
+                [(REACTION_SHORTCODE, shortcode)],
+            )
+        };
+        let added = if timeline.item_by_event_id(&event_id).await.is_some() {
             timeline
                 .toggle_reaction_with_extra_content(
                     &TimelineEventItemId::EventId(event_id),
                     &key,
-                    extra_content(
-                        message_extra_content(persona.as_ref()),
-                        [
-                            (IMAGE_SOURCE_PACKS, Some(source)),
-                            (REACTION_SHORTCODE, shortcode),
-                            ("m.mentions", Some(empty_mentions())),
-                        ],
-                    ),
+                    extra,
                 )
                 .await
                 .or_failed(core, "react")?
         } else {
-            timeline
-                .toggle_reaction_with_extra_content(
-                    &TimelineEventItemId::EventId(event_id),
-                    &key,
-                    extra_content(
-                        message_extra_content(persona.as_ref()),
-                        [(REACTION_SHORTCODE, shortcode)],
-                    ),
-                )
-                .await
-                .or_failed(core, "react")?
+            core.toggle_reaction_outside_timeline(&room_id, &event_id, &key, extra)
+                .await?
         };
         if added && let Err(error) = core.remember_reaction(&key).await {
             tracing::warn!("reaction history could not be saved: {error:?}");

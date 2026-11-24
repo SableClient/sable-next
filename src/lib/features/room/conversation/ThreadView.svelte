@@ -171,6 +171,12 @@
     void timeline.stop();
   });
 
+  /** The list holds its place for a focus it cannot find, so it gets the root once that has loaded. */
+  let listFocus = $derived(
+    focusEventId === rootEventId && !timeline.items.some((item) => item.event_id === rootEventId)
+      ? null
+      : focusEventId
+  );
   let original = $derived(
     timeline.items.find((item) => item.event_id === rootEventId) ?? rootMessage
   );
@@ -329,7 +335,7 @@
     editEventId={conversation.context?.kind === 'edit' ? conversation.context.eventId : null}
     inlineEditor={conversation.inlineEdit ? inlineEditor : undefined}
     {timeline}
-    {focusEventId}
+    focusEventId={listFocus}
     threadRootId={rootEventId}
     onRetryLoad={() => timeline.retry()}
     onJumpToEvent={jumpToEvent}

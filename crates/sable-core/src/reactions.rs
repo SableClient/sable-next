@@ -146,6 +146,46 @@ impl Core {
         Ok(found)
     }
 
+    /// Toggles the user's `key` reaction on an event no open timeline holds, such as a forum post
+    /// older than the room's loaded messages. Returns whether the reaction was added.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the relations cannot be fetched or the server refuses the change.
+    pub(crate) async fn toggle_reaction_outside_timeline(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: &OwnedEventId,
+        key: &str,
+        extra: Option<Map<String, Value>>,
+    ) -> Result<bool, RpcError> {
+        let room = self.room(room_id).await?;
+        let mine = self
+            .reaction_event_ids(room_id, event_id, key, room.own_user_id())
+            .await?;
+        if mine.is_empty() {
+            let mut content = extra.unwrap_or_default();
+            content.insert(
+                "m.relates_to".to_owned(),
+                serde_json::json!({
+                    "rel_type": "m.annotation",
+                    "event_id": event_id,
+                    "key": key,
+                }),
+            );
+            room.send_raw("m.reaction", Value::Object(content))
+                .await
+                .or_failed(self, "react")?;
+            return Ok(true);
+        }
+        for id in mine {
+            room.redact(&id, None, None)
+                .await
+                .or_failed(self, "react")?;
+        }
+        Ok(false)
+    }
+
     /// Grouped `m.reaction` events targeting `event_id`, fetched from relations.
     ///
     /// # Errors

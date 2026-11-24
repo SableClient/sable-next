@@ -126,6 +126,134 @@ async fn reaction_ids_follow_pages_and_match_sender_and_key() {
 
 #[tokio::test]
 #[cfg(not(target_family = "wasm"))]
+async fn a_reaction_outside_the_timeline_is_sent_then_taken_back() {
+    use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};
+    use matrix_sdk_test::JoinedRoomBuilder;
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{body_partial_json, method, path_regex},
+    };
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let me = client.user_id().unwrap().to_owned();
+    let room_id = room_id!("!old-post:example.org");
+    server
+        .sync_room(&client, JoinedRoomBuilder::new(room_id))
+        .await;
+    server.mock_room_state_encryption().plain().mount().await;
+    let relations = "/_matrix/client/v1/rooms/.*/relations/.*/m.annotation";
+    let relation = json!({"rel_type": "m.annotation", "event_id": "$post", "key": "👍"});
+    let none = Mock::given(method("GET"))
+        .and(path_regex(relations))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
+        .mount_as_scoped(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex("/_matrix/client/v3/rooms/.*/send/m.reaction/.*"))
+        .and(body_partial_json(
+            json!({"m.relates_to": relation, "shortcode": ":up:"}),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$mine"})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = crate::test_support::signed_in_core(&server, client).await.0;
+    let toggle = |extra| {
+        let core = &core;
+        async move {
+            core.toggle_reaction_outside_timeline(
+                &room_id.to_owned(),
+                &event_id!("$post").to_owned(),
+                "👍",
+                extra,
+            )
+            .await
+            .unwrap()
+        }
+    };
+
+    let extra = serde_json::Map::from_iter([("shortcode".to_owned(), json!(":up:"))]);
+    assert!(toggle(Some(extra)).await);
+
+    drop(none);
+    Mock::given(method("GET"))
+        .and(path_regex(relations))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": [{
+            "type": "m.reaction", "event_id": "$mine", "sender": me,
+            "content": {"m.relates_to": relation},
+        }]})))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex("/_matrix/client/v3/rooms/.*/redact/.*mine/.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$gone"})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    assert!(!toggle(None).await);
+}
+
+#[tokio::test]
+#[cfg(not(target_family = "wasm"))]
+async fn reacting_to_a_message_the_timeline_has_not_loaded_sends_the_reaction() {
+    use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};
+    use matrix_sdk_test::JoinedRoomBuilder;
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{body_partial_json, method, path_regex},
+    };
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!old-post:example.org");
+    server
+        .sync_room(&client, JoinedRoomBuilder::new(room_id))
+        .await;
+    server.mock_room_state_encryption().plain().mount().await;
+    Mock::given(method("GET"))
+        .and(path_regex("/_matrix/client/v3/rooms/.*/event/.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "type": "m.room.message", "event_id": "$post", "sender": "@ana:example.org",
+            "origin_server_ts": 1, "room_id": room_id,
+            "content": {"msgtype": "m.text", "body": "an old post"},
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            "/_matrix/client/v1/rooms/.*/relations/.*/m.annotation",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex("/_matrix/client/v3/rooms/.*/send/m.reaction/.*"))
+        .and(body_partial_json(json!({"m.relates_to": {
+            "rel_type": "m.annotation", "event_id": "$post", "key": "👍",
+        }})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$mine"})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = crate::test_support::signed_in_core(&server, client).await.0;
+
+    core.run(crate::api::messages::ReactParams {
+        room_id: room_id.to_owned(),
+        event_id: event_id!("$post").to_owned(),
+        key: "👍".to_owned(),
+        source_pack: None,
+        shortcode: None,
+        thread_root: None,
+        subscription: None,
+        persona: None,
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+#[cfg(not(target_family = "wasm"))]
 async fn reaction_pagination_that_repeats_a_token_fails() {
     use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};
     use matrix_sdk_test::JoinedRoomBuilder;

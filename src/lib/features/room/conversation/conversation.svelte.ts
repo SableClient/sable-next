@@ -584,8 +584,15 @@ export class Conversation {
     key: string,
     sourcePack: ImageSourcePackView | null = null
   ): void => {
-    void this.#toggleReaction(eventId, key, sourcePack).catch(failed('reaction'));
+    void this.react(eventId, key, sourcePack).catch(failed('reaction'));
   };
+
+  /** Like `toggleReaction`, for a caller that reports the failure or acts once it is sent. */
+  readonly react = (
+    eventId: string,
+    key: string,
+    sourcePack: ImageSourcePackView | null = null
+  ): Promise<void> => this.#toggleReaction(eventId, key, sourcePack);
 
   readonly quickReact = async (
     targetRoomId: string,
@@ -848,11 +855,19 @@ export class Conversation {
       if (!reply || reply.body !== null || reply.fallback !== null) continue;
 
       const eventId = item.event_id;
-      if (eventId === null || this.#requestedDetails.has(eventId)) continue;
+      if (eventId === null) continue;
+      // Each timeline fills in its own rows, so a message shown again elsewhere asks again.
+      const request = `${this.#timeline.subscriptionId ?? ''}:${eventId}`;
+      if (this.#requestedDetails.has(request)) continue;
 
-      this.#requestedDetails.add(eventId);
+      this.#requestedDetails.add(request);
       void this.#core.rpc.timeline
-        .fetchEventDetails({ room_id: roomId, event_id: eventId, thread_root: this.#threadRoot })
+        .fetchEventDetails({
+          room_id: roomId,
+          event_id: eventId,
+          thread_root: this.#threadRoot,
+          subscription: this.#timeline.subscriptionId,
+        })
         .catch((error: unknown) => {
           console.debug('[sable room] reply details unavailable', error);
         });

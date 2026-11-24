@@ -3854,6 +3854,8 @@ export type Rpc = {
 	room_id: string,
 	event_id: string,
 	thread_root?: string | null,
+	/**  The timeline showing the event, since a linked message's context is not the live one. */
+	subscription?: SubscriptionId | null,
 }) => Promise<null>;
     eventItems: (params: {
 	room_id: string,

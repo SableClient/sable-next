@@ -1147,8 +1147,11 @@ impl Core {
         room_id: &OwnedRoomId,
         event_id: &OwnedEventId,
         thread_root: Option<&OwnedEventId>,
+        subscription: Option<SubscriptionId>,
     ) -> Result<(), RpcError> {
-        let timeline = self.timeline_for(room_id, thread_root).await?;
+        let timeline = self
+            .subscribed_timeline(room_id, thread_root, subscription)
+            .await?;
         let fetched = timeline.fetch_details_for_event(event_id).await;
         if let Err(TimelineError::EventNotInTimeline(_)) = fetched {
             tracing::debug!(
