@@ -911,6 +911,7 @@ impl Core {
 
     /// Closes what a push opened for an account that is not the active one. The active account's
     /// client belongs to its session.
+    #[cfg(not(target_family = "wasm"))]
     pub(crate) async fn evict_idle_account_client(&self, account_id: &str) {
         let active = self
             .session
