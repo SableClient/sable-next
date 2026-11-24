@@ -787,7 +787,7 @@ fn refuses_device(error: &matrix_sdk::Error) -> bool {
 
 fn reuses_oauth_client(session: &PersistedSession, redirect_uri: &Url) -> bool {
     session::registered_redirect_uri(session, redirect_uri)
-        == session::registration_redirect_uri(redirect_uri)
+        .is_some_and(|registered| registered == session::registration_redirect_uri(redirect_uri))
 }
 
 #[cfg(test)]

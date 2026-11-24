@@ -1049,19 +1049,19 @@ pub fn registration_redirect_uri(redirect_uri: &Url) -> Url {
 }
 
 #[must_use]
-pub fn registered_redirect_uri(session: &PersistedSession, requested: &Url) -> Url {
+pub fn registered_redirect_uri(session: &PersistedSession, requested: &Url) -> Option<Url> {
     if let Some(uri) = &session.oauth_redirect_uri {
-        return uri.clone();
+        return Some(uri.clone());
     }
     if matches!(requested.scheme(), "http" | "https") {
-        return registration_redirect_uri(requested);
+        return None;
     }
     let legacy = if session.oauth_issuer.is_some() {
         "moe.sable.app:/login"
     } else {
         "moe.sable.next:/login"
     };
-    Url::parse(legacy).unwrap_or_else(|_| requested.clone())
+    Url::parse(legacy).ok()
 }
 
 /// # Errors

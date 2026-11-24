@@ -110,18 +110,18 @@ fn re_authentication_reuses_the_redirect_the_client_was_registered_with() {
     let next = url::Url::parse("moe.sable.next:/login").unwrap();
     let web = url::Url::parse("https://app.sable.moe/login").unwrap();
 
-    assert_eq!(registered_redirect_uri(&session, &app), next);
-    assert_eq!(registered_redirect_uri(&session, &web), web);
+    assert_eq!(registered_redirect_uri(&session, &app), Some(next.clone()));
+    assert_eq!(registered_redirect_uri(&session, &web), None);
     session.oauth_issuer = Some(url::Url::parse("https://issuer.example.org").unwrap());
-    assert_eq!(registered_redirect_uri(&session, &next), app);
+    assert_eq!(registered_redirect_uri(&session, &next), Some(app.clone()));
     session.oauth_redirect_uri = Some(next.clone());
-    assert_eq!(registered_redirect_uri(&session, &app), next);
+    assert_eq!(registered_redirect_uri(&session, &app), Some(next.clone()));
 
     let loopback = url::Url::parse("http://127.0.0.1:41000/callback").unwrap();
     session.oauth_redirect_uri = Some(registration_redirect_uri(&loopback));
     assert_eq!(
         registered_redirect_uri(&session, &loopback),
-        url::Url::parse("http://127.0.0.1/callback").unwrap()
+        url::Url::parse("http://127.0.0.1/callback").ok()
     );
     session.oauth_redirect_uri = Some(next.clone());
 
