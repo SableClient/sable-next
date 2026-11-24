@@ -6,6 +6,7 @@ yanked = "warn"
 unmaintained = "workspace"
 ignore = [
   { id = "RUSTSEC-2023-0071", reason = "openidconnect uses RSA to verify provider signatures with public keys; Sable does not perform RSA private-key operations" },
+  { id = "RUSTSEC-2026-0502", reason = "needs a crafted database and WAL pair, and Sable only opens databases it wrote in its own data directory. The fix needs rusqlite 0.42, which the matrix-sdk-sqlite fork does not accept yet" },
 ]
 
 [licenses]
@@ -33,6 +34,10 @@ exceptions = [
   ] },
   { crate = "finl_unicode", allow = [
     "Unicode-DFS-2016",
+  ] },
+  { crate = "sqlcipher-src", allow = [
+    "blessing",
+    "WTFPL",
   ] },
 ]
 
