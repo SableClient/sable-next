@@ -4,6 +4,8 @@ import type { CoreEvent } from '#src/generated/protocol';
 import type { WasmDebugImage, WorkerMessage, WorkerRequest } from '#src/worker/protocol';
 import wasmVersion from '#src/generated/wasm/sable_wasm_version.js';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
+import searchWorkerUrl from '../worker/search-db.worker.ts?worker&url';
+import { createSearchDatabaseHost } from './search-db-host';
 import { CoreError, commandFailed, transportFailure, type Transport } from './index';
 import { createStallMonitor } from './stall-monitor';
 import { applyWasmDebugImage } from './wasm-debug';
@@ -24,6 +26,12 @@ import { readText, writeText } from '../lib/platform/local-json.js';
 import { deleteAccountWebStorage, resetWebStorage } from '../lib/platform/session-storage.js';
 
 const reportedCoreErrors = new Set<string>();
+
+const searchDatabase = createSearchDatabaseHost({
+  locks: typeof navigator === 'undefined' ? undefined : navigator.locks,
+  spawn: () => new Worker(new URL(searchWorkerUrl, self.location.href), { type: 'module' }),
+  channel: () => new MessageChannel(),
+});
 
 function isStorageFailure(line: string): boolean {
   return /database without an in-progress transaction|connection to indexed database server lost|database connection is closing|TransactionAborted/i.test(
@@ -316,6 +324,7 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
     };
 
     nextWorker.port.start();
+    searchDatabase.attach(nextWorker.port);
     if (debugLogs) nextWorker.port.postMessage({ debugLogs: true });
     if (typeof document !== 'undefined') {
       nextWorker.port.postMessage({

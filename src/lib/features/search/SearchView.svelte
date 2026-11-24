@@ -170,13 +170,7 @@
 
   let showCoverage = $derived(coverage !== '' && core.searchCoverage?.state !== 'complete');
 
-  let emptyLabel = $derived(
-    search.older
-      ? i18n.t('search.emptyRecent')
-      : showCoverage
-        ? i18n.t('search.emptyIndexing')
-        : i18n.t('search.empty')
-  );
+  let emptyLabel = $derived(showCoverage ? i18n.t('search.emptyIndexing') : i18n.t('search.empty'));
 
   let status = $derived.by(() => {
     if (!search.runnable) return '';
@@ -650,9 +644,6 @@
             <p>{emptyLabel}</p>
             {#if coverage}
               <p class="coverage">{coverage}</p>
-            {/if}
-            {#if search.older}
-              <SearchLoadMore {search} />
             {/if}
           {/if}
           <ul>

@@ -77,8 +77,6 @@ pub struct MessagesParams {
     pub offset: u32,
     #[serde(default)]
     pub context: u32,
-    #[serde(default)]
-    pub older: Option<String>,
     /// The query's words as the platform's word segmenter cut them, which is
     /// where Chinese and Japanese are split. Without them each unspaced run is
     /// one word.
@@ -90,7 +88,6 @@ pub struct MessagesParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct MessagesOk {
     pub hits: Vec<SearchHitView>,
-    pub older: Option<String>,
 }
 
 impl Handler for MessagesParams {
@@ -104,7 +101,6 @@ impl Handler for MessagesParams {
             limit,
             offset,
             context,
-            older,
             words,
         } = self;
         let filter = crate::search::IndexFilter {
@@ -113,27 +109,16 @@ impl Handler for MessagesParams {
         };
         let limit = (limit as usize).min(MAX_SEARCH_RESULTS);
         let context = (context as usize).min(MAX_SEARCH_CONTEXT);
-        let (hits, older) = if let Some(cursor) = older {
-            core.search_older(&query, &filter, order, limit, &cursor, context)
-                .await
-        } else {
-            let hits = core
-                .search_messages(&query, &filter, order, limit, offset as usize, context)
-                .await;
-            let older = if core.searches_locally(&query, &filter, order).await {
-                core.older_start(&filter).await
-            } else {
-                None
-            };
-            (hits, older)
-        };
+        let hits = core
+            .search_messages(&query, &filter, order, limit, offset as usize, context)
+            .await;
 
         let expand = crate::search::expands(order);
         Ok(MessagesOk {
             hits: hits
                 .into_iter()
                 .map(|hit| {
-                    let matched = sable_search::inverted::matched_words(
+                    let matched = sable_search::matching::matched_words(
                         &query,
                         &filter.words,
                         &hit.body,
@@ -143,7 +128,6 @@ impl Handler for MessagesParams {
                     view::search_hit_view(hit, matched)
                 })
                 .collect(),
-            older,
         })
     }
 }

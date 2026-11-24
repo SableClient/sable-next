@@ -1800,6 +1800,8 @@ export type SearchMetricsView = {
 	memory_bytes: number,
 	memory_budget: number,
 	disk_bytes: number,
+	disk_index_bytes: number,
+	disk_bookkeeping_bytes: number,
 	disk_budget: number,
 	rooms_joined: number,
 	rooms_indexed: number,
@@ -1807,7 +1809,6 @@ export type SearchMetricsView = {
 	rooms_exhausted: number,
 	rooms_failed: number,
 	rooms_blind: number,
-	rooms_unreadable: number,
 	events_crawled: number,
 	event_budget: number,
 	batches: number,
@@ -3695,7 +3696,6 @@ export type Rpc = {
 	limit: number,
 	offset: number,
 	context?: number,
-	older?: string | null,
 	/**
 	 *  The query's words as the platform's word segmenter cut them, which is
 	 *  where Chinese and Japanese are split. Without them each unspaced run is
@@ -3704,7 +3704,6 @@ export type Rpc = {
 	words?: string[],
 }) => Promise<{
 	hits: SearchHitView[],
-	older: string | null,
 }>;
     coverage: (params?: Record<string, never>) => Promise<SearchCoverageView>;
     metrics: (params?: Record<string, never>) => Promise<SearchMetricsView>;

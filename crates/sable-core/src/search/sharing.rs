@@ -2,13 +2,13 @@ use std::collections::{HashMap, HashSet};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
-use matrix_sdk::Client;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::document::Document;
-use super::persist::{self, Cover};
+use super::persist::Cover;
+use super::store::Store;
 
 #[cfg(test)]
 mod live;
@@ -205,24 +205,13 @@ impl History {
     }
 }
 
-async fn settled_history(client: &Client, room_id: &OwnedRoomId) -> Option<History> {
-    let manifest = persist::read_manifest(client, room_id).await?;
-    let mut documents = Vec::new();
-    let mut classified = Vec::new();
-    for entry in &manifest.chunks {
-        let persist::ChunkRead::Found(stored) =
-            persist::load_chunk(client, room_id, entry.id).await
-        else {
-            return None;
-        };
-        documents.extend(stored.documents);
-        classified.extend(stored.classified);
-    }
+async fn settled_history(store: &Store, room_id: &OwnedRoomId) -> Option<History> {
+    let snapshot = store.snapshot(room_id).await.ok()?;
     Some(History::new(
-        documents,
-        classified,
-        manifest.edits.into_iter().collect(),
-        manifest.redacted,
+        snapshot.documents,
+        snapshot.classified,
+        snapshot.edits,
+        snapshot.redacted,
     ))
 }
 

@@ -32,19 +32,18 @@ pub(super) async fn empty_cache(
 
 #[test]
 fn test_a_hit_carries_its_indexed_neighbours_minus_ignored_senders() {
-    let (mut index, room) = filtered_index();
-    index
-        .rooms
-        .get_mut(&room)
-        .expect("room index")
-        .upsert(document(
+    let (index, room) = filtered_index();
+    index.upsert(
+        &room,
+        document(
             "troll",
             "noise",
             "@troll:localhost",
             2_500,
             None,
             Vec::new(),
-        ));
+        ),
+    );
     let mut hits = index.search(
         "pipeline",
         &crate::search::IndexFilter::default(),
@@ -60,7 +59,7 @@ fn test_a_hit_carries_its_indexed_neighbours_minus_ignored_senders() {
         0,
     ));
 
-    index.fill_context(
+    index.context(
         &mut hits,
         &[matrix_sdk::ruma::user_id!("@troll:localhost").to_owned()],
         1,
@@ -78,9 +77,8 @@ fn test_a_hit_carries_its_indexed_neighbours_minus_ignored_senders() {
     assert_eq!(ids(&hits[1].after), ["$screenshot"]);
 }
 
-#[test]
-fn test_a_cache_refill_costs_nothing_when_the_index_already_holds_it() {
-    use crate::search::{MessageIndex, RoomIndex};
+#[async_test]
+async fn test_a_cache_refill_costs_nothing_when_the_index_already_holds_it() {
     use matrix_sdk::deserialized_responses::TimelineEvent;
 
     let room_id = room_id!("!refilled:localhost").to_owned();
@@ -100,23 +98,15 @@ fn test_a_cache_refill_costs_nothing_when_the_index_already_holds_it() {
         })
         .collect();
 
-    let mut index = MessageIndex::new();
-    index
-        .rooms
-        .entry(room_id.clone())
-        .or_insert_with(RoomIndex::new);
+    let index = MessageIndex::new();
 
-    assert_eq!(index.unclassified(&room_id, events.clone()).len(), 2);
+    assert_eq!(index.unclassified(&room_id, events.clone()).await.len(), 2);
 
     for event in &events {
-        index
-            .rooms
-            .get_mut(&room_id)
-            .expect("the room")
-            .mark_classified(event.event_id().expect("an event id").to_owned(), 0);
+        index.mark_classified(&room_id, event.event_id().expect("an event id"), 0);
     }
 
-    assert!(index.unclassified(&room_id, events).is_empty());
+    assert!(index.unclassified(&room_id, events).await.is_empty());
 }
 
 #[async_test]
@@ -160,7 +150,7 @@ async fn test_reindexing_a_classified_cache_does_not_reload_it_from_storage() {
         "search-classified",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
     store.wait_for_write_to_start().await;
     store.fail_next_last_chunk_load();
 
@@ -255,8 +245,8 @@ async fn test_an_encrypted_rooms_plaintext_is_searchable_and_edits_replace_the_b
         .room(&room_id)
         .await
         .expect("room event cache");
-    let mut index = MessageIndex::new();
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    let index = MessageIndex::new();
+    reingest_whole_room(&index, &cache, &room_id).await;
 
     let hits = in_room(&index, &room_id, "deploying", 10, 0);
     assert_eq!(hits.len(), 1, "{hits:?}", hits = hits.len());
@@ -277,7 +267,7 @@ async fn test_an_encrypted_rooms_plaintext_is_searchable_and_edits_replace_the_b
         )
         .await;
 
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    reingest_whole_room(&index, &cache, &room_id).await;
 
     assert!(
         in_room(&index, &room_id, "deploying", 10, 0).is_empty(),
@@ -328,7 +318,7 @@ async fn test_an_edit_crawled_before_its_original_keeps_the_new_body() {
             .into_event(),
     ];
 
-    let mut index = MessageIndex::new();
+    let index = MessageIndex::new();
     index
         .ingest(&room_id, crawled, &cache, &RedactionRules::V11)
         .await;
@@ -386,7 +376,7 @@ async fn test_a_thread_reply_is_marked_and_keeps_the_mark_through_an_edit() {
             .into_event(),
     ];
 
-    let mut index = MessageIndex::new();
+    let index = MessageIndex::new();
     index
         .ingest(&room_id, events, &cache, &RedactionRules::V11)
         .await;
@@ -440,8 +430,8 @@ async fn test_a_redaction_drops_the_message_from_the_index() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    let mut index = MessageIndex::new();
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    let index = MessageIndex::new();
+    reingest_whole_room(&index, &cache, &room_id).await;
     assert_eq!(in_room(&index, &room_id, "regrettable", 10, 0).len(), 1);
 
     server
@@ -455,7 +445,7 @@ async fn test_a_redaction_drops_the_message_from_the_index() {
         )
         .await;
 
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    reingest_whole_room(&index, &cache, &room_id).await;
 
     assert!(
         in_room(&index, &room_id, "regrettable", 10, 0).is_empty(),
@@ -494,8 +484,8 @@ async fn test_pagination_walks_one_ordering_without_repeating_a_hit() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    let mut index = MessageIndex::new();
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    let index = MessageIndex::new();
+    reingest_whole_room(&index, &cache, &room_id).await;
 
     let ids = |hits: Vec<crate::search::Hit>| {
         hits.into_iter().map(|hit| hit.event_id).collect::<Vec<_>>()
@@ -548,11 +538,11 @@ async fn test_leaving_a_room_forgets_its_documents() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    let mut index = MessageIndex::new();
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    let index = MessageIndex::new();
+    reingest_whole_room(&index, &cache, &room_id).await;
     assert_eq!(in_room(&index, &room_id, "secret", 10, 0).len(), 1);
 
-    index.forget_room(&room_id);
+    index.forget_room(&room_id).await;
 
     assert!(in_room(&index, &room_id, "secret", 10, 0).is_empty());
     assert!(
@@ -707,7 +697,7 @@ async fn test_an_edit_keeps_the_originals_time_and_takes_its_new_mentions() {
             .into_event(),
     ];
 
-    let mut index = MessageIndex::new();
+    let index = MessageIndex::new();
     index
         .ingest(&room_id, events, &cache, &RedactionRules::V11)
         .await;
@@ -749,7 +739,7 @@ async fn test_an_edit_crawled_a_batch_before_its_original_is_fixed_up_when_it_la
         .room(&room_id)
         .sender(user_id!("@kris:localhost"));
 
-    let mut index = MessageIndex::new();
+    let index = MessageIndex::new();
     index
         .ingest(
             &room_id,
@@ -824,7 +814,7 @@ async fn test_an_edit_from_someone_else_is_ignored() {
             .into_event()
     };
 
-    let mut together = MessageIndex::new();
+    let together = MessageIndex::new();
     together
         .ingest(
             &room_id,
@@ -834,7 +824,7 @@ async fn test_an_edit_from_someone_else_is_ignored() {
         )
         .await;
 
-    let mut forged_first = MessageIndex::new();
+    let forged_first = MessageIndex::new();
     forged_first
         .ingest(&room_id, vec![forged()], &cache, &RedactionRules::V11)
         .await;
@@ -894,8 +884,8 @@ async fn test_redacting_an_edit_brings_the_previous_body_back() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    let mut index = MessageIndex::new();
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    let index = MessageIndex::new();
+    reingest_whole_room(&index, &cache, &room_id).await;
     assert_eq!(in_room(&index, &room_id, "rollback", 10, 0).len(), 1);
 
     server
@@ -905,7 +895,7 @@ async fn test_redacting_an_edit_brings_the_previous_body_back() {
                 .add_timeline_event(factory.redaction(edit_id).event_id(event_id!("$redaction"))),
         )
         .await;
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    reingest_whole_room(&index, &cache, &room_id).await;
 
     assert!(
         in_room(&index, &room_id, "rollback", 10, 0).is_empty(),
@@ -957,8 +947,8 @@ async fn test_a_live_pass_applies_an_edit_that_arrives_with_its_original() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    let mut index = MessageIndex::new();
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    let index = MessageIndex::new();
+    reingest_whole_room(&index, &cache, &room_id).await;
 
     assert!(in_room(&index, &room_id, "deploy", 10, 0).is_empty());
     let hits = in_room(&index, &room_id, "rollback", 10, 0);
@@ -976,20 +966,17 @@ async fn test_the_words_of_a_search_request_split_its_query() {
         "search-words",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.search_index
-        .lock()
-        .await
-        .rooms
-        .entry(room_id!("!words:localhost").to_owned())
-        .or_insert_with(crate::search::RoomIndex::new)
-        .upsert(document(
+    core.search_index.lock().await.upsert(
+        room_id!("!words:localhost"),
+        document(
             "study",
             "日本語を勉強する",
             "@kris:localhost",
             1,
             None,
             Vec::new(),
-        ));
+        ),
+    );
     let search = |words: &[&str]| {
         serde_json::from_value::<crate::api::search::MessagesParams>(json!({
             "query": "日本語勉強",

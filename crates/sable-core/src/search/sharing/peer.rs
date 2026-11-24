@@ -628,7 +628,7 @@ impl Core {
 
     async fn search_score(&self) -> (u64, u64) {
         (
-            self.search_index.lock().await.stored_documents() as u64,
+            self.search_index.lock().await.documents().await as u64,
             self.search_crawl.lock().await.complete_rooms() as u64,
         )
     }

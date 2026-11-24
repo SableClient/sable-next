@@ -1,10 +1,9 @@
-mod cold;
 mod crawl;
+mod filters;
 mod golden;
 mod ingest;
+mod lifecycle;
 mod media;
-#[cfg(not(target_family = "wasm"))]
-mod performance;
 mod restore;
 mod server;
 mod updates;
@@ -17,7 +16,7 @@ use std::sync::Arc;
 use crate::search::MessageIndex;
 
 pub(super) async fn in_restored_room(
-    index: &mut MessageIndex,
+    index: &MessageIndex,
     room_id: &ruma::OwnedRoomId,
     query: &str,
     limit: usize,
@@ -57,7 +56,7 @@ pub(super) fn in_room(
 }
 
 pub(super) async fn reingest_whole_room(
-    index: &mut MessageIndex,
+    index: &MessageIndex,
     cache: &matrix_sdk::event_cache::RoomEventCache,
     room_id: &ruma::OwnedRoomId,
 ) {
@@ -67,7 +66,7 @@ pub(super) async fn reingest_whole_room(
         .await;
 }
 
-pub(super) fn document(
+pub(in crate::search) fn document(
     seed: &str,
     body: &str,
     sender: &str,
@@ -95,36 +94,41 @@ pub(super) fn document(
 
 pub(super) fn filtered_index() -> (MessageIndex, ruma::OwnedRoomId) {
     let room = ruma::RoomId::parse("!filters:localhost").expect("room id");
-    let mut index = MessageIndex::new();
-    let room_index = index
-        .rooms
-        .entry(room.clone())
-        .or_insert_with(crate::search::RoomIndex::new);
+    let index = MessageIndex::new();
 
-    room_index.upsert(document(
-        "kris",
-        "the deploy pipeline is broken",
-        "@kris:localhost",
-        1_000,
-        None,
-        Vec::new(),
-    ));
-    room_index.upsert(document(
-        "alice",
-        "deploy finished, see https://example.org/build",
-        "@alice:localhost",
-        2_000,
-        None,
-        vec![matrix_sdk::ruma::user_id!("@kris:localhost").to_owned()],
-    ));
-    room_index.upsert(document(
-        "screenshot",
-        "deploy screenshot.png",
-        "@alice:localhost",
-        3_000,
-        Some(crate::protocol::SearchAttachment::Image),
-        Vec::new(),
-    ));
+    index.upsert(
+        &room,
+        document(
+            "kris",
+            "the deploy pipeline is broken",
+            "@kris:localhost",
+            1_000,
+            None,
+            Vec::new(),
+        ),
+    );
+    index.upsert(
+        &room,
+        document(
+            "alice",
+            "deploy finished, see https://example.org/build",
+            "@alice:localhost",
+            2_000,
+            None,
+            vec![matrix_sdk::ruma::user_id!("@kris:localhost").to_owned()],
+        ),
+    );
+    index.upsert(
+        &room,
+        document(
+            "screenshot",
+            "deploy screenshot.png",
+            "@alice:localhost",
+            3_000,
+            Some(crate::protocol::SearchAttachment::Image),
+            Vec::new(),
+        ),
+    );
 
     (index, room)
 }
@@ -161,23 +165,10 @@ pub(super) fn attachment_pages(
     not_senders: &[ruma::OwnedUserId],
     limit: usize,
 ) -> Vec<Vec<String>> {
-    attachment_pages_with(index, room, not_senders, limit, &mut |_| None)
-}
-
-pub(super) fn attachment_pages_with(
-    index: &MessageIndex,
-    room: &ruma::RoomId,
-    not_senders: &[ruma::OwnedUserId],
-    limit: usize,
-    load: &mut dyn FnMut(
-        crate::search::persist::ChunkId,
-    ) -> Option<crate::search::persist::StoredChunk>,
-) -> Vec<Vec<String>> {
     let mut pages = Vec::new();
-    let mut work = crate::search::index::PageWork::default();
     let mut before: Option<(u64, ruma::OwnedEventId)> = None;
     loop {
-        let step = index.attachment_page(
+        let step = index.attachment_step(
             room,
             crate::protocol::RoomAttachmentKind::Media,
             not_senders,
@@ -185,16 +176,10 @@ pub(super) fn attachment_pages_with(
                 .as_ref()
                 .map(|(ts, event_id)| (*ts, event_id.as_str())),
             limit,
-            &work,
         );
         let (items, next) = match step {
-            crate::search::index::PageStep::Done(items, next) => (items, next),
-            crate::search::index::PageStep::Hydrate(_) => panic!("unexpected hydrate step"),
-            crate::search::index::PageStep::Need(chunk) => {
-                let stored = load(chunk).expect("stored chunk");
-                work.loaded.insert(chunk, stored);
-                continue;
-            }
+            crate::search::store::PageStep::Done(items, next) => (items, next),
+            crate::search::store::PageStep::Hydrate(_) => panic!("unexpected hydrate step"),
         };
         pages.push(
             items
@@ -219,45 +204,6 @@ pub(super) fn found(
         .into_iter()
         .map(|hit| hit.event_id.to_string())
         .collect()
-}
-
-pub(super) fn persisted(index: &mut crate::search::RoomIndex) {
-    let flush = index.take_flush();
-    for (chunk, stored) in flush.chunks {
-        index
-            .chunk_meta
-            .insert(chunk, (1_000, stored.documents.len()));
-    }
-}
-
-pub(super) fn budgeted_room(count: usize, from: u64) -> crate::search::RoomIndex {
-    let mut index = crate::search::RoomIndex::new();
-    for seed in 0..count {
-        let ts = from + seed as u64;
-        index.upsert(document(
-            &format!("d{ts}"),
-            &format!("deploy note w{ts}"),
-            "@kris:localhost",
-            ts,
-            None,
-            Vec::new(),
-        ));
-    }
-    persisted(&mut index);
-    index
-}
-
-pub(super) fn seed_room(index: &mut crate::search::RoomIndex, count: usize) {
-    for seed in 0..count {
-        index.upsert(document(
-            &format!("s{seed}"),
-            &format!("message {seed}"),
-            "@kris:localhost",
-            seed as u64,
-            None,
-            Vec::new(),
-        ));
-    }
 }
 
 pub(super) async fn logged_in(

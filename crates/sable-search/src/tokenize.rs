@@ -214,7 +214,7 @@ mod tests {
     }
 
     fn finds(query: &str, document: &str) -> bool {
-        crate::inverted::matched_words(query, &[], document, false).is_some()
+        crate::matching::matched_words(query, &[], document, false).is_some()
     }
 
     #[test]

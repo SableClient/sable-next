@@ -363,8 +363,13 @@ impl TimelineItemContentView {
 }
 
 /// State is never encrypted without MSC4362, so a decrypted state change is forged.
-pub(crate) const fn forged_state(encrypted: bool, content: &TimelineItemContent) -> bool {
+pub(crate) const fn forged_state_event(encrypted: bool) -> bool {
     encrypted
+}
+
+/// The same, for the content of a timeline item.
+pub(crate) const fn forged_state(encrypted: bool, content: &TimelineItemContent) -> bool {
+    forged_state_event(encrypted)
         && matches!(
             content,
             TimelineItemContent::MembershipChange(_)

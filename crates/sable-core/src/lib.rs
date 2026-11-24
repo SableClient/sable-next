@@ -23,6 +23,8 @@ mod errors;
 mod gestures;
 pub use errors::CoreError;
 pub(crate) use errors::ResultExt;
+#[cfg(target_family = "wasm")]
+pub use search::attach_search_port;
 pub mod image_packs;
 mod inbox;
 mod invites;
@@ -255,8 +257,6 @@ pub struct Core {
     server_search_enabled: AtomicBool,
     read_room: parking_lot::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
-    search_flush: Mutex<()>,
-    retiring_search: parking_lot::Mutex<HashMap<String, Arc<Mutex<()>>>>,
     search_crawl: Mutex<search::CrawlProgress>,
     server_search: Mutex<search::ServerSearch>,
     foreground_paginations: AtomicU32,
@@ -430,8 +430,6 @@ impl Core {
                 timelines::MAX_CACHED_THREAD_TIMELINES,
             )),
             search_index: Mutex::new(search::MessageIndex::new()),
-            search_flush: Mutex::new(()),
-            retiring_search: parking_lot::Mutex::new(HashMap::new()),
             search_crawl: Mutex::new(search::CrawlProgress::default()),
             server_search: Mutex::new(search::ServerSearch::default()),
             call_sessions: Mutex::new(HashMap::new()),

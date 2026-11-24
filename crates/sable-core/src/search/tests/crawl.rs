@@ -51,7 +51,8 @@ async fn test_search_watcher_releases_paginated_room_cache() {
     );
     core.foreground_paginations
         .store(1, std::sync::atomic::Ordering::Relaxed);
-    core.watch_search_index("", &client, "");
+    let directory = tempfile::tempdir().unwrap();
+    core.watch_search_index(&client, directory.path().to_str().unwrap());
     wait_for_hits(&core, &room_id, "latest", 1).await;
 
     let history = (0..300)
@@ -137,8 +138,8 @@ async fn test_back_pagination_reaches_the_index_and_notifies_it() {
         .await
         .expect("room event cache");
 
-    let mut index = MessageIndex::new();
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    let index = MessageIndex::new();
+    reingest_whole_room(&index, &cache, &room_id).await;
     assert!(
         in_room(&index, &room_id, "archaeology", 10, 0).is_empty(),
         "the older message is not in the cache yet"
@@ -182,7 +183,7 @@ async fn test_back_pagination_reaches_the_index_and_notifies_it() {
     .unwrap_or(false);
     assert!(notified, "back-pagination must wake the indexer");
 
-    reingest_whole_room(&mut index, &cache, &room_id).await;
+    reingest_whole_room(&index, &cache, &room_id).await;
 
     let hits = in_room(&index, &room_id, "archaeology", 10, 0);
     assert_eq!(hits.len(), 1, "the backfilled message must be searchable");
@@ -294,8 +295,10 @@ async fn test_a_restored_room_does_not_charge_the_crawl_budget_again() {
         "search-budget",
         Box::new(crate::store::MemorySessionStore::default()),
     );
+    let directory = tempfile::tempdir().unwrap();
+    let store_id = directory.path().to_str().unwrap();
+    core.open_search_index(&client, store_id).await;
     core.prime_persisted_rooms(&client).await;
-    core.flush_search_index(&client).await;
 
     let (cache, _drop_handles) = client
         .event_cache()
@@ -315,7 +318,8 @@ async fn test_a_restored_room_does_not_charge_the_crawl_budget_again() {
         "search-budget-restored",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    restored.restore_persisted_index(&client).await;
+    drop(core);
+    restored.open_search_index(&client, store_id).await;
 
     let fresh = restored
         .search_index

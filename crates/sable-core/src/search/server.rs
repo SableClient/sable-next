@@ -18,8 +18,7 @@ use matrix_sdk::ruma::{
 };
 
 use super::{
-    ContextLine, Hit, IndexFilter, edited_or_own_event_id, expands, indexable_body, inverted,
-    replacement_of,
+    ContextLine, Hit, IndexFilter, edited_or_own_event_id, expands, indexable_body, replacement_of,
 };
 use crate::Core;
 use crate::messages::latest_valid_replacement;
@@ -320,7 +319,7 @@ fn hit_from(
     };
     if edited
         .as_ref()
-        .is_some_and(|body| !inverted::matches_every_word(query, words, body, expand))
+        .is_some_and(|body| !sable_search::matching::matches_every_word(query, words, body, expand))
     {
         return None;
     }

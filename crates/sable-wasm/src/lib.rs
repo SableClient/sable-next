@@ -195,6 +195,11 @@ pub struct SableCore {
 impl SableCore {
     /// `store_id` names the `IndexedDB` database, and the three functions are the
     /// session store, each of which must return a Promise.
+    #[wasm_bindgen(js_name = attachSearchPort)]
+    pub fn attach_search_port(&self, port: web_sys::MessagePort) {
+        sable_core::attach_search_port(port);
+    }
+
     #[wasm_bindgen(constructor)]
     #[must_use]
     pub fn new(

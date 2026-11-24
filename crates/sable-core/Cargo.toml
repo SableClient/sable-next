@@ -31,6 +31,7 @@ harness = false
 sable-frostbite = { path = "../sable-frostbite", version = "0.1.0" }
 sable-model = { path = "../sable-model", version = "0.1.0" }
 sable-search = { path = "../sable-search", version = "0.1.0" }
+sable-sql = { path = "../sable-sql", version = "0.1.0" }
 sable-link-preview = { workspace = true, features = ["tunnel"] }
 matrix-sdk = { workspace = true, features = ["qrcode", "unstable-msc4388"] }
 qrcode = { version = "0.14.1", default-features = false }
@@ -80,6 +81,7 @@ hmac = "0.13"
 zeroize = "1.9.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
+sable-sql = { path = "../sable-sql", version = "0.1.0", features = ["engine"] }
 aes-gcm = "0.11"
 p256 = { version = "0.14", default-features = false, features = ["alloc", "ecdh"] }
 reqwest = { version = "0.13", default-features = false, features = ["socks", "gzip"] }
@@ -90,8 +92,12 @@ rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", 
 tokio = { workspace = true }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+rusqlite = { version = "0.41.1", default-features = false, features = ["bundled-sqlcipher", "cache", "fallible_uint"] }
 keyring-core = "1.0.1"
 apple-native-keyring-store = { version = "1.0.2", features = ["keychain", "protected"] }
+
+[target.'cfg(all(not(target_family = "wasm"), not(any(target_os = "macos", target_os = "ios"))))'.dependencies]
+rusqlite = { version = "0.41.1", default-features = false, features = ["bundled-sqlcipher-vendored-openssl", "cache", "fallible_uint"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring-core = "1.0.1"
@@ -133,6 +139,8 @@ web-sys = { version = "0.3", features = [
   "Request",
   "RequestInit",
   "RequestMode",
+  "MessagePort",
+  "MessageEvent",
 ] }
 getrandom = { version = "0.4", features = ["wasm_js"] }
 

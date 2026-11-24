@@ -1,530 +1,19 @@
-use std::collections::{BTreeMap, HashMap};
+//! What the crawler and the ignored-user watcher keep next to the index, and
+//! the removal of what older versions stored in the SDK state store instead.
+
+use std::collections::BTreeMap;
 
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, OwnedUserId};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use super::Document;
+use super::store::Store;
 use crate::store::StoreError;
 
-pub(super) const SCHEMA: u32 = 5;
-pub(super) const DERIVATION: u32 = 2;
-const LEGACY_SCHEMAS: [u32; 2] = [3, 4];
-
-pub(super) type ChunkId = u32;
-
-fn legacy_key(room_id: &OwnedRoomId) -> Vec<u8> {
-    format!("sable.search.documents.{room_id}").into_bytes()
-}
-
-fn manifest_key(room_id: &OwnedRoomId) -> Vec<u8> {
-    format!("sable.search.room.{room_id}").into_bytes()
-}
-
-fn chunk_key(room_id: &OwnedRoomId, chunk: ChunkId) -> Vec<u8> {
-    format!("sable.search.chunk.{room_id}.{chunk}").into_bytes()
-}
-
-fn rooms_key() -> Vec<u8> {
-    b"sable.search.rooms".to_vec()
-}
-
-fn ignored_key() -> Vec<u8> {
-    b"sable.search.ignored".to_vec()
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize)]
-pub(super) struct ChunkEntry {
-    pub(super) id: ChunkId,
-    pub(super) start: u64,
-    pub(super) bytes: usize,
-    pub(super) count: usize,
-}
-
-#[derive(Serialize, Deserialize)]
-pub(super) struct Manifest {
-    version: u32,
-    pub(super) next_chunk: ChunkId,
-    pub(super) chunks: Vec<ChunkEntry>,
-    pub(super) edits: Vec<(OwnedEventId, OwnedEventId)>,
-    #[serde(default)]
-    pub(super) redacted: Vec<OwnedEventId>,
-    #[serde(default)]
-    pub(super) pending_redactions: Vec<OwnedEventId>,
-    #[serde(default)]
-    pub(super) pending_replacements: Vec<matrix_sdk::deserialized_responses::TimelineEvent>,
-    #[serde(default)]
-    pub(super) floor: u64,
-    #[serde(default)]
-    pub(super) derived: u32,
-    #[serde(default)]
-    pub(super) rederive_from: u64,
-}
-
-impl Manifest {
-    pub(super) const fn new(
-        next_chunk: ChunkId,
-        chunks: Vec<ChunkEntry>,
-        edits: Vec<(OwnedEventId, OwnedEventId)>,
-        floor: u64,
-    ) -> Self {
-        Self {
-            version: SCHEMA,
-            next_chunk,
-            chunks,
-            edits,
-            redacted: Vec::new(),
-            pending_redactions: Vec::new(),
-            pending_replacements: Vec::new(),
-            floor,
-            derived: DERIVATION,
-            rederive_from: 0,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub(super) struct StoredChunk {
-    version: u32,
-    pub(super) documents: Vec<Document>,
-    pub(super) classified: Vec<(OwnedEventId, u64)>,
-}
-
-impl StoredChunk {
-    pub(super) const fn new(
-        documents: Vec<Document>,
-        classified: Vec<(OwnedEventId, u64)>,
-    ) -> Self {
-        Self {
-            version: SCHEMA,
-            documents,
-            classified,
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct LegacyRoom {
-    version: u32,
-    documents: Vec<Document>,
-    classified: Vec<OwnedEventId>,
-    #[serde(default)]
-    edits: Vec<(OwnedEventId, OwnedEventId)>,
-}
-
-pub(super) struct Restored {
-    pub(super) manifest: Manifest,
-    pub(super) loaded: Vec<(ChunkId, StoredChunk)>,
-    pub(super) legacy: bool,
-}
-
-pub(super) struct Flush {
-    pub(super) chunks: Vec<(ChunkId, StoredChunk)>,
-    pub(super) cold: Vec<(ChunkId, StoredChunk)>,
-    pub(super) scan: Vec<ChunkId>,
-    pub(super) removed: Vec<ChunkId>,
-    pub(super) manifest: Manifest,
-    pub(super) legacy: bool,
-}
-
-pub(super) enum Opened {
-    Manifest(Manifest),
-    Legacy(Restored),
-    Absent,
-    Discarded,
-    Unreadable,
-}
-
-pub(super) enum ChunkRead {
-    Found(StoredChunk),
-    Missing,
-    Unreadable,
-}
-
-enum Read<T> {
-    Found(T),
-    Absent,
-    Unreadable,
-    Unparsable,
-}
-
-const ZLIB_HEADER: u8 = 0x78;
-const COMPRESSION_LEVEL: u8 = 6;
-
-pub(super) fn encode(json: &[u8]) -> Vec<u8> {
-    miniz_oxide::deflate::compress_to_vec_zlib(json, COMPRESSION_LEVEL)
-}
-
-pub(super) fn decode(bytes: Vec<u8>) -> Result<Vec<u8>, StoreError> {
-    if bytes.first() == Some(&ZLIB_HEADER) {
-        miniz_oxide::inflate::decompress_to_vec_zlib(&bytes)
-            .map_err(|error| StoreError::Message(format!("{error:?}")))
-    } else {
-        Ok(bytes)
-    }
-}
-
-async fn seam_get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, StoreError> {
-    client
-        .state_store()
-        .get_custom_value(key)
-        .await
-        .map_err(StoreError::backend)
-}
-
-async fn seam_put(
-    client: &matrix_sdk::Client,
-    key: &[u8],
-    bytes: Vec<u8>,
-) -> Result<(), StoreError> {
-    client
-        .state_store()
-        .set_custom_value_no_read(key, bytes)
-        .await
-        .map_err(StoreError::backend)
-}
-
-async fn seam_delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), StoreError> {
-    client
-        .state_store()
-        .remove_custom_value(key)
-        .await
-        .map(drop)
-        .map_err(StoreError::backend)
-}
-
-#[cfg(target_family = "wasm")]
-fn text_key(key: &[u8]) -> Result<&str, StoreError> {
-    std::str::from_utf8(key).map_err(StoreError::backend)
-}
-
-#[cfg(target_family = "wasm")]
-async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, StoreError> {
-    let database = match super::idb::attached(client) {
-        super::idb::Attached::Open(database) => database,
-        super::idb::Attached::Closed => {
-            return Err(StoreError::Invalid("the search database is closed"));
-        }
-        super::idb::Attached::Detached => return seam_get(client, key).await,
-    };
-    let text = text_key(key)?;
-    if let Some(bytes) = super::idb::get(&database, text).await? {
-        return Ok(Some(bytes));
-    }
-    let Some(bytes) = seam_get(client, key).await? else {
-        return Ok(None);
-    };
-    if super::idb::put(&database, text, &bytes).await.is_ok()
-        && let Err(error) = seam_delete(client, key).await
-    {
-        warn!(key = text, "dropping migrated search data failed: {error}");
-    }
-    Ok(Some(bytes))
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, StoreError> {
-    seam_get(client, key).await
-}
-
-#[cfg(target_family = "wasm")]
-async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), StoreError> {
-    match super::idb::attached(client) {
-        super::idb::Attached::Open(database) => {
-            super::idb::put(&database, text_key(key)?, &bytes).await
-        }
-        super::idb::Attached::Closed => Err(StoreError::Invalid("the search database is closed")),
-        super::idb::Attached::Detached => seam_put(client, key, bytes).await,
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), StoreError> {
-    seam_put(client, key, bytes).await
-}
-
-#[cfg(target_family = "wasm")]
-async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), StoreError> {
-    match super::idb::attached(client) {
-        super::idb::Attached::Open(database) => {
-            super::idb::delete(&database, text_key(key)?).await?;
-            seam_delete(client, key).await
-        }
-        super::idb::Attached::Closed => Err(StoreError::Invalid("the search database is closed")),
-        super::idb::Attached::Detached => seam_delete(client, key).await,
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), StoreError> {
-    seam_delete(client, key).await
-}
-
-#[cfg(target_family = "wasm")]
-pub(super) async fn attach(client: &matrix_sdk::Client, store_id: &str) {
-    if let Err(error) = super::idb::attach(client, store_id).await {
-        warn!("opening the search database failed, using the state store: {error}");
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
-pub(super) async fn remove_dictionary(base_store: &str) {
-    let directory = std::path::Path::new(base_store).join("search-dictionaries");
-    if let Err(error) = tokio::fs::remove_dir_all(directory).await
-        && error.kind() != std::io::ErrorKind::NotFound
-    {
-        warn!("removing the old search dictionary failed: {error}");
-    }
-}
-
-#[cfg(target_family = "wasm")]
-pub(super) async fn remove_dictionary() {
-    let deleted = match matrix_indexed_db_futures::database::Database::delete_by_name(
-        "sable-search-dictionary",
-    ) {
-        Ok(request) => request.await.map_err(|error| error.to_string()),
-        Err(error) => Err(error.to_string()),
-    };
-    if let Err(error) = deleted {
-        warn!("removing the old search dictionary failed: {error}");
-    }
-}
-
-async fn read<T: DeserializeOwned>(client: &matrix_sdk::Client, key: &[u8]) -> Read<T> {
-    match get(client, key).await.map(|bytes| bytes.map(decode)) {
-        Ok(Some(Ok(bytes))) => match serde_json::from_slice(&bytes) {
-            Ok(value) => Read::Found(value),
-            Err(error) => {
-                warn!(key = %String::from_utf8_lossy(key), "persisted search data did not parse: {error}");
-                Read::Unparsable
-            }
-        },
-        Ok(Some(Err(error))) => {
-            warn!(key = %String::from_utf8_lossy(key), "persisted search data did not decompress: {error}");
-            Read::Unparsable
-        }
-        Ok(None) => Read::Absent,
-        Err(error) => {
-            warn!(key = %String::from_utf8_lossy(key), "reading persisted search data failed: {error}");
-            Read::Unreadable
-        }
-    }
-}
-
-async fn write(client: &matrix_sdk::Client, key: &[u8], value: &impl Serialize) -> Option<usize> {
-    let json = match serde_json::to_vec(value) {
-        Ok(json) => json,
-        Err(error) => {
-            warn!(key = %String::from_utf8_lossy(key), "serialising search data failed: {error}");
-            return None;
-        }
-    };
-    match put(client, key, encode(&json)).await {
-        Ok(()) => Some(json.len()),
-        Err(error) => {
-            warn!(key = %String::from_utf8_lossy(key), "persisting search data failed: {error}");
-            None
-        }
-    }
-}
-
-async fn remove(client: &matrix_sdk::Client, key: &[u8]) -> bool {
-    match delete(client, key).await {
-        Ok(()) => true,
-        Err(error) => {
-            warn!(key = %String::from_utf8_lossy(key), "dropping persisted search data failed: {error}");
-            false
-        }
-    }
-}
-
-pub(super) async fn open(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> Opened {
-    match read::<Manifest>(client, &manifest_key(room_id)).await {
-        Read::Found(manifest) if manifest.version == SCHEMA => return Opened::Manifest(manifest),
-        Read::Found(manifest) => {
-            info!(
-                %room_id,
-                found = manifest.version,
-                expected = SCHEMA,
-                "discarding a persisted search index written by another schema"
-            );
-            let _ = forget(client, room_id).await;
-            return Opened::Discarded;
-        }
-        Read::Unparsable => {
-            let _ = forget(client, room_id).await;
-            return Opened::Discarded;
-        }
-        Read::Unreadable => return Opened::Unreadable,
-        Read::Absent => {}
-    }
-
-    match read::<LegacyRoom>(client, &legacy_key(room_id)).await {
-        Read::Found(legacy) if LEGACY_SCHEMAS.contains(&legacy.version) => {
-            let stamps: HashMap<&OwnedEventId, u64> = legacy
-                .documents
-                .iter()
-                .map(|document| (&document.event_id, document.origin_server_ts))
-                .collect();
-            let classified = legacy
-                .classified
-                .iter()
-                .map(|event_id| (event_id.clone(), stamps.get(event_id).copied().unwrap_or(0)))
-                .collect();
-            let count = legacy.documents.len();
-            let mut manifest = Manifest::new(
-                1,
-                vec![ChunkEntry {
-                    id: 0,
-                    start: 0,
-                    bytes: 0,
-                    count,
-                }],
-                legacy.edits,
-                0,
-            );
-            manifest.derived = 0;
-            Opened::Legacy(Restored {
-                manifest,
-                loaded: vec![(0, StoredChunk::new(legacy.documents, classified))],
-                legacy: true,
-            })
-        }
-        Read::Found(_) | Read::Unparsable => {
-            let _ = forget(client, room_id).await;
-            Opened::Discarded
-        }
-        Read::Absent => Opened::Absent,
-        Read::Unreadable => Opened::Unreadable,
-    }
-}
-
-pub(super) async fn read_manifest(
-    client: &matrix_sdk::Client,
-    room_id: &OwnedRoomId,
-) -> Option<Manifest> {
-    match read::<Manifest>(client, &manifest_key(room_id)).await {
-        Read::Found(manifest) if manifest.version == SCHEMA => Some(manifest),
-        _ => None,
-    }
-}
-
-pub(super) async fn load_chunk(
-    client: &matrix_sdk::Client,
-    room_id: &OwnedRoomId,
-    chunk: ChunkId,
-) -> ChunkRead {
-    match read::<StoredChunk>(client, &chunk_key(room_id, chunk)).await {
-        Read::Found(stored) if stored.version == SCHEMA => ChunkRead::Found(stored),
-        Read::Unreadable => ChunkRead::Unreadable,
-        Read::Found(_) | Read::Absent | Read::Unparsable => {
-            warn!(%room_id, chunk, "a listed search chunk is missing or stale");
-            ChunkRead::Missing
-        }
-    }
-}
-
-#[must_use]
-pub(super) async fn write_chunk(
-    client: &matrix_sdk::Client,
-    room_id: &OwnedRoomId,
-    chunk: ChunkId,
-    stored: &StoredChunk,
-) -> Option<usize> {
-    write(client, &chunk_key(room_id, chunk), stored).await
-}
-
-#[must_use]
-pub(super) async fn write_manifest(
-    client: &matrix_sdk::Client,
-    room_id: &OwnedRoomId,
-    manifest: &Manifest,
-) -> bool {
-    write(client, &manifest_key(room_id), manifest)
-        .await
-        .is_some()
-}
-
-pub(super) async fn remove_chunk(
-    client: &matrix_sdk::Client,
-    room_id: &OwnedRoomId,
-    chunk: ChunkId,
-) {
-    let _ = remove(client, &chunk_key(room_id, chunk)).await;
-}
-
-pub(super) async fn remove_legacy(client: &matrix_sdk::Client, room_id: &OwnedRoomId) {
-    let _ = remove(client, &legacy_key(room_id)).await;
-}
-
-#[must_use]
-pub(super) async fn forget(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> bool {
-    let next_chunk = match read::<Manifest>(client, &manifest_key(room_id)).await {
-        Read::Found(manifest) => manifest.next_chunk,
-        Read::Unreadable => return false,
-        Read::Absent | Read::Unparsable => 0,
-    };
-    let mut forgotten = remove(client, &manifest_key(room_id)).await;
-    for chunk in 0..next_chunk {
-        forgotten &= remove(client, &chunk_key(room_id, chunk)).await;
-    }
-    forgotten &= remove(client, &legacy_key(room_id)).await;
-    forgotten && unlist_room(client, room_id).await
-}
-
-pub(super) async fn listed_rooms(client: &matrix_sdk::Client) -> Vec<OwnedRoomId> {
-    match read::<Vec<OwnedRoomId>>(client, &rooms_key()).await {
-        Read::Found(rooms) => rooms,
-        Read::Absent | Read::Unreadable | Read::Unparsable => Vec::new(),
-    }
-}
-
-pub(super) async fn ignored_unchanged(
-    client: &matrix_sdk::Client,
-    ignored: &[OwnedUserId],
-) -> bool {
-    matches!(
-        read::<Vec<OwnedUserId>>(client, &ignored_key()).await,
-        Read::Found(stored) if stored == ignored
-    )
-}
-
-pub(super) async fn save_ignored(client: &matrix_sdk::Client, ignored: &[OwnedUserId]) {
-    let _ = write(client, &ignored_key(), &ignored.to_vec()).await;
-}
-
-#[must_use]
-pub(super) async fn list_room(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> bool {
-    let mut rooms = match read::<Vec<OwnedRoomId>>(client, &rooms_key()).await {
-        Read::Found(rooms) => rooms,
-        Read::Absent | Read::Unparsable => Vec::new(),
-        Read::Unreadable => return false,
-    };
-    if rooms.contains(room_id) {
-        return true;
-    }
-    rooms.push(room_id.clone());
-    write(client, &rooms_key(), &rooms).await.is_some()
-}
-
-async fn unlist_room(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> bool {
-    let mut rooms = match read::<Vec<OwnedRoomId>>(client, &rooms_key()).await {
-        Read::Found(rooms) => rooms,
-        Read::Absent | Read::Unparsable => return true,
-        Read::Unreadable => return false,
-    };
-    let before = rooms.len();
-    rooms.retain(|listed| listed != room_id);
-    rooms.len() == before || write(client, &rooms_key(), &rooms).await.is_some()
-}
-
-const CRAWL_SCHEMA: u32 = 3;
-const CRAWL_SCHEMAS_READ: [u32; 2] = [3, 4];
-
-fn crawl_key() -> Vec<u8> {
-    b"sable.search.crawl".to_vec()
-}
+const CRAWL_SCHEMA: u32 = 4;
+const CRAWL_KEY: &str = "crawl";
+const IGNORED_KEY: &str = "ignored";
+const LEGACY_PURGED_KEY: &str = "legacy-purged";
 
 #[derive(Default, Serialize, Deserialize)]
 pub(super) struct StoredCrawl {
@@ -544,6 +33,16 @@ pub(super) struct StoredCrawlRoom {
     pub(super) reached_start: bool,
     #[serde(default)]
     pub(super) cover: Option<Cover>,
+    #[serde(default)]
+    pub(super) hole: Option<Hole>,
+}
+
+/// Events missing between the newest indexed one and a batch that sync delivered detached from it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct Hole {
+    pub(super) anchor: OwnedEventId,
+    pub(super) until: OwnedEventId,
+    pub(super) token: Option<String>,
 }
 
 const fn default_gapped() -> bool {
@@ -561,25 +60,32 @@ pub(super) struct Cover {
     pub(super) stops: bool,
 }
 
-pub(super) async fn load_crawl(client: &matrix_sdk::Client) -> StoredCrawl {
-    let bytes = match get(client, &crawl_key())
-        .await
-        .map(|bytes| bytes.map(decode))
-    {
-        Ok(Some(Ok(bytes))) => bytes,
-        Ok(None) => return StoredCrawl::default(),
-        Ok(Some(Err(error))) => {
-            warn!("discarding crawl checkpoints that did not decompress: {error}");
-            return StoredCrawl::default();
-        }
+async fn read(store: &Store, key: &'static str) -> Option<Vec<u8>> {
+    match store.meta(key).await {
+        Ok(value) => value,
         Err(error) => {
-            warn!("reading the persisted crawl checkpoints failed: {error}");
-            return StoredCrawl::default();
+            warn!(key, "reading persisted search data failed: {error}");
+            None
         }
-    };
+    }
+}
 
+async fn write(store: &Store, key: &'static str, value: Vec<u8>) -> bool {
+    match store.set_meta(key, value).await {
+        Ok(()) => true,
+        Err(error) => {
+            warn!(key, "persisting search data failed: {error}");
+            false
+        }
+    }
+}
+
+pub(super) async fn load_crawl(store: &Store) -> StoredCrawl {
+    let Some(bytes) = read(store, CRAWL_KEY).await else {
+        return StoredCrawl::default();
+    };
     match serde_json::from_slice::<StoredCrawl>(&bytes) {
-        Ok(stored) if CRAWL_SCHEMAS_READ.contains(&stored.version) => stored,
+        Ok(stored) if stored.version == CRAWL_SCHEMA => stored,
         Ok(stored) => {
             info!(
                 found = stored.version,
@@ -597,33 +103,25 @@ pub(super) async fn load_crawl(client: &matrix_sdk::Client) -> StoredCrawl {
 
 #[must_use]
 pub(super) async fn save_crawl(
-    client: &matrix_sdk::Client,
+    store: &Store,
     rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom>,
 ) -> bool {
     let stored = StoredCrawl {
         version: CRAWL_SCHEMA,
         rooms,
     };
-    let json = match serde_json::to_vec(&stored) {
-        Ok(json) => json,
+    match serde_json::to_vec(&stored) {
+        Ok(json) => write(store, CRAWL_KEY, json).await,
         Err(error) => {
             warn!("serialising the crawl checkpoints failed: {error}");
-            return false;
-        }
-    };
-
-    match put(client, &crawl_key(), encode(&json)).await {
-        Ok(()) => true,
-        Err(error) => {
-            warn!("persisting the crawl checkpoints failed: {error}");
             false
         }
     }
 }
 
 #[must_use]
-pub(super) async fn forget_crawl(client: &matrix_sdk::Client) -> bool {
-    match delete(client, &crawl_key()).await {
+pub(super) async fn forget_crawl(store: &Store) -> bool {
+    match store.remove_meta(CRAWL_KEY).await {
         Ok(()) => true,
         Err(error) => {
             warn!("dropping the persisted crawl checkpoints failed: {error}");
@@ -632,255 +130,144 @@ pub(super) async fn forget_crawl(client: &matrix_sdk::Client) -> bool {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
-pub(crate) async fn reset_state_cache(
-    path: &std::path::Path,
-    key: Option<&crate::secrets::Key>,
-) -> Result<(), StoreError> {
-    use matrix_sdk::SqliteStateStore;
-    use matrix_sdk_base::StateStore as _;
-
-    let source = SqliteStateStore::open_with_config(&crate::store_encryption::config(path, key))
+pub(super) async fn ignored_unchanged(store: &Store, ignored: &[OwnedUserId]) -> bool {
+    saved_ignored(store)
         .await
-        .map_err(StoreError::backend)?;
-    let temporary = tempfile::tempdir_in(path).map_err(StoreError::backend)?;
-    let target =
-        SqliteStateStore::open_with_config(&crate::store_encryption::config(temporary.path(), key))
-            .await
-            .map_err(StoreError::backend)?;
+        .is_some_and(|stored| stored == ignored)
+}
 
-    let mut rooms: Vec<OwnedRoomId> = match copy_value(&source, &target, &rooms_key()).await? {
-        Some(bytes) => serde_json::from_slice(&decode(bytes)?).map_err(StoreError::backend)?,
-        None => Vec::new(),
-    };
-    let mut rooms_changed = false;
-    for room in source
-        .get_room_infos(&matrix_sdk::store::RoomLoadSettings::default())
+pub(super) async fn saved_ignored(store: &Store) -> Option<Vec<OwnedUserId>> {
+    read(store, IGNORED_KEY)
+        .await
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+}
+
+pub(super) async fn save_ignored(store: &Store, ignored: &[OwnedUserId]) {
+    if let Ok(json) = serde_json::to_vec(ignored) {
+        write(store, IGNORED_KEY, json).await;
+    }
+}
+
+/// Removes what versions before the SQLite index kept in the SDK state store,
+/// once. The crawler rebuilds the index, so none of it is converted.
+pub(super) async fn purge_legacy(store: &Store, client: &matrix_sdk::Client, store_id: &str) {
+    if read(store, LEGACY_PURGED_KEY).await.is_some() {
+        return;
+    }
+    #[cfg(target_family = "wasm")]
+    remove_search_database(store_id).await;
+    #[cfg(not(target_family = "wasm"))]
+    let _ = store_id;
+    match purge_state_store(client).await {
+        Ok(()) => {
+            write(store, LEGACY_PURGED_KEY, vec![1]).await;
+        }
+        Err(error) => warn!("removing the old search index failed: {error}"),
+    }
+}
+
+fn legacy_key(room_id: &OwnedRoomId) -> Vec<u8> {
+    format!("sable.search.documents.{room_id}").into_bytes()
+}
+
+fn manifest_key(room_id: &OwnedRoomId) -> Vec<u8> {
+    format!("sable.search.room.{room_id}").into_bytes()
+}
+
+fn chunk_key(room_id: &OwnedRoomId, chunk: u64) -> Vec<u8> {
+    format!("sable.search.chunk.{room_id}.{chunk}").into_bytes()
+}
+
+const ROOMS_KEY: &[u8] = b"sable.search.rooms";
+const OLD_CRAWL_KEY: &[u8] = b"sable.search.crawl";
+const OLD_IGNORED_KEY: &[u8] = b"sable.search.ignored";
+const ZLIB_HEADER: u8 = 0x78;
+
+fn inflated(bytes: &[u8]) -> Vec<u8> {
+    if bytes.first() == Some(&ZLIB_HEADER) {
+        miniz_oxide::inflate::decompress_to_vec_zlib(bytes).unwrap_or_default()
+    } else {
+        bytes.to_vec()
+    }
+}
+
+async fn purge_state_store(client: &matrix_sdk::Client) -> Result<(), StoreError> {
+    let state = client.state_store();
+    let mut rooms: Vec<OwnedRoomId> = state
+        .get_custom_value(ROOMS_KEY)
         .await
         .map_err(StoreError::backend)?
-    {
-        let room_id = room.room_id().to_owned();
-        if !rooms.contains(&room_id)
-            && source
-                .get_custom_value(&legacy_key(&room_id))
-                .await
-                .map_err(StoreError::backend)?
-                .is_some()
-        {
-            rooms.push(room_id);
-            rooms_changed = true;
+        .map_or_else(Vec::new, |bytes| {
+            serde_json::from_slice(&inflated(&bytes)).unwrap_or_default()
+        });
+    for room in client.joined_rooms() {
+        if !rooms.iter().any(|listed| listed == room.room_id()) {
+            rooms.push(room.room_id().to_owned());
         }
     }
+
     for room_id in &rooms {
-        let _ = copy_value(&source, &target, &legacy_key(room_id)).await?;
-        if let Some(bytes) = copy_value(&source, &target, &manifest_key(room_id)).await? {
-            let manifest: Manifest =
-                serde_json::from_slice(&decode(bytes)?).map_err(StoreError::backend)?;
-            for chunk in manifest.chunks {
-                let _ = copy_value(&source, &target, &chunk_key(room_id, chunk.id)).await?;
-            }
+        let chunks = state
+            .remove_custom_value(&manifest_key(room_id))
+            .await
+            .map_err(StoreError::backend)?
+            .and_then(|manifest| {
+                serde_json::from_slice::<serde_json::Value>(&inflated(&manifest)).ok()
+            })
+            .and_then(|manifest| manifest.get("next_chunk")?.as_u64())
+            .unwrap_or(0);
+        for chunk in 0..chunks {
+            state
+                .remove_custom_value(&chunk_key(room_id, chunk))
+                .await
+                .map_err(StoreError::backend)?;
         }
-    }
-    if rooms_changed {
-        target
-            .set_custom_value_no_read(
-                &rooms_key(),
-                encode(&serde_json::to_vec(&rooms).map_err(StoreError::backend)?),
-            )
+        state
+            .remove_custom_value(&legacy_key(room_id))
             .await
             .map_err(StoreError::backend)?;
     }
-    let _ = copy_value(&source, &target, &crawl_key()).await?;
-    let _ = copy_value(&source, &target, &ignored_key()).await?;
-    target.close().await.map_err(StoreError::backend)?;
-    source.close().await.map_err(StoreError::backend)?;
-
-    let database = matrix_sdk::STATE_STORE_DATABASE_NAME;
-    let replacement = temporary.path().join(database);
-    // Windows refuses to flush a handle opened for reading only.
-    std::fs::OpenOptions::new()
-        .write(true)
-        .open(&replacement)
-        .and_then(|file| file.sync_all())
-        .map_err(|source| StoreError::Path {
-            path: replacement.clone(),
-            source,
-        })?;
-    for suffix in ["-wal", "-shm"] {
-        let sidecar = path.join(format!("{database}{suffix}"));
-        match std::fs::remove_file(&sidecar) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(source) => {
-                return Err(StoreError::Path {
-                    path: sidecar,
-                    source,
-                });
-            }
-        }
+    for key in [ROOMS_KEY, OLD_CRAWL_KEY, OLD_IGNORED_KEY] {
+        state
+            .remove_custom_value(key)
+            .await
+            .map_err(StoreError::backend)?;
     }
-    let database = path.join(database);
-    std::fs::rename(replacement, &database).map_err(|source| StoreError::Path {
-        path: database,
-        source,
-    })
+    Ok(())
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn copy_value(
-    source: &matrix_sdk::SqliteStateStore,
-    target: &matrix_sdk::SqliteStateStore,
-    key: &[u8],
-) -> Result<Option<Vec<u8>>, StoreError> {
-    use matrix_sdk_base::StateStore as _;
-
-    let bytes = source
-        .get_custom_value(key)
-        .await
-        .map_err(StoreError::backend)?;
-    if let Some(bytes) = &bytes {
-        target
-            .set_custom_value_no_read(key, bytes.clone())
-            .await
-            .map_err(StoreError::backend)?;
+pub(super) async fn remove_dictionary(base_store: &str) {
+    let directory = std::path::Path::new(base_store).join("search-dictionaries");
+    if let Err(error) = tokio::fs::remove_dir_all(directory).await
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        warn!("removing the old search dictionary failed: {error}");
     }
-    Ok(bytes)
+}
+
+#[cfg(target_family = "wasm")]
+pub(super) async fn remove_dictionary() {
+    remove_indexed_database("sable-search-dictionary").await;
+}
+
+/// Older versions kept the index in an `IndexedDB` database of its own.
+#[cfg(target_family = "wasm")]
+async fn remove_search_database(store_id: &str) {
+    remove_indexed_database(&format!("{store_id}::sable-search")).await;
+}
+
+#[cfg(target_family = "wasm")]
+async fn remove_indexed_database(name: &str) {
+    let deleted = match matrix_indexed_db_futures::database::Database::delete_by_name(name) {
+        Ok(request) => request.await.map_err(|error| error.to_string()),
+        Err(error) => Err(error.to_string()),
+    };
+    if let Err(error) = deleted {
+        warn!(name, "removing the old search database failed: {error}");
+    }
 }
 
 #[cfg(test)]
-mod codec_tests {
-    use super::{decode, encode};
-
-    #[test]
-    fn a_compressed_value_reads_back_and_shrinks() {
-        let json = br#"{"version":5,"documents":[]}"#.repeat(200);
-        let stored = encode(&json);
-        assert!(stored.len() < json.len() / 4);
-        assert_eq!(decode(stored).unwrap(), json);
-    }
-
-    #[test]
-    fn a_value_written_before_compression_passes_through() {
-        let object = br#"{"version":5}"#.to_vec();
-        let list = br#"["!a:b"]"#.to_vec();
-        assert_eq!(decode(object.clone()).unwrap(), object);
-        assert_eq!(decode(list.clone()).unwrap(), list);
-    }
-
-    #[cfg(not(target_family = "wasm"))]
-    #[tokio::test]
-    async fn the_old_search_dictionary_goes_and_the_store_stays() {
-        let base = tempfile::tempdir().unwrap();
-        let dictionaries = base.path().join("search-dictionaries");
-        std::fs::create_dir(&dictionaries).unwrap();
-        std::fs::write(dictionaries.join("jieba-0.10.4.dict.zlib"), b"dictionary").unwrap();
-        std::fs::write(base.path().join("accounts.json"), b"{}").unwrap();
-        let base_store = base.path().to_str().unwrap();
-
-        super::remove_dictionary(base_store).await;
-        super::remove_dictionary(base_store).await;
-
-        assert!(!dictionaries.exists());
-        assert_eq!(
-            std::fs::read(base.path().join("accounts.json")).unwrap(),
-            b"{}"
-        );
-    }
-
-    #[cfg(not(target_family = "wasm"))]
-    #[tokio::test]
-    async fn cache_reset_keeps_unlisted_legacy_documents() {
-        use matrix_sdk_base::{RoomInfo, RoomState, StateStore as _, store::StateChanges};
-
-        let directory = tempfile::tempdir().unwrap();
-        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
-            .await
-            .unwrap();
-        let room_id = matrix_sdk::ruma::room_id!("!legacy:example.org").to_owned();
-        let mut changes = StateChanges::default();
-        changes
-            .room_infos
-            .insert(room_id.clone(), RoomInfo::new(&room_id, RoomState::Joined));
-        store.save_changes(&changes).await.unwrap();
-        let legacy = br#"{"version":4,"documents":[],"classified":[]}"#.to_vec();
-        store
-            .set_custom_value_no_read(&super::legacy_key(&room_id), legacy.clone())
-            .await
-            .unwrap();
-        store.close().await.unwrap();
-
-        super::reset_state_cache(directory.path(), None)
-            .await
-            .unwrap();
-
-        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
-            .await
-            .unwrap();
-        assert_eq!(
-            store
-                .get_custom_value(&super::legacy_key(&room_id))
-                .await
-                .unwrap(),
-            Some(legacy)
-        );
-        let rooms: Vec<ruma::OwnedRoomId> = serde_json::from_slice(
-            &decode(
-                store
-                    .get_custom_value(&super::rooms_key())
-                    .await
-                    .unwrap()
-                    .unwrap(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(rooms, vec![room_id]);
-        assert!(
-            store
-                .get_room_infos(&matrix_sdk::store::RoomLoadSettings::default())
-                .await
-                .unwrap()
-                .is_empty()
-        );
-        store.close().await.unwrap();
-    }
-
-    #[cfg(not(target_family = "wasm"))]
-    #[tokio::test]
-    async fn cache_reset_leaves_the_original_store_when_search_data_cannot_be_read() {
-        use matrix_sdk_base::StateStore as _;
-
-        let directory = tempfile::tempdir().unwrap();
-        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
-            .await
-            .unwrap();
-        store
-            .set_custom_value_no_read(b"marker", b"cached".to_vec())
-            .await
-            .unwrap();
-        store
-            .set_custom_value_no_read(&super::rooms_key(), b"invalid index".to_vec())
-            .await
-            .unwrap();
-        store.close().await.unwrap();
-
-        assert!(
-            super::reset_state_cache(directory.path(), None)
-                .await
-                .is_err()
-        );
-
-        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
-            .await
-            .unwrap();
-        assert_eq!(
-            store.get_custom_value(b"marker").await.unwrap(),
-            Some(b"cached".to_vec())
-        );
-        assert_eq!(
-            store.get_custom_value(&super::rooms_key()).await.unwrap(),
-            Some(b"invalid index".to_vec())
-        );
-        store.close().await.unwrap();
-    }
-}
+#[path = "persist_tests.rs"]
+mod tests;

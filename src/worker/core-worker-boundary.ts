@@ -28,6 +28,7 @@ export type WorkerCore = {
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
   rtcData(sessionId: string, frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array>;
   setActive(active: boolean): Promise<void>;
+  attachSearchPort?(port: MessagePort): void;
 };
 
 export type WorkerPort = {
@@ -240,6 +241,13 @@ export function createCoreWorkerBoundary(
         await stop();
         port.postMessage({ id: request.id, uri: null });
         terminate();
+        return;
+      }
+      if ('searchPort' in request) {
+        const { searchPort } = request;
+        void core.then((instance) => {
+          instance.attachSearchPort?.(searchPort);
+        });
         return;
       }
       if ('debugLogs' in request) {

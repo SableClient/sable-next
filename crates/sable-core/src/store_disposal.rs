@@ -104,6 +104,7 @@ async fn discard_files(base_store_id: &str, store_id: &str) -> Result<(), StoreE
             root.join("store.new"),
             root.join("store.old"),
             root.join("cache"),
+            root.join(crate::search::DIRECTORY),
         ]
     };
     for path in paths {
@@ -137,6 +138,8 @@ async fn remove_path(path: std::path::PathBuf) -> Result<(), StoreError> {
 #[cfg(target_family = "wasm")]
 fn discard_databases(store_id: &str) -> Result<(), StoreError> {
     use wasm_bindgen::JsCast;
+
+    crate::search::remove_database(store_id);
 
     let factory: web_sys::IdbFactory = js_sys::Reflect::get(&js_sys::global(), &"indexedDB".into())
         .map_err(|error| StoreError::Message(format!("{error:?}")))?

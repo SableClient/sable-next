@@ -18,6 +18,8 @@ const cargoArgs = [
   'sable-wasm',
   '--package',
   'sable-model-wasm',
+  '--package',
+  'sable-search-worker',
   '--target',
   'wasm32-unknown-unknown',
   '--profile',
@@ -152,6 +154,10 @@ try {
   writeFileSync(`${output}/sable_wasm_version.js`, `export default '${sha256(generated)}';\n`);
 
   await bindgen('sable_model_wasm.wasm', 'sable_model', {
+    optimize: ['-Oz'],
+  });
+
+  await bindgen('sable_search_worker.wasm', 'sable_search_worker', {
     optimize: ['-Oz'],
   });
 } finally {

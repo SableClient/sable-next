@@ -183,7 +183,7 @@ async fn test_an_encrypted_room_is_never_searched_on_the_homeserver() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
 
     let hits = core
         .search_messages(
@@ -242,7 +242,7 @@ async fn test_a_homeserver_that_cannot_search_falls_back_to_the_local_index() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
 
     let hits = core
         .search_messages(
@@ -300,7 +300,7 @@ async fn test_a_dated_query_stays_local_even_for_an_unencrypted_room() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
 
     let filter = crate::search::IndexFilter {
         after_ts: Some(1_000),
@@ -362,7 +362,7 @@ async fn test_a_filter_only_query_stays_local_even_for_an_unencrypted_room() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
 
     let filter = crate::search::IndexFilter {
         senders: vec![sender.to_owned()],

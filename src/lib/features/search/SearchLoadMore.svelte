@@ -38,11 +38,7 @@
       disabled={search.searching}
       onclick={() => void search.loadMore()}
     >
-      {search.searching
-        ? i18n.t('search.searching')
-        : search.older
-          ? i18n.t('search.loadOlder')
-          : i18n.t('search.loadMore')}
+      {search.searching ? i18n.t('search.searching') : i18n.t('search.loadMore')}
     </Button>
   </div>
 {/if}

@@ -398,7 +398,6 @@ impl Core {
         if let Some(session) = self.take_session().await {
             session.sync_service.stop().await;
         }
-        self.settle_retired_search(None).await;
         let accounts: Vec<String> = self.account_clients.lock().await.keys().cloned().collect();
         for account_id in accounts {
             self.invalidate_account_client(&account_id).await;
@@ -413,7 +412,6 @@ impl Core {
             if let Some(session) = self.take_session().await {
                 session.sync_service.stop().await;
             }
-            self.settle_retired_search(None).await;
             let accounts = self.accounts().await?;
             let mut outcome = Ok(());
             for account in &accounts.accounts {
@@ -1022,7 +1020,6 @@ impl Core {
         let Some(account_id) = account_id else {
             return self.clear_persisted_session().await;
         };
-        self.settle_retired_search(Some(account_id)).await;
         // Nothing opens the account again while its files go.
         self.mark_account_needs_reauth(Some(account_id), false)
             .await?;
@@ -1192,34 +1189,19 @@ impl Core {
     }
 
     pub(crate) async fn take_session(&self) -> Option<Session> {
-        let (session, index) = self.detach_session().await;
-        if let Some(session) = &session {
-            search::save_index(&session.client, index).await;
-        }
-        session
+        self.detach_session().await
     }
 
-    async fn retire_session(&self) -> Option<Session> {
-        let (session, index) = self.detach_session().await;
-        if let Some(session) = &session {
-            self.retire_search_index(&session.account_id, &session.client, index)
-                .await;
-        }
-        session
-    }
-
-    async fn detach_session(&self) -> (Option<Session>, search::MessageIndex) {
+    async fn detach_session(&self) -> Option<Session> {
         self.end_all_calls().await;
         let client = self.session.current(|session| session.client.clone());
         if let Some(client) = client {
             self.flush_inbox(&client).await;
         }
-        // Lock order: room subscriptions, then the session, then the search flush. Opening a room
-        // reads the session under the first, a search copy saves under the second.
+        // Lock order: room subscriptions, then the session. Opening a room reads the session under
+        // the first.
         let mut room_subscriptions = self.room_subscriptions.lock().await;
         let mut session = self.session.write().await;
-        // An aborted task must not be holding a flush it took from the index.
-        let flushing = self.search_flush.lock().await;
         self.session_handlers.lock().clear();
         self.session_tasks.lock().clear();
         self.to_device_inbox.lock().take();
@@ -1243,14 +1225,10 @@ impl Core {
             .send_replace(crate::nicknames::Nicknames::default());
         *self.probed_state() = crate::probed_state::ProbedState::default();
         *self.recent_state.lock() = crate::probed_state::RecentState::default();
-        let index = std::mem::replace(
-            &mut *self.search_index.lock().await,
-            search::MessageIndex::new(),
-        );
-        drop(flushing);
+        *self.search_index.lock().await = search::MessageIndex::new();
         self.search_crawl.lock().await.reset();
         self.server_search.lock().await.reset();
-        (session.take(), index)
+        session.take()
     }
 
     pub(crate) async fn finish_sign_in(
@@ -1390,8 +1368,8 @@ impl Core {
             .await?;
 
         // Do not disrupt the active session unless its replacement started
-        // successfully. `retire_session` also aborts its owned watcher tasks.
-        if let Some(previous) = self.retire_session().await {
+        // successfully. `take_session` also aborts its owned watcher tasks.
+        if let Some(previous) = self.take_session().await {
             previous.sync_service.stop().await;
         }
 
@@ -1460,7 +1438,7 @@ impl Core {
             .registered_store_id(&account_id)
             .await
             .unwrap_or_else(|| self.store_id.clone());
-        self.watch_search_index(&account_id, &client, &store_id);
+        self.watch_search_index(&client, &store_id);
         self.watch_ignored_users(&client);
         self.watch_ignored_history(&client, &sync_service);
         self.watch_sync_stall(&client, &sync_service, crate::sync_support::SYNC_STALL);
@@ -1703,7 +1681,11 @@ fn oauth_account_deactivate_url(
 const LOG_OUT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[cfg(not(target_family = "wasm"))]
-const CACHE_DATABASES: [&str; 2] = ["matrix-sdk-event-cache.sqlite3", "matrix-sdk-media.sqlite3"];
+const CACHE_DATABASES: [&str; 3] = [
+    "matrix-sdk-event-cache.sqlite3",
+    "matrix-sdk-media.sqlite3",
+    matrix_sdk::STATE_STORE_DATABASE_NAME,
+];
 
 #[cfg(not(target_family = "wasm"))]
 async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::CoreError> {
@@ -1732,8 +1714,6 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), crate::Co
         .await
         .backend()?;
     drop(crypto);
-
-    search::reset_state_cache(&store, key.as_ref()).await?;
 
     for directory in [store, std::path::Path::new(&account.store_id).join("cache")] {
         for database in CACHE_DATABASES {

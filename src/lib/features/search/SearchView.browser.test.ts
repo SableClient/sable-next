@@ -51,7 +51,7 @@ const rooms = [
 async function mount() {
   allRooms.on = true;
   let onEvent: ((event: CoreEvent) => void) | undefined;
-  const messages = vi.fn().mockResolvedValue({ hits: [], older: null });
+  const messages = vi.fn().mockResolvedValue({ hits: [] });
   Object.assign(core, {
     session: { user_id: '@me:example.org' },
     searchCoverageUnavailable: false,
@@ -314,10 +314,9 @@ test('a pagination error keeps results visible and retries the failed page', asy
   messages
     .mockResolvedValueOnce({
       hits: Array.from({ length: 30 }, (_, index) => hit(`$first${index}`)),
-      older: null,
     })
     .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValue({ hits: [hit('$next')], older: null });
+    .mockResolvedValue({ hits: [hit('$next')] });
   await userEvent.fill(field.element(), 'deploy');
   const rows = screen.getByRole('group', { name: /^search\.openResultFrom/ });
   await expect.element(rows).toHaveLength(30);
@@ -331,9 +330,7 @@ test('a pagination error keeps results visible and retries the failed page', asy
 
 test('indexing updates refresh an unchanged search', async () => {
   const { screen, field, messages, emitCoverage } = await mount();
-  messages
-    .mockResolvedValueOnce({ hits: [], older: null })
-    .mockResolvedValue({ hits: [hit('$indexed')], older: null });
+  messages.mockResolvedValueOnce({ hits: [] }).mockResolvedValue({ hits: [hit('$indexed')] });
   await userEvent.fill(field.element(), 'deploy');
   await expect.element(screen.getByRole('status')).toHaveTextContent('search.empty');
   emitCoverage({ documents: 1, rooms_pending: 0, rooms_failed: 0, state: 'complete' });
@@ -348,7 +345,6 @@ test('a result marks the words the core matched it on', async () => {
   const { screen, field, messages } = await mount();
   messages.mockResolvedValue({
     hits: [{ ...hit('$category'), body: 'the category list', matched: ['category'] }],
-    older: null,
   });
   await userEvent.fill(field.element(), 'cat');
   await expect.element(screen.getByRole('mark')).toHaveTextContent('category');

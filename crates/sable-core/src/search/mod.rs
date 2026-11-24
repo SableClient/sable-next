@@ -1,4 +1,5 @@
-mod chunks;
+mod apply;
+mod ban;
 mod core_api;
 mod crawl;
 mod document;
@@ -6,24 +7,22 @@ mod index;
 mod network;
 mod sharing;
 pub(crate) use network::CrawlNetwork;
+mod exec;
 mod filter;
-#[cfg(target_family = "wasm")]
-mod idb;
 mod persist;
 mod server;
+mod store;
+#[cfg(target_family = "wasm")]
+mod store_web;
 
 pub(crate) const MAX_SEARCH_RESULTS: usize = 200;
 
-pub(crate) use core_api::save_index;
 pub(crate) use crawl::CrawlProgress;
 pub(crate) use filter::IndexFilter;
-#[cfg(not(target_family = "wasm"))]
-pub(crate) use persist::reset_state_cache;
 pub(crate) use server::ServerSearch;
 pub(crate) use sharing::SearchSharing;
 
 use crate::now_ms;
-use sable_search::inverted;
 use std::time::Duration;
 
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -33,30 +32,34 @@ use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
 use matrix_sdk::ruma::{OwnedEventId, OwnedUserId};
 
-use self::document::{Document, indexable_body, replacement_of};
 #[cfg(test)]
-use self::index::RoomIndex;
-pub(crate) use self::index::{ContextLine, Hit, MessageIndex, expands};
+use self::document::Document;
+use self::document::{indexable_body, replacement_of};
+pub(crate) use self::index::{ContextLine, Hit, MessageIndex};
+#[cfg(not(target_family = "wasm"))]
+pub(crate) use self::store::DIRECTORY;
+pub(crate) use self::store::expands;
+#[cfg(target_family = "wasm")]
+pub use self::store_web::attach_search_port;
+#[cfg(target_family = "wasm")]
+pub(crate) use self::store_web::remove as remove_database;
 
-const EVENTS_PER_INGEST_YIELD: usize = 16;
-const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
+const INGEST_CHUNK: usize = 64;
 const INGEST_WAIT: Duration = Duration::from_millis(25);
 const INGEST_WAIT_ATTEMPTS: usize = 200;
-const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
-const MEMORY_BUDGET: usize = 64 * 1024 * 1024;
+const REDACTABLE_KINDS: [&str; 4] = [
+    "m.room.message",
+    "m.sticker",
+    "m.poll.start",
+    "org.matrix.msc3381.poll.start",
+];
+
 const DISK_BUDGET: u64 = 512 * 1024 * 1024;
-const COLD_CHUNKS_PER_PAGE: usize = 32;
-const OLDER_PAGE_BUDGET_MS: u64 = 50;
 const HYDRATE_BATCH: usize = 30;
 const HYDRATE_CONCURRENCY: usize = 8;
-const DOCUMENT_OVERHEAD: usize = 1_600;
-const CLASSIFIED_OVERHEAD: usize = 96;
 const PINNED_FETCH_CONCURRENCY: usize = 4;
 
-const INITIAL_DOCUMENTS: usize = 64;
-const CHANGES_BEFORE_FLUSH: usize = 32;
-const TICKS_BEFORE_FLUSH: u32 = 5;
 pub(super) fn edited_or_own_event_id(original: &OriginalSyncRoomMessageEvent) -> OwnedEventId {
     match &original.content.relates_to {
         Some(Relation::Replacement(replacement)) => replacement.event_id.clone(),
@@ -82,13 +85,26 @@ fn ingestable_events(
         .collect()
 }
 
+/// A redacted event carries `redacted_because`, or else comes back with the
+/// content a redaction leaves of a message.
 fn is_redacted(event: &TimelineEvent) -> bool {
-    event
-        .raw()
+    let raw = event.raw();
+    let because = raw
         .get_field::<serde_json::Value>("unsigned")
         .ok()
         .flatten()
-        .is_some_and(|unsigned| unsigned.get("redacted_because").is_some())
+        .is_some_and(|unsigned| unsigned.get("redacted_because").is_some());
+    because
+        || (raw
+            .get_field::<String>("type")
+            .ok()
+            .flatten()
+            .is_some_and(|kind| REDACTABLE_KINDS.contains(&kind.as_str()))
+            && raw
+                .get_field::<serde_json::Map<String, serde_json::Value>>("content")
+                .ok()
+                .flatten()
+                .is_some_and(|content| content.is_empty()))
 }
 
 pub(crate) async fn ignored_user_ids(client: &matrix_sdk::Client) -> Vec<OwnedUserId> {
@@ -118,3 +134,22 @@ fn redacted_event_id(
 
 #[cfg(test)]
 mod tests;
+
+/// Fills an account's database as an earlier session would have left it.
+#[cfg(all(test, not(target_family = "wasm")))]
+pub(crate) async fn seed_account_index(store_id: &str, room_id: &ruma::RoomId, count: usize) {
+    let index = MessageIndex::with_store(store::Store::open_account(store_id).await);
+    for position in 0..count {
+        index.upsert(
+            room_id,
+            tests::document(
+                &format!("indexed-{position}"),
+                "retained archaeology",
+                "@alice:example.org",
+                100 + position as u64,
+                None,
+                Vec::new(),
+            ),
+        );
+    }
+}

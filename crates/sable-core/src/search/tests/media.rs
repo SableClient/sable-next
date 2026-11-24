@@ -8,41 +8,38 @@ use crate::search::MessageIndex;
 #[test]
 fn test_a_migrated_picture_without_media_asks_to_be_hydrated_once() {
     let room = ruma::RoomId::parse("!migrated:localhost").expect("room id");
-    let mut index = MessageIndex::new();
-    index
-        .rooms
-        .entry(room.clone())
-        .or_insert_with(crate::search::RoomIndex::new)
-        .upsert(document(
+    let index = MessageIndex::new();
+    index.upsert(
+        &room,
+        document(
             "old",
             "beach.png",
             "@kris:localhost",
             1,
             Some(crate::protocol::SearchAttachment::Image),
             Vec::new(),
-        ));
+        ),
+    );
     let page = |tried: std::collections::HashSet<ruma::OwnedEventId>| {
-        index.attachment_page(
+        crate::search::exec::block_on(index.store().attachment_page(
             &room,
             crate::protocol::RoomAttachmentKind::Media,
             &[],
             None,
             10,
-            &crate::search::index::PageWork {
-                tried,
-                ..crate::search::index::PageWork::default()
-            },
-        )
+            &tried,
+        ))
+        .expect("attachment page")
     };
 
-    let crate::search::index::PageStep::Hydrate(asked) = page(std::collections::HashSet::new())
+    let crate::search::store::PageStep::Hydrate(asked) = page(std::collections::HashSet::new())
     else {
         panic!("expected a hydrate step");
     };
     assert_eq!(asked, [event_id!("$old").to_owned()]);
 
     assert!(
-        matches!(page(asked.into_iter().collect()), crate::search::index::PageStep::Done(items, None) if items.is_empty())
+        matches!(page(asked.into_iter().collect()), crate::search::store::PageStep::Done(items, None) if items.is_empty())
     );
 }
 
@@ -68,20 +65,17 @@ async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
         )
         .await;
     let core = logged_in(&server, &client, "search-hydrate").await;
-    core.search_index
-        .lock()
-        .await
-        .rooms
-        .entry(room_id.clone())
-        .or_insert_with(crate::search::RoomIndex::new)
-        .upsert(document(
+    core.search_index.lock().await.upsert(
+        &room_id,
+        document(
             "image",
             "beach.png",
             "@kris:localhost",
             1,
             Some(crate::protocol::SearchAttachment::Image),
             Vec::new(),
-        ));
+        ),
+    );
 
     let (items, _) = core
         .attachment_page(
@@ -101,11 +95,11 @@ async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
         }] if source == "mxc://localhost/beach"
     ));
     let index = core.search_index.lock().await;
-    let stored = index.rooms[&room_id]
-        .document(&event_id!("$image").to_owned())
+    let stored = index
+        .document(&room_id, &event_id!("$image").to_owned())
+        .await
         .expect("still indexed");
     assert_eq!(stored.media.len(), 1);
-    assert!(index.rooms[&room_id].dirty);
     drop(room);
 }
 
@@ -169,7 +163,7 @@ async fn test_room_attachments_sort_the_index_into_media_files_and_links() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
 
     let (media, next) = core
         .room_attachments(&room_id, RoomAttachmentKind::Media, 10, None)
@@ -267,7 +261,7 @@ async fn test_room_attachments_list_each_gallery_item_under_its_tab() {
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
 
     let (media, _) = core
         .room_attachments(&room_id, RoomAttachmentKind::Media, 10, None)

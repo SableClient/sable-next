@@ -1660,7 +1660,6 @@
     "developerSearchEvents": "Evenimente indexate în sesiunea asta",
     "developerSearchRate": "Rata de indexare",
     "developerSearchRoomsPending": "Camere rămase de indexat",
-    "developerSearchRoomsUnreadable": "Camere cu index de salvare necitibil",
     "developerSearchCount": "{{count, number}}",
     "developerSearchRatio": "{{value, number}}/{{total, number}}",
     "developerSearchPhaseCrawling": "Se indexează",

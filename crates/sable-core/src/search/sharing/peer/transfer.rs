@@ -41,8 +41,6 @@ enum CopyError {
     InvalidParts(OwnedRoomId),
     #[error("part {part} of {room} failed its hash or range check")]
     BadPart { room: OwnedRoomId, part: usize },
-    #[error("the index could not save {0}")]
-    NotDurable(OwnedRoomId),
     #[error("could not save the received parts")]
     Store,
 }
@@ -288,11 +286,9 @@ impl Core {
         let reply = match (&mut *transfer, message) {
             (Transfer::Sending(_), None) => {
                 // Send our room list to the receiver.
-                let index = self.search_index.lock().await;
+                let rooms = self.search_index.lock().await.rooms().await;
 
-                Some(Message::RoomList {
-                    rooms: index.rooms.keys().cloned().collect(),
-                })
+                Some(Message::RoomList { rooms })
             }
             (Transfer::Receiving(_), None) => {
                 // We need to wait on the sender to kick things off by sending the room list.
@@ -331,7 +327,7 @@ impl Core {
         match message {
             Message::RequestRoom { room } => {
                 *state = if joined(client, &room) {
-                    self.peer_snapshot(client, room.clone()).await
+                    self.peer_snapshot(room.clone()).await
                 } else {
                     None
                 };
@@ -598,18 +594,11 @@ impl Core {
             .unwrap_or_default()
     }
 
-    async fn peer_snapshot(&self, client: &Client, room: OwnedRoomId) -> Option<SenderState> {
-        self.save_rooms(client, vec![room.clone()]).await;
-        self.save_changed_checkpoints(client).await;
-        {
-            let index = self.search_index.lock().await;
-            if !index.settled(&room) || !index.is_durable(&room, index.revision(&room)) {
-                return None;
-            }
-        }
-        let history = settled_history(client, &room).await?;
+    async fn peer_snapshot(&self, room: OwnedRoomId) -> Option<SenderState> {
+        self.save_changed_checkpoints().await;
+        let history = settled_history(&self.search_store().await, &room).await?;
         let (boundary, resume) = self.search_crawl.lock().await.share_boundary(&room);
-        let floor = self.search_index.lock().await.floor_of(&room);
+        let floor = self.search_index.lock().await.floor_of(&room).await;
         let from = boundary
             .or_else(|| history.weights.first().map(|&(ts, _)| ts))
             .unwrap_or(0)
@@ -675,26 +664,18 @@ impl Core {
             None => None,
         };
 
-        let revision = {
-            let mut index = self.search_index.lock().await;
-            index
-                .import_redactions(
-                    room,
-                    payload.redacted,
-                    cache.as_ref().map(|(cache, _)| cache),
-                )
-                .await;
-            index
-                .import(room, payload.documents, payload.classified, payload.edits)
-                .await;
-            index.revision(room)
-        };
-        self.save_rooms(client, vec![room.clone()]).await;
-        if self.search_index.lock().await.is_durable(room, revision) {
-            Ok(())
-        } else {
-            Err(CopyError::NotDurable(room.clone()))
-        }
+        let index = self.search_index.lock().await;
+        index
+            .import_redactions(
+                room,
+                payload.redacted,
+                cache.as_ref().map(|(cache, _)| cache),
+            )
+            .await;
+        index
+            .import(room, payload.documents, payload.classified, payload.edits)
+            .await;
+        Ok(())
     }
 
     async fn finish_receiving_room(
@@ -719,17 +700,14 @@ impl Core {
                     crawl.has_token(&room),
                 )
             };
-            let (revision, floor) = {
-                let index = self.search_index.lock().await;
-                (index.revision(&room), index.floor_of(&room))
-            };
+            let floor = self.search_index.lock().await.floor_of(&room).await;
             if floor > cover.from {
                 cover.from = floor;
                 cover.resume = None;
                 cover.stops = false;
             }
-            self.search_crawl.lock().await.cover(&room, cover, revision);
-            self.save_changed_checkpoints(client).await;
+            self.search_crawl.lock().await.cover(&room, cover);
+            self.save_changed_checkpoints().await;
         }
 
         if parts.parts.is_empty() {

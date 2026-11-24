@@ -550,6 +550,42 @@ fn extra_link_schemes(html: &Html) -> Vec<String> {
     schemes
 }
 
+/// What only the HTML of a message says: where its links lead, why a span is
+/// hidden as a spoiler, and the names of its custom emotes. The quoted reply is
+/// not part of it.
+#[must_use]
+pub fn html_only_text(formatted: &str) -> Vec<String> {
+    let html = Html::parse(&sanitize(formatted));
+    let mut found = Vec::new();
+    let mut pending: Vec<_> = html.children().collect();
+    while let Some(node) = pending.pop() {
+        pending.extend(node.children());
+        let Some(element) = node.as_element() else {
+            continue;
+        };
+        let attrs = element.attrs.borrow();
+        let attribute = |name: &str| {
+            attrs
+                .iter()
+                .find(|attr| attr.name.local.as_ref() == name)
+                .map(|attr| attr.value.to_string())
+        };
+        let text = match element.name.local.as_ref() {
+            "a" => attribute("href").filter(|href| !href.starts_with("mxc:")),
+            "img" if attribute("data-mx-emoticon").is_some() => {
+                attribute("alt").or_else(|| attribute("title"))
+            }
+            _ => None,
+        };
+        found.extend(text);
+        found.extend(attribute("data-mx-spoiler"));
+    }
+    found.retain(|text| !text.trim().is_empty());
+    found.reverse();
+    found.dedup();
+    found
+}
+
 /// The HTML the UI renders for a message: the sender's `formatted_body` once
 /// sanitised, or the plain body linkified.
 #[must_use]

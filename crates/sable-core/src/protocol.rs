@@ -702,11 +702,15 @@ pub struct SearchMetricsView {
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub documents_loaded: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub memory_bytes: usize,
+    pub memory_bytes: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub memory_budget: usize,
+    pub memory_budget: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub disk_bytes: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub disk_index_bytes: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub disk_bookkeeping_bytes: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub disk_budget: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
@@ -721,8 +725,6 @@ pub struct SearchMetricsView {
     pub rooms_failed: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub rooms_blind: usize,
-    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub rooms_unreadable: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub events_crawled: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]

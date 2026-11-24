@@ -18,6 +18,7 @@ pub use diff::map_diff;
 pub use directory::{public_room, room_preview_from_stripped_state, room_preview_view};
 #[cfg(test)]
 pub(crate) use item::forged_state;
+pub(crate) use item::forged_state_event;
 pub use item::{
     Highlights, LocalContent, aggregation_item, latest_edit_id, standalone_item, timeline_item,
 };

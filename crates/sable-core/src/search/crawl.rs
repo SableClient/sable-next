@@ -14,11 +14,11 @@ use matrix_sdk::ruma::api::client::message::get_message_events;
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
 use matrix_sdk::ruma::events::AnyTimelineEvent;
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{OwnedRoomId, RoomId, UInt};
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, UInt};
 use matrix_sdk::{EncryptionState, Room, RoomState};
 use tracing::warn;
 
-use super::persist::{self, Cover, StoredCrawlRoom};
+use super::persist::{self, Cover, Hole, StoredCrawlRoom};
 use super::sharing::DISCOVERY;
 use crate::Core;
 use crate::protocol::{
@@ -112,14 +112,13 @@ pub(crate) struct CrawlProgress {
     frontiers: HashMap<OwnedRoomId, u64>,
     resumed: HashSet<OwnedRoomId>,
     gapped: HashSet<OwnedRoomId>,
+    pub(super) holes: HashMap<OwnedRoomId, Hole>,
     covered: HashMap<OwnedRoomId, Cover>,
     anchored: HashSet<OwnedRoomId>,
     probed: HashSet<OwnedRoomId>,
     blind: HashMap<OwnedRoomId, usize>,
     lost_sessions: HashSet<(OwnedRoomId, String)>,
     stalled: HashMap<OwnedRoomId, u32>,
-    discarded: HashSet<OwnedRoomId>,
-    awaiting: HashMap<OwnedRoomId, u64>,
     saved: BTreeMap<OwnedRoomId, StoredCrawlRoom>,
     /// When the checkpoints were last written, so a busy crawl saves them in batches.
     checkpointed: Option<web_time::Instant>,
@@ -170,7 +169,26 @@ fn decrypted_or_utd(
 
 impl CrawlProgress {
     fn skips(&self, room_id: &RoomId) -> bool {
-        self.reached_start.contains(room_id) || self.failed.contains(room_id)
+        (self.reached_start.contains(room_id) && !self.holes.contains_key(room_id))
+            || self.failed.contains(room_id)
+    }
+
+    /// Notes that events after `anchor` and before `until` were never seen.
+    pub(super) fn open_hole(
+        &mut self,
+        room_id: &OwnedRoomId,
+        anchor: OwnedEventId,
+        until: OwnedEventId,
+    ) {
+        self.changed = true;
+        self.holes
+            .entry(room_id.clone())
+            .and_modify(|hole| hole.until.clone_from(&until))
+            .or_insert(Hole {
+                anchor,
+                until,
+                token: None,
+            });
     }
 
     const fn spent(&self) -> bool {
@@ -239,42 +257,34 @@ impl CrawlProgress {
         self.tokens.get(room_id).map_or(fresh, Clone::clone)
     }
 
-    fn advance(&mut self, room_id: &OwnedRoomId, token: Option<String>) {
+    pub(super) fn advance(&mut self, room_id: &OwnedRoomId, token: Option<String>) {
         self.changed = true;
         self.tokens.insert(room_id.clone(), token);
     }
 
     pub(super) fn checkpoints(&self) -> BTreeMap<OwnedRoomId, StoredCrawlRoom> {
+        let stored =
+            |room_id: &OwnedRoomId, token: Option<String>, reached_start: bool| StoredCrawlRoom {
+                shared_resume: self.resumed.contains(room_id),
+                frontier: self.frontiers.get(room_id).copied(),
+                gapped: self.gapped.contains(room_id),
+                token,
+                reached_start,
+                cover: self.covered.get(room_id).cloned(),
+                hole: self.holes.get(room_id).cloned(),
+            };
         let mut rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom> = self
             .tokens
             .keys()
             .chain(self.covered.keys())
+            .chain(self.holes.keys())
             .map(|room_id| {
-                (
-                    room_id.clone(),
-                    StoredCrawlRoom {
-                        shared_resume: self.resumed.contains(room_id),
-                        frontier: self.frontiers.get(room_id).copied(),
-                        gapped: self.gapped.contains(room_id),
-                        token: self.tokens.get(room_id).cloned().flatten(),
-                        reached_start: false,
-                        cover: self.covered.get(room_id).cloned(),
-                    },
-                )
+                let token = self.tokens.get(room_id).cloned().flatten();
+                (room_id.clone(), stored(room_id, token, false))
             })
             .collect();
         for room_id in &self.exhausted {
-            rooms.insert(
-                room_id.clone(),
-                StoredCrawlRoom {
-                    shared_resume: self.resumed.contains(room_id),
-                    frontier: self.frontiers.get(room_id).copied(),
-                    gapped: self.gapped.contains(room_id),
-                    token: None,
-                    reached_start: true,
-                    cover: self.covered.get(room_id).cloned(),
-                },
-            );
+            rooms.insert(room_id.clone(), stored(room_id, None, true));
         }
         rooms
     }
@@ -340,43 +350,26 @@ impl CrawlProgress {
         true
     }
 
-    pub(super) fn cover(&mut self, room_id: &OwnedRoomId, cover: Cover, revision: u64) {
+    pub(super) fn cover(&mut self, room_id: &OwnedRoomId, cover: Cover) {
         if self.covered.get(room_id) != Some(&cover) {
             self.covered.insert(room_id.clone(), cover);
             self.anchored.remove(room_id);
             self.changed = true;
-            self.awaiting.insert(room_id.clone(), revision);
         }
     }
 
-    fn changed_checkpoints(
-        &mut self,
-        unflushed: &HashSet<OwnedRoomId>,
-    ) -> Option<BTreeMap<OwnedRoomId, StoredCrawlRoom>> {
+    fn changed_checkpoints(&mut self) -> Option<BTreeMap<OwnedRoomId, StoredCrawlRoom>> {
         if !self.changed {
             return None;
         }
-        let mut rooms = self.checkpoints();
-        for room_id in unflushed {
-            match self.saved.get(room_id) {
-                Some(saved) => rooms.insert(room_id.clone(), saved.clone()),
-                None => rooms.remove(room_id),
-            };
-        }
-        self.awaiting
-            .retain(|room_id, _| unflushed.contains(room_id));
-        self.changed = !unflushed.is_empty();
-        Some(rooms)
+        self.changed = false;
+        Some(self.checkpoints())
     }
 
     pub(super) fn restore(&mut self, rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom>) {
         self.changed = false;
         self.saved.clone_from(&rooms);
         for (room_id, room) in rooms {
-            if self.discarded.contains(&room_id) {
-                self.changed = true;
-                continue;
-            }
             if room.shared_resume {
                 self.resumed.insert(room_id.clone());
             }
@@ -388,6 +381,9 @@ impl CrawlProgress {
             }
             if let Some(cover) = room.cover {
                 self.covered.insert(room_id.clone(), cover);
+            }
+            if let Some(hole) = room.hole {
+                self.holes.insert(room_id.clone(), hole);
             }
             if room.reached_start {
                 self.exhausted.insert(room_id.clone());
@@ -416,10 +412,6 @@ impl CrawlProgress {
         self.stalled.remove(room_id);
     }
 
-    pub(super) fn discard(&mut self, room_id: OwnedRoomId) {
-        self.discarded.insert(room_id);
-    }
-
     pub(super) fn forget(&mut self, room_id: &RoomId) {
         self.reached_start.remove(room_id);
         self.exhausted.remove(room_id);
@@ -429,12 +421,12 @@ impl CrawlProgress {
         self.frontiers.remove(room_id);
         self.resumed.remove(room_id);
         self.gapped.remove(room_id);
+        self.holes.remove(room_id);
         self.anchored.remove(room_id);
         self.covered.remove(room_id);
         self.probed.remove(room_id);
         self.blind.remove(room_id);
         self.stalled.remove(room_id);
-        self.awaiting.remove(room_id);
         self.changed = true;
     }
 
@@ -467,7 +459,7 @@ impl Core {
     async fn crawl(self: Arc<Self>, client: &matrix_sdk::Client) {
         let mut reported: Option<(SearchCoverageView, web_time::Instant)> = None;
 
-        let stored = persist::load_crawl(client).await;
+        let stored = persist::load_crawl(&self.search_store().await).await;
         {
             let mut progress = self.search_crawl.lock().await;
             progress.restore(stored.rooms);
@@ -485,12 +477,12 @@ impl Core {
         loop {
             self.report_coverage(client, &mut reported).await;
 
-            if self.held_back(client).await {
+            if self.held_back().await {
                 continue;
             }
 
             let Some(room_id) = self.next_room_to_crawl(client).await else {
-                self.save_changed_checkpoints(client).await;
+                self.save_changed_checkpoints().await;
                 self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
                 matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
                 continue;
@@ -508,7 +500,6 @@ impl Core {
             let pause = match self.crawl_once(client, &room_id).await {
                 Ok(CrawlOutcome::Paused) => continue,
                 Ok(CrawlOutcome::Batch(outcome)) if outcome.reached_start => {
-                    self.search_index.lock().await.finish_rederive(&room_id);
                     let mut progress = self.search_crawl.lock().await;
                     progress.steady(&room_id);
                     progress.settle(room_id, outcome.exhausted);
@@ -541,7 +532,13 @@ impl Core {
     }
 
     /// Waits out whatever keeps the crawler from its next room, and says whether it did.
-    async fn held_back(&self, client: &matrix_sdk::Client) -> bool {
+    async fn held_back(&self) -> bool {
+        if !self.search_index.lock().await.ready() {
+            self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
+            matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
+            return true;
+        }
+
         if !self
             .search_crawler_enabled
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -552,11 +549,11 @@ impl Core {
         }
 
         if !self.checkpoint_batch_open().await {
-            self.save_changed_checkpoints(client).await;
+            self.save_changed_checkpoints().await;
         }
 
         if !self.search_crawl_active() {
-            self.save_changed_checkpoints(client).await;
+            self.save_changed_checkpoints().await;
             self.search_crawl
                 .lock()
                 .await
@@ -579,9 +576,9 @@ impl Core {
         }
 
         let spent = self.search_crawl.lock().await.spent();
-        let full = self.search_index.lock().await.is_full();
+        let full = self.search_index.lock().await.is_full().await;
         if spent || full {
-            self.save_changed_checkpoints(client).await;
+            self.save_changed_checkpoints().await;
             self.search_crawl.lock().await.enter(if spent {
                 SearchCrawlPhase::BudgetSpent
             } else {
@@ -603,28 +600,14 @@ impl Core {
             .is_some_and(|at| at.elapsed() < CHECKPOINT_INTERVAL)
     }
 
-    pub(super) async fn save_changed_checkpoints(&self, client: &matrix_sdk::Client) {
-        let awaiting = self.search_crawl.lock().await.awaiting.clone();
-        let unflushed: HashSet<OwnedRoomId> = {
-            let index = self.search_index.lock().await;
-            awaiting
-                .into_iter()
-                .filter(|(room_id, revision)| !index.is_durable(room_id, *revision))
-                .map(|(room_id, _)| room_id)
-                .collect()
-        };
-        let Some(checkpoints) = self
-            .search_crawl
-            .lock()
-            .await
-            .changed_checkpoints(&unflushed)
-        else {
+    pub(super) async fn save_changed_checkpoints(&self) {
+        let Some(checkpoints) = self.search_crawl.lock().await.changed_checkpoints() else {
             return;
         };
         if checkpoints == self.search_crawl.lock().await.saved {
             return;
         }
-        if persist::save_crawl(client, checkpoints.clone()).await {
+        if persist::save_crawl(&self.search_store().await, checkpoints.clone()).await {
             let mut progress = self.search_crawl.lock().await;
             progress.saved = checkpoints;
             progress.checkpointed = Some(web_time::Instant::now());
@@ -688,8 +671,8 @@ impl Core {
 
     pub(crate) async fn search_coverage(&self, client: &matrix_sdk::Client) -> SearchCoverageView {
         let index = self.search_index.lock().await;
-        let documents = index.stored_documents();
-        let full = index.is_full();
+        let documents = index.documents().await;
+        let full = index.is_full().await;
         drop(index);
 
         let progress = self.search_crawl.lock().await;
@@ -727,13 +710,9 @@ impl Core {
 
     pub(crate) async fn search_metrics(&self, client: &matrix_sdk::Client) -> SearchMetricsView {
         let index = self.search_index.lock().await;
-        let documents = index.stored_documents();
-        let documents_loaded = index.documents();
-        let (memory_budget, disk_budget) = index.budgets();
-        let memory_bytes = index.memory();
-        let disk_bytes = index.disk();
-        let rooms_indexed = index.rooms.len();
-        let rooms_unreadable = index.unreadable.len();
+        let stats = index.stats().await.unwrap_or_default();
+        let disk_budget = index.disk_budget();
+        let rooms_indexed = index.rooms().await.len();
         drop(index);
 
         let rooms = client.joined_rooms();
@@ -742,11 +721,13 @@ impl Core {
 
         SearchMetricsView {
             phase: metrics.phase,
-            documents,
-            documents_loaded,
-            memory_bytes,
-            memory_budget,
-            disk_bytes,
+            documents: stats.documents,
+            documents_loaded: stats.documents,
+            memory_bytes: stats.memory_used,
+            memory_budget: stats.memory_budget,
+            disk_bytes: stats.disk,
+            disk_index_bytes: stats.disk_index,
+            disk_bookkeeping_bytes: stats.disk_bookkeeping,
             disk_budget,
             rooms_joined: rooms.len(),
             rooms_indexed,
@@ -757,7 +738,6 @@ impl Core {
             rooms_exhausted: progress.exhausted.len(),
             rooms_failed: progress.failed.len(),
             rooms_blind: progress.blind_rooms(),
-            rooms_unreadable,
             events_crawled: progress.events,
             event_budget: progress.tuning.max_events as usize,
             batches: metrics.batches,
@@ -778,7 +758,7 @@ impl Core {
         let rooms = client.joined_rooms();
         self.settle_one_encryption_state(&rooms).await;
 
-        let candidates: Vec<(&RoomId, bool, usize)> = {
+        let candidates: Vec<(&RoomId, bool, usize, bool)> = {
             let progress = self.search_crawl.lock().await;
             let tiered = rooms.iter().all(|room| {
                 !room.encryption_state().is_unknown() || progress.probed.contains(room.room_id())
@@ -795,18 +775,29 @@ impl Core {
                         room.room_id(),
                         tiered && crawls_first(room),
                         progress.visits.get(room.room_id()).copied().unwrap_or(0),
+                        progress.holes.contains_key(room.room_id()),
                     )
                 })
                 .collect()
         };
 
         let index = self.search_index.lock().await;
-        candidates
+        let mut ranked = Vec::with_capacity(candidates.len());
+        for (room_id, first, visits, holed) in candidates {
+            ranked.push((
+                (
+                    !holed,
+                    !first,
+                    visits,
+                    Reverse(index.newest_in(room_id).await),
+                ),
+                room_id,
+            ));
+        }
+        ranked
             .into_iter()
-            .min_by_key(|&(room_id, first, visits)| {
-                (!first, visits, Reverse(index.newest_in(room_id)))
-            })
-            .map(|(room_id, ..)| room_id.to_owned())
+            .min_by(|(left, _), (right, _)| left.cmp(right))
+            .map(|(_, room_id)| room_id.to_owned())
     }
 
     async fn settle_one_encryption_state(&self, rooms: &[Room]) {
@@ -903,6 +894,7 @@ impl Core {
             .lock()
             .await
             .floor_of(room_id)
+            .await
             .max(now_ms().saturating_sub(CRAWL_MAX_AGE_MS));
         let below = |floor: u64| {
             floor > 0
@@ -961,6 +953,24 @@ impl Core {
     }
 
     pub(super) async fn crawl_once(
+        &self,
+        client: &matrix_sdk::Client,
+        room_id: &OwnedRoomId,
+    ) -> matrix_sdk::Result<CrawlOutcome> {
+        let hole = self.search_crawl.lock().await.holes.get(room_id).cloned();
+        let Some(hole) = hole else {
+            return self.crawl_back(client, room_id).await;
+        };
+        let event_cache = client
+            .event_cache()
+            .ok_or_else(|| matrix_sdk::Error::UnknownError("event cache is disabled".into()))?;
+        let Some(room) = client.get_room(room_id) else {
+            return Ok(CrawlOutcome::gone());
+        };
+        self.fill_hole(event_cache, &room, hole).await
+    }
+
+    async fn crawl_back(
         &self,
         client: &matrix_sdk::Client,
         room_id: &OwnedRoomId,
@@ -1039,18 +1049,18 @@ impl Core {
                 .iter()
                 .filter_map(|event| event.timestamp_raw().map(|ts| u64::from(ts.get())))
                 .min();
+            let bans = super::ban::bans_in(&messages.chunk);
             let mut events = messages.chunk;
             events.reverse();
 
             self.search_crawl.lock().await.ingesting = Some(room_id.clone());
 
-            let (fresh, revision) = {
-                let mut index = self.search_index.lock().await;
-                let fresh = index
-                    .ingest_with(room_id, events, &cache, &rules, true)
-                    .await;
-                (fresh, index.revision(room_id))
-            };
+            let fresh = self
+                .search_index
+                .lock()
+                .await
+                .ingest_with(room_id, events, &cache, &rules, true)
+                .await;
 
             let mut progress = self.search_crawl.lock().await;
             progress.ingesting = None;
@@ -1066,11 +1076,127 @@ impl Core {
                     .and_modify(|previous| *previous = (*previous).min(frontier))
                     .or_insert(frontier);
             }
-            progress.awaiting.insert(room_id.clone(), revision);
             progress.events = progress.events.saturating_add(fresh);
+            drop(progress);
+            self.settle_bans(&room, bans).await;
+            self.refetch_unedited(&room, &cache, &rules).await;
         }
 
         Ok(CrawlOutcome::Batch(outcome))
+    }
+}
+
+impl Core {
+    /// Pages forward from the newest event indexed before a limited sync until
+    /// the batch that sync delivered, which the live pass has indexed already.
+    async fn fill_hole(
+        &self,
+        event_cache: &matrix_sdk::event_cache::EventCache,
+        room: &Room,
+        hole: Hole,
+    ) -> matrix_sdk::Result<CrawlOutcome> {
+        let room_id = room.room_id().to_owned();
+        let from = if let Some(token) = hole.token.clone() {
+            token
+        } else {
+            let Some(context) = self
+                .search_network
+                .run(room.event_with_context(&hole.anchor, false, UInt::MIN, None))
+                .await
+            else {
+                return Ok(CrawlOutcome::Paused);
+            };
+            match context.map(|context| context.next_batch_token) {
+                Ok(Some(token)) => token,
+                Ok(None) => return Ok(self.close_hole(&room_id).await),
+                Err(error)
+                    if error
+                        .as_client_api_error()
+                        .is_some_and(|api| api.status_code.as_u16() == 404) =>
+                {
+                    return Ok(self.close_hole(&room_id).await);
+                }
+                Err(error) => return Err(error),
+            }
+        };
+
+        let batch = self.search_crawl.lock().await.tuning.batch;
+        let mut request = get_message_events::v3::Request::new(room_id.clone(), Direction::Forward);
+        request.from = Some(from);
+        request.limit = UInt::from(batch);
+        request.filter.not_types = vec!["m.reaction".to_owned()];
+        let requested = now_ms();
+        let Some(messages) = self
+            .search_network
+            .run(self.crawl_page(room, request))
+            .await
+        else {
+            return Ok(CrawlOutcome::Paused);
+        };
+        let messages = messages?;
+        {
+            let mut progress = self.search_crawl.lock().await;
+            progress.visit(&room_id);
+            progress.metrics.request(now_ms().saturating_sub(requested));
+        }
+        if room.state() != RoomState::Joined {
+            return Ok(CrawlOutcome::gone());
+        }
+
+        let closed = messages.end.is_none()
+            || messages.chunk.is_empty()
+            || messages
+                .chunk
+                .iter()
+                .any(|event| event.event_id() == Some(hole.until.as_ref()));
+        let gap = messages.chunk.iter().any(|event| event.kind.is_utd());
+        let readable = !gap;
+        let bans = super::ban::bans_in(&messages.chunk);
+        let (cache, _drop_handles) = event_cache.room(&room_id).await?;
+        let rules = room.clone_info().room_version_rules_or_default().redaction;
+
+        self.search_crawl.lock().await.ingesting = Some(room_id.clone());
+        let fresh = self
+            .search_index
+            .lock()
+            .await
+            .ingest_with(&room_id, messages.chunk, &cache, &rules, true)
+            .await;
+        {
+            let mut progress = self.search_crawl.lock().await;
+            progress.ingesting = None;
+            if gap {
+                progress.gapped.insert(room_id.clone());
+            }
+            progress.events = progress.events.saturating_add(fresh);
+            progress.changed = true;
+            if closed {
+                progress.holes.remove(&room_id);
+            } else if let Some(open) = progress.holes.get_mut(&room_id) {
+                open.token = messages.end;
+            }
+        }
+        self.settle_bans(room, bans).await;
+        self.refetch_unedited(room, &cache, &rules).await;
+
+        Ok(CrawlOutcome::Batch(CrawlBatch {
+            reached_start: false,
+            exhausted: false,
+            undecryptable: 0,
+            readable,
+        }))
+    }
+
+    async fn close_hole(&self, room_id: &OwnedRoomId) -> CrawlOutcome {
+        let mut progress = self.search_crawl.lock().await;
+        progress.holes.remove(room_id);
+        progress.changed = true;
+        CrawlOutcome::Batch(CrawlBatch {
+            reached_start: false,
+            exhausted: false,
+            undecryptable: 0,
+            readable: true,
+        })
     }
 }
 
@@ -1678,60 +1804,6 @@ mod tests {
     }
 
     #[test]
-    fn test_a_discarded_index_does_not_keep_its_room_written_off() {
-        let mut progress = CrawlProgress::default();
-        progress.discard(room());
-
-        progress.restore(BTreeMap::from([(
-            room(),
-            StoredCrawlRoom {
-                shared_resume: false,
-                frontier: None,
-                gapped: false,
-                token: None,
-                reached_start: true,
-                cover: None,
-            },
-        )]));
-
-        assert!(!progress.skips(&room()));
-        assert!(
-            progress
-                .changed_checkpoints(&HashSet::new())
-                .is_some_and(|checkpoints| checkpoints.is_empty()),
-            "the stale checkpoint must be rewritten away"
-        );
-    }
-
-    #[async_test]
-    async fn test_checkpoints_written_by_main_survive_the_upgrade() {
-        let server = MatrixMockServer::new().await;
-        let client = server.client_builder().build().await;
-        client
-            .state_store()
-            .set_custom_value(
-                b"sable.search.crawl",
-                serde_json::to_vec(&serde_json::json!({
-                    "version": 3,
-                    "rooms": { "!crawled:localhost": { "token": "t42", "reached_start": false } },
-                }))
-                .expect("json"),
-            )
-            .await
-            .expect("stored");
-
-        let stored = super::super::persist::load_crawl(&client).await;
-
-        assert_eq!(
-            stored
-                .rooms
-                .get(&room())
-                .and_then(|room| room.token.as_deref()),
-            Some("t42")
-        );
-    }
-
-    #[test]
     fn test_legacy_checkpoints_do_not_advertise_coverage() {
         for reached_start in [false, true] {
             let stored: StoredCrawlRoom = serde_json::from_value(serde_json::json!({
@@ -1758,74 +1830,17 @@ mod tests {
     #[test]
     fn test_checkpoints_are_only_rewritten_when_they_change() {
         let mut progress = CrawlProgress::default();
-        assert!(progress.changed_checkpoints(&HashSet::new()).is_none());
+        assert!(progress.changed_checkpoints().is_none());
 
         progress.advance(&room(), Some("next".to_owned()));
-        assert!(progress.changed_checkpoints(&HashSet::new()).is_some());
-        assert!(progress.changed_checkpoints(&HashSet::new()).is_none());
+        assert!(progress.changed_checkpoints().is_some());
+        assert!(progress.changed_checkpoints().is_none());
 
         progress.visit(&room());
         assert!(
-            progress.changed_checkpoints(&HashSet::new()).is_none(),
+            progress.changed_checkpoints().is_none(),
             "a visit is not a checkpoint"
         );
-    }
-
-    #[async_test]
-    async fn test_a_checkpoint_is_not_persisted_ahead_of_the_documents_it_skips() {
-        let server = MatrixMockServer::new().await;
-        let client = server.client_builder().build().await;
-
-        let room_id = room();
-        let factory = EventFactory::new()
-            .room(&room_id)
-            .sender(user_id!("@kris:localhost"))
-            .server_ts(super::now_ms());
-        server.mock_room_state_encryption().plain().mount().await;
-        let joined = server
-            .sync_room(
-                &client,
-                JoinedRoomBuilder::new(&room_id)
-                    .set_timeline_limited()
-                    .set_timeline_prev_batch("previous"),
-            )
-            .await;
-        server
-            .mock_room_messages()
-            .ok(RoomMessagesResponseTemplate::default()
-                .events(vec![factory.text_msg("older archaeology")])
-                .end_token("deeper"))
-            .mount()
-            .await;
-
-        let (core, _events) = crate::Core::new(
-            "crawl-durable-checkpoint",
-            Box::new(crate::store::MemorySessionStore::default()),
-        );
-        core.crawl_once(&client, &room_id)
-            .await
-            .expect("crawl one batch");
-
-        core.save_changed_checkpoints(&client).await;
-        assert!(
-            !super::persist::load_crawl(&client)
-                .await
-                .rooms
-                .contains_key(&room_id)
-        );
-
-        core.flush_search_index(&client).await;
-        core.save_changed_checkpoints(&client).await;
-        assert_eq!(
-            super::persist::load_crawl(&client)
-                .await
-                .rooms
-                .get(&room_id)
-                .and_then(|room| room.token.as_deref()),
-            Some("deeper")
-        );
-
-        drop(joined);
     }
 
     #[async_test]
@@ -1862,19 +1877,17 @@ mod tests {
         core.crawl_once(&client, &room_id)
             .await
             .expect("crawl one batch");
-        core.flush_search_index(&client).await;
-        core.save_changed_checkpoints(&client).await;
+        core.save_changed_checkpoints().await;
         assert_eq!(core.search_crawl.lock().await.checkpoint_writes, 1);
         assert!(core.checkpoint_batch_open().await, "a busy crawl batches");
 
         for _ in 0..3 {
-            core.save_changed_checkpoints(&client).await;
+            core.save_changed_checkpoints().await;
         }
         core.crawl_once(&client, &room_id)
             .await
             .expect("crawl the same batch again");
-        core.flush_search_index(&client).await;
-        core.save_changed_checkpoints(&client).await;
+        core.save_changed_checkpoints().await;
         assert_eq!(
             core.search_crawl.lock().await.checkpoint_writes,
             1,
@@ -1919,10 +1932,9 @@ mod tests {
             Box::new(crate::store::MemorySessionStore::default()),
         );
         {
-            let mut index = core.search_index.lock().await;
-            let mut room_index = super::super::RoomIndex::new();
-            room_index.floor = super::now_ms();
-            index.rooms.insert(room_id.clone(), room_index);
+            let index = core.search_index.lock().await;
+            crate::search::exec::block_on(index.store().set_floor(&room_id, super::now_ms()))
+                .unwrap();
         }
 
         let outcome = core
@@ -1936,7 +1948,7 @@ mod tests {
                 ..
             })
         ));
-        assert_eq!(core.search_index.lock().await.documents(), 0);
+        assert_eq!(core.search_index.lock().await.documents().await, 0);
 
         drop(joined);
     }
@@ -1984,7 +1996,6 @@ mod tests {
                 resume: None,
                 stops: true,
             },
-            0,
         );
 
         let outcome = core
@@ -1998,7 +2009,7 @@ mod tests {
                 ..
             })
         ));
-        assert_eq!(core.search_index.lock().await.documents(), 0);
+        assert_eq!(core.search_index.lock().await.documents().await, 0);
 
         drop(joined);
     }
@@ -2046,7 +2057,6 @@ mod tests {
                 resume: Some("resume-here".to_owned()),
                 stops: true,
             },
-            0,
         );
 
         let outcome = core
@@ -2104,9 +2114,8 @@ mod tests {
             Box::new(crate::store::MemorySessionStore::default()),
         );
         {
-            let mut index = core.search_index.lock().await;
-            let room_index = super::super::RoomIndex::new();
-            index.rooms.insert(room_id.clone(), room_index);
+            let index = core.search_index.lock().await;
+            index.ensure_room(&room_id);
         }
 
         let outcome = core
@@ -2120,7 +2129,7 @@ mod tests {
                 ..
             })
         ));
-        assert_eq!(core.search_index.lock().await.documents(), 0);
+        assert_eq!(core.search_index.lock().await.documents().await, 0);
 
         drop(joined);
     }
@@ -2267,6 +2276,7 @@ mod tests {
                     stops: false,
                     ..super::Cover::default()
                 }),
+                hole: None,
             },
         )]));
         assert!(progress.reject_shared_resume(&room));

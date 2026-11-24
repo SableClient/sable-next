@@ -107,6 +107,15 @@
       <SettingsRow id="search-disk" title={i18n.t('settings.developerSearchDisk')}>
         <code>{bytes(metrics.disk_bytes, metrics.disk_budget)}</code>
       </SettingsRow>
+      <SettingsRow id="search-disk-index" title={i18n.t('settings.developerSearchDiskIndex')}>
+        <code>{bytes(metrics.disk_index_bytes, metrics.disk_bytes)}</code>
+      </SettingsRow>
+      <SettingsRow
+        id="search-disk-bookkeeping"
+        title={i18n.t('settings.developerSearchDiskBookkeeping')}
+      >
+        <code>{bytes(metrics.disk_bookkeeping_bytes, metrics.disk_bytes)}</code>
+      </SettingsRow>
       <SettingsRow id="search-events" title={i18n.t('settings.developerSearchEvents')}>
         <code>{ratio(metrics.events_crawled, metrics.event_budget)}</code>
       </SettingsRow>
@@ -148,12 +157,6 @@
       </SettingsRow>
       <SettingsRow id="search-rooms-blind" title={i18n.t('settings.developerSearchRoomsBlind')}>
         <code>{count(metrics.rooms_blind)}</code>
-      </SettingsRow>
-      <SettingsRow
-        id="search-rooms-unreadable"
-        title={i18n.t('settings.developerSearchRoomsUnreadable')}
-      >
-        <code>{count(metrics.rooms_unreadable)}</code>
       </SettingsRow>
     </ul>
   {:else if unavailable}

@@ -388,7 +388,7 @@ fn shared_coverage_keeps_gaps_and_local_crawl_progress() {
 async fn a_stale_peer_does_not_replace_a_newer_local_edit() {
     use crate::search::{MessageIndex, tests::in_room};
     let room = matrix_sdk::ruma::room_id!("!peer:localhost").to_owned();
-    let mut index = MessageIndex::new();
+    let index = MessageIndex::new();
     let mut local = document("edited", "revised", "@kris:localhost", 10, None, Vec::new());
     local.edited_at = Some(30);
     index
@@ -518,27 +518,6 @@ async fn live_core(
     core.watch_search_peers(client, generation);
     core.watch_rtc(client, generation);
     (core, events)
-}
-
-#[tokio::test]
-async fn a_session_ending_during_a_copy_does_not_deadlock() {
-    let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
-    let client = server.client_builder().build().await;
-    let (core, _events) = live_core(&client, "peer-teardown").await;
-    let flushing = core.search_flush.lock().await;
-    let copying = core.copying_session().await.unwrap();
-    let ending = core.take_session();
-    tokio::pin!(ending);
-    assert!(futures_util::poll!(ending.as_mut()).is_pending());
-    drop(flushing);
-
-    let saving = core.save_rooms(&client, Vec::new());
-    tokio::pin!(saving);
-    tokio::time::timeout(Duration::from_secs(5), saving)
-        .await
-        .expect("a copy must be able to save while a session is ending");
-    drop(copying);
-    assert!(ending.await.is_some());
 }
 
 #[tokio::test]
@@ -696,7 +675,7 @@ async fn verified_devices_copy_history_and_changes() {
     reopen(&writer, &target, &id, [&source, &reader]);
     assert_eq!(exchange(&writer, &target, &id).await, 0);
 
-    let event_id = super::super::settled_history(&source, &room)
+    let event_id = super::super::settled_history(&writer.search_store().await, &room)
         .await
         .unwrap()
         .documents

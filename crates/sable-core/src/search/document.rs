@@ -311,6 +311,39 @@ pub(super) fn indexable_body(body: &str) -> String {
 }
 
 pub(super) fn message_text(msgtype: &MessageType, raw: Option<&serde_json::Value>) -> String {
+    let mut text = media_text(msgtype, raw);
+    for extra in extra_text(raw) {
+        if !extra.is_empty() && !text.contains(&extra) {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(&extra);
+        }
+    }
+    text
+}
+
+/// Text a message carries beside its body: a forum thread's title and the name
+/// of the persona that sent it. An edit's own are in `m.new_content`.
+fn extra_text(raw: Option<&serde_json::Value>) -> Vec<String> {
+    let Some(content) = raw.map(|raw| raw.get("m.new_content").unwrap_or(raw)) else {
+        return Vec::new();
+    };
+    let formatted = content
+        .get("formatted_body")
+        .and_then(serde_json::Value::as_str)
+        .map(crate::matrix_html::html_only_text)
+        .unwrap_or_default();
+    let title = content
+        .get(crate::view::FORUM_TITLE)
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    let persona =
+        crate::view::per_message_profile(Some(content)).and_then(|profile| profile.display_name);
+    title.into_iter().chain(persona).chain(formatted).collect()
+}
+
+fn media_text(msgtype: &MessageType, raw: Option<&serde_json::Value>) -> String {
     let body = crate::view::authored_body(msgtype.body(), raw);
     let filenames = match msgtype {
         MessageType::Gallery(gallery) => crate::view::gallery_filenames(gallery),
@@ -440,21 +473,92 @@ fn poll_document<'text>(
     }
 }
 
+/// Whether the timeline shows this state event as forged, which search must not index either.
+pub(super) fn forged_state_event(event: &TimelineEvent) -> bool {
+    crate::view::forged_state_event(event.encryption_info().is_some())
+}
+
+/// A message of the extensible kind, which has no `msgtype`: its plain text block.
+/// `raw` is the whole event.
+pub(super) fn extensible_text_document(raw: &serde_json::Value) -> Option<Document> {
+    let content = raw.get("content")?;
+    let block = content
+        .get("m.text")
+        .or_else(|| content.get("org.matrix.msc1767.text"))?
+        .as_array()?;
+    let body = block
+        .iter()
+        .find(|part| part.get("mimetype").is_none_or(|mime| mime == "text/plain"))?
+        .get("body")?
+        .as_str()?
+        .to_owned();
+    plain_document(raw, body)
+}
+
+/// A calendar event, with the uid that its later updates share.
+pub(super) fn calendar_document(raw: &serde_json::Value) -> Option<(Document, String)> {
+    let item = sable_model::calendar::read_entry(
+        raw.get("event_id")?.as_str()?,
+        raw.get("sender")?.as_str()?,
+        raw.get("content")?,
+    )?;
+    let body = [item.title, item.description, item.location]
+        .into_iter()
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    Some((plain_document(raw, body)?, item.uid))
+}
+
+fn plain_document(raw: &serde_json::Value, body: String) -> Option<Document> {
+    Some(Document {
+        event_id: raw
+            .get("event_id")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|id| id.try_into().ok())?,
+        has_link: contains_link(&body),
+        folded: String::new(),
+        body,
+        sender: raw
+            .get("sender")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|id| id.try_into().ok())?,
+        origin_server_ts: raw
+            .get("origin_server_ts")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0),
+        attachments: Vec::new(),
+        mentions: Vec::new(),
+        in_thread: false,
+        edited_at: None,
+        edit_id: None,
+        encrypted: None,
+        media: Vec::new(),
+        state: false,
+    })
+}
+
 pub(super) fn state_document(
     state: &AnySyncStateEvent,
     content: Option<&serde_json::Value>,
 ) -> Document {
-    let body = content
-        .and_then(serde_json::Value::as_object)
-        .map(|fields| {
-            fields
-                .values()
-                .filter_map(serde_json::Value::as_str)
-                .filter(|value| !value.is_empty())
-                .collect::<Vec<_>>()
-                .join("\n")
-        })
-        .unwrap_or_default();
+    let text = |key: &str| content.and_then(|content| content.get(key)?.as_str());
+    let body = match state.event_type().to_string().as_str() {
+        "m.room.name" => text("name"),
+        "m.room.topic" => text("topic").or_else(|| {
+            content?
+                .get("m.topic")?
+                .get("m.text")?
+                .as_array()?
+                .first()?
+                .get("body")?
+                .as_str()
+        }),
+        "m.room.member" => text("displayname"),
+        _ => None,
+    }
+    .unwrap_or_default()
+    .to_owned();
     Document {
         event_id: state.event_id().to_owned(),
         has_link: false,
@@ -636,6 +740,164 @@ pub(super) fn edited_document(
 mod tests {
     use serde_json::json;
 
+    fn html_message(body: &str, formatted: &str) -> String {
+        let content = json!({ "msgtype": "m.text", "body": body, "format": "org.matrix.custom.html", "formatted_body": formatted });
+        let event: super::OriginalSyncRoomMessageEvent = serde_json::from_value(json!({
+            "type": "m.room.message", "event_id": "$h", "sender": "@a:localhost",
+            "origin_server_ts": 1, "content": &content
+        }))
+        .unwrap();
+        super::document_of(&event, Some(&content), false).body
+    }
+
+    #[test]
+    fn the_target_of_a_link_is_searchable() {
+        let body = html_message("see docs", "see <a href=\"https://example.org/x\">docs</a>");
+        assert!(body.contains("https://example.org/x"));
+        assert!(
+            !html_message(
+                "see https://example.org/x",
+                "see <a href=\"https://example.org/x\">https://example.org/x</a>"
+            )
+            .contains("x\nhttps")
+        );
+    }
+
+    #[test]
+    fn a_spoiler_reason_and_a_custom_emote_are_searchable_but_a_quoted_reply_is_not() {
+        let body = html_message(
+            "hi",
+            "<mx-reply><blockquote><a href=\"https://quoted.example\">q</a></blockquote></mx-reply>\
+             <span data-mx-spoiler=\"film ending\">secret</span> <img data-mx-emoticon src=\"mxc://x/y\" alt=\":blobcat:\">",
+        );
+        assert!(body.contains("film ending"));
+        assert!(body.contains(":blobcat:"));
+        assert!(!body.contains("quoted.example"));
+    }
+
+    #[test]
+    fn a_decrypted_state_event_is_forged_and_a_plain_one_is_not() {
+        use matrix_sdk::deserialized_responses::{
+            AlgorithmInfo, DecryptedRoomEvent, EncryptionInfo, TimelineEvent, VerificationState,
+        };
+        let event = json!({
+            "type": "m.room.name", "event_id": "$s", "state_key": "", "sender": "@a:localhost",
+            "origin_server_ts": 1, "content": { "name": "Fake" }
+        });
+        let plain = TimelineEvent::from_plaintext(serde_json::from_value(event.clone()).unwrap());
+        let decrypted = TimelineEvent::from_decrypted(
+            DecryptedRoomEvent {
+                event: serde_json::from_value(event).unwrap(),
+                encryption_info: std::sync::Arc::new(EncryptionInfo {
+                    sender: matrix_sdk::ruma::user_id!("@a:localhost").to_owned(),
+                    sender_device: None,
+                    forwarder: None,
+                    algorithm_info: AlgorithmInfo::MegolmV1AesSha2 {
+                        curve25519_key: String::new(),
+                        sender_claimed_keys: std::collections::BTreeMap::new(),
+                        session_id: None,
+                    },
+                    verification_state: VerificationState::Verified,
+                }),
+                unsigned_encryption_info: None,
+            },
+            None,
+        );
+
+        assert!(!super::forged_state_event(&plain));
+        assert!(super::forged_state_event(&decrypted));
+    }
+
+    #[test]
+    fn an_extensible_text_message_is_searchable() {
+        let raw = json!({
+            "type": "m.message", "event_id": "$m", "sender": "@a:localhost", "origin_server_ts": 4,
+            "content": { "m.text": [
+                { "body": "<b>hello</b>", "mimetype": "text/html" },
+                { "body": "hello extensible" }
+            ] }
+        });
+        assert_eq!(
+            super::extensible_text_document(&raw).unwrap().body,
+            "hello extensible"
+        );
+    }
+
+    #[test]
+    fn a_calendar_events_title_description_and_place_are_searchable() {
+        let raw = json!({
+            "type": "chat.commet.calendar_events", "event_id": "$c", "sender": "@a:localhost",
+            "origin_server_ts": 9,
+            "content": {
+                "uid": "u1", "start": "2030-01-01T10:00", "title": "Sprint review",
+                "description": "Demo day", "locations": { "l": { "name": "Room 4" } }
+            }
+        });
+        let (document, uid) = super::calendar_document(&raw).unwrap();
+        assert_eq!(uid, "u1");
+        assert!(document.body.contains("Sprint review"));
+        assert!(document.body.contains("Demo day"));
+    }
+
+    fn message(content: &serde_json::Value) -> super::Document {
+        let event: super::OriginalSyncRoomMessageEvent = serde_json::from_value(json!({
+            "type": "m.room.message", "event_id": "$m", "sender": "@a:localhost",
+            "origin_server_ts": 1, "content": content
+        }))
+        .unwrap();
+        super::document_of(&event, Some(content), false)
+    }
+
+    #[test]
+    fn a_forum_thread_title_is_searchable() {
+        let document = message(&json!({
+            "msgtype": "m.text", "body": "hi", "moe.sable.forum.title": "Roadmap Q4"
+        }));
+        assert_eq!(document.body, "hi\nRoadmap Q4");
+    }
+
+    #[test]
+    fn a_personas_name_is_searchable() {
+        let document = message(&json!({
+            "msgtype": "m.text", "body": "hello",
+            "m.per_message_profile": { "id": "ada", "displayname": "Ada Lovelace" }
+        }));
+        assert_eq!(document.body, "hello\nAda Lovelace");
+    }
+
+    #[test]
+    fn only_the_text_of_state_events_is_indexed() {
+        let state = |kind: &str, key: &str, content: serde_json::Value| {
+            let event: super::AnySyncStateEvent = serde_json::from_value(json!({
+                "type": kind, "event_id": "$s", "state_key": key,
+                "sender": "@a:localhost", "origin_server_ts": 1, "content": content
+            }))
+            .unwrap();
+            super::state_document(&event, Some(&content)).body
+        };
+        assert_eq!(state("m.room.name", "", json!({ "name": "Crew" })), "Crew");
+        assert_eq!(
+            state(
+                "m.room.member",
+                "@a:localhost",
+                json!({ "membership": "join", "displayname": "Ada" })
+            ),
+            "Ada"
+        );
+        assert_eq!(
+            state("m.room.join_rules", "", json!({ "join_rule": "invite" })),
+            ""
+        );
+        assert_eq!(
+            state(
+                "m.room.avatar",
+                "",
+                json!({ "url": "mxc://localhost/avatar" })
+            ),
+            ""
+        );
+    }
+
     #[test]
     fn a_sticker_is_searchable_by_its_description() {
         let sticker: super::OriginalSyncStickerEvent = serde_json::from_value(json!({
@@ -696,7 +958,7 @@ mod tests {
 
         assert_eq!(
             super::message_text(&text("Kris: hello"), Some(&profiled)),
-            "hello"
+            "hello\nKris"
         );
         assert_eq!(
             super::message_text(&text("Kris: hello"), None),
@@ -704,7 +966,7 @@ mod tests {
         );
         assert_eq!(
             super::message_text(&text("hello"), Some(&profiled)),
-            "hello"
+            "hello\nKris"
         );
     }
 

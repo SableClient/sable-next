@@ -65,7 +65,6 @@ pub(super) async fn crawl_to_start(core: &Core, client: &Client, room_id: &Owned
             break;
         }
     }
-    core.flush_search_index(client).await;
 }
 
 pub(super) async fn needles(core: &Core, room_id: &OwnedRoomId) -> usize {
