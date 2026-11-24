@@ -10,23 +10,25 @@
   const failedEmotes = new SvelteSet<string>();
 </script>
 
-{#each segments as segment, index (index)}{#if typeof segment === 'string' || failedEmotes.has(segment.source)}{typeof segment ===
-    'string'
-      ? segment
-      : segment.alt}{:else}<MediaImage
-      class="preview-emote"
-      source={segment.source}
-      alt={segment.alt}
-      title={segment.alt}
-      width={64}
-      height={64}
-      original
-      emoticon
-      onfailed={(source) => failedEmotes.add(source)}
-    />{/if}{/each}
+<span class="preview-segments"
+  >{#each segments as segment, index (index)}{#if typeof segment === 'string' || failedEmotes.has(segment.source)}{typeof segment ===
+      'string'
+        ? segment
+        : segment.alt}{:else}<MediaImage
+        class="preview-emote"
+        source={segment.source}
+        alt={segment.alt}
+        title={segment.alt}
+        width={64}
+        height={64}
+        original
+        emoticon
+        onfailed={(source) => failedEmotes.add(source)}
+      />{/if}{/each}</span
+>
 
 <style>
-  :global(.preview-emote) {
+  .preview-segments :global(.preview-emote) {
     display: inline-block;
     height: 1.25em;
     max-width: 6em;

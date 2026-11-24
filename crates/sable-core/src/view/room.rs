@@ -345,7 +345,14 @@ fn message_preview(msgtype: &MessageType, content: Option<&serde_json::Value>) -
         MessageType::Location(_) => Preview::labelled(LatestEventKind::Location, None),
         other => Preview {
             emotes: crate::preview::message_emotes(other),
-            ..Preview::text(&authored_body(other.body(), content))
+            ..Preview::text(
+                &content
+                    .and_then(crate::notifications::push_preview)
+                    .map_or_else(
+                        || authored_body(other.body(), content),
+                        |text| authored_body(&text, None),
+                    ),
+            )
         },
     }
 }
@@ -940,6 +947,27 @@ mod tests {
         assert_eq!(
             message_preview(&message.msgtype, Some(&content)),
             Preview::text("hi")
+        );
+    }
+
+    #[test]
+    fn a_rich_text_preview_shows_emotes_by_their_alt_text() {
+        let content = serde_json::json!({
+            "msgtype": "m.text",
+            "body": "Eve: hi :love:",
+            "format": "org.matrix.custom.html",
+            "formatted_body": "<strong data-mx-profile-fallback>Eve: </strong>hi <img data-mx-emoticon src=\"mxc://example.org/love\" alt=\"love\">",
+            "com.beeper.per_message_profile": {"displayname": "Eve", "has_fallback": true}
+        });
+        let message: RoomMessageEventContent = serde_json::from_value(content.clone()).unwrap();
+        let preview = message_preview(&message.msgtype, Some(&content));
+        assert_eq!(preview.body, "hi love");
+        assert_eq!(
+            preview.emotes,
+            [PreviewEmote {
+                alt: "love".to_owned(),
+                source: "mxc://example.org/love".to_owned(),
+            }]
         );
     }
 
