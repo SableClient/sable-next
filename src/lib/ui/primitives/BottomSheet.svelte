@@ -45,6 +45,7 @@
   let dragOffset = $state(0);
   let dragDelta = 0;
   let expanded = $state(false);
+  let liftedHeight = $state<number | null>(null);
   let dismissing = $state(false);
   let body = $state<HTMLElement | null>(null);
   let suppressClick = false;
@@ -60,6 +61,7 @@
     if (!open) {
       pointerId = null;
       dragOffset = 0;
+      liftedHeight = null;
       expanded = false;
     } else {
       dismissing = false;
@@ -157,6 +159,8 @@
     let originX = 0;
     let originY = 0;
     let moved = 0;
+    let startHeight = 0;
+    let maxHeight = 0;
     const velocity = new Velocity();
 
     function start(event: TouchEvent): void {
@@ -190,17 +194,23 @@
         }
         touchDragging = true;
         suppressClick = true;
+        const sheet = node.closest('.dialog-content');
+        startHeight = sheetHeight();
+        maxHeight = sheet ? Number.parseFloat(getComputedStyle(sheet).maxHeight) : startHeight;
       }
       event.preventDefault();
       velocity.track(touch.clientY, event.timeStamp);
       moved = deltaY;
-      dragOffset = expandable ? deltaY : Math.max(0, deltaY);
+      dragOffset = Math.max(0, deltaY);
+      // Growing instead of translating keeps the sheet on the bottom edge and its top on screen.
+      liftedHeight = deltaY < 0 && canExpand() ? Math.min(startHeight - deltaY, maxHeight) : null;
     }
 
     function end(): void {
       claimable = false;
       if (!touchDragging) return;
       touchDragging = false;
+      liftedHeight = null;
       settle(moved, velocity.value);
     }
 
@@ -249,13 +259,16 @@
     : dismissing
       ? 'sheet-dismissing'
       : 'sheet-settling'}
-  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight || expanded ? 'height: calc(100dvh - var(--safe-top) - var(--keyboard-overlap) - var(--space-300) * 2);' : ''} transform: translateY(${dismissing ? '100%' : `${String(dragOffset)}px`})`}
+  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight || expanded ? 'height: calc(100dvh - var(--safe-top) - var(--keyboard-overlap) - var(--space-300) * 2);' : liftedHeight !== null ? `height: ${String(liftedHeight)}px;` : ''} transform: translateY(${dismissing ? '100%' : `${String(dragOffset)}px`})`}
   {onOpenChange}
   {onOpenAutoFocus}
 >
   <div
     bind:this={body}
-    class={['sheet-body', { 'content-inset': contentInset, expanded }]}
+    class={[
+      'sheet-body',
+      { 'content-inset': contentInset, expanded: expanded || liftedHeight !== null },
+    ]}
     role="presentation"
     onclickcapture={contentClick}
     onpointerdown={startContentDrag}

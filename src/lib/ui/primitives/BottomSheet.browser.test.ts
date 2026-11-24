@@ -110,3 +110,22 @@ test('a downward swipe dismisses only once the sheet content is scrolled to its 
   body.scrollTop = 0;
   expect(swipeClaimed()).toBe(true);
 });
+
+test('an upward swipe grows an expandable sheet without lifting it off the bottom edge', async () => {
+  const screen = await render(Harness, { expandable: true });
+  const dialog = screen.getByRole('dialog', { name: 'Options' });
+  await expect.element(dialog).toBeVisible();
+  const option = screen.getByRole('button', { name: 'Option 1', exact: true }).element();
+  const at = (clientY: number) => [
+    new Touch({ identifier: 1, target: option, clientX: 100, clientY }),
+  ];
+  const bottom = dialog.element().getBoundingClientRect().bottom;
+
+  option.dispatchEvent(new TouchEvent('touchstart', { touches: at(300), bubbles: true }));
+  option.dispatchEvent(
+    new TouchEvent('touchmove', { touches: at(-400), bubbles: true, cancelable: true })
+  );
+  await expect.poll(() => dialog.element().getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
+  expect(dialog.element().getBoundingClientRect().bottom).toBeCloseTo(bottom, 0);
+  option.dispatchEvent(new TouchEvent('touchend', { bubbles: true }));
+});

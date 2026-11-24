@@ -1,10 +1,11 @@
 <script lang="ts">
   import BottomSheet from './BottomSheet.svelte';
 
-  let { fullHeight = false }: { fullHeight?: boolean } = $props();
+  let { fullHeight = false, expandable = false }: { fullHeight?: boolean; expandable?: boolean } =
+    $props();
 </script>
 
-<BottomSheet open label="Options" closeLabel="Close" {fullHeight}>
+<BottomSheet open label="Options" closeLabel="Close" {fullHeight} {expandable}>
   <div>
     <input aria-label="Filter" />
     {#each Array.from({ length: 12 }, (_, index) => index) as index (index)}
