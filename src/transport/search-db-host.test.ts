@@ -100,3 +100,23 @@ test('a browser without locks starts the worker at once', () => {
   expect(workers).toHaveLength(1);
   expect(core.postMessage).toHaveBeenCalledTimes(1);
 });
+
+test('a worker that cannot start leaves the core connection alone', () => {
+  const failed = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const core = { postMessage: vi.fn() } satisfies CoreEndpoint;
+  const host = createSearchDatabaseHost({
+    locks: undefined,
+    spawn: () => {
+      throw new ReferenceError('Worker is not defined');
+    },
+    channel: () => new MessageChannel(),
+  });
+
+  expect(() => {
+    host.attach(core);
+  }).not.toThrow();
+
+  expect(core.postMessage).not.toHaveBeenCalled();
+  expect(failed).toHaveBeenCalledOnce();
+  failed.mockRestore();
+});

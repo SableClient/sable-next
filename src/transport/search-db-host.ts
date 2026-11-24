@@ -40,8 +40,13 @@ export function createSearchDatabaseHost(deps: SearchDatabaseHostDeps): SearchDa
   }
 
   function own(): Promise<never> {
-    worker = deps.spawn();
-    handOver();
+    // Without the worker the core has no local index and searches the server instead.
+    try {
+      worker = deps.spawn();
+      handOver();
+    } catch (error) {
+      console.error('[sable search] the search database worker could not start', error);
+    }
     // Held until the tab ends, which is what hands the lock on.
     return new Promise<never>(() => {});
   }

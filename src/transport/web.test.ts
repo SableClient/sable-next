@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('../worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
+vi.mock('./search-db-host', () => ({
+  createSearchDatabaseHost: () => ({ attach: vi.fn() }),
+}));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
 
 const { captureException, addBreadcrumb, startSpan, startInactiveSpan, endCoreSpan } = vi.hoisted(

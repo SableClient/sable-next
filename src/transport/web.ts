@@ -142,6 +142,8 @@ function openSharedWorker(): CoreConnection {
   prewarmed = null;
   const generation = adopted?.generation ?? readGeneration();
   const worker = adopted?.worker ?? openWorker(generation);
+  // Only the WASM core keeps its index in the browser. A native core has SQLite of its own.
+  searchDatabase.attach(worker.port);
 
   return {
     port: worker.port,
@@ -324,7 +326,6 @@ export function createWebTransport(open: () => CoreConnection = openSharedWorker
     };
 
     nextWorker.port.start();
-    searchDatabase.attach(nextWorker.port);
     if (debugLogs) nextWorker.port.postMessage({ debugLogs: true });
     if (typeof document !== 'undefined') {
       nextWorker.port.postMessage({
