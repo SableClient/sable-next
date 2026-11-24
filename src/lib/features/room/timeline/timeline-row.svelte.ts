@@ -22,7 +22,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 import { type TimelineLayout } from '#lib/settings/definitions.js';
 import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
 import { useRoomCosmetics, type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
-import type { MatrixLink } from '#lib/rooms/matrix-link.js';
+import { matrixLinkDestination, parseMatrixLink, type MatrixLink } from '#lib/rooms/matrix-link.js';
 
 import { useSenderColors } from '../members/members.js';
 import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
@@ -356,13 +356,16 @@ export class TimelineRow {
     }));
   };
 
-  #linkActions(event: Event): Pick<MessageActions, 'onCopyHref' | 'onShareHref'> {
-    const link =
-      event.target instanceof Element
-        ? event.target.closest<HTMLAnchorElement>('a[href]')?.href
-        : null;
+  #linkActions(
+    event: Event
+  ): Pick<MessageActions, 'linkDestination' | 'onCopyHref' | 'onShareHref'> {
+    const target = event.target instanceof Element ? event.target : null;
+    const link = target?.closest<HTMLAnchorElement>('a[href]')?.href;
     if (!link || !this.actionable) return {};
+    const concealed = target.closest('[data-mx-spoiler]:not([aria-pressed="false"])');
+    const matrix = concealed ? null : parseMatrixLink(link);
     return {
+      linkDestination: matrix ? matrixLinkDestination(matrix) : undefined,
       onCopyHref: () => {
         void copyText(link)
           .then(() => toasts.info(i18n.t('timeline.linkCopied')))

@@ -36,6 +36,12 @@ export function parseMatrixLink(href: string): MatrixLink | null {
   return parseLink(href, matrixLinkHost());
 }
 
+export function matrixLinkDestination(link: MatrixLink): string {
+  if (link.kind === 'user') return link.user_id;
+  if (link.kind === 'room') return link.room_id;
+  return `${link.room_id}/${link.event_id}`;
+}
+
 /** matrix.to queries live inside the fragment; matrix: queries precede it. */
 export function matrixLinkParameters(href: string): URLSearchParams {
   const resource = /^matrix:/i.test(href)

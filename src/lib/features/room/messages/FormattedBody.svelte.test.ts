@@ -725,17 +725,22 @@ test('leaves out the description when an emoji alt text is just its shortcode', 
   expect(document.querySelector('.emote-card-description')).toBeNull();
 });
 
-test('shows the target of a link whose text differs from it on hover', async () => {
+test.each([
+  ['https://example.com/a', 'click here', 'https://example.com/a'],
+  ['https://matrix.to/#/%23elsewhere:example.org', 'click here', '#elsewhere:example.org'],
+  ['matrix:u/alice:example.org', '@alice', '@alice:example.org'],
+  ['https://link.sable.moe/#/!room:example.org/$event', 'click here', '!room:example.org/$event'],
+])('shows the actual destination of %s on hover', async (href, label, destination) => {
   render(FormattedBodyHarness, {
-    props: { html: '<p><a href="https://example.com/a">click here</a></p>', entries: [] },
+    props: { html: `<p><a href="${href}"><strong>click here</strong></a></p>`, entries: [] },
   });
   await tick();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  await user.hover(screen.getByRole('link', { name: 'click here' }));
+  await user.hover(screen.getByRole('link', { name: label }));
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe('https://example.com/a');
+  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe(destination);
 });
 
 test('closes the link target tooltip when the window loses focus', async () => {
@@ -755,9 +760,12 @@ test('closes the link target tooltip when the window loses focus', async () => {
   expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
 });
 
-test('shows the link target when the link takes keyboard focus', async () => {
+test.each([
+  ['https://example.com/a', 'https://example.com/a'],
+  ['matrix:roomid/room:example.org/e/event', '!room:example.org/$event'],
+])('shows the destination of %s on keyboard focus', async (href, destination) => {
   render(FormattedBodyHarness, {
-    props: { html: '<p><a href="https://example.com/a">click here</a></p>', entries: [] },
+    props: { html: `<p><a href="${href}">click here</a></p>`, entries: [] },
   });
   await tick();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -765,18 +773,36 @@ test('shows the link target when the link takes keyboard focus', async () => {
   await user.tab();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe('https://example.com/a');
+  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe(destination);
 });
 
-test('shows no tooltip for a link whose text is its own address', async () => {
+test.each([
+  ['https://example.com/', 'https://example.com/'],
+  ['matrix:r/room:example.org', '#room:example.org'],
+])('shows no tooltip for %s when its address is already visible', async (href, label) => {
   render(FormattedBodyHarness, {
-    props: { html: '<p><a href="https://example.com/">https://example.com/</a></p>', entries: [] },
+    props: { html: `<p><a href="${href}">${label}</a></p>`, entries: [] },
   });
   await tick();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  await user.hover(screen.getByRole('link', { name: 'https://example.com/' }));
+  await user.hover(screen.getByRole('link', { name: label }));
   await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
+});
+
+test('does not show a Matrix destination through a concealed spoiler', async () => {
+  render(FormattedBodyHarness, {
+    props: {
+      html: '<span data-mx-spoiler><a href="matrix:r/secret:example.org">Room</a></span>',
+      entries: [],
+    },
+  });
+  await tick();
+
+  await user.hover(screen.getByRole('link', { name: 'Room' }));
+  await tick();
 
   expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
 });

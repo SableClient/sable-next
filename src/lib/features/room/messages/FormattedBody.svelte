@@ -34,8 +34,11 @@
     useRoomMediaPreviews,
   } from '../media/room-media-previews.svelte.js';
 
-  import type { MatrixLink } from '#lib/rooms/matrix-link.js';
-  import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
+  import {
+    matrixLinkDestination,
+    parseMatrixLink,
+    type MatrixLink,
+  } from '#lib/rooms/matrix-link.js';
   import { splitVia } from '#lib/rooms/join-address.js';
   import { settingsLinkLabel } from '../settings/settings-link-label';
   import { parseSettingsLink } from '../settings/settings-link';
@@ -508,21 +511,24 @@
   }
 
   function linkTarget(anchor: HTMLAnchorElement): string | null {
-    if (anchor.dataset.matrixLink || anchor.dataset.settingsLink) return null;
+    if (anchor.dataset.settingsLink) return null;
     const text = anchor.textContent.trim();
-    return text === anchor.href || text === anchor.getAttribute('href') ? null : anchor.href;
+    if (text === anchor.href || text === anchor.getAttribute('href')) return null;
+    const matrix = anchor.dataset.matrixLink ? parseMatrixLink(anchor.href) : null;
+    const destination = matrix ? matrixLinkDestination(matrix) : anchor.href;
+    return text === destination ? null : destination;
   }
 
   function definitionOf(target: EventTarget | null): HTMLElement | null {
-    let found =
-      target instanceof Element
-        ? target.closest<HTMLElement>(
-            'abbr[data-abbr-definition], .time-chip, img[data-mx-emoticon], a[href]'
-          )
-        : null;
-    if (found instanceof HTMLAnchorElement && !linkTarget(found)) found = null;
-    const spoiler = found?.closest<HTMLElement>('[data-mx-spoiler]');
-    return spoiler && spoiler.ariaPressed !== 'false' ? null : found;
+    if (!(target instanceof Element)) return null;
+    const spoiler = target.closest<HTMLElement>('[data-mx-spoiler]');
+    if (spoiler && spoiler.ariaPressed !== 'false') return null;
+    const matrix = target.closest<HTMLAnchorElement>('a[data-matrix-link]');
+    if (matrix && linkTarget(matrix) !== null) return matrix;
+    const found = target.closest<HTMLElement>(
+      'abbr[data-abbr-definition], .time-chip, img[data-mx-emoticon], a[href]'
+    );
+    return found instanceof HTMLAnchorElement && !linkTarget(found) ? null : found;
   }
 
   function closeDefinition(): void {
@@ -632,7 +638,7 @@
 {/snippet}
 
 {#snippet linkCard()}
-  <span class="link-card">{definition}</span>
+  <bdi dir="ltr" class="link-card">{definition}</bdi>
 {/snippet}
 
 {#if definitionAnchor && definition}

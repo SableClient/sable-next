@@ -508,6 +508,25 @@ test('a touch context menu the row never saw pressed opens the sheet', async () 
   expect(document.querySelector('[data-dialog-content]')).not.toBeNull();
 });
 
+test('a touch context menu on a Matrix link shows its actual destination', async () => {
+  const linked = item(false);
+  if (linked.content.kind !== 'message') throw new Error('expected a message');
+  linked.content.html = '<a href="matrix:r/elsewhere:example.org"><strong>General</strong></a>';
+  render(TimelineItemHarness, {
+    props: { core, item: { item: linked, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  screen
+    .getByText('General')
+    .dispatchEvent(
+      new PointerEvent('contextmenu', { pointerType: 'touch', bubbles: true, cancelable: true })
+    );
+  await tick();
+
+  expect(screen.getByRole('dialog')).toHaveTextContent('Link destination: #elsewhere:example.org');
+});
+
 test('offers to add a message inline emote to your own pack', async () => {
   // The SDK sanitises `data-mx-emoticon` away before the core sees the message.
   const html =

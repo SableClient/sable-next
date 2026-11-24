@@ -46,6 +46,7 @@ export type MessageActions = {
   copyTextLabel?: string;
   onCopyLink?: () => void;
   onCopyMatrixLink?: () => void;
+  linkDestination?: string;
   onCopyHref?: () => void;
   onShareHref?: () => void;
   onPin?: () => void;
