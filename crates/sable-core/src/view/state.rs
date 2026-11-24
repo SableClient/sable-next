@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use matrix_sdk::ruma::events::StateEventContentChange;
-use matrix_sdk::ruma::events::room::member::RoomMemberEventContent;
+use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
 use matrix_sdk_ui::timeline::{AnyOtherStateEventContentChange, MembershipChange, OtherState};
 use serde::Deserialize as _;
 use serde_with::{DefaultOnError, serde_as};
@@ -22,6 +22,24 @@ pub(super) fn membership_reason(
         .as_deref()
         .filter(|reason| !reason.trim().is_empty())
         .map(ToOwned::to_owned)
+}
+
+/// MSC4293's `redact_events`, which only means something on a ban or a leave someone else
+/// sent. Read from the membership itself: the SDK cannot tell a kick from a leave when the
+/// event comes without the content it replaced.
+pub(super) const fn removes_events(
+    content: &StateEventContentChange<RoomMemberEventContent>,
+) -> bool {
+    match content {
+        StateEventContentChange::Original { content, .. } => {
+            content.redact_events
+                && matches!(
+                    content.membership,
+                    MembershipState::Ban | MembershipState::Leave
+                )
+        }
+        StateEventContentChange::Redacted(_) => false,
+    }
 }
 
 pub(super) const fn membership_change(change: Option<MembershipChange>) -> MembershipChangeView {

@@ -3611,6 +3611,58 @@ async fn a_pin_change_reports_what_was_added_and_dropped() {
     ));
 }
 
+/// The overlay decides which rows a ban removes from this flag on the ban's own row.
+#[tokio::test]
+async fn a_ban_row_says_whether_it_removes_the_members_events() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!bans:example.org");
+    let member = |event_id: &str, user: &str, membership: &str, redact_events: bool| {
+        ruma::serde::Raw::<ruma::events::AnySyncTimelineEvent>::from_json_string(
+            json!({
+                "type": "m.room.member",
+                "event_id": event_id,
+                "sender": "@mod:example.org",
+                "state_key": user,
+                "origin_server_ts": 1,
+                "content": {
+                    "membership": membership,
+                    "org.matrix.msc4293.redact_events": redact_events,
+                },
+            })
+            .to_string(),
+        )
+        .unwrap()
+    };
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(member("$removing", "@spam:example.org", "ban", true))
+                // A kick that comes without the content it replaced.
+                .add_timeline_event(member("$kick", "@noise:example.org", "leave", true))
+                .add_timeline_event(member("$plain", "@other:example.org", "ban", false))
+                .add_timeline_event(member("$join", "@new:example.org", "join", true)),
+        )
+        .await;
+
+    let flags: Vec<_> = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room")
+        .into_iter()
+        .filter_map(|item| match item.content {
+            crate::protocol::TimelineItemContentView::Membership { removes_events, .. } => {
+                Some(removes_events)
+            }
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(flags, [true, true, false, false]);
+}
+
 #[tokio::test]
 async fn joining_a_call_is_worded_as_a_join() {
     let server = MatrixMockServer::new().await;

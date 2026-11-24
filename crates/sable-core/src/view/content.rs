@@ -27,7 +27,9 @@ use super::media::{
     media_source, video_playback, video_thumbnail,
 };
 use super::raw::RawFields;
-use super::state::{membership_change, membership_reason, pinned_change, state_change};
+use super::state::{
+    membership_change, membership_reason, pinned_change, removes_events, state_change,
+};
 
 fn text_message(
     msgtype: &MessageType,
@@ -451,6 +453,7 @@ pub(super) fn content(
             change: membership_change(change.change()),
             display_name: change.display_name().and_then(visible_name),
             reason: membership_reason(change.content()),
+            removes_events: removes_events(change.content()),
         },
 
         TimelineItemContent::ProfileChange(change) => TimelineItemContentView::ProfileChange {

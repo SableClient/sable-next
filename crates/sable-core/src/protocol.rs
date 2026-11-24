@@ -2375,6 +2375,12 @@ pub enum TimelineItemContentView {
         /// back to a raw user id.
         display_name: Option<String>,
         reason: Option<String>,
+        /// MSC4293: a ban or leave that asks for the member's events to be removed, which
+        /// counts when someone else sent it. Only the core reads it, to decide which rows it
+        /// shows as deleted.
+        #[serde(skip)]
+        #[cfg_attr(feature = "typegen", specta(skip))]
+        removes_events: bool,
     },
     /// A display name or avatar change on an already-joined member. Separate
     /// from `Membership` because clients hide these by default.

@@ -637,15 +637,17 @@ impl Core {
                     if event.prev_content().is_none() {
                         core.emit_profile_changed(generation, &room, &event).await;
                     }
-                    let ban = room.power_levels().await.ok().and_then(|power_levels| {
+                    let power_levels = room.power_levels().await.ok();
+                    let ban = power_levels.as_ref().and_then(|power_levels| {
                         BanRedaction::from_membership(
                             &event.sender,
                             &event.state_key,
                             &event.content,
-                            &power_levels,
+                            power_levels,
+                            event.origin_server_ts.0.into(),
                         )
                     });
-                    core.overlay_ban_redaction(room.room_id(), &event.state_key, ban)
+                    core.overlay_ban_redaction(room.room_id(), &event.state_key, ban, power_levels)
                         .await;
                 }
             }

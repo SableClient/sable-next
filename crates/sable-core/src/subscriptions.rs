@@ -620,6 +620,7 @@ impl TimelineWorker {
                 }?;
                 Some(overlay.apply(crate::protocol::VectorDiff::Set { index, value }))
             })
+            .flatten()
             .collect();
         if !diffs.is_empty() {
             self.core.emit(CoreEvent::TimelineDiff {
@@ -672,7 +673,10 @@ impl TimelineWorker {
         let mut overlay = self.overlay.lock();
         self.core.emit(CoreEvent::TimelineDiff {
             subscription: self.subscription,
-            diffs: diffs.into_iter().map(|diff| overlay.apply(diff)).collect(),
+            diffs: diffs
+                .into_iter()
+                .flat_map(|diff| overlay.apply(diff))
+                .collect(),
         });
     }
 }
@@ -794,8 +798,8 @@ impl Core {
         if stored_bridge {
             overlay.lock().set_bridged();
         }
-        let bans = BanRedaction::in_room(&room).await;
-        overlay.lock().seed_ban_redactions(bans);
+        let (bans, redactors) = BanRedaction::in_room(&room).await;
+        overlay.lock().seed_ban_redactions(bans, redactors);
         // Seeded before the stream starts, so its diffs apply to this snapshot.
         let items = overlay.lock().reset(items);
         let task = spawn(
@@ -1064,9 +1068,10 @@ impl Core {
         room_id: &RoomId,
         user_id: &UserId,
         ban: Option<BanRedaction>,
+        redactors: Option<ruma::events::room::power_levels::RoomPowerLevels>,
     ) {
         self.overlay_room(room_id, |overlay| {
-            overlay.set_ban_redaction(user_id, ban.clone())
+            overlay.set_ban_redaction(user_id, ban.clone(), redactors.clone())
         })
         .await;
     }

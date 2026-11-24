@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::nicknames::{Nicknames, RealNames};
 use crate::protocol::{
     MentionView, MessageShieldCode, PreviewEmote, ReplyFallbackView, TimelineItemContentView,
-    TimelineItemView, VectorDiff,
+    TimelineItemView, TimelineVisibility, VectorDiff,
 };
 use crate::view::apply_diff;
 
@@ -53,12 +53,14 @@ impl ReplyFallback {
     }
 }
 
-/// MSC4293: who removed a user's messages by banning or kicking them with
-/// `redact_events`, and why.
+/// MSC4293: who removed a user's events by banning or kicking them with
+/// `redact_events`, when and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BanRedaction {
     by: OwnedUserId,
     reason: Option<String>,
+    /// When the ban or kick was sent, in milliseconds since the Unix epoch.
+    at: u64,
 }
 
 impl BanRedaction {
@@ -69,6 +71,7 @@ impl BanRedaction {
         target: &UserId,
         content: &RoomMemberEventContent,
         power_levels: &RoomPowerLevels,
+        at: u64,
     ) -> Option<Self> {
         let removed = match content.membership {
             MembershipState::Ban => true,
@@ -79,23 +82,27 @@ impl BanRedaction {
             .then(|| Self {
                 by: sender.to_owned(),
                 reason: content.reason.clone(),
+                at,
             })
     }
 
-    /// The bans and kicks with `redact_events` among the room's stored members.
-    pub(crate) async fn in_room(room: &matrix_sdk::Room) -> HashMap<OwnedUserId, Self> {
+    /// The bans and kicks with `redact_events` among the room's stored members, and the power
+    /// levels they were judged by.
+    pub(crate) async fn in_room(
+        room: &matrix_sdk::Room,
+    ) -> (HashMap<OwnedUserId, Self>, Option<RoomPowerLevels>) {
         use matrix_sdk::RoomMemberships;
         use matrix_sdk::deserialized_responses::MemberEvent;
         use matrix_sdk::ruma::events::room::member::SyncRoomMemberEvent;
 
-        let (Ok(power_levels), Ok(members)) = (
-            room.power_levels().await,
-            room.members_no_sync(RoomMemberships::BAN | RoomMemberships::LEAVE)
-                .await,
-        ) else {
-            return HashMap::new();
+        let Ok(power_levels) = room.power_levels().await else {
+            return (HashMap::new(), None);
         };
-        members
+        let members = room
+            .members_no_sync(RoomMemberships::BAN | RoomMemberships::LEAVE)
+            .await
+            .unwrap_or_default();
+        let bans = members
             .iter()
             .filter_map(|member| {
                 let MemberEvent::Sync(SyncRoomMemberEvent::Original(event)) =
@@ -108,10 +115,12 @@ impl BanRedaction {
                     &event.state_key,
                     &event.content,
                     &power_levels,
+                    event.origin_server_ts.0.into(),
                 )
                 .map(|ban| (member.user_id().to_owned(), ban))
             })
-            .collect()
+            .collect();
+        (bans, Some(power_levels))
     }
 
     fn hide(&self, item: TimelineItemView) -> TimelineItemView {
@@ -142,7 +151,13 @@ impl BanRedaction {
 #[derive(Debug, Default)]
 pub(crate) struct TimelineOverlay {
     items: Vec<TimelineItemView>,
+    /// The latest ban or kick with `redact_events` known for a user. It decides for the rows
+    /// that no loaded member row of theirs follows, and a later member event never lifts it.
     ban_redactions: HashMap<OwnedUserId, BanRedaction>,
+    /// Who may redact other people's events, which is who a removal is honoured from.
+    redactors: Option<RoomPowerLevels>,
+    /// The removal each hidden row falls under, by item id.
+    removals: HashMap<String, BanRedaction>,
     /// Items as they were before a ban hid them, by item id.
     hidden: HashMap<String, TimelineItemView>,
     profiles: HashMap<OwnedUserId, SenderProfile>,
@@ -171,16 +186,7 @@ impl TimelineOverlay {
     }
 
     fn hidden_on_ban(&mut self, item: TimelineItemView) -> TimelineItemView {
-        let ban = item
-            .sender
-            .as_ref()
-            .and_then(|sender| self.ban_redactions.get(sender))
-            .filter(|_| {
-                item.event_id.is_some()
-                    && item.row == crate::protocol::TimelineRowKind::Message
-                    && !matches!(item.content, TimelineItemContentView::Redacted { .. })
-            });
-        let Some(ban) = ban else {
+        let Some(ban) = self.removals.get(&item.id) else {
             self.hidden.remove(&item.id);
             return item;
         };
@@ -252,14 +258,16 @@ impl TimelineOverlay {
     pub(crate) fn reset(&mut self, items: Vec<TimelineItemView>) -> Vec<TimelineItemView> {
         self.real_names.clear();
         self.items = items.into_iter().map(|item| self.overlaid(item)).collect();
+        self.settle_removals(0..self.items.len());
         self.items.clone()
     }
 
-    /// `diff` with its items overlaid, kept in step with the host's copy.
+    /// `diff` with its items overlaid, kept in step with the host's copy, then a `Set` for
+    /// each other row the diff hides or shows again: a member row decides for the rows before it.
     pub(crate) fn apply(
         &mut self,
         diff: VectorDiff<TimelineItemView>,
-    ) -> VectorDiff<TimelineItemView> {
+    ) -> Vec<VectorDiff<TimelineItemView>> {
         let diff = match diff {
             VectorDiff::Append { values } => VectorDiff::Append {
                 values: values.into_iter().map(|item| self.overlaid(item)).collect(),
@@ -301,7 +309,125 @@ impl TimelineOverlay {
             self.real_names.retain(|id, _| held.contains(id.as_str()));
             self.hidden.retain(|id, _| held.contains(id.as_str()));
         }
-        diff
+        let placed = placed(&diff, self.items.len());
+        let others = self.settle_removals(placed.clone());
+        let mut diffs = vec![self.as_settled(diff, placed)];
+        diffs.extend(others);
+        diffs
+    }
+
+    /// The member row that decides for the user's earlier rows, and the removal it carries. A
+    /// forged one, which the view hides, decides nothing.
+    fn member_row(&self, item: &TimelineItemView) -> Option<(OwnedUserId, Option<BanRedaction>)> {
+        if item.visibility == TimelineVisibility::Hidden {
+            return None;
+        }
+        match &item.content {
+            TimelineItemContentView::Membership {
+                user_id,
+                reason,
+                removes_events,
+                ..
+            } => {
+                let removal = item
+                    .sender
+                    .as_ref()
+                    .filter(|sender| {
+                        *removes_events
+                            && *sender != user_id
+                            && self.redactors.as_ref().is_some_and(|power_levels| {
+                                power_levels.user_can_redact_event_of_other(sender)
+                            })
+                    })
+                    .map(|sender| BanRedaction {
+                        by: sender.clone(),
+                        reason: reason.clone(),
+                        at: item.timestamp,
+                    });
+                Some((user_id.clone(), removal))
+            }
+            TimelineItemContentView::ProfileChange { user_id, .. } => Some((user_id.clone(), None)),
+            _ => None,
+        }
+    }
+
+    /// MSC4293 removes a user's events back to their previous member event, so each row falls
+    /// under the nearest later member row of its sender, or under the latest known removal
+    /// where none is loaded. Returns the `Set` diffs for the changed rows outside `placed`.
+    fn settle_removals(
+        &mut self,
+        placed: std::ops::Range<usize>,
+    ) -> Vec<VectorDiff<TimelineItemView>> {
+        let mut later: HashMap<OwnedUserId, Option<BanRedaction>> = HashMap::new();
+        let mut removals = HashMap::new();
+        for item in self.items.iter().rev() {
+            let original = self.hidden.get(&item.id).unwrap_or(item);
+            if let Some((user_id, removal)) = self.member_row(original) {
+                later.insert(user_id, removal);
+                continue;
+            }
+            let Some(sender) = original.sender.as_ref().filter(|_| removable(original)) else {
+                continue;
+            };
+            let removal = match later.get(sender) {
+                Some(removal) => removal.clone(),
+                None => self
+                    .ban_redactions
+                    .get(sender)
+                    .filter(|ban| original.timestamp <= ban.at)
+                    .cloned(),
+            };
+            if let Some(removal) = removal {
+                removals.insert(item.id.clone(), removal);
+            }
+        }
+        let changed: Vec<usize> = self
+            .items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| removals.get(&item.id) != self.removals.get(&item.id))
+            .map(|(index, _)| index)
+            .collect();
+        self.removals = removals;
+        let mut diffs = Vec::new();
+        for index in changed {
+            let Some(item) = self.items.get(index).cloned() else {
+                continue;
+            };
+            let value = self.reoverlaid(item);
+            if let Some(slot) = self.items.get_mut(index) {
+                slot.clone_from(&value);
+            }
+            if !placed.contains(&index) {
+                diffs.push(VectorDiff::Set { index, value });
+            }
+        }
+        diffs
+    }
+
+    /// `diff` carrying the rows it placed as they are now that removals are settled.
+    fn as_settled(
+        &self,
+        diff: VectorDiff<TimelineItemView>,
+        placed: std::ops::Range<usize>,
+    ) -> VectorDiff<TimelineItemView> {
+        let rows = || self.items.get(placed.clone()).unwrap_or_default().to_vec();
+        let row = |value| self.items.get(placed.start).cloned().unwrap_or(value);
+        match diff {
+            VectorDiff::Append { .. } => VectorDiff::Append { values: rows() },
+            VectorDiff::Reset { .. } => VectorDiff::Reset { values: rows() },
+            VectorDiff::PushFront { value } => VectorDiff::PushFront { value: row(value) },
+            VectorDiff::PushBack { value } => VectorDiff::PushBack { value: row(value) },
+            VectorDiff::Insert { index, value } => VectorDiff::Insert {
+                index,
+                value: row(value),
+            },
+            VectorDiff::Set { index, value } => VectorDiff::Set {
+                index,
+                value: row(value),
+            },
+            other => other,
+        }
     }
 
     fn refresh(
@@ -344,25 +470,30 @@ impl TimelineOverlay {
     }
 
     /// Seeds the bans known when the timeline opens, before its first items.
-    pub(crate) fn seed_ban_redactions(&mut self, bans: HashMap<OwnedUserId, BanRedaction>) {
+    pub(crate) fn seed_ban_redactions(
+        &mut self,
+        bans: HashMap<OwnedUserId, BanRedaction>,
+        redactors: Option<RoomPowerLevels>,
+    ) {
         self.ban_redactions = bans;
+        self.redactors = redactors;
     }
 
-    /// The `Set` diffs that hide or show again `user_id`'s messages after a
-    /// change to their membership.
+    /// The `Set` diffs that hide `user_id`'s events after a ban or kick with `redact_events`.
+    /// Any other member event leaves what is hidden as it is: MSC4293 never undoes a removal.
     pub(crate) fn set_ban_redaction(
         &mut self,
         user_id: &UserId,
         ban: Option<BanRedaction>,
+        redactors: Option<RoomPowerLevels>,
     ) -> Vec<VectorDiff<TimelineItemView>> {
-        let unchanged = match ban {
-            Some(ban) => self.ban_redactions.insert(user_id.to_owned(), ban.clone()) == Some(ban),
-            None => self.ban_redactions.remove(user_id).is_none(),
-        };
-        if unchanged {
-            return Vec::new();
+        if let Some(redactors) = redactors {
+            self.redactors = Some(redactors);
         }
-        self.refresh(|item| item.sender.as_deref() == Some(user_id))
+        if let Some(ban) = ban {
+            self.ban_redactions.insert(user_id.to_owned(), ban);
+        }
+        self.settle_removals(0..0)
     }
 
     /// The content a ban hides from the timeline, for a moderator to read.
@@ -460,6 +591,37 @@ impl TimelineOverlay {
     }
 }
 
+/// The rows a diff put in place, which it carries itself.
+fn placed(diff: &VectorDiff<TimelineItemView>, len: usize) -> std::ops::Range<usize> {
+    match diff {
+        VectorDiff::Append { values } => len.saturating_sub(values.len())..len,
+        VectorDiff::Reset { .. } => 0..len,
+        VectorDiff::PushFront { .. } => 0..len.min(1),
+        VectorDiff::PushBack { .. } => len.saturating_sub(1)..len,
+        VectorDiff::Insert { index, .. } | VectorDiff::Set { index, .. } => {
+            let index = (*index).min(len);
+            index..(index + 1).min(len)
+        }
+        _ => 0..0,
+    }
+}
+
+/// What a removal hides: everything its sender sent except state. A redacted state event
+/// still takes effect, and a member row is where the next removal stops. A row the reader
+/// never sees stays one, rather than turning into a deleted message.
+fn removable(item: &TimelineItemView) -> bool {
+    item.event_id.is_some()
+        && item.row != crate::protocol::TimelineRowKind::Annotation
+        && item.visibility != TimelineVisibility::Hidden
+        && !matches!(
+            item.content,
+            TimelineItemContentView::Redacted { .. }
+                | TimelineItemContentView::Membership { .. }
+                | TimelineItemContentView::ProfileChange { .. }
+                | TimelineItemContentView::StateEvent { .. }
+        )
+}
+
 fn mismatched_sender(item: &TimelineItemView) -> bool {
     item.shield
         .is_some_and(|shield| shield.code == MessageShieldCode::MismatchedSender)
@@ -491,7 +653,9 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::protocol::{MentionView, MessageShieldView, ReplyView, TimelineItemContentView};
+    use crate::protocol::{
+        MembershipChangeView, MentionView, MessageShieldView, ReplyView, TimelineItemContentView,
+    };
 
     fn item(id: &str, sender: &str, reply: Option<ReplyView>) -> TimelineItemView {
         let content = TimelineItemContentView::Message {
@@ -576,9 +740,9 @@ mod tests {
         ));
         assert_eq!(overlay.items[0].shield, None);
         assert!(overlay.items[1].shield.is_some());
-        let VectorDiff::PushBack { value } = overlay.apply(VectorDiff::PushBack {
+        let [VectorDiff::PushBack { value }] = &overlay.apply(VectorDiff::PushBack {
             value: shielded("c", MessageShieldCode::MismatchedSender),
-        }) else {
+        })[..] else {
             unreachable!()
         };
         assert_eq!(value.shield, None);
@@ -625,9 +789,9 @@ mod tests {
                 .is_empty()
         );
 
-        let VectorDiff::PushBack { value } = overlay.apply(VectorDiff::PushBack {
+        let [VectorDiff::PushBack { value }] = &overlay.apply(VectorDiff::PushBack {
             value: item("d", "@alice:x", None),
-        }) else {
+        })[..] else {
             panic!("a push back");
         };
         assert_eq!(value.sender_name.as_deref(), Some("Alicia"));
@@ -731,13 +895,13 @@ mod tests {
             1
         );
 
-        let VectorDiff::Set { value, .. } = overlay.apply(VectorDiff::Set {
+        let [VectorDiff::Set { value, .. }] = &overlay.apply(VectorDiff::Set {
             index: 1,
             value: reply,
-        }) else {
+        })[..] else {
             panic!("a set");
         };
-        let shown = value.in_reply_to.expect("a reply");
+        let shown = value.in_reply_to.as_ref().expect("a reply");
         assert_eq!(shown.sender, Some(user_id!("@ana:x").to_owned()));
         assert_eq!(shown.body, None);
         assert_eq!(
@@ -813,13 +977,13 @@ mod tests {
                 .is_empty()
         );
 
-        let VectorDiff::Set { value, .. } = overlay.apply(VectorDiff::Set {
+        let [VectorDiff::Set { value, .. }] = &overlay.apply(VectorDiff::Set {
             index: 1,
             value: deleted("b"),
-        }) else {
+        })[..] else {
             panic!("a set");
         };
-        assert_eq!(redaction_reason(&value), Some("spam"));
+        assert_eq!(redaction_reason(value), Some("spam"));
     }
 
     #[test]
@@ -860,23 +1024,27 @@ mod tests {
         let kick = json!({"membership": "leave", "org.matrix.msc4293.redact_events": true});
 
         assert_eq!(
-            BanRedaction::from_membership(moderator, spammer, &membership(ban.clone()), &pl),
+            BanRedaction::from_membership(moderator, spammer, &membership(ban.clone()), &pl, 0),
             Some(BanRedaction {
                 by: moderator.to_owned(),
                 reason: Some("spam".to_owned()),
+                at: 0,
             })
         );
         assert!(
-            BanRedaction::from_membership(moderator, spammer, &membership(kick.clone()), &pl)
+            BanRedaction::from_membership(moderator, spammer, &membership(kick.clone()), &pl, 0)
                 .is_some()
         );
-        assert!(BanRedaction::from_membership(spammer, spammer, &membership(kick), &pl).is_none());
+        assert!(
+            BanRedaction::from_membership(spammer, spammer, &membership(kick), &pl, 0).is_none()
+        );
         assert!(
             BanRedaction::from_membership(
                 user_id!("@user:x"),
                 spammer,
                 &membership(ban.clone()),
-                &pl
+                &pl,
+                0
             )
             .is_none()
         );
@@ -885,76 +1053,276 @@ mod tests {
                 moderator,
                 spammer,
                 &membership(json!({"membership": "ban"})),
-                &pl
+                &pl,
+                0
             )
             .is_none()
         );
         let redaction_locked =
             levels(json!({"users": {"@mod:x": 50}, "events": {"m.room.redaction": 100}}));
         assert!(
-            BanRedaction::from_membership(moderator, spammer, &membership(ban), &redaction_locked)
-                .is_none()
+            BanRedaction::from_membership(
+                moderator,
+                spammer,
+                &membership(ban),
+                &redaction_locked,
+                0
+            )
+            .is_none()
         );
     }
 
-    #[test]
-    fn a_ban_hides_the_senders_messages_until_lifted() {
+    const MOD: &str = "@mod:x";
+    const SPAM: &str = "@spam:x";
+
+    fn member_row(
+        id: &str,
+        sender: &str,
+        user: &str,
+        change: MembershipChangeView,
+        removes_events: bool,
+    ) -> TimelineItemView {
+        let content = TimelineItemContentView::Membership {
+            user_id: OwnedUserId::try_from(user).unwrap(),
+            change,
+            display_name: None,
+            reason: Some("spam".to_owned()),
+            removes_events,
+        };
+        TimelineItemView {
+            row: content.row_kind(),
+            visibility: content.visibility(),
+            content,
+            ..item(id, sender, None)
+        }
+    }
+
+    fn ban_row(id: &str) -> TimelineItemView {
+        member_row(id, MOD, SPAM, MembershipChangeView::Banned, true)
+    }
+
+    fn at(timestamp: u64, item: TimelineItemView) -> TimelineItemView {
+        TimelineItemView { timestamp, ..item }
+    }
+
+    /// An overlay of a room where `@mod:x` may redact other people's events.
+    fn moderated() -> TimelineOverlay {
         let mut overlay = TimelineOverlay::default();
+        overlay.seed_ban_redactions(HashMap::new(), Some(levels(json!({"users": {MOD: 50}}))));
+        overlay
+    }
+
+    fn removed(overlay: &TimelineOverlay) -> Vec<&str> {
+        overlay
+            .items
+            .iter()
+            .filter(|item| item.redacted_on_ban == Some(true))
+            .map(|item| item.id.as_str())
+            .collect()
+    }
+
+    /// MSC4293's own example: the removal stops at the member event before the ban.
+    fn rejoined_then_banned() -> Vec<TimelineItemView> {
+        vec![
+            item("a", SPAM, None),
+            item("b", SPAM, None),
+            member_row("left", SPAM, SPAM, MembershipChangeView::Left, false),
+            member_row("joined", SPAM, SPAM, MembershipChangeView::Joined, false),
+            item("d", SPAM, None),
+            item("other", "@ok:x", None),
+            item("e", SPAM, None),
+            ban_row("banned"),
+        ]
+    }
+
+    #[test]
+    fn a_ban_removes_only_what_was_sent_since_the_previous_member_event() {
+        let mut overlay = moderated();
         let spam = TimelineItemView {
             reactions: vec![crate::protocol::ReactionGroup {
                 key: "👍".to_owned(),
                 senders: Vec::new(),
             }],
-            ..item("a", "@spam:x", None)
+            ..item("d", SPAM, None)
         };
-        overlay.reset(vec![spam, item("b", "@ok:x", None)]);
-        let ban = BanRedaction {
-            by: user_id!("@mod:x").to_owned(),
-            reason: None,
-        };
+        let mut items = rejoined_then_banned();
+        items[4] = spam;
 
-        let diffs = overlay.set_ban_redaction(user_id!("@spam:x"), Some(ban.clone()));
-        assert!(matches!(
-            diffs.as_slice(),
-            [VectorDiff::Set { index: 0, .. }]
-        ));
-        let hidden = &overlay.items[0];
-        assert_eq!(hidden.redacted_on_ban, Some(true));
+        let sent = overlay.reset(items);
+
+        assert_eq!(removed(&overlay), ["d", "e"]);
+        let hidden = &sent[4];
         assert!(hidden.reactions.is_empty());
         assert!(!hidden.redactable);
         assert!(matches!(
             &hidden.content,
-            TimelineItemContentView::Redacted { reason: None, redacted_by: Some(by) } if by == "@mod:x"
+            TimelineItemContentView::Redacted { reason: Some(reason), redacted_by: Some(by) }
+                if reason == "spam" && by == MOD
         ));
         assert!(matches!(
-            overlay.hidden_content(&OwnedEventId::try_from("$a").unwrap()),
-            Some(TimelineItemContentView::Message { body, .. }) if body == "a"
+            overlay.hidden_content(&OwnedEventId::try_from("$d").unwrap()),
+            Some(TimelineItemContentView::Message { body, .. }) if body == "d"
         ));
-        assert_eq!(overlay.items[1].redacted_on_ban, None);
-        assert!(
-            overlay
-                .set_ban_redaction(user_id!("@spam:x"), Some(ban))
-                .is_empty()
-        );
+    }
 
-        let VectorDiff::PushBack { value } = overlay.apply(VectorDiff::PushBack {
-            value: item("c", "@spam:x", None),
-        }) else {
-            unreachable!()
+    #[test]
+    fn an_unban_or_a_rejoin_leaves_removed_events_removed() {
+        let mut overlay = moderated();
+        overlay.reset(rejoined_then_banned());
+
+        for row in [
+            member_row("unbanned", MOD, SPAM, MembershipChangeView::Unbanned, false),
+            member_row("back", SPAM, SPAM, MembershipChangeView::Joined, false),
+            item("f", SPAM, None),
+        ] {
+            let diffs = overlay.apply(VectorDiff::PushBack { value: row });
+            assert_eq!(diffs.len(), 1, "nothing already shown changes");
+        }
+        overlay.set_ban_redaction(user_id!("@spam:x"), None, None);
+        assert_eq!(removed(&overlay), ["d", "e"]);
+
+        // Reopened while the user is back in the room, with nothing but the rows to go by.
+        let rows = overlay.hidden.clone();
+        let reopened: Vec<_> = overlay
+            .items
+            .iter()
+            .map(|item| rows.get(&item.id).unwrap_or(item).clone())
+            .collect();
+        let mut overlay = moderated();
+        overlay.reset(reopened);
+        assert_eq!(removed(&overlay), ["d", "e"]);
+    }
+
+    #[test]
+    fn a_ban_arriving_after_the_events_hides_them() {
+        let mut overlay = moderated();
+        let mut items = rejoined_then_banned();
+        let ban = items.pop().unwrap();
+        overlay.reset(items);
+        assert_eq!(removed(&overlay), Vec::<&str>::new());
+
+        let diffs = overlay.apply(VectorDiff::PushBack { value: ban });
+
+        assert!(matches!(
+            diffs.as_slice(),
+            [
+                VectorDiff::PushBack { .. },
+                VectorDiff::Set { index: 4, .. },
+                VectorDiff::Set { index: 6, .. }
+            ]
+        ));
+        assert_eq!(removed(&overlay), ["d", "e"]);
+    }
+
+    #[test]
+    fn older_events_loaded_later_fall_on_the_right_side_of_the_member_event() {
+        let mut overlay = moderated();
+        let mut items = rejoined_then_banned();
+        let earlier: Vec<_> = items.drain(..5).collect();
+        overlay.reset(items);
+        assert_eq!(removed(&overlay), ["e"]);
+
+        for value in earlier.into_iter().rev() {
+            let diffs = overlay.apply(VectorDiff::PushFront { value });
+            assert_eq!(diffs.len(), 1);
+        }
+
+        assert_eq!(removed(&overlay), ["d", "e"]);
+    }
+
+    #[test]
+    fn a_removal_is_honoured_only_from_a_moderator_removing_someone_else() {
+        let rows = |ban: TimelineItemView| vec![item("d", SPAM, None), ban];
+        let mut overlay = moderated();
+        for ban in [
+            member_row("ban", "@user:x", SPAM, MembershipChangeView::Banned, true),
+            member_row("leave", SPAM, SPAM, MembershipChangeView::Left, true),
+            member_row("plain", MOD, SPAM, MembershipChangeView::Banned, false),
+            TimelineItemView {
+                visibility: TimelineVisibility::Hidden,
+                ..ban_row("forged")
+            },
+        ] {
+            overlay.reset(rows(ban));
+            assert_eq!(removed(&overlay), Vec::<&str>::new());
+        }
+
+        overlay.reset(rows(member_row(
+            "kick",
+            MOD,
+            SPAM,
+            MembershipChangeView::Kicked,
+            true,
+        )));
+        assert_eq!(removed(&overlay), ["d"]);
+    }
+
+    #[test]
+    fn state_and_already_deleted_rows_are_left_as_they_are() {
+        let mut overlay = moderated();
+        let state = TimelineItemContentView::StateEvent {
+            event_type: "m.room.topic".to_owned(),
+            state_key: String::new(),
+            content: None,
+            prev_content: None,
+            change: None,
         };
-        assert_eq!(value.redacted_on_ban, Some(true));
+        let deleted = TimelineItemContentView::Redacted {
+            reason: None,
+            redacted_by: None,
+        };
+        let cute = TimelineItemContentView::Unsupported {
+            description: "x.event".to_owned(),
+        };
+        let unseen = TimelineItemContentView::HiddenEvent {
+            event_type: "x.unseen".to_owned(),
+            content: None,
+            redacts: None,
+        };
+        let row = |id: &str, content: TimelineItemContentView| TimelineItemView {
+            row: content.row_kind(),
+            visibility: content.visibility(),
+            content,
+            ..item(id, SPAM, None)
+        };
 
-        overlay.set_ban_redaction(user_id!("@spam:x"), None);
-        assert_eq!(overlay.items[0].redacted_on_ban, None);
-        assert_eq!(overlay.items[0].reactions.len(), 1);
+        overlay.reset(vec![
+            row("state", state),
+            row("deleted", deleted),
+            row("unseen", unseen),
+            row("event", cute),
+            ban_row("banned"),
+        ]);
+
+        assert_eq!(removed(&overlay), ["event"]);
+    }
+
+    /// A thread holds no member rows, so the ban known from the room decides.
+    #[test]
+    fn without_member_rows_a_known_ban_removes_what_was_sent_before_it() {
+        let mut overlay = moderated();
+        overlay.reset(vec![
+            at(50, item("before", SPAM, None)),
+            at(150, item("after", SPAM, None)),
+        ]);
+        let ban = BanRedaction {
+            by: user_id!("@mod:x").to_owned(),
+            reason: None,
+            at: 100,
+        };
+
+        let diffs = overlay.set_ban_redaction(user_id!("@spam:x"), Some(ban), None);
+
         assert!(matches!(
-            &overlay.items[0].content,
-            TimelineItemContentView::Message { body, .. } if body == "a"
+            diffs.as_slice(),
+            [VectorDiff::Set { index: 0, .. }]
         ));
         assert!(
             overlay
-                .hidden_content(&OwnedEventId::try_from("$a").unwrap())
-                .is_none()
+                .set_ban_redaction(user_id!("@spam:x"), None, None)
+                .is_empty(),
+            "a later member event lifts nothing"
         );
+        assert_eq!(removed(&overlay), ["before"]);
     }
 }
