@@ -65,6 +65,16 @@ test('switching accounts ignores stale responses', async () => {
   expect(mocks.preferences).toHaveBeenLastCalledWith({}, {});
 });
 
+test('rerunning the root load keeps the account configuration', async () => {
+  await loadDeployment();
+  mocks.cache.mockReturnValueOnce({ branding: { appName: 'Account A' } });
+  mocks.discover.mockResolvedValueOnce(undefined);
+  activateAccountConfiguration({ account_id: 'a', user_id: '@alice:a.example' });
+  await loadDeployment();
+  expect(deployment().branding.appName).toBe('Account A');
+  activateAccountConfiguration(null);
+});
+
 test('login preview leaves the active account unchanged', async () => {
   await loadDeployment();
   mocks.discover.mockResolvedValueOnce({

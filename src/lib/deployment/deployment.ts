@@ -23,8 +23,12 @@ export { removeAccountConfiguration } from '#lib/config/account-discovery.js';
 
 let revision = 0;
 let loginRevision = 0;
+let loaded = false;
 
+// SvelteKit reruns the root load when a link to the current page is clicked.
 export async function loadDeployment(): Promise<void> {
+  if (loaded) return;
+  loaded = true;
   configuration.base = await runtimeConfig();
   applyDeploymentDefaults(configuration.base.settingsDefaults);
   applyDeploymentLocks(configuration.base.settingsLocked);
