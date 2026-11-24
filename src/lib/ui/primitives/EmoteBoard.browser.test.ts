@@ -4,6 +4,9 @@ import { render } from 'vitest-browser-svelte';
 
 import type { ImagePackView } from '#src/generated/protocol';
 
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('#lib/platform/overlay-back.svelte.js', () => ({ holdOverlayBack: () => {} }));
 vi.mock('#lib/core/context.js', async () => {
   const mock = await import('#lib/core/__mocks__/context.js');
   return { useCoreClient: () => mock.core, provideCoreClient: vi.fn() };
@@ -53,8 +56,10 @@ vi.mock('#lib/emoji/load-packs.js', () => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { expectScrollsInsideFrame } from '#lib/test-support/dialog-scroll.js';
 
 import EmoteBoard from './EmoteBoard.svelte';
+import SheetHarness from './EmoteBoardSheetHarness.test.svelte';
 
 afterEach(async () => {
   activePacks = packs;
@@ -235,4 +240,21 @@ test('a board opened while hidden still shows its emoji once visible', async () 
     )
     .toBeGreaterThan(0);
   host.remove();
+});
+
+test('the phone sheet scrolls only the grid, not the sheet around it', async () => {
+  await page.viewport(390, 750);
+  document.documentElement.style.setProperty('--safe-area-inset-top', '59px');
+  document.documentElement.style.setProperty('--safe-area-inset-bottom', '34px');
+  Object.assign(core, { fetchMedia: vi.fn().mockResolvedValue(new Uint8Array()) });
+  try {
+    await render(SheetHarness);
+    await expect.poll(() => document.querySelector('.grid-scroller')).not.toBeNull();
+    const list = document.querySelector<HTMLElement>('.grid-scroller');
+    if (!list) throw new Error('the board list is not rendered');
+    expectScrollsInsideFrame(list);
+  } finally {
+    document.documentElement.style.removeProperty('--safe-area-inset-top');
+    document.documentElement.style.removeProperty('--safe-area-inset-bottom');
+  }
 });
