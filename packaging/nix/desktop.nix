@@ -9,7 +9,8 @@
   nodejs_26,
   pkg-config,
   aws-lc,
-  sqlite,
+  sqlcipher,
+  openssl,
   pipewire,
   libpulseaudio,
   autoPatchelfHook,
@@ -56,9 +57,10 @@ stdenv.mkDerivation (finalAttrs: {
 
   buildInputs = [
     aws-lc
-    sqlite
+    sqlcipher
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
+    openssl
     pipewire
     libpulseaudio
     stdenv.cc.cc.lib
