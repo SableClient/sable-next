@@ -81,9 +81,10 @@ export const MOBILE_TAB_PATHS = new Set(['/navigate', '/inbox', '/profile', '/al
 const COMPOSER_REGION = '[data-focus-region="composer"]';
 const HEADING_ATTEMPTS = 10;
 
-export function trackRouteFocus(): void {
+export function trackRouteFocus(): (href: string) => Promise<void> {
   let origin: Element | null = null;
   let composerObserver: MutationObserver | undefined;
+  let composerNavigation: { href: string } | undefined;
   beforeNavigate(() => {
     composerObserver?.disconnect();
     origin = document.activeElement;
@@ -91,29 +92,32 @@ export function trackRouteFocus(): void {
   afterNavigate((navigation) => {
     const from = origin;
     origin = null;
-    if (from?.isConnected && from.closest(TREE_REGIONS)) {
-      if (navigation.to && ROOM_PATH.test(navigation.to.url.pathname) && matchesAppLayout()) {
-        const focusComposer = () => {
-          if (
-            (document.activeElement !== document.body && document.activeElement !== from) ||
-            focusRegion('composer')
-          ) {
-            composerObserver?.disconnect();
-            return true;
-          }
-          return false;
-        };
-        if (!focusComposer()) {
-          composerObserver = new MutationObserver(focusComposer);
-          composerObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['contenteditable'],
-          });
+    const fromTree = from?.isConnected && from.closest(TREE_REGIONS);
+    const to = navigation.to?.url;
+    const shortcut = navigation.type === 'goto' && to?.href === composerNavigation?.href;
+    if (to && ROOM_PATH.test(to.pathname) && (fromTree || shortcut) && matchesAppLayout()) {
+      const focusComposer = () => {
+        if (
+          (document.activeElement !== document.body && document.activeElement !== from) ||
+          focusRegion('composer')
+        ) {
+          composerObserver?.disconnect();
+          return true;
         }
-        return;
+        return false;
+      };
+      if (!focusComposer()) {
+        composerObserver = new MutationObserver(focusComposer);
+        composerObserver.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['contenteditable'],
+        });
       }
+      return;
+    }
+    if (fromTree) {
       if (document.activeElement === document.body && from instanceof HTMLElement) from.focus();
       return;
     }
@@ -124,7 +128,7 @@ export function trackRouteFocus(): void {
     ) {
       return;
     }
-    if (!navigation.to || !ROOM_PATH.test(navigation.to.url.pathname)) return;
+    if (!to || !ROOM_PATH.test(to.pathname)) return;
     let attempts = HEADING_ATTEMPTS;
     const focusHeading = () => {
       if (document.activeElement !== document.body) return;
@@ -134,6 +138,17 @@ export function trackRouteFocus(): void {
     };
     focusHeading();
   });
+
+  return async (href) => {
+    const request = { href: new URL(href, page.url).href };
+    composerNavigation = request;
+    try {
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
+      await goto(href);
+    } finally {
+      if (composerNavigation === request) composerNavigation = undefined;
+    }
+  };
 }
 
 export function isRoomSwitch(href: string): boolean {

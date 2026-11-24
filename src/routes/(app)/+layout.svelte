@@ -1146,7 +1146,7 @@
     };
   });
 
-  trackRouteFocus();
+  const gotoWithComposerFocus = trackRouteFocus();
 
   function activeRoomSection(): string | null {
     const home = resolve('/(app)/home');
@@ -1156,7 +1156,7 @@
     return findRoomByPathId(roomList.rooms, page.params.spaceId)?.room_id ?? null;
   }
 
-  function jumpToRoom(roomId: string): void {
+  function jumpToRoom(roomId: string, focusComposer = false): void {
     const path = restoredRoomPath(
       roomList.rooms,
       roomId,
@@ -1164,8 +1164,11 @@
       preferences.showHome,
       (spaceId) => roomList.section(spaceId)?.descendants ?? []
     );
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- restoredRoomPath() resolves the route itself
-    void goto(path);
+    if (focusComposer) void gotoWithComposerFocus(path);
+    else {
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- restoredRoomPath() resolves the route itself
+      void goto(path);
+    }
   }
 
   $effect(() => {
@@ -1240,11 +1243,11 @@
         },
         'navigation.previousRoom': () => {
           const target = roomAtOffset(openRoomId, -1);
-          if (target) jumpToRoom(target);
+          if (target) jumpToRoom(target, true);
         },
         'navigation.nextRoom': () => {
           const target = roomAtOffset(openRoomId, 1);
-          if (target) jumpToRoom(target);
+          if (target) jumpToRoom(target, true);
         },
         'room.markRead': () => {
           const room = roomList.byId(openRoomId);
