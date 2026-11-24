@@ -273,7 +273,7 @@ test('a space applies its levels to the rooms below it that you can edit', async
   render(RoomPermissionsSettings, { room: space as never, permissions });
   expect(await screen.findByText(/Apply to 1 room/)).toBeInTheDocument();
 
-  await user.click(screen.getByRole('button', { name: 'Apply' }));
+  await user.click(screen.getByRole('button', { name: 'Apply space settings…' }));
   await user.click(
     within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apply' })
   );

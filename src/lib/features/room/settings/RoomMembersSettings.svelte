@@ -53,6 +53,7 @@
     needsPowerConfirmation,
     type PowerLevelTagMap,
   } from './power-level-tags';
+  import SpaceApplySettings from './SpaceApplySettings.svelte';
 
   interface Props {
     room: RoomListItemView | null;
@@ -381,6 +382,12 @@
       >{i18n.t(denied ? 'room.membersDenied' : 'room.membersFailed')}</Alert
     >
   {/if}
+
+  <SpaceApplySettings
+    {room}
+    canEdit={permissions?.can_change_power_levels ?? false}
+    disabled={busy !== null}
+  />
 
   {#if loading && members.length === 0}
     <p class="settings-status" role="status"><Spinner small /></p>

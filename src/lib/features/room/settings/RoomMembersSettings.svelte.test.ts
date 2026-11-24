@@ -27,6 +27,13 @@ Object.assign(core.rpc.members, {
   ban: vi.fn<(params: object) => Promise<null>>(),
   unban: vi.fn<() => Promise<null>>(),
   setUserPowerLevel: vi.fn<() => Promise<null>>(),
+  syncChildPowerLevels:
+    vi.fn<
+      (params: {
+        space_id: string;
+        child_ids: string[];
+      }) => Promise<{ updated: number; skipped: number }>
+    >(),
   powerLevelTags: vi.fn<() => Promise<Record<string, PowerLevelTagView>>>(() =>
     Promise.resolve({})
   ),
@@ -37,6 +44,15 @@ Object.assign(core.rpc.account, { searchUserDirectory });
 
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
   usePresenceStore: () => ({ get: () => null, peek: () => null }),
+}));
+
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+  useRoomList: () => ({
+    roomSpaces: (id: string) =>
+      id === '!space:example.org'
+        ? { descendants: [room.room_id, '!subspace:example.org'] }
+        : undefined,
+  }),
 }));
 
 import RoomMembersSettings from './RoomMembersSettings.svelte';
@@ -55,6 +71,7 @@ const alice: MemberView = {
 };
 
 const room: RoomListItemView = { room_id: '!room:example.org' } as RoomListItemView;
+const space: RoomListItemView = { ...room, room_id: '!space:example.org', room_kind: 'space' };
 
 const permissions: RoomPermissionsView = {
   own_power_level: 100,
@@ -80,6 +97,28 @@ async function renderMembers(roomPermissions: RoomPermissionsView = permissions)
 
 const search = () => screen.getByRole('searchbox');
 const invites = () => screen.queryByRole('region', { name: 'Invite people' });
+
+test('applies space settings to descendant rooms and subspaces only after confirmation', async () => {
+  core.rpc.members.list.mockResolvedValue([alice]);
+  core.rpc.members.syncChildPowerLevels.mockResolvedValue({ updated: 1, skipped: 1 });
+  render(RoomMembersSettings, {
+    room: space,
+    permissions: { ...permissions, can_change_power_levels: true },
+  });
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole('button', { name: 'Apply space settings…' }));
+  expect(core.rpc.members.syncChildPowerLevels).not.toHaveBeenCalled();
+  await user.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apply' })
+  );
+
+  expect(await screen.findByText('Updated 1 room, 1 skipped.')).toBeInTheDocument();
+  expect(core.rpc.members.syncChildPowerLevels).toHaveBeenCalledWith({
+    space_id: space.room_id,
+    child_ids: [room.room_id, '!subspace:example.org'],
+  });
+});
 
 test('offers approval and denial for join requests', async () => {
   const requester: MemberView = { ...alice, membership: 'knock' };
