@@ -2959,10 +2959,6 @@ export type Rpc = {
 }) => Promise<null>;
   };
   messages: {
-    markdownToContent: (params: {
-	markdown: string,
-	pills?: ComposerPill[],
-}) => Promise<ComposerContent>;
     send: (params: {
 	room_id: string,
 	body: string,
@@ -4118,7 +4114,6 @@ export type RpcMethods = {
   'members.look': Rpc['members']['look'];
   'members.set_look': Rpc['members']['setLook'];
   'members.set_pronouns': Rpc['members']['setPronouns'];
-  'messages.markdown_to_content': Rpc['messages']['markdownToContent'];
   'messages.send': Rpc['messages']['send'];
   'messages.send_raw_event': Rpc['messages']['sendRawEvent'];
   'messages.send_redaction': Rpc['messages']['sendRedaction'];
@@ -4488,7 +4483,6 @@ export function createRpc(call: RpcCall): Rpc {
       setPronouns: (params) => call('members.set_pronouns', params) as ReturnType<Rpc['members']['setPronouns']>,
     },
     messages: {
-      markdownToContent: (params) => call('messages.markdown_to_content', params) as ReturnType<Rpc['messages']['markdownToContent']>,
       send: (params) => call('messages.send', params) as ReturnType<Rpc['messages']['send']>,
       sendRawEvent: (params) => call('messages.send_raw_event', params) as ReturnType<Rpc['messages']['sendRawEvent']>,
       sendRedaction: (params) => call('messages.send_redaction', params) as ReturnType<Rpc['messages']['sendRedaction']>,

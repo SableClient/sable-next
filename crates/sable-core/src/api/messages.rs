@@ -28,14 +28,13 @@ use crate::outgoing::reaction_shortcode;
 use crate::outgoing::sticker_info;
 use crate::outgoing::{gif_content, location_content, message_content, reply_to, thread_reply};
 use crate::protocol::{
-    AttachmentInfoView, ComposerContent, ComposerPill, GestureView, ImageSourcePackReferenceView,
+    AttachmentInfoView, GestureView, ImageSourcePackReferenceView,
     ImageSourcePackView, MessageKind, PackImageInfoView, PerMessageProfileView, ReactionGroup,
     ReactionShortcodeView, RpcCode, RpcError, ScheduledMessageView, SubscriptionId, UrlPreviewView,
 };
 use crate::{Core, ResultExt, view};
 
 domain! {
-    markdown_to_content,
     send,
     send_raw_event,
     send_redaction,
@@ -73,28 +72,6 @@ domain! {
     remember_sticker,
     set_typing,
     media_config,
-}
-
-/// A typed message as the web composer's plain mode sends it, each
-/// `\u{FFFC}` in `markdown` standing for the next of `pills`.
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
-pub struct MarkdownToContentParams {
-    pub markdown: String,
-    #[serde(default)]
-    pub pills: Vec<ComposerPill>,
-}
-
-impl Handler for MarkdownToContentParams {
-    type Ok = ComposerContent;
-
-    fn run(self, _core: &Arc<Core>) -> impl Future<Output = Result<ComposerContent, RpcError>> {
-        std::future::ready(Ok(sable_model::markdown::markdown_to_content(
-            &self.markdown,
-            &self.pills,
-            None,
-        )))
-    }
 }
 
 #[derive(Debug, Deserialize)]

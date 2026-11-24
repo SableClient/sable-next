@@ -3928,30 +3928,6 @@ async fn recovery_adopts_an_account_data_key_that_seals_our_documents() {
     assert!(document.can_seal);
 }
 
-#[tokio::test]
-async fn markdown_to_content_needs_no_session() {
-    use crate::protocol::ComposerPill;
-
-    let (core, _events) = Core::new("markdown-test", Box::new(MemorySessionStore::default()));
-    let content = core
-        .run(crate::api::messages::MarkdownToContentParams {
-            markdown: "**hi** \u{FFFC}".to_owned(),
-            pills: vec![ComposerPill::Mention {
-                user_id: "@ana:example.org".to_owned(),
-                name: "Ana".to_owned(),
-                via: Vec::new(),
-            }],
-        })
-        .await
-        .unwrap();
-    assert_eq!(content.body, "**hi** Ana");
-    assert_eq!(
-        content.formatted_body.as_deref(),
-        Some("<strong>hi</strong> <a href=\"matrix:u/ana:example.org\">Ana</a>")
-    );
-    assert_eq!(content.mentions.user_ids, ["@ana:example.org"]);
-}
-
 /// An account-data event the server stores, served back slowly enough that two
 /// unguarded read-modify-writes would both read the empty document.
 #[derive(Clone, Default)]

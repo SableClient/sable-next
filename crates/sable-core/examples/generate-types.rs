@@ -133,6 +133,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register::<AttachmentInfoView>()
         .register::<SendAttachmentRequest>()
         .register::<SendGalleryRequest>()
+        .register::<sable_model::markdown::ComposerContent>()
+        .register::<sable_model::markdown::ComposerPill>()
         .register::<sable_model::emote_picker::EmoteRecentsInput>()
         .register::<sable_model::emote_picker::EmoteRecents>()
         .register::<sable_model::search_query::ParsedQuery>()

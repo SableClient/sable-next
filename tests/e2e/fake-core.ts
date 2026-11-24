@@ -1211,11 +1211,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         return null;
       },
       'messages.edit': () => null,
-      'messages.markdown_to_content': (params) => ({
-        body: params.markdown,
-        formatted_body: null,
-        mentions: { user_ids: [], room: false },
-      }),
       'messages.bulk_redact': () => 0,
       'messages.delete_thread': () => null,
       'messages.event_reactions': (params) =>
