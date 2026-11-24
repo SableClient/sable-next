@@ -310,6 +310,18 @@ impl TimelineOverlay {
             self.hidden.retain(|id, _| held.contains(id.as_str()));
         }
         let placed = placed(&diff, self.items.len());
+        // Nothing removed and no removal known, so only a placed row can start one.
+        if self.ban_redactions.is_empty()
+            && self.removals.is_empty()
+            && !self
+                .items
+                .get(placed.clone())
+                .unwrap_or_default()
+                .iter()
+                .any(removes_events)
+        {
+            return vec![diff];
+        }
         let others = self.settle_removals(placed.clone());
         let mut diffs = vec![self.as_settled(diff, placed)];
         diffs.extend(others);
@@ -620,6 +632,16 @@ fn removable(item: &TimelineItemView) -> bool {
                 | TimelineItemContentView::ProfileChange { .. }
                 | TimelineItemContentView::StateEvent { .. }
         )
+}
+
+const fn removes_events(item: &TimelineItemView) -> bool {
+    matches!(
+        item.content,
+        TimelineItemContentView::Membership {
+            removes_events: true,
+            ..
+        }
+    )
 }
 
 fn mismatched_sender(item: &TimelineItemView) -> bool {
