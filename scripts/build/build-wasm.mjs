@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node
 import { execFile, spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import { lock } from 'proper-lockfile';
 import { cargoPackageVersion, cargoRustFlags } from '../lib/cargo.mjs';
@@ -105,7 +106,7 @@ async function bindgen(input, name, { optimize, features = [] }) {
       .slice(0, 32)
       .replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
     await run(process.execPath, [
-      'node_modules/sentry/dist/bin.cjs',
+      fileURLToPath(new URL('./bin.cjs', import.meta.resolve('sentry'))),
       'wasm-split',
       wasm,
       '-d',

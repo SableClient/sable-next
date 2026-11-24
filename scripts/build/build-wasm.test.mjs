@@ -120,7 +120,6 @@ test('release WASM and debug symbols are reproducible', async () => {
       join(directory, 'Cargo.lock'),
       '[[package]]\nname="wasm-bindgen"\nversion="0.2.100"\n'
     );
-    const sentry = new URL('./bin.cjs', import.meta.resolve('sentry')).pathname;
     const mock = `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
@@ -153,12 +152,8 @@ if (command === 'wasm-opt') {
   fs.copyFileSync(source, args[target + 1]);
  }
 }
-if (command === 'sentry') {
- const child = require('node:child_process').spawnSync(process.execPath, [${JSON.stringify(sentry)}, ...args], {stdio:'inherit'});
- process.exit(child.status ?? 1);
-}
 `;
-    for (const name of ['rustc', 'cargo', 'wasm-bindgen', 'wasm-opt', 'sentry']) {
+    for (const name of ['rustc', 'cargo', 'wasm-bindgen', 'wasm-opt']) {
       await writeFile(join(bin, name), mock, { mode: 0o755 });
     }
     const build = () =>
@@ -177,7 +172,8 @@ if (command === 'sentry') {
       });
     const result = build();
     assert.equal(result.status, 0, result.stderr);
-    for (const name of ['sable_wasm', 'sable_model']) {
+    const modules = ['sable_wasm', 'sable_model', 'sable_search_worker'];
+    for (const name of modules) {
       const shipped = new WebAssembly.Module(await readFile(join(output, `${name}_bg.wasm`)));
       const debug = new WebAssembly.Module(
         await readFile(join(output, 'debug', `${name}_bg.debug.wasm`))
@@ -198,7 +194,7 @@ if (command === 'sentry') {
     const optimizations = calls.filter(
       (call) => call.command === 'wasm-opt' && call.args.includes('--output')
     );
-    assert.equal(optimizations.length, 2);
+    assert.equal(optimizations.length, modules.length);
     assert.ok(optimizations.every((call) => call.args.includes('-g')));
     const { default: image } = await import(join(output, 'sable_wasm_build_id.js'));
     const shipped = new WebAssembly.Module(await readFile(join(output, 'sable_wasm_bg.wasm')));
@@ -208,7 +204,7 @@ if (command === 'sentry') {
     assert.equal(image.code_id, codeId);
     assert.equal(image.debug_id, `${codeId.slice(0, 32)}0`);
 
-    const artifacts = ['sable_wasm', 'sable_model'].flatMap((name) => [
+    const artifacts = modules.flatMap((name) => [
       `${name}_bg.wasm`,
       `debug/${name}_bg.debug.wasm`,
       `${name}_build_id.js`,
