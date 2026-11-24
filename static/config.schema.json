@@ -372,6 +372,13 @@
           "type": "boolean",
           "default": true
         },
+        "saturation": {
+          "title": "Saturation",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
         "quickCss": {
           "type": "string",
           "default": ""
@@ -1910,6 +1917,13 @@
           "title": "Use this server’s theme",
           "type": "boolean",
           "default": true
+        },
+        "saturation": {
+          "title": "Saturation",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
         },
         "quickCss": {
           "type": "string",

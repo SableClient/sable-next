@@ -85,6 +85,15 @@ export const appearanceCategory: SettingsCategory = {
       type: 'boolean',
     },
     {
+      key: 'saturation',
+      section: 'themes',
+      icon: PaletteIcon,
+      name: 'settings.saturation',
+      terms: ['settings.terms.saturation'],
+      type: 'range',
+      step: 0.05,
+    },
+    {
       key: 'showRoomIcon',
       section: 'sidebar',
       icon: ImageIcon,

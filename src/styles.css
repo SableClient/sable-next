@@ -578,6 +578,10 @@ html {
   --sheet-inset-bottom: 0px;
 }
 
+:is(:root, :fullscreen) {
+  filter: var(--app-saturation-filter, none);
+}
+
 :root[dir='rtl'] {
   --safe-inline-start: var(--safe-right);
   --safe-inline-end: var(--safe-left);

@@ -230,6 +230,14 @@
   });
 
   $effect(() => {
+    const saturation = preferences.saturation;
+    document.documentElement.style.setProperty(
+      '--app-saturation-filter',
+      saturation === 1 ? 'none' : `saturate(${String(saturation)})`
+    );
+  });
+
+  $effect(() => {
     const preview = themePreview.current;
     if (preview) {
       applyTheme(preview.kind, systemDark.current);
