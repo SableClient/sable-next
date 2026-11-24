@@ -32,10 +32,10 @@ export function restoredRoomPath(
   spaceRooms: (spaceId: string) => readonly string[]
 ): string {
   const room = rooms.find((entry) => entry.room_id === roomId);
+  if (room && section === HOME_SECTION && showHome) {
+    return resolve('/(app)/home/[roomId]', { roomId: roomPathParam(room, rooms) });
+  }
   if (room && !room.is_direct) {
-    if (section === HOME_SECTION && showHome) {
-      return resolve('/(app)/home/[roomId]', { roomId: roomPathParam(room, rooms) });
-    }
     const space = rooms.find(
       (entry) =>
         entry.room_id === section &&
