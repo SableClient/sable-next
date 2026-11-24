@@ -12,7 +12,7 @@
   import type { RoomListItemView, StatusView } from '#src/generated/protocol';
   import PreviewSegments from '#lib/features/room/messages/PreviewSegments.svelte';
   import { previewSegments } from '#lib/features/room/messages/reply-preview.js';
-  import { mediaPreviewSettings, previewsShown } from '#lib/settings/media-previews.svelte.js';
+  import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import CalendarRowEvent from '#lib/features/calendar/CalendarRowEvent.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -27,9 +27,7 @@
 
   let { name, room, preview = null, peerStatus = null }: Props = $props();
 
-  let emotesShown = $derived(
-    previewsShown(mediaPreviewSettings.mediaPreviews, room?.join_rule ?? null)
-  );
+  let emotesShown = $derived(mediaPreviewSettings.shownIn(room));
 </script>
 
 <span class="room-text">

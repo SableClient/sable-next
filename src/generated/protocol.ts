@@ -1439,6 +1439,8 @@ export type RoomListItemView = {
 	space_children: SpaceChildEdge[],
 	/**  The network a bridge relays this room from, per its `m.bridge` state. */
 	bridge: BridgeView | null,
+	/**  The room's own MSC4278 level; `null` when the account's applies. */
+	media_previews: MediaPreviewsView | null,
 	unread: number,
 	notifying: number,
 	highlight: number,

@@ -995,6 +995,8 @@ pub struct RoomListItemView {
     pub space_children: Vec<SpaceChildEdge>,
     /// The network a bridge relays this room from, per its `m.bridge` state.
     pub bridge: Option<BridgeView>,
+    /// The room's own MSC4278 level; `null` when the account's applies.
+    pub media_previews: Option<MediaPreviewsView>,
     pub unread: u32,
     pub notifying: u32,
     pub highlight: u32,

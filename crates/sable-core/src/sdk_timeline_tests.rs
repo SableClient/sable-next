@@ -6172,6 +6172,57 @@ async fn redacting_a_topic_the_server_already_stripped_leaves_the_room_without_t
     );
 }
 
+#[tokio::test]
+async fn room_summary_carries_the_rooms_own_media_preview_level() {
+    use crate::protocol::MediaPreviewsView;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!previews:example.org");
+    let level = |event_type: &str, level: &str| {
+        ruma::serde::Raw::new(&json!({
+            "type": event_type,
+            "content": { "media_previews": level },
+        }))
+        .unwrap()
+        .cast_unchecked()
+    };
+    let unstable = level("io.element.msc4278.media_preview_config", "off");
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_account_data(unstable),
+        )
+        .await;
+    let item =
+        matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
+    let mut cache = std::collections::HashMap::new();
+    super::view::enrich_rooms([&item], &mut cache).await;
+    assert_eq!(
+        room_row(&item, &cache).media_previews,
+        Some(MediaPreviewsView::Off)
+    );
+
+    let stable = level("m.media_preview_config", "private");
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_account_data(stable),
+        )
+        .await;
+    super::view::enrich_rooms([&item], &mut cache).await;
+    assert_eq!(
+        room_row(&item, &cache).media_previews,
+        Some(MediaPreviewsView::Off),
+        "a row update alone does not read the store again"
+    );
+    super::view::refresh_media_previews([&item], &mut cache).await;
+    assert_eq!(
+        room_row(&item, &cache).media_previews,
+        Some(MediaPreviewsView::Private)
+    );
+}
+
 fn room_row(
     item: &matrix_sdk_ui::room_list_service::RoomListItem,
     cache: &std::collections::HashMap<ruma::OwnedRoomId, super::view::RoomInfo>,

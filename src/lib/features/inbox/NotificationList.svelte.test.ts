@@ -76,18 +76,20 @@ test('reloads the feed when a room gains unread notifications', async () => {
 });
 
 test.each([
-  ['on', 'public', true],
-  ['off', 'invite', false],
-  ['private', 'public', false],
+  ['on', null, 'public', true],
+  ['off', null, 'invite', false],
+  ['private', null, 'public', false],
+  ['on', 'off', 'invite', false],
+  ['off', 'on', 'public', true],
 ] as const)(
-  'with media previews %s, a custom emote in a %s room notification shows as an image: %s',
-  async (level, joinRule, image) => {
+  "with media previews %s and the room's own %s, a custom emote in a %s room notification shows as an image: %s",
+  async (level, roomLevel, joinRule, image) => {
     setPreference('mediaAutoLoad', level);
     onTestFinished(() => {
       setPreference('mediaAutoLoad', 'on');
       inbox.mockResolvedValue({ items: [], has_more: false });
     });
-    roomList.rooms = [room('!a:example.org', { join_rule: joinRule })];
+    roomList.rooms = [room('!a:example.org', { join_rule: joinRule, media_previews: roomLevel })];
     inbox.mockResolvedValue({
       items: [
         {

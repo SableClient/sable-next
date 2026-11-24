@@ -3,6 +3,7 @@ import type {
   MediaPreviewConfigView,
   MediaPreviewsView,
   RoomJoinRuleView,
+  RoomListItemView,
 } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -42,6 +43,11 @@ class MediaPreviewSettings {
 
   get mediaPreviews(): MediaPreviews {
     return this.global.media_previews ?? preferences.mediaAutoLoad;
+  }
+
+  /** A room's own level wins over the account's. */
+  shownIn(room: Pick<RoomListItemView, 'media_previews' | 'join_rule'> | undefined): boolean {
+    return previewsShown(room?.media_previews ?? this.mediaPreviews, room?.join_rule ?? null);
   }
 
   get inviteAvatars(): InviteAvatars {

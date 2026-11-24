@@ -57,6 +57,7 @@ const room: RoomListItemView = withCounts({
   supports_knock_restricted: false,
   space_children: [],
   bridge: null,
+  media_previews: null,
   unread: 0,
   notifying: 0,
   highlight: 0,

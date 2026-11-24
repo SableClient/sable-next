@@ -42,6 +42,7 @@ const rooms = ['Quiet', 'Loud'].map((name) =>
     supports_knock_restricted: false,
     space_children: [],
     bridge: null,
+    media_previews: null,
     unread: 2,
     notifying: 0,
     highlight: 0,

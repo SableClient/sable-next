@@ -158,7 +158,7 @@ impl RoomListWorker {
         (self.client.event_handler_drop_guard(handle), receiver)
     }
 
-    fn watch_avatar_overrides(
+    fn watch_row_account_data(
         &self,
     ) -> (
         matrix_sdk::event_handler::EventHandlerDropGuard,
@@ -170,9 +170,11 @@ impl RoomListWorker {
                   room: matrix_sdk::Room| {
                 let sender = sender.clone();
                 async move {
-                    if raw.get_field::<String>("type").ok().flatten().as_deref()
-                        == Some(crate::spaces::AVATAR_OVERRIDE_EVENT)
-                    {
+                    let event_type = raw.get_field::<String>("type").ok().flatten();
+                    if event_type.as_deref().is_some_and(|event_type| {
+                        event_type == crate::spaces::AVATAR_OVERRIDE_EVENT
+                            || crate::account_documents::is_media_preview_event(event_type)
+                    }) {
                         let _ = sender.send(room.room_id().to_owned());
                     }
                 }
@@ -181,7 +183,7 @@ impl RoomListWorker {
         (self.client.event_handler_drop_guard(handle), receiver)
     }
 
-    async fn on_avatar_overrides(
+    async fn on_row_account_data(
         &mut self,
         room_ids: HashSet<OwnedRoomId>,
     ) -> Vec<crate::protocol::VectorDiff<RoomListItemView>> {
@@ -192,6 +194,7 @@ impl RoomListWorker {
             .map(RoomListItem::from)
             .collect();
         view::enrich_rooms(&rooms, &mut self.room_cache).await;
+        view::refresh_media_previews(&rooms, &mut self.room_cache).await;
         self.rows.refresh(
             &rooms,
             &self.room_cache,
@@ -210,7 +213,7 @@ impl RoomListWorker {
         let mut batch = DiffBatch::new(ROOM_LIST_BATCH_INTERVAL);
         self.dm_spaces = self.load_dm_spaces().await;
         let (_handler, mut state_changes) = self.watch_parent_state();
-        let (_override_handler, mut avatar_overrides) = self.watch_avatar_overrides();
+        let (_account_data_handler, mut row_account_data) = self.watch_row_account_data();
         loop {
             let held = batch.wait(Instant::now());
             let diffs = tokio::select! {
@@ -251,12 +254,12 @@ impl RoomListWorker {
                     self.on_parent_state_changes(changes).await;
                     self.rows.relink(&self.room_cache, &self.dm_spaces, &self.parents.links)
                 }
-                room_id = avatar_overrides.recv() => {
+                room_id = row_account_data.recv() => {
                     let Some(room_id) = room_id else { break; };
                     let room_ids = std::iter::once(room_id)
-                        .chain(std::iter::from_fn(|| avatar_overrides.try_recv().ok()))
+                        .chain(std::iter::from_fn(|| row_account_data.try_recv().ok()))
                         .collect();
-                    let diffs = self.on_avatar_overrides(room_ids).await;
+                    let diffs = self.on_row_account_data(room_ids).await;
                     if diffs.is_empty() {
                         continue;
                     }

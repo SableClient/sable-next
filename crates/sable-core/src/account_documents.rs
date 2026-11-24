@@ -58,21 +58,34 @@ pub(crate) fn media_preview_config(content: Option<&Value>) -> MediaPreviewConfi
     }
 }
 
+/// The room's own level, which wins over the account's. `Err` when the store could not be read,
+/// so the caller can keep what it had.
+pub(crate) async fn room_media_previews(
+    room: &matrix_sdk::Room,
+) -> Result<Option<MediaPreviewsView>, ()> {
+    for event in [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT] {
+        let content = room
+            .account_data(event.into())
+            .await
+            .map_err(|_| ())?
+            .and_then(|raw| raw.get_field::<Value>("content").ok().flatten());
+        if let Some(level) = media_preview_config(content.as_ref()).media_previews {
+            return Ok(Some(level));
+        }
+    }
+    Ok(None)
+}
+
+pub(crate) fn is_media_preview_event(event_type: &str) -> bool {
+    [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT].contains(&event_type)
+}
+
 /// Mirrors the app's `previewsShown`.
 #[cfg(not(target_family = "wasm"))]
 pub(crate) async fn shows_media_previews(room: &matrix_sdk::Room) -> bool {
     use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 
-    let mut level = None;
-    for event in [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT] {
-        let content = room
-            .account_data(event.into())
-            .await
-            .ok()
-            .flatten()
-            .and_then(|raw| raw.get_field::<Value>("content").ok().flatten());
-        level = level.or_else(|| media_preview_config(content.as_ref()).media_previews);
-    }
+    let mut level = room_media_previews(room).await.ok().flatten();
     for event in [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT] {
         let content = room
             .client()

@@ -25,7 +25,7 @@
   import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
   import PreviewSegments from '#lib/features/room/messages/PreviewSegments.svelte';
   import { previewSegments } from '#lib/features/room/messages/reply-preview.js';
-  import { mediaPreviewSettings, previewsShown } from '#lib/settings/media-previews.svelte.js';
+  import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
   import { MemberProfile } from '#lib/features/room/members/member-profile.svelte.js';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
@@ -352,10 +352,7 @@
                       <PreviewSegments
                         segments={previewSegments(
                           item.body,
-                          previewsShown(
-                            mediaPreviewSettings.mediaPreviews,
-                            roomList.byId(group.roomId)?.join_rule ?? null
-                          )
+                          mediaPreviewSettings.shownIn(roomList.byId(group.roomId))
                             ? item.emotes
                             : []
                         )}

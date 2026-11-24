@@ -1430,11 +1430,12 @@ test('a custom emote in a message preview shows as its image', async () => {
 });
 
 test.each([
-  ['off', 'invite'],
-  ['private', 'public'],
+  ['off', null, 'invite'],
+  ['private', null, 'public'],
+  ['on', 'off', 'invite'],
 ] as const)(
-  'a custom emote in a message preview stays text when media previews are %s in a %s room',
-  async (level, joinRule) => {
+  "a custom emote in a message preview stays text when media previews are %s and the room's own %s in a %s room",
+  async (level, roomLevel, joinRule) => {
     visit('/home');
     setPreference('showHome', true);
     setPreference('messagePreviews', 'all');
@@ -1447,6 +1448,7 @@ test.each([
         room_id: '!r:example.org',
         name: 'Room',
         join_rule: joinRule,
+        media_previews: roomLevel,
         latest_event: latest('hi :blob:', 1, {
           emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
         }),

@@ -237,6 +237,7 @@ mod tests {
             supports_knock_restricted: false,
             space_children: Vec::new(),
             bridge: None,
+            media_previews: None,
             unread: 4,
             notifying: 4,
             highlight: 1,
@@ -284,6 +285,7 @@ mod tests {
             tags: Vec::new(),
             voice_roster: None,
             avatar_override: None,
+            media_previews: None,
             bridge: None,
             latest_sender: None,
         };
@@ -317,6 +319,7 @@ mod tests {
             tags: Vec::new(),
             voice_roster: None,
             avatar_override: None,
+            media_previews: None,
             bridge: None,
             latest_sender: None,
         }

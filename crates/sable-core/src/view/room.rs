@@ -21,9 +21,9 @@ use matrix_sdk_ui::{eyeball_im, room_list_service::RoomListItem};
 
 use crate::api::rooms::RoomKind;
 use crate::protocol::{
-    BridgeView, LatestEventKind, LatestEventView, NotificationModeView, NotificationSettingsView,
-    PredecessorRoomView, PreviewEmote, RoomJoinRuleView, RoomListItemView, RoomTag, RoomUnreadView,
-    SpaceChildEdge,
+    BridgeView, LatestEventKind, LatestEventView, MediaPreviewsView, NotificationModeView,
+    NotificationSettingsView, PredecessorRoomView, PreviewEmote, RoomJoinRuleView,
+    RoomListItemView, RoomTag, RoomUnreadView, SpaceChildEdge,
 };
 
 use super::diff::diff_values;
@@ -54,6 +54,8 @@ pub struct RoomInfo {
     pub tags: Vec<RoomTag>,
     pub(crate) voice_roster: Option<crate::calls::VoiceRoomRoster>,
     pub avatar_override: Option<String>,
+    /// Read once per row, then by `refresh_media_previews` when the room's account data changes.
+    pub media_previews: Option<MediaPreviewsView>,
     /// Read once per row, as a bridge sets it when it creates the room.
     pub bridge: Option<BridgeView>,
     pub latest_sender: Option<LatestSender>,
@@ -139,6 +141,7 @@ pub fn room_list_item<S: BuildHasher>(
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
         bridge: info.and_then(|i| i.bridge.clone()),
+        media_previews: info.and_then(|i| i.media_previews),
         unread,
         notifying,
         highlight,
@@ -494,6 +497,20 @@ pub(crate) async fn enrich_rooms<'a, S: BuildHasher>(
     }
 }
 
+pub(crate) async fn refresh_media_previews<'a, S: BuildHasher>(
+    rooms: impl IntoIterator<Item = &'a RoomListItem>,
+    room_cache: &mut HashMap<OwnedRoomId, RoomInfo, S>,
+) {
+    for room in rooms {
+        if let (Some(info), Ok(level)) = (
+            room_cache.get_mut(room.room_id()),
+            crate::account_documents::room_media_previews(room).await,
+        ) {
+            info.media_previews = level;
+        }
+    }
+}
+
 pub(crate) fn latest_items(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) -> Vec<&RoomListItem> {
     let mut latest: HashMap<&RoomId, &RoomListItem> = HashMap::new();
     for item in diffs.iter().flat_map(diff_values) {
@@ -636,6 +653,12 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
             None
         },
         avatar_override,
+        media_previews: match previous {
+            Some(previous) => previous.media_previews,
+            None => crate::account_documents::room_media_previews(room)
+                .await
+                .unwrap_or_default(),
+        },
         latest_sender: latest_sender(room).await,
     }
 }

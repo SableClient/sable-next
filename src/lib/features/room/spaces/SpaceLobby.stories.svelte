@@ -38,6 +38,7 @@
       },
     ],
     bridge: null,
+    media_previews: null,
     unread: 1,
     notifying: 0,
     highlight: 0,

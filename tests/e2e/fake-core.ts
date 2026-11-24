@@ -191,6 +191,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       supports_knock_restricted: false,
       space_children: [],
       bridge: null,
+      media_previews: null,
       unread:
         workerMode === 'room_name_overflow'
           ? 0
