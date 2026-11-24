@@ -49,7 +49,10 @@ import {
 } from '#lib/gif/providers.js';
 import { replyPreviewBody, type ReplyVersion } from '#lib/features/room/messages/reply-preview.js';
 import { isMediaCaptionContent } from '#lib/features/room/messages/media-caption.js';
-import { previewableLinks, previewWhitelistEntry } from '#lib/features/room/media/link-preview.js';
+import {
+  outgoingPreviewableLinks,
+  previewWhitelistEntry,
+} from '#lib/features/room/media/link-preview.js';
 import {
   previewSources,
   resolveUrlPreview,
@@ -171,8 +174,7 @@ export class Conversation {
   ): Promise<{ previews: UrlPreviewView[]; suppressed: boolean }> {
     const sources = previewSources(this.#encrypted());
     const tunnel = usesTunnel(this.#encrypted(), this.#publicRoom());
-    if (!html) return { previews: [], suppressed: false };
-    const links = previewableLinks(html, body).filter((url) => body.includes(url));
+    const links = outgoingPreviewableLinks(html, body).filter((url) => body.includes(url));
     const wanted = links.filter((url) => !dismissed.includes(url));
     const previews = await Promise.all(
       wanted.map(

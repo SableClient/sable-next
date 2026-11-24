@@ -26,7 +26,7 @@
   import type { ReplyDirection } from '#lib/features/room/timeline/timeline-format.js';
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
   import { previewSources } from '#lib/features/room/media/link-preview-cache.js';
-  import { previewableLinks } from '#lib/features/room/media/link-preview.js';
+  import { outgoingPreviewableLinks } from '#lib/features/room/media/link-preview.js';
   import { i18n } from '#lib/i18n.js';
   import { serverNameOf } from '#lib/matrix-id.js';
   import { isPackChange } from '#lib/emoji/load-packs.js';
@@ -809,7 +809,7 @@
     draftLinksTimeout = setTimeout(() => {
       const doc = editor.doc();
       const message = doc ? (richSend ? serializeComposer(doc) : serializePlain(doc)) : null;
-      draftLinks = message?.formatted ? previewableLinks(message.formatted, message.body) : [];
+      draftLinks = message ? outgoingPreviewableLinks(message.formatted, message.body) : [];
     }, 300);
   }
 

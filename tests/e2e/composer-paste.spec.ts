@@ -24,3 +24,43 @@ test('Ctrl+V pastes into the composer while nothing is focused', async ({
 
   await expect.poll(() => app.composer.innerText()).toBe('pasted from nowhere');
 });
+
+test('a URL pasted into the plain composer previews in the draft and on send', async ({
+  page,
+  context,
+  app,
+  timeline,
+  installRoomCore,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only');
+  const url = 'https://example.test/article';
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'sable-preferences',
+      JSON.stringify({ urlPreviews: true, encryptedUrlPreviews: true, richTextComposer: false })
+    );
+  });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await installRoomCore('ready');
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  await app.composer.focus();
+  await page.evaluate((text) => navigator.clipboard.writeText(text), url);
+  await page.keyboard.press('ControlOrMeta+V');
+
+  await expect(page.locator('.preview-url')).toBeVisible();
+  await app.composer.press('Enter');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.__e2eCalls.findLast((call) => call.method === 'messages.send')?.params
+      )
+    )
+    .toMatchObject({
+      body: url,
+      formatted: null,
+      link_previews: [expect.objectContaining({ url, title: 'The Example Article' })],
+    });
+});

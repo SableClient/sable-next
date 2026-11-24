@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   previewableLinks,
   imageMimeFromUrl,
+  outgoingPreviewableLinks,
   previewGif,
   previewWhitelistEntry,
 } from './link-preview';
@@ -123,6 +124,21 @@ describe('previewableLinks', () => {
     expect(
       previewableLinks('<code>x<code><a href="https://example.org/a">a</a></code>y</code>')
     ).toEqual([]);
+  });
+});
+
+describe('outgoingPreviewableLinks', () => {
+  it('finds bare and explicit links in order, excluding hidden text and link labels', () => {
+    const html =
+      '<p><strong>See</strong> https://example.org/a ' +
+      '<code>https://example.org/code</code> ' +
+      '<span data-mx-spoiler>https://example.org/spoiler</span> ' +
+      '<a href="https://example.org/b">https://example.org/label</a> ' +
+      '&lt;https://example.org/quiet&gt;</p>';
+    expect(outgoingPreviewableLinks(html, '')).toEqual([
+      'https://example.org/a',
+      'https://example.org/b',
+    ]);
   });
 });
 

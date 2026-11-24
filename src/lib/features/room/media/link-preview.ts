@@ -1,5 +1,6 @@
 import { gifFromUploadedMxc, type GifResult } from '#lib/gif/providers.js';
 import { appMime } from '#lib/mime.js';
+import { topicToHtml } from '#lib/model/model.js';
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 import type { UrlPreviewView, VideoPlaybackView } from '#src/generated/protocol';
 
@@ -144,14 +145,56 @@ function bracketed(anchor: Element): boolean {
   );
 }
 
+const HIDDEN_LINK_CONTEXT = 'pre, code, span[data-mx-spoiler]';
+
+function previewableHref(anchor: Element, body: string): string | null {
+  const href = anchor.getAttribute('href') ?? '';
+  return !anchor.closest(HIDDEN_LINK_CONTEXT) &&
+    !bracketed(anchor) &&
+    isPreviewable(href) &&
+    !body.includes(`<${href}>`)
+    ? href
+    : null;
+}
+
 export function previewableLinks(html: string, body = ''): string[] {
   if (!html.includes('<a')) return [];
   const links = new Set<string>();
   const document = new DOMParser().parseFromString(html, 'text/html');
   for (const anchor of document.querySelectorAll('a[href]')) {
-    if (anchor.closest('pre, code, span[data-mx-spoiler]') || bracketed(anchor)) continue;
-    const href = anchor.getAttribute('href') ?? '';
-    if (isPreviewable(href) && !body.includes(`<${href}>`)) links.add(href);
+    const href = previewableHref(anchor, body);
+    if (href !== null) links.add(href);
+  }
+  return [...links];
+}
+
+export function outgoingPreviewableLinks(html: string | null, body: string): string[] {
+  const links = new Set<string>();
+  const addBareLinks = (text: string) => {
+    if (!/https?:\/\//iu.test(text)) return;
+    for (const href of previewableLinks(topicToHtml(text), body)) {
+      if (text.includes(href)) links.add(href);
+    }
+  };
+  if (html === null) {
+    addBareLinks(body);
+  } else {
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT
+    );
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      if (node instanceof Element && node.matches('a[href]')) {
+        const href = previewableHref(node, body);
+        if (href !== null) links.add(href);
+      } else if (
+        node.nodeType === Node.TEXT_NODE &&
+        !node.parentElement?.closest(`a, ${HIDDEN_LINK_CONTEXT}, mx-reply, script, style, textarea`)
+      ) {
+        addBareLinks(node.textContent ?? '');
+      }
+    }
   }
   return [...links];
 }
