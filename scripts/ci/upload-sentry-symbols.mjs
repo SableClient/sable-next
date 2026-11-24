@@ -49,12 +49,18 @@ export async function collectSymbols(root) {
   return symbols;
 }
 
+// The check prints its report and then exits 1 for a file it finds unusable.
 function inspectFile(path) {
-  return JSON.parse(
-    execFileSync(SentryCli.getPath(), ['debug-files', 'check', '--json', path], {
-      encoding: 'utf8',
-    })
-  );
+  try {
+    return JSON.parse(
+      execFileSync(SentryCli.getPath(), ['debug-files', 'check', '--json', path], {
+        encoding: 'utf8',
+      })
+    );
+  } catch (error) {
+    if (error.status === 1 && error.stdout) return JSON.parse(error.stdout);
+    throw error;
+  }
 }
 
 async function debugIds(path) {
