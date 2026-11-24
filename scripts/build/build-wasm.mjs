@@ -104,7 +104,8 @@ async function bindgen(input, name, { optimize, features = [] }) {
     const buildId = sha256(readFileSync(wasm))
       .slice(0, 32)
       .replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
-    await run('sentry', [
+    await run(process.execPath, [
+      'node_modules/sentry/dist/bin.cjs',
       'wasm-split',
       wasm,
       '-d',
