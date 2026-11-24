@@ -1296,6 +1296,10 @@ impl Core {
             return Err(error);
         }
         // Pushes can find the login once it is persisted.
+        #[cfg_attr(
+            target_family = "wasm",
+            expect(clippy::let_unit_value, reason = "the web has no store lease")
+        )]
         let lease = match lease {
             Some(lease) => lease,
             None => session::store_lease(store_id).await,

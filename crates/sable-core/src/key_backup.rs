@@ -192,6 +192,13 @@ type BackedUpSession = (
 
 /// Decrypting a batch is CPU-bound, so it stays off the async task. A session
 /// that cannot be read is logged and counted as failed by the caller.
+#[cfg_attr(
+    target_family = "wasm",
+    expect(
+        clippy::unused_async,
+        reason = "only native moves the work off the task"
+    )
+)]
 async fn decrypt_batch(
     key: BackupDecryptionKey,
     batch: Vec<BackedUpSession>,
