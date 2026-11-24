@@ -92,12 +92,20 @@ rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", 
 tokio = { workspace = true }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-rusqlite = { version = "0.41.1", default-features = false, features = ["bundled-sqlcipher", "cache", "fallible_uint"] }
+rusqlite = { version = "0.41.1", default-features = false, features = [
+  "bundled-sqlcipher",
+  "cache",
+  "fallible_uint",
+] }
 keyring-core = "1.0.1"
 apple-native-keyring-store = { version = "1.0.2", features = ["keychain", "protected"] }
 
 [target.'cfg(all(not(target_family = "wasm"), not(any(target_os = "macos", target_os = "ios"))))'.dependencies]
-rusqlite = { version = "0.41.1", default-features = false, features = ["bundled-sqlcipher-vendored-openssl", "cache", "fallible_uint"] }
+rusqlite = { version = "0.41.1", default-features = false, features = [
+  "bundled-sqlcipher-vendored-openssl",
+  "cache",
+  "fallible_uint",
+] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring-core = "1.0.1"

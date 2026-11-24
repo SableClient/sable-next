@@ -11,14 +11,22 @@ crate-type = ["cdylib", "rlib"]
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 sable-sql = { path = "../sable-sql", version = "0.1.0", features = ["engine"] }
-rusqlite = { version = "0.41.1", default-features = false, features = ["ffi-sqlite-wasm-rs", "cache"] }
+rusqlite = { version = "0.41.1", default-features = false, features = [
+  "ffi-sqlite-wasm-rs",
+  "cache",
+] }
 sqlite-wasm-rs = { version = "=0.6.3", default-features = false, features = ["wasm-bindgen"] }
 sqlite-wasm-vfs = { version = "0.3.0", features = ["sahpool"] }
 rsqlite-vfs = "0.2"
 js-sys = { workspace = true }
 wasm-bindgen = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
-web-sys = { version = "0.3", features = ["MessagePort", "MessageEvent", "console", "WorkerGlobalScope"] }
+web-sys = { version = "0.3", features = [
+  "MessagePort",
+  "MessageEvent",
+  "console",
+  "WorkerGlobalScope",
+] }
 
 [lints]
 workspace = true
