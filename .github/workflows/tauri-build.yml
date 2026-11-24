@@ -215,6 +215,10 @@ jobs:
               esac
             fi
           fi
+          if [ "$RUNNER_OS" = Windows ]; then
+            # Git Bash's perl lacks modules that OpenSSL's Configure loads.
+            export OPENSSL_SRC_PERL='C:/Strawberry/perl/bin/perl.exe'
+          fi
           pnpm --dir electron package "$PLATFORM" "${sign_args[@]}"
       - name: Remove the signing keychain
         if: ${{ always() && runner.os == 'macOS' && env.APPLE_CERTIFICATE != '' }}
@@ -313,7 +317,7 @@ jobs:
           copyback: false
           envs: 'VERSION TAG VITE_APP_VERSION SABLE_BUILD_FLAVOR ELECTRON_SKIP_BINARY_DOWNLOAD FORGEJO_URL FORGEJO_REPOSITORY FORGEJO_TOKEN CARGO_INCREMENTAL CARGO_TERM_COLOR'
           prepare: |
-            pkg install -y electron45 node24 npm-node24 rustup-init
+            pkg install -y electron45 node24 npm-node24 perl5 rustup-init
             rustup-init -y --profile minimal --default-toolchain none
           run: |
             set -e
