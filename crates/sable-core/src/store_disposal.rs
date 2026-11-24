@@ -211,11 +211,12 @@ mod tests {
 
         let failed = super::discard(base, &account).await;
 
-        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o700)).unwrap();
-        // Skipped where permissions do not bind, such as a root user.
+        // Skipped where permissions do not bind, such as a root user, who
+        // has removed the directory by now.
         if failed.is_ok() {
             return;
         }
+        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o700)).unwrap();
         assert!(crate::secrets::load(&reference).unwrap().is_some());
         super::discard(base, &account).await.unwrap();
         assert!(crate::secrets::load(&reference).unwrap().is_none());
