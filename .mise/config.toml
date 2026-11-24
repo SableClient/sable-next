@@ -225,6 +225,15 @@ depends = ["tauri:setup:macos"]
 confirm = { message = "Set up iOS Xcode project? (required for Tauri)", default = "no" }
 run = ["command -v pod >/dev/null 2>&1 || brew install cocoapods", "pnpm tauri ios init"]
 
+[tasks.electron]
+description = "Build the web assets and start the Electron app"
+run = "pnpm --dir electron start"
+raw = true
+
+[tasks."electron:package"]
+description = "Package the Electron app for this platform; arguments go to electron-builder, e.g. `--win`"
+run = [{ task = "build" }, "pnpm --dir electron package"]
+
 [tasks.opentofu]
 description = "Run OpenTofu for the Cloudflare deployment"
 run = "tofu"
