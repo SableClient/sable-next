@@ -7,6 +7,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { parseArgs } from 'node:util';
 import { SentryCli } from '@sentry/cli';
+import { runSentryCli } from './sentry-cli.mjs';
 
 const binaries = ['app', 'sable'];
 const addons = ['sable_node.node', 'sable_audiofox.node'];
@@ -148,7 +149,7 @@ async function main() {
     console.info(`Validated ${ids.size} debug identifiers in ${symbols.size} native symbol files`);
     return;
   }
-  uploadDebugFiles(ids, symbols);
+  await uploadDebugFiles(ids, symbols);
   // The mirror depends on symbols.electronjs.org, so a failure there must not
   // block the release; it only leaves Electron's own frames unsymbolicated.
   if (values.electron) {
@@ -160,11 +161,11 @@ async function main() {
   }
 }
 
-function uploadDebugFiles(ids, files) {
+async function uploadDebugFiles(ids, files) {
   const args = ['debug-files', 'upload', '--include-sources', '--wait'];
   for (const id of ids) args.push('--id', id);
   args.push(...files);
-  execFileSync(SentryCli.getPath(), args, { stdio: 'inherit' });
+  await runSentryCli(args);
 }
 
 // Linux ships the Electron binary renamed, and Sentry's built-in Electron
@@ -179,7 +180,7 @@ async function mirrorElectronSymbols(executable) {
   if (!(await debugIds(file)).includes(id)) {
     throw new Error(`Debug identifiers do not match: ${executable} and ${url}`);
   }
-  uploadDebugFiles([id], [file]);
+  await uploadDebugFiles([id], [file]);
 }
 
 if (import.meta.main) await main();

@@ -1,7 +1,6 @@
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { SentryCli } from '@sentry/cli';
+import { runSentryCli } from './sentry-cli.mjs';
 
 export async function collectMaps(root) {
   const entries = await readdir(root, { recursive: true }).catch((error) => {
@@ -25,7 +24,7 @@ async function main() {
   }
   const [assets = 'dist'] = process.argv.slice(2);
   for (const args of sentryCommands(assets, process.env.VITE_APP_VERSION)) {
-    execFileSync(SentryCli.getPath(), args, { stdio: 'inherit' });
+    await runSentryCli(args);
   }
   if (process.env.VITE_SENTRY_ENVIRONMENT !== 'production') return;
   for (const root of [assets, '.svelte-kit/output']) {
