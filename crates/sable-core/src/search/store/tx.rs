@@ -20,9 +20,13 @@ fn json_of(row: &[Value], column: usize) -> Option<Document> {
 
 /// One room of the database. Writes wait in the transaction until something
 /// reads or it commits, and then go out in one batch with that read.
+///
+/// Every batch commits on its own. Queue `mark_classified` and
+/// `record_redacted` after the last read of an event, so they commit with its
+/// writes: committed earlier, a write that then fails would never be retried.
 pub(in crate::search) struct RoomTx<'store> {
     store: &'store Store,
-    room: String,
+    pub(super) room: String,
     queued: Vec<Statement>,
     pub(in crate::search) redacted: HashSet<OwnedEventId>,
 }
@@ -55,11 +59,11 @@ impl<'store> RoomTx<'store> {
         })
     }
 
-    fn queue(&mut self, statement: Statement) {
+    pub(super) fn queue(&mut self, statement: Statement) {
         self.queued.push(statement);
     }
 
-    async fn read(&mut self, statement: Statement) -> Result<Rows> {
+    pub(super) async fn read(&mut self, statement: Statement) -> Result<Rows> {
         let mut batch = std::mem::take(&mut self.queued);
         batch.push(statement);
         Ok(self.store.run(batch).await?.pop().unwrap_or_default())
@@ -121,16 +125,12 @@ impl<'store> RoomTx<'store> {
         Ok(self.row(event_id).await?.map(|(_, document)| document))
     }
 
-    pub(in crate::search) fn mark_redacted(&mut self, event_id: &OwnedEventId) -> bool {
-        if !self.redacted.insert(event_id.clone()) {
-            return false;
-        }
+    pub(in crate::search) fn record_redacted(&mut self, event_id: &EventId) {
         self.queue(statement!(
             "INSERT OR IGNORE INTO redacted (room_id, event_id) VALUES (?1, ?2)",
             self.room.as_str(),
             event_id.as_str()
         ));
-        true
     }
 
     pub(in crate::search) async fn edit_target(
@@ -185,27 +185,29 @@ impl<'store> RoomTx<'store> {
             if indexed.body == document.body {
                 if !indexed.same_metadata(document) {
                     self.queue(statement!(
-                        "UPDATE doc SET ts = ?1, sender = ?2, state = ?3, json = ?4 WHERE id = ?5",
+                        "UPDATE doc SET ts = ?1, sender = ?2, state = ?3, attachment = ?4, json = ?5
+                         WHERE id = ?6",
                         document.origin_server_ts,
                         document.sender.as_str(),
                         document.state,
+                        document.listed(),
                         document_json(document),
                         id
                     ));
                 }
                 return Ok(());
             }
-            self.queue(statement!("DELETE FROM fts WHERE rowid = ?1", id));
             self.queue(statement!("DELETE FROM doc WHERE id = ?1", id));
         }
         self.queue(statement!(
-            "INSERT INTO doc (room_id, event_id, ts, sender, state, json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO doc (room_id, event_id, ts, sender, state, attachment, json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             self.room.as_str(),
             document.event_id.as_str(),
             document.origin_server_ts,
             document.sender.as_str(),
             document.state,
+            document.listed(),
             document_json(document)
         ));
         self.queue(statement!(
@@ -216,17 +218,10 @@ impl<'store> RoomTx<'store> {
     }
 
     pub(in crate::search) fn remove(&mut self, event_id: &EventId) {
-        let (room, event) = (self.room.clone(), event_id.as_str());
-        self.queue(statement!(
-            "DELETE FROM fts WHERE rowid IN
-                 (SELECT id FROM doc WHERE room_id = ?1 AND event_id = ?2)",
-            room.as_str(),
-            event
-        ));
         self.queue(statement!(
             "DELETE FROM doc WHERE room_id = ?1 AND event_id = ?2",
-            room.as_str(),
-            event
+            self.room.as_str(),
+            event_id.as_str()
         ));
     }
 
@@ -317,11 +312,6 @@ impl<'store> RoomTx<'store> {
         edits: Vec<(OwnedEventId, OwnedEventId)>,
     ) -> Result<()> {
         let floor = self.floor().await?;
-        for (event_id, ts) in classified {
-            if ts >= floor {
-                self.mark_classified(&event_id, ts);
-            }
-        }
         for (edit, target) in edits {
             self.queue(statement!(
                 "INSERT OR IGNORE INTO edit (room_id, edit_id, target_id) VALUES (?1, ?2, ?3)",
@@ -338,6 +328,11 @@ impl<'store> RoomTx<'store> {
             let document = adopt_edit(document, existing.as_ref(), &self.redacted);
             let document = self.apply_pending(document).await?;
             self.upsert(&document).await?;
+        }
+        for (event_id, ts) in classified {
+            if ts >= floor {
+                self.mark_classified(&event_id, ts);
+            }
         }
         self.commit().await
     }

@@ -51,7 +51,7 @@ pub(super) enum Location {
 pub(super) fn open_connection(
     location: &Location,
     key: Option<&crate::secrets::Key>,
-) -> rusqlite::Result<rusqlite::Connection> {
+) -> std::result::Result<rusqlite::Connection, sable_sql::OpenError> {
     use std::fmt::Write as _;
 
     let connection = match location {
@@ -68,6 +68,22 @@ pub(super) fn open_connection(
     }
     sable_sql::prepare(&connection, matches!(location, Location::File(_)))?;
     Ok(connection)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub(super) fn open_or_start_over(
+    directory: &std::path::Path,
+    key: Option<&crate::secrets::Key>,
+) -> std::result::Result<rusqlite::Connection, sable_sql::OpenError> {
+    let location = Location::File(directory.join(DATABASE));
+    open_connection(&location, key).or_else(|error| {
+        if !error.starts_over() {
+            return Err(error);
+        }
+        tracing::warn!("the search database cannot be used, starting it over: {error}");
+        remove_files(directory);
+        open_connection(&location, key)
+    })
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -137,14 +153,7 @@ impl Store {
         let directory = std::path::Path::new(store_id).join(DIRECTORY);
         let opened = tokio::task::spawn_blocking(move || {
             std::fs::create_dir_all(&directory)?;
-            let location = Location::File(directory.join(DATABASE));
-            open_connection(&location, key.as_ref())
-                .or_else(|error| {
-                    tracing::warn!("opening the search database failed, starting it over: {error}");
-                    remove_files(&directory);
-                    open_connection(&location, key.as_ref())
-                })
-                .map_err(std::io::Error::other)
+            open_or_start_over(&directory, key.as_ref()).map_err(std::io::Error::other)
         })
         .await;
         match opened {
@@ -294,22 +303,16 @@ impl Store {
 
     pub(super) async fn forget_room(&self, room_id: &RoomId) -> Result<()> {
         let room = room_id.as_str();
-        let mut statements = vec![statement!(
-            "DELETE FROM fts WHERE rowid IN (SELECT id FROM doc WHERE room_id = ?1)",
-            room
-        )];
-        statements.extend(
-            [
-                "doc",
-                "classified",
-                "edit",
-                "redacted",
-                "pending_edit",
-                "room",
-            ]
-            .map(|table| statement!(format!("DELETE FROM {table} WHERE room_id = ?1"), room)),
-        );
-        self.run(statements).await.map(drop)
+        let statements = [
+            "doc",
+            "classified",
+            "edit",
+            "redacted",
+            "pending_edit",
+            "room",
+        ]
+        .map(|table| statement!(format!("DELETE FROM {table} WHERE room_id = ?1"), room));
+        self.run(statements.into()).await.map(drop)
     }
 
     /// The bytes the database holds, not counting pages waiting for reuse.
@@ -350,12 +353,6 @@ impl Store {
                 };
                 let floor = newest.saturating_add(1);
                 statements.extend([
-                    statement!(
-                        "DELETE FROM fts WHERE rowid IN
-                             (SELECT id FROM doc WHERE room_id = ?1 AND ts < ?2)",
-                        room_id,
-                        floor
-                    ),
                     statement!(
                         "DELETE FROM doc WHERE room_id = ?1 AND ts < ?2",
                         room_id,

@@ -166,7 +166,6 @@ impl Item {
 }
 
 pub(super) async fn apply(tx: &mut RoomTx<'_>, item: Item) -> Result<()> {
-    tx.mark_classified(&item.event_id, item.ts);
     match item.step {
         Step::Document(document) => tx.upsert(&document).await,
         Step::Calendar(document, _) => tx.upsert(&document).await,
@@ -178,7 +177,9 @@ pub(super) async fn apply(tx: &mut RoomTx<'_>, item: Item) -> Result<()> {
         } => apply_room_message(tx, &event, &message, cached, fallback.as_ref()).await,
         Step::PollEdit(edit) => apply_poll_edit(tx, *edit).await,
         Step::Nothing => Ok(()),
-    }
+    }?;
+    tx.mark_classified(&item.event_id, item.ts);
+    Ok(())
 }
 
 fn poll_edit(
@@ -340,34 +341,42 @@ pub(super) async fn apply_redacted(
     redacted: &OwnedEventId,
     latest: Latest,
 ) -> Result<Option<OwnedEventId>> {
-    if !tx.mark_redacted(redacted) {
+    if !tx.redacted.insert(redacted.clone()) {
         return Ok(None);
     }
     tx.remove_pending_edit(redacted);
 
     let target = tx.edit_target(redacted).await?;
+    let unedited = match (&target, latest) {
+        (Some(target), Latest::Content(document)) => {
+            let existing = tx.document(target).await?;
+            let document = adopt_edit(*document, existing.as_ref(), &tx.redacted);
+            let document = tx.apply_pending(document).await?;
+            tx.upsert(&document).await?;
+            None
+        }
+        (Some(target), Latest::Gone) => {
+            if tx
+                .document(target)
+                .await?
+                .is_some_and(|document| !document.is_redacted(&tx.redacted))
+            {
+                None
+            } else {
+                tx.remove(target);
+                tx.unclassify(target);
+                Some(target.clone())
+            }
+        }
+        _ => {
+            tx.forget_message(redacted);
+            tx.forget_edits_to(redacted);
+            None
+        }
+    };
     if target.is_some() {
         tx.forget_edit(redacted);
     }
-    let (Some(target), Latest::Content(_) | Latest::Gone) = (&target, &latest) else {
-        tx.forget_message(redacted);
-        tx.forget_edits_to(redacted);
-        return Ok(None);
-    };
-    if let Latest::Content(document) = latest {
-        let existing = tx.document(target).await?;
-        let document = adopt_edit(*document, existing.as_ref(), &tx.redacted);
-        let document = tx.apply_pending(document).await?;
-        return tx.upsert(&document).await.map(|()| None);
-    }
-    if tx
-        .document(target)
-        .await?
-        .is_some_and(|document| !document.is_redacted(&tx.redacted))
-    {
-        return Ok(None);
-    }
-    tx.remove(target);
-    tx.unclassify(target);
-    Ok(Some(target.clone()))
+    tx.record_redacted(redacted);
+    Ok(unedited)
 }

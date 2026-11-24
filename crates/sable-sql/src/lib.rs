@@ -12,10 +12,13 @@ use rusqlite::types::{Value as SqliteValue, ValueRef};
 use rusqlite::{Connection, params_from_iter};
 
 #[cfg(feature = "engine")]
-const SCHEMA: i64 = 1;
+const SCHEMA: i64 = 2;
 #[cfg(feature = "engine")]
 /// The page cache the index may use, as the memory budget it reports.
 const CACHE_KIB: i64 = 64 * 1024;
+#[cfg(feature = "engine")]
+/// What the write-ahead log shrinks back to once a large batch is checkpointed.
+const LOG_BYTES: i64 = 16 * 1024 * 1024;
 
 /// A statement that answers with the bytes the page cache holds, which no SQL says.
 pub const CACHE_USED: &str = "sable:cache-used";
@@ -232,26 +235,55 @@ fn cache_used(connection: &Connection) -> i64 {
 }
 
 #[cfg(feature = "engine")]
+#[derive(Debug, thiserror::Error)]
+pub enum OpenError {
+    #[error("the database was written by schema {0}")]
+    Schema(i64),
+    #[error(transparent)]
+    Sqlite(#[from] rusqlite::Error),
+}
+
+#[cfg(feature = "engine")]
+impl OpenError {
+    /// Whether the file itself is at fault, so that only starting it over
+    /// helps. A busy or unreadable file is left alone.
+    #[must_use]
+    pub fn starts_over(&self) -> bool {
+        use rusqlite::ErrorCode::{DatabaseCorrupt, NotADatabase};
+
+        match self {
+            Self::Schema(_) => true,
+            Self::Sqlite(error) => matches!(
+                error.sqlite_error_code(),
+                Some(NotADatabase | DatabaseCorrupt)
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "engine")]
 /// Gets a database ready for use, creating its tables when it is new.
 ///
 /// # Errors
 /// Fails when the file is not a search database, or one of another version.
-pub fn prepare(connection: &Connection, write_ahead_log: bool) -> rusqlite::Result<()> {
+pub fn prepare(connection: &Connection, write_ahead_log: bool) -> Result<(), OpenError> {
     let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
     if version != 0 && version != SCHEMA {
-        return Err(rusqlite::Error::InvalidQuery);
+        return Err(OpenError::Schema(version));
     }
     if version == 0 {
         connection.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;")?;
     }
     if write_ahead_log {
         connection.pragma_update(None, "journal_mode", "WAL")?;
+        connection.pragma_update(None, "journal_size_limit", LOG_BYTES)?;
     }
     connection.pragma_update(None, "synchronous", "NORMAL")?;
     connection.pragma_update(None, "cache_size", -CACHE_KIB)?;
     if version == 0 {
-        connection.execute_batch(SCHEMA_SQL)?;
-        connection.pragma_update(None, "user_version", SCHEMA)?;
+        connection.execute_batch(&format!(
+            "BEGIN; {SCHEMA_SQL} PRAGMA user_version = {SCHEMA}; COMMIT;"
+        ))?;
     }
     Ok(())
 }
@@ -270,11 +302,14 @@ const SCHEMA_SQL: &str =
                      ts INTEGER NOT NULL,
                      sender TEXT NOT NULL,
                      state INTEGER NOT NULL,
+                     attachment INTEGER NOT NULL,
                      json BLOB NOT NULL
                  );
                  CREATE UNIQUE INDEX doc_by_event ON doc (room_id, event_id);
                  CREATE INDEX doc_by_age ON doc (room_id, ts, event_id);
                  CREATE INDEX doc_by_ts ON doc (ts);
+                 CREATE INDEX doc_by_attachment ON doc (room_id, ts, event_id)
+                     WHERE attachment = 1;
                  CREATE TABLE classified (
                      room_id TEXT NOT NULL,
                      event_id TEXT NOT NULL,
@@ -302,13 +337,19 @@ const SCHEMA_SQL: &str =
                      PRIMARY KEY (room_id, edit_id)
                  ) WITHOUT ROWID;
                  CREATE INDEX pending_edit_by_target ON pending_edit (room_id, target_id);
+                 -- Terms arrive split by our tokenizer, so only white space may
+                 -- separate them. The default categories also cut at marks and
+                 -- symbols, which breaks Indic, Khmer, Myanmar and Lao words and
+                 -- drops emoji.
                  CREATE VIRTUAL TABLE fts USING fts5(
                      text,
                      content = '',
                      contentless_delete = 1,
-                     tokenize = 'unicode61 remove_diacritics 0'
+                     tokenize = \"unicode61 remove_diacritics 0 categories 'L* M* N* P* S* C*'\"
                  );
-                 CREATE VIRTUAL TABLE fts_vocab USING fts5vocab(fts, row);";
+                 CREATE VIRTUAL TABLE fts_vocab USING fts5vocab(fts, row);
+                 CREATE TRIGGER doc_deleted AFTER DELETE ON doc
+                     BEGIN DELETE FROM fts WHERE rowid = old.id; END;";
 
 #[cfg(all(test, feature = "engine"))]
 mod tests {
@@ -392,5 +433,25 @@ mod tests {
         )
         .unwrap();
         assert_eq!(kept[0], [vec![Value::Integer(1)]]);
+    }
+
+    #[test]
+    fn only_a_file_at_fault_is_started_over() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.pragma_update(None, "user_version", 1).unwrap();
+        let outdated = prepare(&connection, false).unwrap_err();
+        assert!(matches!(outdated, OpenError::Schema(1)));
+        assert!(outdated.starts_over());
+
+        let busy = rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+            None,
+        );
+        assert!(!OpenError::from(busy).starts_over());
+        let foreign = rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_NOTADB),
+            None,
+        );
+        assert!(OpenError::from(foreign).starts_over());
     }
 }

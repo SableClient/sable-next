@@ -169,7 +169,7 @@ test('a document written through the search worker is found again after the work
   const first = new SearchDatabase();
   await first.batch(DATABASE, [
     [
-      'INSERT INTO doc (room_id, event_id, ts, sender, state, json) VALUES (?1, ?2, ?3, ?4, 0, ?5)',
+      'INSERT INTO doc (room_id, event_id, ts, sender, state, attachment, json) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5)',
       ['!room:example.org', '$one', 5, '@alice:example.org', 'x'],
     ],
     ["INSERT INTO fts (rowid, text) VALUES (last_insert_rowid(), 'thai สวัสดี needle')", []],

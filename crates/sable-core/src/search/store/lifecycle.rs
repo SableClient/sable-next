@@ -1,7 +1,7 @@
 use matrix_sdk::ruma::{OwnedEventId, OwnedUserId, RoomId, UserId};
 use sable_sql::statement;
 
-use super::{Result, Store, text};
+use super::{Result, RoomTx, Store, text};
 
 impl Store {
     pub(in crate::search) async fn newest_event(
@@ -61,25 +61,14 @@ impl Store {
             self.set_meta(&removals_key(room_id), json).await?;
         }
         let (room, sender) = (room_id.as_str(), removal.sender.as_str());
-        self.run(vec![
-            statement!(
-                "DELETE FROM fts WHERE rowid IN
-                     (SELECT id FROM doc WHERE room_id = ?1 AND sender = ?2 AND state = 0
-                      AND ts > ?3 AND ts <= ?4)",
-                room,
-                sender,
-                removal.after,
-                removal.until
-            ),
-            statement!(
-                "DELETE FROM doc WHERE room_id = ?1 AND sender = ?2 AND state = 0
-                 AND ts > ?3 AND ts <= ?4",
-                room,
-                sender,
-                removal.after,
-                removal.until
-            ),
-        ])
+        self.rows(statement!(
+            "DELETE FROM doc WHERE room_id = ?1 AND sender = ?2 AND state = 0
+             AND ts > ?3 AND ts <= ?4",
+            room,
+            sender,
+            removal.after,
+            removal.until
+        ))
         .await
         .map(drop)
     }
@@ -98,21 +87,26 @@ struct CalendarVersion {
     ts: u64,
 }
 
-impl Store {
+impl RoomTx<'_> {
     /// Records `event_id` as the current version of calendar event `uid` and
     /// returns the version it replaces, or `None` when a newer one is known.
     pub(in crate::search) async fn replace_calendar_version(
-        &self,
-        room_id: &RoomId,
+        &mut self,
         uid: &str,
         event_id: &OwnedEventId,
         ts: u64,
     ) -> Result<Option<Option<OwnedEventId>>> {
-        let key = format!("calendar:{room_id}:{uid}");
-        let known: Option<CalendarVersion> = self
-            .meta(&key)
-            .await?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok());
+        let key = format!("calendar:{}:{uid}", self.room);
+        let rows = self
+            .read(statement!(
+                "SELECT value FROM meta WHERE key = ?1",
+                key.as_str()
+            ))
+            .await?;
+        let known: Option<CalendarVersion> = rows
+            .first()
+            .and_then(|row| row.first()?.as_blob())
+            .and_then(|bytes| serde_json::from_slice(bytes).ok());
         if known.as_ref().is_some_and(|known| known.ts > ts) {
             return Ok(None);
         }
@@ -121,7 +115,12 @@ impl Store {
             ts,
         })
         .map_err(|error| super::SqlError(error.to_string()))?;
-        self.set_meta(&key, json).await?;
+        self.queue(statement!(
+            "INSERT INTO meta (key, value) VALUES (?1, ?2)
+             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            key,
+            json
+        ));
         Ok(Some(
             known
                 .map(|known| known.event_id)

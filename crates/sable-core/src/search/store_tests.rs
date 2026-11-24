@@ -2,14 +2,15 @@ use matrix_sdk::ruma::{OwnedRoomId, RoomId, room_id};
 
 use std::sync::Arc;
 
-use super::{Location, Store, open_connection, search_key};
+use super::{DATABASE, Location, Store, open_connection, open_or_start_over, search_key};
 use crate::api::search::SearchOrder;
+use crate::protocol::SearchAttachment;
 use crate::search::exec::{Exec, block_on};
 use crate::search::tests::document;
 use crate::search::{IndexFilter, MessageIndex};
 use crate::secrets::Key;
 
-fn file_store(location: &Location, key: Option<&Key>) -> rusqlite::Result<Store> {
+fn file_store(location: &Location, key: Option<&Key>) -> Result<Store, sable_sql::OpenError> {
     let connection = open_connection(location, key)?;
     Ok(Store::from_exec(Exec::Native(Arc::new(
         parking_lot::Mutex::new(connection),
@@ -117,6 +118,65 @@ fn an_encrypted_database_holds_no_plaintext_and_needs_its_key() {
     let hits = reopened.search("hunter2", &IndexFilter::default(), SearchOrder::Rank, 5, 0);
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].event_id.as_str(), "$secret");
+}
+
+#[test]
+fn a_database_of_an_older_schema_is_started_over() {
+    let directory = tempfile::tempdir().unwrap();
+    {
+        let older = rusqlite::Connection::open(directory.path().join(DATABASE)).unwrap();
+        older
+            .execute_batch("CREATE TABLE doc (id INTEGER PRIMARY KEY); PRAGMA user_version = 1;")
+            .unwrap();
+    }
+
+    let connection = open_or_start_over(directory.path(), None).unwrap();
+
+    let indexed: i64 = connection
+        .query_row("SELECT count(*) FROM fts", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(indexed, 0);
+}
+
+#[test]
+fn a_filter_only_the_document_answers_pages_through_every_match_once() {
+    let index = MessageIndex::new();
+    for position in 0..700 {
+        index.upsert(
+            room(),
+            document(
+                &position.to_string(),
+                "deploy notes",
+                "@kris:localhost",
+                position,
+                (position % 2 == 0).then_some(SearchAttachment::Image),
+                Vec::new(),
+            ),
+        );
+    }
+    let pictures = IndexFilter {
+        has: vec![SearchAttachment::Image],
+        ..IndexFilter::default()
+    };
+
+    let mut found = Vec::new();
+    loop {
+        let page = index.search("deploy", &pictures, SearchOrder::Oldest, 100, found.len());
+        if page.is_empty() {
+            break;
+        }
+        found.extend(page.into_iter().map(|hit| hit.origin_server_ts));
+    }
+
+    assert_eq!(found, (0..700).step_by(2).collect::<Vec<u64>>());
+}
+
+#[test]
+fn words_of_scripts_that_stack_marks_are_told_apart_and_an_emoji_is_found() {
+    let index = index_of(&["ດີ ຫຼາຍ", "ດາ ຫຼາຍ", "party 🎉 time"]);
+
+    assert_eq!(found_unexpanded(&index, "ດີ"), [0]);
+    assert_eq!(found_unexpanded(&index, "🎉"), [2]);
 }
 
 #[test]

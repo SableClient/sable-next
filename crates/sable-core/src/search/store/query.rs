@@ -14,6 +14,11 @@ use crate::search::{ContextLine, HYDRATE_BATCH, Hit, IndexFilter};
 
 /// Larger than any relevance score, so a word as typed outranks its typos and prefixes.
 const EXACT_BONUS: f64 = 1_000.0;
+/// Rows read per query when a filter has to be checked in Rust, doubled up to
+/// `MAX_SCAN` while a page stays short.
+const SCAN: usize = 256;
+const MAX_SCAN: usize = 4096;
+const ATTACHMENT_SCAN: usize = 128;
 
 pub(in crate::search) enum PageStep {
     Done(Vec<RoomAttachmentView>, Option<(u64, OwnedEventId)>),
@@ -27,63 +32,18 @@ pub(in crate::search) struct Snapshot {
     pub(in crate::search) redacted: Vec<OwnedEventId>,
 }
 
-struct Ranked {
-    id: u64,
-    room_id: String,
-    event_id: String,
-    origin_server_ts: u64,
-    score: f64,
-}
-
 /// Date orders have no score to sink a loose match, so only relevance takes
 /// prefixes and typos.
 pub(crate) const fn expands(order: SearchOrder) -> bool {
     matches!(order, SearchOrder::Rank)
 }
 
-fn by_rank(left: &Ranked, right: &Ranked) -> std::cmp::Ordering {
-    right
-        .score
-        .partial_cmp(&left.score)
-        .unwrap_or(std::cmp::Ordering::Equal)
-        .then_with(|| left.event_id.cmp(&right.event_id))
-}
-
-fn by_recency(left: &Ranked, right: &Ranked) -> std::cmp::Ordering {
-    right
-        .origin_server_ts
-        .cmp(&left.origin_server_ts)
-        .then_with(|| left.event_id.cmp(&right.event_id))
-}
-
-fn by_age(left: &Ranked, right: &Ranked) -> std::cmp::Ordering {
-    left.origin_server_ts
-        .cmp(&right.origin_server_ts)
-        .then_with(|| left.event_id.cmp(&right.event_id))
-}
-
-fn page_ranked(
-    mut ranked: Vec<Ranked>,
-    order: SearchOrder,
-    limit: usize,
-    offset: usize,
-) -> Vec<Ranked> {
-    let compare = match order {
-        SearchOrder::Rank => by_rank,
-        SearchOrder::Recent => by_recency,
-        SearchOrder::Oldest => by_age,
-    };
-    let wanted = offset.saturating_add(limit);
-
-    if wanted < ranked.len() {
-        ranked.select_nth_unstable_by(wanted, compare);
-        ranked.truncate(wanted);
+const fn order_by(order: SearchOrder) -> &'static str {
+    match order {
+        SearchOrder::Rank => "score DESC, d.event_id",
+        SearchOrder::Recent => "d.ts DESC, d.event_id",
+        SearchOrder::Oldest => "d.ts, d.event_id",
     }
-    ranked.sort_unstable_by(compare);
-
-    ranked.drain(..offset.min(ranked.len()));
-    ranked.truncate(limit);
-    ranked
 }
 
 /// What the filter asks of a document that its columns do not answer.
@@ -159,78 +119,98 @@ impl Store {
         offset: usize,
     ) -> Result<Vec<Hit>> {
         let terms = FoldedTerms::of(filter, pinned);
-        let with_document = needs_document(filter, &terms);
+        let by_document = needs_document(filter, &terms);
         let (conditions, scope_values) = scope(filter);
-        let expand = expands(order);
-        let document = if with_document { "d.json" } else { "NULL" };
+        let order_by = order_by(order);
 
-        let mut statements = Vec::new();
-        let mut exact_at = None;
-        let sql = if query.is_empty() {
-            format!(
-                "SELECT d.id, d.event_id, d.ts, 0.0, {document}, d.room_id
-                 FROM doc d WHERE {conditions}"
+        let (sql, mut params) = if query.is_empty() {
+            (
+                format!(
+                    "SELECT d.room_id, 0.0 AS score, d.json
+                     FROM doc d WHERE {conditions}
+                     ORDER BY {order_by} LIMIT ? OFFSET ?"
+                ),
+                Vec::new(),
             )
         } else {
-            let expression = self.expression(query, filter, expand).await?;
-            let Some(expression) = expression else {
+            let expand = expands(order);
+            let Some(expression) = self.expression(query, filter, expand).await? else {
                 return Ok(Vec::new());
             };
-            if expand && let Some(exact) = exact_expression(query, &filter.words) {
-                exact_at = Some(statements.len());
-                statements.push(statement!(
-                    "SELECT rowid FROM fts WHERE fts MATCH ?1",
-                    exact
-                ));
-            }
-            let mut main = vec![Value::from(expression)];
-            main.extend(scope_values.clone());
-            statements.push(Statement {
-                sql: format!(
-                    "SELECT d.id, d.event_id, d.ts, -bm25(fts), {document}, d.room_id
-                     FROM fts JOIN doc d ON d.id = fts.rowid
-                     WHERE fts MATCH ? AND {conditions}"
-                ),
-                params: main,
-            });
-            let mut answers = self.run(statements).await?;
-            let rows = answers.pop().unwrap_or_default();
-            let bonus: HashSet<u64> = exact_at
-                .and_then(|at| answers.get(at))
-                .into_iter()
-                .flatten()
-                .filter_map(|row| int(row, 0))
-                .collect();
-            return self
-                .page(
-                    rows,
-                    &bonus,
-                    filter,
-                    &terms,
-                    with_document,
-                    order,
-                    limit,
-                    offset,
+            let exact = exact_expression(query, &filter.words).filter(|_| expand);
+            let bonus = if exact.is_some() {
+                format!(
+                    " + CASE WHEN fts.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?)
+                      THEN {EXACT_BONUS:?} ELSE 0.0 END"
                 )
-                .await;
+            } else {
+                String::new()
+            };
+            let mut params: Vec<Value> = exact.into_iter().map(Value::from).collect();
+            params.push(Value::from(expression));
+            (
+                format!(
+                    "SELECT d.room_id, -bm25(fts){bonus} AS score, d.json
+                     FROM fts JOIN doc d ON d.id = fts.rowid
+                     WHERE fts MATCH ? AND {conditions}
+                     ORDER BY {order_by} LIMIT ? OFFSET ?"
+                ),
+                params,
+            )
         };
-        let rows = self
-            .rows(Statement {
-                sql,
-                params: scope_values,
-            })
-            .await?;
-        self.page(
-            rows,
-            &HashSet::new(),
-            filter,
-            &terms,
-            with_document,
-            order,
-            limit,
-            offset,
-        )
-        .await
+        params.extend(scope_values);
+
+        let (mut at, mut skip, mut step) = if by_document {
+            (0, offset, limit.max(SCAN))
+        } else {
+            (offset, 0, limit)
+        };
+        let mut hits = Vec::new();
+        while hits.len() < limit {
+            let mut page = params.clone();
+            page.extend([Value::from(step), Value::from(at)]);
+            let rows = self
+                .rows(Statement {
+                    sql: sql.clone(),
+                    params: page,
+                })
+                .await?;
+            for row in &rows {
+                let Some(document) = row.get(2).and_then(Value::as_blob).and_then(decode) else {
+                    continue;
+                };
+                if by_document && !document.matches(filter, &terms) {
+                    continue;
+                }
+                if skip > 0 {
+                    skip -= 1;
+                    continue;
+                }
+                let Some(room_id) = text(row, 0).and_then(|room| OwnedRoomId::try_from(room).ok())
+                else {
+                    continue;
+                };
+                hits.push(Hit {
+                    room_id,
+                    event_id: document.event_id,
+                    body: document.body,
+                    sender: document.sender,
+                    origin_server_ts: document.origin_server_ts,
+                    score: row.get(1).and_then(Value::as_f64).unwrap_or(0.0),
+                    before: Vec::new(),
+                    after: Vec::new(),
+                });
+                if hits.len() == limit {
+                    break;
+                }
+            }
+            if rows.len() < step {
+                break;
+            }
+            at += rows.len();
+            step = (step * 2).min(MAX_SCAN);
+        }
+        Ok(hits)
     }
 
     /// The full-text expression for `query`, with the typos the index holds for its words.
@@ -283,86 +263,6 @@ impl Store {
                     .unwrap_or_default()
             },
         ))
-    }
-
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "one step of search, with its inputs"
-    )]
-    async fn page(
-        &self,
-        rows: Rows,
-        bonus: &HashSet<u64>,
-        filter: &IndexFilter,
-        terms: &FoldedTerms,
-        with_document: bool,
-        order: SearchOrder,
-        limit: usize,
-        offset: usize,
-    ) -> Result<Vec<Hit>> {
-        let mut ranked = Vec::new();
-        for row in &rows {
-            let (Some(id), Some(event_id), Some(ts), Some(room_id)) =
-                (int(row, 0), text(row, 1), int(row, 2), text(row, 5))
-            else {
-                continue;
-            };
-            if with_document
-                && !row
-                    .get(4)
-                    .and_then(Value::as_blob)
-                    .and_then(decode)
-                    .is_some_and(|document| document.matches(filter, terms))
-            {
-                continue;
-            }
-            ranked.push(Ranked {
-                id,
-                room_id: room_id.to_owned(),
-                event_id: event_id.to_owned(),
-                origin_server_ts: ts,
-                score: row.get(3).and_then(Value::as_f64).unwrap_or(0.0)
-                    + if bonus.contains(&id) {
-                        EXACT_BONUS
-                    } else {
-                        0.0
-                    },
-            });
-        }
-
-        let page = page_ranked(ranked, order, limit, offset);
-        let documents = self
-            .run(
-                page.iter()
-                    .map(|entry| statement!("SELECT json FROM doc WHERE id = ?1", entry.id))
-                    .collect(),
-            )
-            .await?;
-        let mut hits = Vec::new();
-        for (entry, rows) in page.into_iter().zip(documents) {
-            let Some(document) = rows
-                .first()
-                .and_then(|row| row.first())
-                .and_then(Value::as_blob)
-                .and_then(decode)
-            else {
-                continue;
-            };
-            let Ok(room_id) = OwnedRoomId::try_from(entry.room_id) else {
-                continue;
-            };
-            hits.push(Hit {
-                room_id,
-                event_id: document.event_id,
-                body: document.body,
-                sender: document.sender,
-                origin_server_ts: document.origin_server_ts,
-                score: entry.score,
-                before: Vec::new(),
-                after: Vec::new(),
-            });
-        }
-        Ok(hits)
     }
 
     pub(in crate::search) async fn fill_context(
@@ -424,44 +324,52 @@ impl Store {
         limit: usize,
         tried: &HashSet<OwnedEventId>,
     ) -> Result<PageStep> {
-        let (ceiling, cursor_id) = before.map_or((u64::MAX, ""), |(ts, id)| (ts, id));
-        let rows = self
-            .rows(statement!(
-                "SELECT json FROM doc
-                 WHERE room_id = ?1
-                   AND (ts < ?2 OR (ts = ?2 AND event_id < ?3))
-                   AND (json_extract(json, '$.has_link') = 1
-                        OR json_array_length(json, '$.attachments') > 0
-                        OR json_array_length(json, '$.media') > 0)
-                 ORDER BY ts DESC, event_id DESC",
-                room_id.as_str(),
-                ceiling,
-                cursor_id
-            ))
-            .await?;
+        let (mut ceiling, mut cursor_id) =
+            before.map_or((u64::MAX, String::new()), |(ts, id)| (ts, id.to_owned()));
         let mut found: Vec<(u64, OwnedEventId, Vec<RoomAttachmentView>)> = Vec::new();
         let mut unhydrated = Vec::new();
-        for row in &rows {
-            if found.len() > limit {
+        'scan: loop {
+            let rows = self
+                .rows(statement!(
+                    "SELECT ts, event_id, json FROM doc
+                     WHERE room_id = ?1 AND attachment = 1
+                       AND (ts < ?2 OR (ts = ?2 AND event_id < ?3))
+                     ORDER BY ts DESC, event_id DESC LIMIT ?4",
+                    room_id.as_str(),
+                    ceiling,
+                    cursor_id.as_str(),
+                    ATTACHMENT_SCAN
+                ))
+                .await?;
+            for row in &rows {
+                if found.len() > limit || unhydrated.len() == HYDRATE_BATCH {
+                    break 'scan;
+                }
+                let Some(document) = row.get(2).and_then(Value::as_blob).and_then(decode) else {
+                    continue;
+                };
+                if not_senders.contains(&document.sender) {
+                    continue;
+                }
+                if document.needs_media(kind) && !tried.contains(&document.event_id) {
+                    unhydrated.push(document.event_id);
+                    continue;
+                }
+                let items = document.attachment_items(kind);
+                if !items.is_empty() {
+                    found.push((document.origin_server_ts, document.event_id, items));
+                }
+            }
+            let last = rows
+                .last()
+                .filter(|_| rows.len() == ATTACHMENT_SCAN)
+                .and_then(|row| Some((int(row, 0)?, text(row, 1)?.to_owned())));
+            let Some(last) = last else {
                 break;
-            }
-            let Some(document) = row.first().and_then(Value::as_blob).and_then(decode) else {
-                continue;
             };
-            if not_senders.contains(&document.sender) {
-                continue;
-            }
-            if document.needs_media(kind) && !tried.contains(&document.event_id) {
-                unhydrated.push(document.event_id);
-                continue;
-            }
-            let items = document.attachment_items(kind);
-            if !items.is_empty() {
-                found.push((document.origin_server_ts, document.event_id, items));
-            }
+            (ceiling, cursor_id) = last;
         }
         if !unhydrated.is_empty() {
-            unhydrated.truncate(HYDRATE_BATCH);
             return Ok(PageStep::Hydrate(unhydrated));
         }
 

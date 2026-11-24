@@ -82,7 +82,7 @@ pub fn attach_search_port(port: MessagePort) {
     info!("the search database is attached");
 }
 
-fn post(request: &Request) -> Result<oneshot::Receiver<Result<Vec<Rows>>>> {
+fn post(request: &Request) -> Result<(u32, oneshot::Receiver<Result<Vec<Rows>>>)> {
     LINK.with_borrow_mut(|link| {
         let link = link
             .as_mut()
@@ -102,20 +102,29 @@ fn post(request: &Request) -> Result<oneshot::Receiver<Result<Vec<Rows>>>> {
         link.port
             .post_message_with_transferable(&bytes, &transfer)
             .map_err(|_| SqlError("the search database cannot be reached".to_owned()))?;
-        Ok(receiver)
+        Ok((id, receiver))
     })
 }
 
 async fn exchange(request: Request) -> Result<Vec<Rows>> {
-    let receiver = post(&request)?;
+    let (id, answer) = post(&request)?;
     let timeout = Box::pin(matrix_sdk::sleep::sleep(REPLY_TIMEOUT));
-    match select(receiver, timeout).await {
+    match select(answer, timeout).await {
         Either::Left((Ok(result), _)) => result,
         Either::Left((Err(_), _)) => Err(SqlError("the search database went away".to_owned())),
+        // Keep the link: the core gets a new port only when another tab takes
+        // the database over, so dropping it would end local search over one
+        // slow batch.
         Either::Right(_) => {
-            warn!("the search database stopped answering, waiting for its next owner");
-            drop_link();
-            Err(SqlError("the search database stopped answering".to_owned()))
+            warn!("the search database took too long to answer");
+            LINK.with_borrow(|link| {
+                if let Some(link) = link {
+                    link.pending.borrow_mut().remove(&id);
+                }
+            });
+            Err(SqlError(
+                "the search database took too long to answer".to_owned(),
+            ))
         }
     }
 }

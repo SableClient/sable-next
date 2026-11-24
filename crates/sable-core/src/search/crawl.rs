@@ -499,6 +499,7 @@ impl Core {
             }
             let pause = match self.crawl_once(client, &room_id).await {
                 Ok(CrawlOutcome::Paused) => continue,
+                Ok(CrawlOutcome::Unwritten) => CRAWL_IDLE,
                 Ok(CrawlOutcome::Batch(outcome)) if outcome.reached_start => {
                     let mut progress = self.search_crawl.lock().await;
                     progress.steady(&room_id);
@@ -1038,10 +1039,6 @@ impl Core {
                 .advance(room_id, messages.end);
         } else {
             let (cache, _drop_handles) = event_cache.room(room_id).await?;
-            self.search_crawl
-                .lock()
-                .await
-                .advance(room_id, messages.end);
             let rules = room.clone_info().room_version_rules_or_default().redaction;
             let gap = messages.chunk.iter().any(|event| event.kind.is_utd());
             let frontier = messages
@@ -1053,17 +1050,12 @@ impl Core {
             let mut events = messages.chunk;
             events.reverse();
 
-            self.search_crawl.lock().await.ingesting = Some(room_id.clone());
-
-            let fresh = self
-                .search_index
-                .lock()
-                .await
-                .ingest_with(room_id, events, &cache, &rules, true)
-                .await;
+            let Some(fresh) = self.ingest_page(room_id, events, &cache, &rules).await else {
+                return Ok(CrawlOutcome::Unwritten);
+            };
 
             let mut progress = self.search_crawl.lock().await;
-            progress.ingesting = None;
+            progress.advance(room_id, messages.end);
             if gap {
                 progress.gapped.insert(room_id.clone());
             }
@@ -1087,6 +1079,28 @@ impl Core {
 }
 
 impl Core {
+    async fn ingest_page(
+        &self,
+        room_id: &OwnedRoomId,
+        events: Vec<TimelineEvent>,
+        cache: &matrix_sdk::event_cache::RoomEventCache,
+        rules: &ruma::room_version_rules::RedactionRules,
+    ) -> Option<usize> {
+        self.search_crawl.lock().await.ingesting = Some(room_id.clone());
+        let ingested = self
+            .search_index
+            .lock()
+            .await
+            .ingest_with(room_id, events, cache, rules, true)
+            .await;
+        self.search_crawl.lock().await.ingesting = None;
+        ingested
+            .inspect_err(|error| {
+                warn!(%room_id, "the search index could not take a crawled page: {error}");
+            })
+            .ok()
+    }
+
     /// Pages forward from the newest event indexed before a limited sync until
     /// the batch that sync delivered, which the live pass has indexed already.
     async fn fill_hole(
@@ -1155,16 +1169,14 @@ impl Core {
         let (cache, _drop_handles) = event_cache.room(&room_id).await?;
         let rules = room.clone_info().room_version_rules_or_default().redaction;
 
-        self.search_crawl.lock().await.ingesting = Some(room_id.clone());
-        let fresh = self
-            .search_index
-            .lock()
+        let Some(fresh) = self
+            .ingest_page(&room_id, messages.chunk, &cache, &rules)
             .await
-            .ingest_with(&room_id, messages.chunk, &cache, &rules, true)
-            .await;
+        else {
+            return Ok(CrawlOutcome::Unwritten);
+        };
         {
             let mut progress = self.search_crawl.lock().await;
-            progress.ingesting = None;
             if gap {
                 progress.gapped.insert(room_id.clone());
             }
@@ -1202,6 +1214,7 @@ impl Core {
 
 pub(super) enum CrawlOutcome {
     Paused,
+    Unwritten,
     Batch(CrawlBatch),
 }
 

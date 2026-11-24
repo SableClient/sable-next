@@ -58,7 +58,40 @@ impl Fixture {
                 &RedactionRules::V11,
                 true,
             )
-            .await;
+            .await
+            .expect("the index takes the events");
+    }
+
+    async fn refuse(&self, change: &str) {
+        self.index
+            .store()
+            .rows(sable_sql::statement!(format!(
+                "CREATE TRIGGER refusal BEFORE {change} ON doc
+                 BEGIN SELECT RAISE(ABORT, 'refused'); END"
+            )))
+            .await
+            .expect("trigger");
+    }
+
+    async fn allow(&self) {
+        self.index
+            .store()
+            .rows(sable_sql::statement!("DROP TRIGGER refusal"))
+            .await
+            .expect("trigger");
+    }
+
+    async fn refused(&self, value: &Value) {
+        self.index
+            .ingest_with(
+                &self.room_id,
+                vec![event(value)],
+                &self.cache,
+                &RedactionRules::V11,
+                true,
+            )
+            .await
+            .expect_err("the database refuses the write");
     }
 
     async fn live(&self, events: Vec<TimelineEvent>) {
@@ -129,6 +162,36 @@ fn redaction(id: &str, target: &str, ts: u64) -> Value {
 fn with_unsigned(mut value: Value, unsigned: Value) -> Value {
     value["unsigned"] = unsigned;
     value
+}
+
+#[async_test]
+async fn test_a_message_the_database_refused_is_taken_in_again() {
+    let fixture = Fixture::new().await;
+    let kept = message("$kept", 1_000, "refused marmalade");
+
+    fixture.refuse("INSERT").await;
+    fixture.refused(&kept).await;
+    fixture.allow().await;
+    fixture.crawled(vec![kept]).await;
+
+    assert_eq!(fixture.found("marmalade"), ["$kept"]);
+}
+
+#[async_test]
+async fn test_a_redaction_the_database_refused_is_applied_again() {
+    let fixture = Fixture::new().await;
+    fixture
+        .crawled(vec![message("$gone", 1_000, "refused marmalade")])
+        .await;
+    let redaction = redaction("$redaction", "$gone", 2_000);
+
+    fixture.refuse("DELETE").await;
+    fixture.refused(&redaction).await;
+    assert_eq!(fixture.found("marmalade"), ["$gone"]);
+    fixture.allow().await;
+    fixture.crawled(vec![redaction]).await;
+
+    fixture.assert_none("marmalade");
 }
 
 #[async_test]
@@ -444,7 +507,8 @@ async fn index_crawled(
             &RedactionRules::V11,
             true,
         )
-        .await;
+        .await
+        .expect("the index takes the events");
 }
 
 fn hits(core: &crate::Core, room_id: &OwnedRoomId, query: &str) -> usize {

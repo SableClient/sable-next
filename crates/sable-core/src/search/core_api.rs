@@ -337,11 +337,15 @@ impl Core {
             let Ok(event) = room.load_or_fetch_event(&event_id, None).await else {
                 continue;
             };
-            self.search_index
+            let ingested = self
+                .search_index
                 .lock()
                 .await
                 .ingest_with(&room.room_id().to_owned(), vec![event], cache, rules, true)
                 .await;
+            if let Err(error) = ingested {
+                warn!(%event_id, "the search index could not take a message back: {error}");
+            }
         }
     }
 

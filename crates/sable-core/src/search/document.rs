@@ -73,6 +73,11 @@ impl Document {
                 .is_some_and(|edit| redacted.contains(edit))
     }
 
+    /// Stored as the `attachment` column, the only rows a room's attachment list reads.
+    pub(super) const fn listed(&self) -> bool {
+        self.has_link || !self.attachments.is_empty() || !self.media.is_empty()
+    }
+
     pub(super) fn attachment_items(&self, kind: RoomAttachmentKind) -> Vec<RoomAttachmentView> {
         let item = |gallery_index, content| RoomAttachmentView {
             event_id: self.event_id.clone(),

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use rsqlite_vfs::VfsFilesManager as _;
 use rusqlite::Connection;
-use sable_sql::{Request, Response, decode, encode, prepare, run_batch};
+use sable_sql::{OpenError, Request, Response, decode, encode, prepare, run_batch};
 use sqlite_wasm_rs::WasmOsCallback;
 use sqlite_wasm_vfs::sahpool::{OpfsSAHPoolCfg, OpfsSAHPoolUtil, install};
 use wasm_bindgen::prelude::*;
@@ -37,29 +37,33 @@ fn warn(message: &str) {
     web_sys::console::warn_1(&JsValue::from_str(message));
 }
 
-fn open(databases: &Databases, name: &str) -> Result<Connection, String> {
+fn open(databases: &Databases, name: &str) -> Result<Connection, OpenError> {
     let connection = if databases.pool.is_some() {
         Connection::open(name)
     } else {
         Connection::open_in_memory()
-    }
-    .map_err(|error| error.to_string())?;
-    prepare(&connection, false).map_err(|error| error.to_string())?;
+    }?;
+    prepare(&connection, false)?;
     Ok(connection)
 }
 
 fn connection<'a>(databases: &'a mut Databases, name: &str) -> Result<&'a mut Connection, String> {
     if !databases.open.contains_key(name) {
-        let opened = open(databases, name).or_else(|error| {
-            warn(&format!(
-                "the search database could not be opened, starting it over: {error}"
-            ));
-            if let Some(pool) = &databases.pool {
-                let _ = pool.remove(name);
-                let _ = pool.remove(&format!("{name}-journal"));
-            }
-            open(databases, name)
-        })?;
+        let opened = open(databases, name)
+            .or_else(|error| {
+                if !error.starts_over() {
+                    return Err(error);
+                }
+                warn(&format!(
+                    "the search database cannot be used, starting it over: {error}"
+                ));
+                if let Some(pool) = &databases.pool {
+                    let _ = pool.remove(name);
+                    let _ = pool.remove(&format!("{name}-journal"));
+                }
+                open(databases, name)
+            })
+            .map_err(|error| error.to_string())?;
         databases.open.insert(name.to_owned(), opened);
     }
     databases

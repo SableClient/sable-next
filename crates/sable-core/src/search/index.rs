@@ -258,6 +258,8 @@ impl MessageIndex {
         self.ok("lookup", found).flatten()
     }
 
+    /// A failure is only logged: the events stay unclassified, so the next
+    /// update of the room brings them back.
     pub(crate) async fn ingest(
         &self,
         room_id: &OwnedRoomId,
@@ -265,7 +267,8 @@ impl MessageIndex {
         cache: &RoomEventCache,
         rules: &RedactionRules,
     ) -> usize {
-        self.ingest_with(room_id, events, cache, rules, false).await
+        let ingested = self.ingest_with(room_id, events, cache, rules, false).await;
+        self.ok("ingest", ingested).unwrap_or_default()
     }
 
     pub(super) async fn ingest_with(
@@ -275,17 +278,17 @@ impl MessageIndex {
         cache: &RoomEventCache,
         rules: &RedactionRules,
         crawled: bool,
-    ) -> usize {
+    ) -> Result<usize> {
         let mut fresh = 0;
         let mut events = events.into_iter();
         loop {
             let chunk: Vec<TimelineEvent> = events.by_ref().take(INGEST_CHUNK).collect();
             if chunk.is_empty() {
-                return fresh;
+                return Ok(fresh);
             }
             fresh += self
                 .ingest_chunk(room_id, chunk, cache, rules, crawled)
-                .await;
+                .await?;
             matrix_sdk::sleep::sleep(Duration::ZERO).await;
         }
     }
@@ -297,21 +300,16 @@ impl MessageIndex {
         cache: &RoomEventCache,
         rules: &RedactionRules,
         crawled: bool,
-    ) -> usize {
+    ) -> Result<usize> {
         let ids: Vec<String> = chunk
             .iter()
             .filter_map(|event| event.event_id().map(ToString::to_string))
             .collect();
-        let opened = async {
-            let known = self.store.classified_among(room_id, &ids).await?;
-            let removals = self.store.removals(room_id).await?;
+        let mut known = self.store.classified_among(room_id, &ids).await?;
+        let removals = self.store.removals(room_id).await?;
+        let (floor, mut redacted) = {
             let mut tx = self.store.room(room_id).await?;
-            let floor = tx.floor().await?;
-            Ok((known, floor, tx.redacted.clone(), removals))
-        }
-        .await;
-        let Some((mut known, floor, mut redacted, removals)) = self.ok("lookup", opened) else {
-            return 0;
+            (tx.floor().await?, tx.redacted.clone())
         };
 
         let mut fresh = 0;
@@ -323,9 +321,10 @@ impl MessageIndex {
 
             if is_redacted(event) {
                 if redacted.insert(event_id.clone()) {
-                    self.write_items(room_id, std::mem::take(&mut batch)).await;
+                    self.write_items(room_id, std::mem::take(&mut batch))
+                        .await?;
                     self.apply_redaction(room_id, Some(cache), None, event_id)
-                        .await;
+                        .await?;
                     fresh += 1;
                 }
                 continue;
@@ -348,45 +347,41 @@ impl MessageIndex {
             match apply::plan(event, event_id, ts, cache, rules, crawled).await {
                 Planned::Item(item) => batch.push(*item),
                 Planned::Redaction(redaction) => {
-                    self.write_items(room_id, std::mem::take(&mut batch)).await;
+                    self.write_items(room_id, std::mem::take(&mut batch))
+                        .await?;
                     self.apply_redaction(
                         room_id,
                         Some(cache),
                         redaction.classify,
                         redaction.target,
                     )
-                    .await;
+                    .await?;
                 }
             }
         }
-        self.write_items(room_id, batch).await;
-        fresh
+        self.write_items(room_id, batch).await?;
+        Ok(fresh)
     }
 
-    async fn write_items(&self, room_id: &OwnedRoomId, items: Vec<Item>) {
+    async fn write_items(&self, room_id: &OwnedRoomId, items: Vec<Item>) -> Result<()> {
         if items.is_empty() {
-            return;
+            return Ok(());
         }
-        let written = async {
-            let mut tx = self.store.room(room_id).await?;
-            for item in items {
-                if let Some(uid) = item.calendar_uid() {
-                    match self
-                        .store
-                        .replace_calendar_version(room_id, uid, &item.event_id, item.ts)
-                        .await?
-                    {
-                        None => continue,
-                        Some(Some(older)) => tx.remove(&older),
-                        Some(None) => {}
-                    }
+        let mut tx = self.store.room(room_id).await?;
+        for item in items {
+            if let Some(uid) = item.calendar_uid() {
+                match tx
+                    .replace_calendar_version(uid, &item.event_id, item.ts)
+                    .await?
+                {
+                    None => continue,
+                    Some(Some(older)) => tx.remove(&older),
+                    Some(None) => {}
                 }
-                apply::apply(&mut tx, item).await?;
             }
-            tx.commit().await
+            apply::apply(&mut tx, item).await?;
         }
-        .await;
-        self.ok("ingest", written);
+        tx.commit().await
     }
 
     /// Without `cache`, an edit that is redacted is taken for a redacted message.
@@ -396,40 +391,27 @@ impl MessageIndex {
         cache: Option<&RoomEventCache>,
         classify: Option<(OwnedEventId, u64)>,
         target: OwnedEventId,
-    ) {
-        let latest = match cache {
-            Some(cache) => {
-                let edited = async {
-                    let mut tx = self.store.room(room_id).await?;
-                    let edited = tx.edit_target(&target).await?;
-                    Ok((edited, tx.redacted.clone()))
-                }
-                .await;
-                match self.ok("lookup", edited) {
-                    Some((Some(edited), mut redacted)) => {
-                        redacted.insert(target.clone());
-                        latest_content(cache, &edited, &redacted)
-                            .await
-                            .map_or(Latest::Gone, |document| Latest::Content(Box::new(document)))
-                    }
-                    _ => Latest::Unasked,
-                }
+    ) -> Result<()> {
+        let mut tx = self.store.room(room_id).await?;
+        let latest = match (cache, tx.edit_target(&target).await?) {
+            (Some(cache), Some(edited)) => {
+                let mut redacted = tx.redacted.clone();
+                redacted.insert(target.clone());
+                latest_content(cache, &edited, &redacted)
+                    .await
+                    .map_or(Latest::Gone, |document| Latest::Content(Box::new(document)))
             }
-            None => Latest::Unasked,
+            _ => Latest::Unasked,
         };
-        let applied = async {
-            let mut tx = self.store.room(room_id).await?;
-            if let Some((event_id, ts)) = &classify {
-                tx.mark_classified(event_id, *ts);
-            }
-            let unedited = apply::apply_redacted(&mut tx, &target, latest).await?;
-            tx.commit().await?;
-            Ok(unedited)
+        let unedited = apply::apply_redacted(&mut tx, &target, latest).await?;
+        if let Some((event_id, ts)) = &classify {
+            tx.mark_classified(event_id, *ts);
         }
-        .await;
-        if let Some(Some(message)) = self.ok("redaction", applied) {
+        tx.commit().await?;
+        if let Some(message) = unedited {
             self.unedited.lock().push((room_id.clone(), message));
         }
+        Ok(())
     }
 
     /// The messages whose latest edit was redacted and which now have no
@@ -450,7 +432,8 @@ impl MessageIndex {
         cache: Option<&RoomEventCache>,
     ) {
         for event_id in redacted {
-            self.apply_redaction(room_id, cache, None, event_id).await;
+            let applied = self.apply_redaction(room_id, cache, None, event_id).await;
+            self.ok("redaction", applied);
         }
     }
 
