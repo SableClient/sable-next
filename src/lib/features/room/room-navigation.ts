@@ -140,7 +140,7 @@ export function trackRouteFocus(): (href: string) => Promise<void> {
   });
 
   return async (href) => {
-    const request = { href: new URL(href, page.url).href };
+    const request = { href: new URL(href, page.url.href).href };
     composerNavigation = request;
     try {
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
