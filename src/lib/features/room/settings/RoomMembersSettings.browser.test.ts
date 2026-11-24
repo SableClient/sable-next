@@ -10,6 +10,9 @@ vi.mock('#lib/core/context.js', async () => {
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
   usePresenceStore: () => ({ get: () => null, peek: () => null }),
 }));
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+  useRoomList: () => ({ roomSpaces: () => undefined }),
+}));
 import { core } from '#lib/core/__mocks__/context.js';
 import RoomMembersSettings from './RoomMembersSettings.svelte';
 
