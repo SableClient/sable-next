@@ -26,6 +26,7 @@
     | 'onToggleSilentReply'
     | 'dismissedPreviews'
     | 'onDismissPreview'
+    | 'loadLinkPreview'
   > & {
     conversation: Conversation;
     onSend?: ComposerProps['onSend'];
@@ -60,4 +61,5 @@
   onToggleSilentReply={conversation.toggleSilentReply}
   dismissedPreviews={conversation.dismissedPreviews}
   onDismissPreview={conversation.dismissPreview}
+  loadLinkPreview={conversation.loadLinkPreview}
 />

@@ -14,6 +14,7 @@
     ImageSourcePackView,
     PackImageView,
     PersonaView,
+    UrlPreviewView,
   } from '#src/generated/protocol';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
   import { onDestroy, tick, untrack } from 'svelte';
@@ -198,6 +199,7 @@
     encrypted?: boolean | null;
     dismissedPreviews?: readonly string[];
     onDismissPreview?: (url: string) => void;
+    loadLinkPreview?: (url: string) => Promise<UrlPreviewView | null>;
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
     restoredContext?: ComposerContext | null;
@@ -232,6 +234,7 @@
     encrypted = null,
     dismissedPreviews = [],
     onDismissPreview,
+    loadLinkPreview,
     context = null,
     restoredContext = null,
     onCancelContext,
@@ -905,6 +908,7 @@
     inFlight += 1;
     error = null;
     editor.clear();
+    draftLinks = [];
     expanded = false;
     sourceMode = editor.leaveSource();
     staged = [];
@@ -1507,7 +1511,7 @@
           {/key}
         {/if}
         {#if onDismissPreview && context?.kind !== 'edit' && shownLinks.length > 0}
-          <ComposerLinkPreviews urls={shownLinks} onDismiss={onDismissPreview} />
+          <ComposerLinkPreviews urls={shownLinks} onDismiss={onDismissPreview} {loadLinkPreview} />
         {/if}
         {#if error}
           <ComposerError

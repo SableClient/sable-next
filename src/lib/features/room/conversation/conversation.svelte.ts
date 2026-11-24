@@ -65,9 +65,11 @@ import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 import { stateEventText } from '#lib/features/room/timeline/state-event-text.js';
 import { isMessageRow } from '#lib/features/room/timeline/timeline-format.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { TimeoutError, withTimeout } from '#lib/timeout.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
 const NO_MENTIONS: OutgoingMentions = { user_ids: [], room: false };
+const SEND_PREVIEW_WAIT_MS = 1_500;
 
 export type ConversationSendResult = { kind: 'gifSearch'; query: string };
 
@@ -172,21 +174,31 @@ export class Conversation {
     return this.#threadRoot;
   }
 
+  readonly loadLinkPreview = (url: string): Promise<UrlPreviewView | null> =>
+    resolveUrlPreview(
+      this.#core.rpc.messages,
+      url,
+      previewSources(this.#encrypted()),
+      usesTunnel(this.#encrypted(), this.#publicRoom())
+    );
+
   async #bundledLinkPreviews(
     html: string | null,
     body: string,
     dismissed: readonly string[]
   ): Promise<{ previews: UrlPreviewView[]; suppressed: boolean }> {
-    const sources = previewSources(this.#encrypted());
-    const tunnel = usesTunnel(this.#encrypted(), this.#publicRoom());
     const links = outgoingPreviewableLinks(html, body).filter((url) => body.includes(url));
     const wanted = links.filter((url) => !dismissed.includes(url));
     const previews = await Promise.all(
-      wanted.map(
-        async (url) =>
-          (await resolveUrlPreview(this.#core.rpc.messages, url, sources, tunnel)) ??
-          previewWhitelistEntry(url)
-      )
+      wanted.map(async (url) => {
+        const preview = await withTimeout(this.loadLinkPreview(url), SEND_PREVIEW_WAIT_MS).catch(
+          (error: unknown) => {
+            if (error instanceof TimeoutError) return null;
+            throw error;
+          }
+        );
+        return preview ?? previewWhitelistEntry(url);
+      })
     );
     return {
       previews,

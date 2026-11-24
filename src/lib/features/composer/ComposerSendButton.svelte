@@ -89,6 +89,7 @@
       data-pressing={sendPress.pressing || undefined}
       style="--press-ms: {SCHEDULE_PRESS_MS}ms"
       disabled={!hasContent && !canDelete}
+      aria-busy={sending || undefined}
       label={sendLabel}
       onpointercancel={sendPress.end}
       oncontextmenu={(event: MouseEvent) => {
@@ -118,3 +119,6 @@
     </IconButton>
   {/snippet}
 </Tooltip>
+<span class="screen-reader-only" role="status">
+  {sending ? i18n.t('timeline.sending') : ''}
+</span>

@@ -64,6 +64,7 @@ declare global {
     __e2eAccounts?: SessionInfo[];
     __e2eSwitchAccountError?: boolean;
     __e2eSwitchAccountDelayMs?: number;
+    __e2eUrlPreviewDelayMs?: number;
     __e2eCalls: { method: string; params: unknown }[];
     __e2eProfileSaveError?: boolean;
     __e2eSendError?: string;
@@ -2057,6 +2058,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
 
     const replyDelay = (type: string, params: unknown): number => {
       if (type === 'session.switch_account') return window.__e2eSwitchAccountDelayMs ?? 0;
+      if (type === 'messages.url_preview') return window.__e2eUrlPreviewDelayMs ?? 0;
       if (workerMode === 'forward_history' && type === 'timeline.paginate') return 0;
       if (
         type === 'timeline.subscribe' &&

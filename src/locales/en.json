@@ -3488,6 +3488,7 @@
     "recentMediaChange": "Change",
     "stagedFiles": "Files ready to send",
     "linkPreviews": "Links that will be previewed",
+    "loadingLinkPreview": "Loading link preview…",
     "skipLinkPreview": "Don’t preview {{url}}",
     "removeAttachment": "Remove {{name}}",
     "spoilerAttachment": "Mark {{name}} as a spoiler",

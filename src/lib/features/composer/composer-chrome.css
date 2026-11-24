@@ -223,6 +223,11 @@
   color: var(--sec-main);
 }
 
+.composer-send[aria-busy='true']:disabled {
+  color: var(--primary-main);
+  opacity: 1;
+}
+
 .composer-send:not(:disabled):hover,
 .composer-send:not(:disabled):focus-visible,
 .composer-voice:not(:disabled):hover,
