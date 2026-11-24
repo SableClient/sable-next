@@ -73,6 +73,7 @@
         {#if item.kind === 'image' && item.source}
           {@const source = item.source}
           <MediaImage
+            class="post-media-image"
             {source}
             alt={item.alt ?? ''}
             width={items.length > 1 ? 200 : 400}
@@ -248,6 +249,25 @@
     display: grid;
     gap: var(--space-100);
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .post-media:not(.grid) {
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: center;
+  }
+
+  :global(.post-media-image) {
+    aspect-ratio: var(--media-ratio);
+    border-radius: var(--radius);
+    contain: inline-size;
+    max-height: var(--timeline-media-max);
+    max-width: min(var(--timeline-media-max), 100%);
+  }
+
+  :global(.post-media-image:nth-child(odd):last-child:nth-child(n + 3)) {
+    aspect-ratio: calc(var(--media-ratio) * 2);
+    grid-column: span 2;
   }
 
   .post-quote {

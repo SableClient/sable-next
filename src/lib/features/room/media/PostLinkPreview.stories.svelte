@@ -137,6 +137,15 @@
 />
 
 <Story
+  name="With three images"
+  args={{
+    preview: previewWith({
+      media: [media('image', imageUrl), media('image', imageUrl), media('image', imageUrl)],
+    }),
+  }}
+/>
+
+<Story
   name="With four images"
   args={{
     preview: previewWith({
