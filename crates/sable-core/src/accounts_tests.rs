@@ -1,5 +1,5 @@
 use crate::api::encryption::DeleteDeviceParams;
-use crate::session::{self, Credentials, PersistedAccount};
+use crate::session::{self, AccountState, Credentials, PersistedAccount};
 use crate::test_support::wait_until_retired;
 use std::sync::Arc;
 
@@ -323,8 +323,7 @@ async fn unknown_token_during_failed_preparation_still_ends_the_active_session()
         account_id: "first".to_owned(),
         store_id: core.store_id.clone(),
         session: current_session(&room.client(), server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     let pending = core.claim_session_generation().await;
@@ -336,7 +335,7 @@ async fn unknown_token_during_failed_preparation_still_ends_the_active_session()
     drop(pending);
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            if core.accounts().await.unwrap().accounts[0].needs_reauth {
+            if !core.accounts().await.unwrap().accounts[0].state.usable() {
                 break;
             }
             tokio::task::yield_now().await;
@@ -379,8 +378,7 @@ async fn rejected_devices_discard_credentials_but_keep_their_stores() {
             account_id: "a1".to_owned(),
             store_id: store_id.clone(),
             session: saved.clone(),
-            needs_reauth: false,
-            device_invalidated: false,
+            state: AccountState::Usable,
         });
         *core.accounts.lock().await = Some(registry);
         core.account_clients
@@ -396,8 +394,8 @@ async fn rejected_devices_discard_credentials_but_keep_their_stores() {
         let bytes = core.sessions.load().await.unwrap().unwrap();
         let (registry, _) = AccountRegistry::from_bytes(&bytes, base).unwrap();
         let account = &registry.accounts[0];
-        assert!(account.needs_reauth);
-        assert_eq!(account.device_invalidated, hard);
+        assert!(!account.state.usable());
+        assert_eq!(account.state.device_gone(), hard);
         assert_eq!(
             account.session.credentials.user_id(),
             saved.credentials.user_id()
@@ -428,8 +426,7 @@ async fn a_hard_token_rejection_keeps_the_account() {
         account_id: "first".to_owned(),
         store_id: core.store_id.clone(),
         session: current_session(&room.client(), server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     let rejected = ruma::api::error::UnknownTokenErrorData::new();
@@ -437,7 +434,10 @@ async fn a_hard_token_rejection_keeps_the_account() {
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             let accounts = core.accounts().await.unwrap().accounts;
-            if accounts.first().is_some_and(|account| account.needs_reauth) {
+            if accounts
+                .first()
+                .is_some_and(|account| !account.state.usable())
+            {
                 break;
             }
             tokio::task::yield_now().await;
@@ -448,7 +448,7 @@ async fn a_hard_token_rejection_keeps_the_account() {
     let accounts = core.accounts().await.unwrap().accounts;
     assert_eq!(accounts.len(), 1);
     assert_eq!(accounts[0].account_id, "first");
-    assert!(accounts[0].device_invalidated);
+    assert!(accounts[0].state.device_gone());
 }
 
 #[tokio::test]
@@ -532,8 +532,7 @@ async fn removing_an_inactive_account_signs_its_device_out() {
         account_id: "second".to_owned(),
         store_id,
         session: serde_json::from_value(session).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     };
     core.save_login_tokens(&account).await.unwrap();
     let mut registry = AccountRegistry::empty();
@@ -598,8 +597,7 @@ async fn refreshed_tokens_that_failed_to_save_are_saved_again() {
         account_id: "first".to_owned(),
         store_id: core.store_id.clone(),
         session: current_session(&client, server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     core.credential_writers
@@ -901,8 +899,7 @@ async fn switching_back_to_a_cached_client_rebuilds_one_set_of_handlers() {
         account_id: "first".to_owned(),
         store_id: core.store_id.clone(),
         session: current_session(&client, server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     let mut handler_counts = Vec::new();
@@ -941,8 +938,7 @@ async fn a_foreground_session_starts_while_the_activity_lock_is_busy() {
         account_id: "first".to_owned(),
         store_id: core.store_id.clone(),
         session: current_session(&client, server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     drop(core.take_session().await);
@@ -977,8 +973,7 @@ async fn a_session_started_while_hidden_stays_suspended() {
         account_id: "first".to_owned(),
         store_id: core.store_id.clone(),
         session: current_session(&client, server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     drop(core.take_session().await);
@@ -1119,8 +1114,7 @@ async fn a_saved_session_restores_while_the_homeserver_is_down() {
         account_id,
         store_id,
         session,
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     core.sessions
         .save(serde_json::to_vec(&registry).unwrap())
@@ -1163,8 +1157,7 @@ async fn a_cache_reset_keeps_the_login_keys_and_search_index_but_not_the_sync_po
                 .unwrap(),
             ),
         },
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     core.sessions
         .save(serde_json::to_vec(&registry).unwrap())
@@ -1271,8 +1264,7 @@ async fn late_refresh_persists_after_teardown_and_reuses_live_client() {
         account_id: "first".to_owned(),
         store_id: "unused".to_owned(),
         session: current_session(&client, server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     core.prepare_account_client(&client, &server.server().uri(), "first")
@@ -1373,8 +1365,7 @@ async fn a_refresh_during_an_abandoned_restore_is_saved() {
                 .unwrap(),
             ),
         },
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     core.sessions
         .save(serde_json::to_vec(&registry).unwrap())
@@ -1449,8 +1440,7 @@ async fn restorable_core() -> (
         account_id: "first".to_owned(),
         store_id: session::account_store_id(&core.store_id, "first"),
         session: session::current_session(&room.client(), server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     };
     let seeded = session::restore_client(&account.store_id, &account.session, true)
         .await
@@ -1499,8 +1489,8 @@ async fn tokens_sealed_with_another_key_ask_to_sign_in_again_once() {
 
     drop(capture);
     let accounts = core.accounts().await.unwrap();
-    assert!(accounts.accounts[0].needs_reauth);
-    assert!(!accounts.accounts[0].device_invalidated);
+    assert!(!accounts.accounts[0].state.usable());
+    assert!(!accounts.accounts[0].state.device_gone());
     assert_eq!(accounts.accounts[0].store_id, account.store_id);
     assert!(std::path::Path::new(&account.store_id).exists());
     let lines: Vec<_> = String::from_utf8_lossy(&logs.0.lock())
@@ -1575,7 +1565,7 @@ async fn unreadable_login_tokens_never_fall_back_to_stale_embedded_tokens() {
     core.restore().await.unwrap_err();
     assert_eq!(core.sessions.load().await.unwrap().unwrap(), before);
     assert_eq!(std::fs::read(&path).unwrap(), b"unreadable tokens");
-    assert!(!core.accounts().await.unwrap().accounts[0].needs_reauth);
+    assert!(core.accounts().await.unwrap().accounts[0].state.usable());
 
     core.save_login_tokens(&account).await.unwrap();
     assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
@@ -1708,7 +1698,7 @@ async fn a_stale_sign_in_whose_room_keys_cannot_be_carried_stays_registered() {
         .iter()
         .find(|account| account.account_id == "stale")
         .expect("the stale sign-in waits for a later retry");
-    assert!(kept.needs_reauth);
+    assert!(!kept.state.usable());
     assert!(std::path::Path::new(&stale.store_id).exists());
     core.shutdown().await;
 }
@@ -1824,7 +1814,7 @@ async fn an_account_whose_store_cannot_be_deleted_stays_listed_for_another_remov
         .iter_mut()
         .find(|account| account.account_id == "second")
         .expect("an account whose store is left stays listed");
-    assert!(kept.needs_reauth);
+    assert!(!kept.state.usable());
     kept.store_id.clone_from(&second.store_id);
     *core.accounts.lock().await = Some(registry);
     remove().await.unwrap();
@@ -1842,7 +1832,7 @@ async fn an_account_whose_store_cannot_be_deleted_stays_listed_for_another_remov
 async fn a_sign_in_that_never_started_gives_back_the_one_it_replaced() {
     let (_server, _base, core, first, _events) = restorable_core().await;
     let waiting = PersistedAccount {
-        needs_reauth: true,
+        state: AccountState::NeedsSignIn,
         ..other_sign_in(&core, &first, "waiting")
     };
     let mut registry = core.accounts().await.unwrap();
@@ -1865,7 +1855,8 @@ async fn a_sign_in_that_never_started_gives_back_the_one_it_replaced() {
             .iter()
             .find(|account| account.account_id == account_id)
             .unwrap()
-            .needs_reauth
+            .state
+            != AccountState::Usable
     };
     assert!(!waits("first"));
     assert!(waits("waiting"), "one that already waited still does");
@@ -1879,7 +1870,7 @@ async fn a_stale_sign_in_of_another_user_keeps_its_store_and_waits() {
     session["credentials"]["user_id"] = "@other:example.org".into();
     let other = PersistedAccount {
         session: serde_json::from_value(session).unwrap(),
-        needs_reauth: true,
+        state: AccountState::NeedsSignIn,
         ..other_sign_in(&core, &first, "other")
     };
     let mut registry = core.accounts().await.unwrap();
@@ -1916,7 +1907,7 @@ async fn removing_a_twin_of_the_active_device_leaves_it_signed_in() {
     assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
     let twin = PersistedAccount {
         session: first.session.clone(),
-        needs_reauth: true,
+        state: AccountState::NeedsSignIn,
         ..other_sign_in(&core, &first, "twin")
     };
     let mut registry = core.accounts().await.unwrap();
@@ -1950,7 +1941,7 @@ async fn a_new_sign_in_keeps_the_one_it_replaces_until_it_is_retired() {
         .iter()
         .find(|account| account.account_id == "first")
         .expect("the replaced sign-in stays until its session is retired");
-    assert!(replaced.needs_reauth);
+    assert!(!replaced.state.usable());
     assert!(std::path::Path::new(&first.store_id).exists());
     core.shutdown().await;
 }
@@ -1995,7 +1986,7 @@ async fn unreadable_inactive_tokens_do_not_block_other_accounts_or_removal() {
     assert_eq!(core.active_session_info().unwrap().account_id, "first");
     assert_eq!(core.sessions.load().await.unwrap().unwrap(), before);
     assert_eq!(std::fs::read(&path).unwrap(), b"unreadable tokens");
-    assert!(!core.accounts().await.unwrap().accounts[1].needs_reauth);
+    assert!(core.accounts().await.unwrap().accounts[1].state.usable());
 
     core.remove_inactive_account(RemoveAccountParams {
         account_id: "second".to_owned(),
@@ -2111,8 +2102,7 @@ async fn rejected_tokens_stay_retired_when_the_registry_write_fails() {
         account_id: "first".to_owned(),
         store_id: "unused".to_owned(),
         session: current_session(&room.client(), server.server().uri()).unwrap(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     };
     core.save_login_tokens(&account).await.unwrap();
     let device_id = account.session.credentials.device_id();
@@ -2131,8 +2121,8 @@ async fn rejected_tokens_stay_retired_when_the_registry_write_fails() {
         .unwrap();
     let accounts = core.accounts().await.unwrap();
     assert!(accounts.active_account_id.is_none());
-    assert!(accounts.accounts[0].needs_reauth);
-    assert!(accounts.accounts[0].device_invalidated);
+    assert!(!accounts.accounts[0].state.usable());
+    assert!(accounts.accounts[0].state.device_gone());
     assert!(core.credential_writers.lock().await.is_empty());
 }
 
@@ -2157,8 +2147,7 @@ async fn failed_switch_persistence_keeps_the_previous_session() {
             account_id: account_id.to_owned(),
             store_id: "unused".to_owned(),
             session: current_session(&client, server.server().uri()).unwrap(),
-            needs_reauth: false,
-            device_invalidated: false,
+            state: AccountState::Usable,
         });
     }
     *core.accounts.lock().await = Some(registry);
@@ -2201,8 +2190,7 @@ async fn token_reload_reads_the_durable_session_and_refuses_retired_writers() {
         account_id: "first".into(),
         store_id: "unused".into(),
         session: saved,
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     };
     core.save_login_tokens(&account).await.unwrap();
     registry.upsert(account);
@@ -2248,8 +2236,7 @@ async fn outgoing_credentials_survive_switch_without_resurrecting_accounts() {
         account_id: "first".to_owned(),
         store_id: core.store_id.clone(),
         session: stale.clone(),
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     *core.accounts.lock().await = Some(registry);
     core.credential_writers

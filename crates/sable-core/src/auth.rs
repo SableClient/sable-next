@@ -20,7 +20,7 @@ use url::Url;
 use crate::ResultExt;
 use crate::protocol::{RpcCode, RpcError};
 
-use crate::session::{Credentials, PersistedSession};
+use crate::session::{AccountState, Credentials, PersistedSession};
 
 use crate::{Core, LoginMethod, PendingLogin};
 use crate::{protocol, session};
@@ -40,7 +40,7 @@ impl Core {
             .into_iter()
             .find(|account| account.account_id == account_id)
             .ok_or(RpcCode::NotLoggedIn)?;
-        if !account.needs_reauth {
+        if account.state.usable() {
             #[cfg(not(target_family = "wasm"))]
             let retired = self.retire_unusable_login(&account).await?;
             #[cfg(target_family = "wasm")]
@@ -48,16 +48,16 @@ impl Core {
             if !retired {
                 return Err(RpcCode::NotLoggedIn.into());
             }
-            account.needs_reauth = true;
+            account.state = AccountState::NeedsSignIn;
         }
-        if !account.device_invalidated {
+        if !account.state.device_gone() {
             match session::validate_saved_crypto_store(&account.store_id, &account.session).await {
                 Ok(()) => {}
                 Err(error) if let Some(reason) = error.invalid_reason() => {
                     tracing::warn!(reason, "reauthenticating on a new device");
                     self.mark_account_needs_reauth(Some(&account_id), true)
                         .await?;
-                    account.device_invalidated = true;
+                    account.state = AccountState::DeviceGone;
                     account.session.credentials.discard_tokens();
                 }
                 Err(error) => return Err(self.failed_report("reauth_crypto_store", error)),
@@ -71,7 +71,7 @@ impl Core {
         account: Option<&session::PersistedAccount>,
     ) -> Result<(String, String), RpcError> {
         match account {
-            Some(account) if !account.device_invalidated => {
+            Some(account) if !account.state.device_gone() => {
                 Ok((account.account_id.clone(), account.store_id.clone()))
             }
             _ => self.allocate_account().await,
@@ -85,7 +85,7 @@ impl Core {
         account: Option<&session::PersistedAccount>,
     ) -> Result<matrix_sdk::Client, RpcError> {
         let client = match account {
-            Some(account) if !account.device_invalidated => {
+            Some(account) if !account.state.device_gone() => {
                 session::restore_client(store_id, &account.session, self.persistent_event_cache)
                     .await
             }
@@ -113,10 +113,10 @@ impl Core {
             Ok(Some(account))
                 if client.user_id().map(ToString::to_string)
                     != Some(account.session.credentials.user_id())
-                    || (!account.device_invalidated
+                    || (!account.state.device_gone()
                         && client.device_id().map(ToString::to_string)
                             != Some(account.session.credentials.device_id()))
-                    || (account.device_invalidated
+                    || (account.state.device_gone()
                         && client.device_id().map(ToString::to_string)
                             == Some(account.session.credentials.device_id())) =>
             {
@@ -178,7 +178,7 @@ impl Core {
                 device_display_name.as_deref(),
             ));
         if let Some(account) = &reauth
-            && !account.device_invalidated
+            && !account.state.device_gone()
         {
             login = login.device_id(&account.session.credentials.device_id());
         }
@@ -331,7 +331,7 @@ impl Core {
             Url::parse(&redirect_uri).or_failed(self, "start_oidc_login_redirect_uri")?;
         let mut reauth = self.reauthentication_account(reauth_account_id).await?;
         if let Some(account) = reauth.as_mut()
-            && !account.device_invalidated
+            && !account.state.device_gone()
             && matches!(account.session.credentials, Credentials::OAuth { .. })
             && !reuses_oauth_client(&account.session, &redirect_uri)
         {
@@ -339,7 +339,7 @@ impl Core {
             tracing::warn!("reauthenticating on a new device: the OAuth client cannot be reused");
             self.mark_account_needs_reauth(Some(&account.account_id), true)
                 .await?;
-            account.device_invalidated = true;
+            account.state = AccountState::DeviceGone;
             account.session.credentials.discard_tokens();
         }
         let homeserver = reauth
@@ -368,7 +368,7 @@ impl Core {
         }
         let device_id = reauth
             .as_ref()
-            .filter(|account| !account.device_invalidated)
+            .filter(|account| !account.state.device_gone())
             .map(|account| account.session.credentials.device_id().into());
 
         let mut login =
@@ -478,7 +478,7 @@ impl Core {
         if let Err(error) = finished {
             let refused = pending.take_if(|pending| {
                 refuses_device(&error)
-                    && matches!(&pending.reauth, Some(account) if !account.device_invalidated)
+                    && matches!(&pending.reauth, Some(account) if !account.state.device_gone())
             });
             drop(pending);
             if let Some(account) = refused.and_then(|pending| pending.reauth) {
@@ -662,7 +662,7 @@ impl Core {
                 device_display_name.as_deref(),
             ));
         if let Some(account) = &reauth
-            && !account.device_invalidated
+            && !account.state.device_gone()
         {
             login = login.device_id(&account.session.credentials.device_id());
         }
@@ -959,7 +959,7 @@ mod tests {
         assert_eq!(accounts.accounts.len(), 1);
         assert_eq!(accounts.accounts[0].account_id, "a1");
         assert_eq!(accounts.accounts[0].store_id, store);
-        assert!(!accounts.accounts[0].needs_reauth);
+        assert!(accounts.accounts[0].state.usable());
         assert_eq!(
             logins.read("a1", "EXISTING").unwrap().unwrap().access_token,
             "new-token"
@@ -1064,8 +1064,12 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert!(account.device_invalidated);
-        assert!(core.accounts().await.unwrap().accounts[0].device_invalidated);
+        assert!(account.state.device_gone());
+        assert!(
+            core.accounts().await.unwrap().accounts[0]
+                .state
+                .device_gone()
+        );
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -1110,14 +1114,14 @@ mod tests {
                 ..
             })
         ));
-        assert!(!core.accounts().await.unwrap().accounts[0].needs_reauth);
+        assert!(core.accounts().await.unwrap().accounts[0].state.usable());
 
         logins.forget("a1");
         core.reauthentication_account(Some("a1".into()))
             .await
             .unwrap()
             .unwrap();
-        assert!(core.accounts().await.unwrap().accounts[0].needs_reauth);
+        assert!(!core.accounts().await.unwrap().accounts[0].state.usable());
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -1209,7 +1213,7 @@ mod tests {
             .unwrap()
             .accounts
             .iter()
-            .any(|account| account.account_id == "a1" && account.device_invalidated)
+            .any(|account| account.account_id == "a1" && account.state.device_gone())
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -1346,7 +1350,7 @@ mod tests {
         .expect_err("invalid credentials reject reauthentication");
         let accounts = core.accounts().await.unwrap();
         assert_eq!(accounts.accounts.len(), 1);
-        assert!(accounts.accounts[0].needs_reauth);
+        assert!(!accounts.accounts[0].state.usable());
         assert_eq!(
             accounts.accounts[0].session.credentials.device_id(),
             "EXISTING"

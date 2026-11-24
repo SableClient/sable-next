@@ -183,7 +183,7 @@ mod tests {
         assert!(core.session.read().await.is_some());
         assert_eq!(core.sessions.load().await.unwrap(), stored);
         assert_eq!(client.encryption().ed25519_key().await, identity);
-        assert!(!core.accounts().await.unwrap().accounts[0].needs_reauth);
+        assert!(core.accounts().await.unwrap().accounts[0].state.usable());
     }
 
     #[tokio::test]

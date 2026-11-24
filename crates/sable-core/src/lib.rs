@@ -613,7 +613,7 @@ impl Core {
         for account in registry
             .accounts
             .iter_mut()
-            .filter(|account| account.device_invalidated)
+            .filter(|account| account.state.device_gone())
         {
             account.session.credentials.discard_tokens();
         }
@@ -630,7 +630,7 @@ impl Core {
             || registry
                 .accounts
                 .iter()
-                .any(|account| account.device_invalidated)
+                .any(|account| account.state.device_gone())
         {
             self.write_registry(&registry)
                 .await

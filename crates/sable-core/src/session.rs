@@ -118,10 +118,68 @@ pub struct PersistedAccount {
     pub account_id: String,
     pub store_id: String,
     pub session: PersistedSession,
+    #[serde(flatten)]
+    pub state: AccountState,
+}
+
+/// Whether a saved sign-in can start a session. Saved as the two flags older builds read.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "AccountStateFlags", into = "AccountStateFlags")]
+pub enum AccountState {
+    #[default]
+    Usable,
+    /// Signed out, replaced or being removed. Signing in again keeps its device.
+    NeedsSignIn,
+    /// The server no longer knows its device, so signing in again makes a new one.
+    DeviceGone,
+}
+
+impl AccountState {
+    #[must_use]
+    pub const fn usable(self) -> bool {
+        matches!(self, Self::Usable)
+    }
+
+    #[must_use]
+    pub const fn device_gone(self) -> bool {
+        matches!(self, Self::DeviceGone)
+    }
+
+    /// A gone device never comes back, only a new sign-in replaces it.
+    pub fn require_sign_in(&mut self) {
+        if *self == Self::Usable {
+            *self = Self::NeedsSignIn;
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct AccountStateFlags {
     #[serde(default)]
-    pub needs_reauth: bool,
+    needs_reauth: bool,
     #[serde(default)]
-    pub device_invalidated: bool,
+    device_invalidated: bool,
+}
+
+impl From<AccountStateFlags> for AccountState {
+    fn from(flags: AccountStateFlags) -> Self {
+        if flags.device_invalidated {
+            Self::DeviceGone
+        } else if flags.needs_reauth {
+            Self::NeedsSignIn
+        } else {
+            Self::Usable
+        }
+    }
+}
+
+impl From<AccountState> for AccountStateFlags {
+    fn from(state: AccountState) -> Self {
+        Self {
+            needs_reauth: !state.usable(),
+            device_invalidated: state.device_gone(),
+        }
+    }
 }
 
 impl AccountRegistry {
@@ -157,8 +215,7 @@ impl AccountRegistry {
                     account_id: "a1".to_owned(),
                     store_id: legacy_store_id.to_owned(),
                     session,
-                    needs_reauth: false,
-                    device_invalidated: false,
+                    state: AccountState::Usable,
                 }],
             },
             true,
@@ -192,7 +249,7 @@ impl AccountRegistry {
         let (waiting, usable): (Vec<_>, Vec<_>) = self
             .accounts
             .iter()
-            .partition(|account| account.needs_reauth);
+            .partition(|account| !account.state.usable());
         let latest: std::collections::HashMap<_, _> = waiting
             .into_iter()
             .chain(usable)
@@ -209,7 +266,7 @@ impl AccountRegistry {
             if latest.get(&user_id) == Some(&account.account_id) {
                 continue;
             }
-            account.needs_reauth = true;
+            account.state.require_sign_in();
             if self.active_account_id.as_ref() == Some(&account.account_id) {
                 self.active_account_id = latest.get(&user_id).cloned();
             }
@@ -1422,7 +1479,7 @@ mod tests {
         let usable: Vec<_> = registry
             .accounts
             .iter()
-            .filter(|account| !account.needs_reauth)
+            .filter(|account| account.state.usable())
             .map(|account| account.account_id.as_str())
             .collect();
         assert_eq!(usable, ["a2", "a5"]);

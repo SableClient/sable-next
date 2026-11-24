@@ -460,7 +460,7 @@ async fn signed_in(root: &Path, user: &str) -> Option<(String, String)> {
     let account = registry
         .accounts
         .iter()
-        .find(|account| !account.needs_reauth && account.session.credentials.user_id() == user)?;
+        .find(|account| account.state.usable() && account.session.credentials.user_id() == user)?;
     Some((
         account.account_id.clone(),
         account.session.credentials.device_id(),

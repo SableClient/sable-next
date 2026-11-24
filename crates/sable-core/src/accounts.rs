@@ -13,7 +13,7 @@ use crate::ResultExt;
 use crate::protocol::{CoreEvent, RpcCode, RpcError, SessionInfo};
 
 use crate::session::AccountRegistry;
-use crate::session::{PersistedAccount, PersistedSession, Session};
+use crate::session::{AccountState, PersistedAccount, PersistedSession, Session};
 
 use crate::Core;
 use crate::cosmetics;
@@ -185,21 +185,20 @@ impl Core {
         else {
             return Err(self.failed("restore", "active account is missing"));
         };
-        if account.needs_reauth {
+        if !account.state.usable() {
             return Ok(None);
         }
         let lease = session::store_lease(&account.store_id).await;
-        let client =
-            match self.saved_account_client(&account, &lease).await {
-                Ok(client) => client,
-                Err(error) => {
-                    let retired =
-                        self.accounts().await?.accounts.iter().any(|saved| {
-                            saved.account_id == account.account_id && saved.needs_reauth
-                        });
-                    return if retired { Ok(None) } else { Err(error) };
-                }
-            };
+        let client = match self.saved_account_client(&account, &lease).await {
+            Ok(client) => client,
+            Err(error) => {
+                let retired =
+                    self.accounts().await?.accounts.iter().any(|saved| {
+                        saved.account_id == account.account_id && !saved.state.usable()
+                    });
+                return if retired { Ok(None) } else { Err(error) };
+            }
+        };
         let persisted = account.session;
 
         let info = SessionInfo {
@@ -258,7 +257,7 @@ impl Core {
                         .or_failed(self, "list_accounts_user_id")?,
                     device_id: account.session.credentials.device_id(),
                     homeserver: account.session.homeserver,
-                    needs_reauth: account.needs_reauth,
+                    needs_reauth: !account.state.usable(),
                 })
             })
             .collect::<Result<Vec<_>, RpcError>>()?;
@@ -281,7 +280,7 @@ impl Core {
             .into_iter()
             .find(|account| account.account_id == account_id)
             .ok_or(RpcCode::NotLoggedIn)?;
-        if account.needs_reauth {
+        if !account.state.usable() {
             return Err(RpcCode::NotLoggedIn.into());
         }
         let lease = session::store_lease(&account.store_id).await;
@@ -384,7 +383,7 @@ impl Core {
             session.user_id.as_str() == account.session.credentials.user_id()
                 && session.device_id == account.session.credentials.device_id()
         });
-        if !account.device_invalidated && !twin {
+        if !account.state.device_gone() && !twin {
             self.log_out_saved(account).await;
         }
         self.remove_account(Some(&account_id)).await
@@ -456,8 +455,8 @@ impl Core {
         if let Some(expected) = reauth
             && !registry.accounts.iter().any(|account| {
                 account.account_id == expected.account_id
-                    && account.needs_reauth
-                    && account.device_invalidated == expected.device_invalidated
+                    && !account.state.usable()
+                    && account.state.device_gone() == expected.state.device_gone()
             })
         {
             return Err(RpcCode::NotLoggedIn.into());
@@ -468,10 +467,10 @@ impl Core {
         for account in &mut updated.accounts {
             if account.account_id != account_id && account.session.credentials.user_id() == user_id
             {
-                if !account.needs_reauth {
+                if account.state.usable() {
                     replaced.usable.push(account.account_id.clone());
                 }
-                account.needs_reauth = true;
+                account.state.require_sign_in();
                 replaced.all.push(account.account_id.clone());
             }
         }
@@ -479,8 +478,7 @@ impl Core {
             account_id: account_id.to_owned(),
             store_id: store_id.to_owned(),
             session: persisted.clone(),
-            needs_reauth: false,
-            device_invalidated: false,
+            state: AccountState::Usable,
         };
         self.save_login_tokens(&account)
             .await
@@ -509,8 +507,10 @@ impl Core {
         };
         let mut updated = registry.clone();
         for account in &mut updated.accounts {
-            if account_ids.contains(&account.account_id) {
-                account.needs_reauth = false;
+            if account_ids.contains(&account.account_id)
+                && account.state == AccountState::NeedsSignIn
+            {
+                account.state = AccountState::Usable;
             }
         }
         self.write_registry(&updated)
@@ -601,7 +601,7 @@ impl Core {
                 registry
                     .accounts
                     .iter()
-                    .find(|account| account.account_id == account_id && !account.needs_reauth)
+                    .find(|account| account.account_id == account_id && account.state.usable())
             })
             .map(|account| account.session.credentials.device_id())
             .ok_or(RpcCode::NotLoggedIn)?;
@@ -689,7 +689,7 @@ impl Core {
             for account in loaded
                 .accounts
                 .iter_mut()
-                .filter(|account| !account.needs_reauth)
+                .filter(|account| account.state.usable())
             {
                 let credentials = &mut account.session.credentials;
                 let device_id = credentials.device_id();
@@ -816,7 +816,7 @@ impl Core {
         else {
             return Ok(());
         };
-        if account.needs_reauth {
+        if !account.state.usable() {
             return Ok(());
         }
         let Some(persisted) = session::current_session(client, homeserver.to_owned()) else {
@@ -942,7 +942,7 @@ impl Core {
         let account = updated
             .accounts
             .iter_mut()
-            .find(|account| account.account_id == account_id && !account.needs_reauth)
+            .find(|account| account.account_id == account_id && account.state.usable())
             .ok_or(RpcCode::NotLoggedIn)?;
         let mut clients = self.account_clients.lock().await;
         if !clients.contains_key(account_id) {
@@ -993,8 +993,11 @@ impl Core {
         else {
             return Ok(());
         };
-        account.needs_reauth = true;
-        account.device_invalidated = device_invalidated;
+        if device_invalidated {
+            account.state = AccountState::DeviceGone;
+        } else {
+            account.state.require_sign_in();
+        }
         if device_invalidated {
             account.session.credentials.discard_tokens();
         }
@@ -1110,7 +1113,7 @@ impl Core {
                 Err(error) => return Err(self.failed_with("retire_account_room_keys", &error)),
             }
             // A twin of the successor's own device must stay signed in.
-            if !account.device_invalidated
+            if !account.state.device_gone()
                 && successor.session_meta().is_some_and(|meta| {
                     meta.device_id.as_str() != account.session.credentials.device_id()
                 })
@@ -1319,7 +1322,7 @@ impl Core {
         if let Err(error) = started {
             // The saved login would name a device the server no longer knows.
             self.abandon_sign_in(&client, reauth).await;
-            if reauth.is_none_or(|account| account.device_invalidated) {
+            if reauth.is_none_or(|account| account.state.device_gone()) {
                 if let Err(error) = self
                     .mark_account_needs_reauth(Some(&account_id), true)
                     .await
@@ -1344,7 +1347,7 @@ impl Core {
         client: &matrix_sdk::Client,
         reauth: Option<&PersistedAccount>,
     ) {
-        if reauth.is_some_and(|account| !account.device_invalidated) {
+        if reauth.is_some_and(|account| !account.state.device_gone()) {
             return;
         }
         match matrix_sdk::timeout::timeout(Box::pin(client.logout()), LOG_OUT_TIMEOUT).await {

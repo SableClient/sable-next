@@ -19,7 +19,7 @@ use super::{
 };
 use crate::preview::describe;
 use crate::protocol::PushFetchView;
-use crate::session::PersistedSession;
+use crate::session::{AccountState, PersistedSession};
 use crate::store::{FileSessionStore, SessionStore};
 
 fn event(value: &serde_json::Value) -> AnySyncTimelineEvent {
@@ -247,8 +247,7 @@ async fn saved_login_as(
         account_id,
         store_id,
         session,
-        needs_reauth: false,
-        device_invalidated: false,
+        state: AccountState::Usable,
     });
     FileSessionStore::new(&base)
         .save(serde_json::to_vec(&registry).unwrap())
@@ -505,7 +504,7 @@ async fn a_push_for_a_login_whose_key_is_gone_asks_to_sign_in_again_quietly() {
         assert!(host.is_none());
     }
 
-    assert!(core.accounts().await.unwrap().accounts[0].needs_reauth);
+    assert!(!core.accounts().await.unwrap().accounts[0].state.usable());
     while let Ok(event) = events.try_recv() {
         assert!(
             !matches!(event, crate::protocol::CoreEvent::Failure { .. }),

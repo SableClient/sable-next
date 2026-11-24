@@ -27,7 +27,7 @@ pub(super) fn push_account<'a>(
     device_id: &str,
 ) -> Option<&'a PersistedAccount> {
     accounts.accounts.iter().find(|account| {
-        !account.needs_reauth
+        account.state.usable()
             && account.session.credentials.user_id() == user_id
             && account.session.credentials.device_id() == device_id
     })
