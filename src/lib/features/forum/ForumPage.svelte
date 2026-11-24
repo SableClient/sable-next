@@ -128,6 +128,7 @@
     encrypted: () => resolvedRoom?.encrypted ?? null,
     publicRoom: () => resolvedRoom?.join_rule === 'public',
     canRedactOwn: () => permissions?.can_redact_own ?? true,
+    findItem: (eventId) => forumThreads.threads.find((thread) => thread.eventId === eventId)?.item,
     afterSend: (id) => {
       composing = false;
       donateSentMessage(core, roomList.byId(id));
@@ -157,6 +158,9 @@
   $effect(() => {
     void resolvedRoomId;
     memberLoader.reset();
+    untrack(() => conversation.followRoom());
+    composing = false;
+    query = '';
   });
 
   $effect(() => {
@@ -231,6 +235,7 @@
   $effect(() => {
     const activeRoomId = resolvedRoomId;
     let current = true;
+    permissions = null;
     core.rpc.members
       .permissions({ room_id: activeRoomId })
       .then((next) => {

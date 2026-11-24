@@ -43,7 +43,8 @@ function setup(
   store: Partial<PersonaStore> = {},
   beforeSend?: () => Promise<void>,
   threadRoot: string | null = null,
-  canRedactOwn?: () => boolean
+  canRedactOwn?: () => boolean,
+  findItem?: (eventId: string) => TimelineItemView | undefined
 ) {
   const sendMessage = vi.fn((..._args: unknown[]) => Promise.resolve());
   const editMessage = vi.fn((..._args: unknown[]) => Promise.resolve());
@@ -126,6 +127,7 @@ function setup(
       beforeSend,
       threadRoot,
       canRedactOwn,
+      findItem,
     }),
   };
 }
@@ -772,6 +774,46 @@ test('keeps an edited message kind and persona when returning to live drops its 
     '$original',
     'after',
     expect.objectContaining({ kind: 'emote', persona: original.per_message_profile })
+  );
+});
+
+test('editing a message shown from outside the timeline keeps its title, kind and persona', async () => {
+  const post = withRowFields({
+    ...item('$post', '@kris:example.org'),
+    content: {
+      kind: 'message',
+      body: 'waves',
+      html: 'waves',
+      msgtype: 'emote',
+      edited: false,
+      jumbo: null,
+    },
+    forum_title: 'Release notes',
+    per_message_profile: { display_name: 'Ghost', avatar_url: null },
+  } as TimelineItemView);
+  const { conversation, editMessage } = setup(
+    [],
+    '@kris:example.org',
+    {},
+    undefined,
+    null,
+    undefined,
+    (eventId) => (eventId === '$post' ? post : undefined)
+  );
+
+  conversation.edit('$post', 'waves');
+  expect(conversation.forumTitle).toBe('Release notes');
+  await conversation.sendMessage(ROOM, 'waves back');
+
+  expect(editMessage).toHaveBeenCalledWith(
+    ROOM,
+    '$post',
+    'waves back',
+    expect.objectContaining({
+      kind: 'emote',
+      persona: post.per_message_profile,
+      forum_title: 'Release notes',
+    })
   );
 });
 

@@ -83,6 +83,8 @@ export type ConversationDeps = {
   afterSend?: (roomId: string) => void;
   threadRoot?: string | null;
   canRedactOwn?: () => boolean;
+  /** Messages shown from outside the timeline, such as forum posts older than what it has loaded. */
+  findItem?: (eventId: string) => TimelineItemView | undefined;
 };
 
 function failed(action: string): (error: unknown) => void {
@@ -107,6 +109,7 @@ export class Conversation {
   readonly #publicRoom: () => boolean;
   readonly #threadRoot: string | null;
   readonly #canRedactOwn: () => boolean;
+  readonly #findItem: (eventId: string) => TimelineItemView | undefined;
   readonly #beforeSend: () => Promise<void>;
   readonly #afterSend: (roomId: string) => void;
   /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
@@ -124,6 +127,7 @@ export class Conversation {
     afterSend = () => {},
     threadRoot = null,
     canRedactOwn = () => true,
+    findItem = () => undefined,
   }: ConversationDeps) {
     this.#core = core;
     this.#personas = personas;
@@ -134,6 +138,7 @@ export class Conversation {
     this.#publicRoom = publicRoom ?? (() => false);
     this.#threadRoot = threadRoot;
     this.#canRedactOwn = canRedactOwn;
+    this.#findItem = findItem;
     this.#beforeSend = beforeSend;
     this.#afterSend = afterSend;
     this.restored = readReply(this.#replyKey(), this.#accountId()) ?? null;
@@ -205,12 +210,7 @@ export class Conversation {
     if (body === '' && !(pending?.kind === 'edit' && pending.mediaCaption)) return;
 
     if (pending?.kind === 'edit') {
-      const edited = this.#timeline.items.find(
-        (entry) =>
-          entry.id === pending.timelineItemId ||
-          entry.event_id === pending.eventId ||
-          entry.transaction_id === pending.eventId
-      );
+      const edited = this.#editTarget(pending.eventId, pending.timelineItemId);
       const unchanged =
         body === pending.body &&
         (formatted === null || formatted === pending.html) &&
@@ -705,9 +705,7 @@ export class Conversation {
     html: string | null = null,
     mediaCaption = false
   ): void => {
-    const item = this.#timeline.items.find(
-      (entry) => entry.event_id === eventId || entry.transaction_id === eventId
-    );
+    const item = this.#editTarget(eventId);
     this.forumTitle = item?.forum_title ?? '';
     this.context = {
       kind: 'edit',
@@ -719,6 +717,17 @@ export class Conversation {
       persona: item?.per_message_profile ?? null,
     };
   };
+
+  #editTarget(eventId: string, timelineItemId?: string): TimelineItemView | undefined {
+    return (
+      this.#timeline.items.find(
+        (entry) =>
+          entry.id === timelineItemId ||
+          entry.event_id === eventId ||
+          entry.transaction_id === eventId
+      ) ?? this.#findItem(eventId)
+    );
+  }
 
   #editTimelineItem(item: TimelineItemView, itemId: string): boolean {
     if (item.content.kind === 'message') {
