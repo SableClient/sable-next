@@ -131,7 +131,8 @@
 
   $effect(() => {
     const target = focusEventId;
-    if (target === null) {
+    // The root's own context is the room around it, which takes no thread actions.
+    if (target === null || target === rootEventId) {
       void timeline.startThread(roomId, rootEventId);
       return;
     }

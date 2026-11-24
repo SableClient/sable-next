@@ -5990,6 +5990,54 @@ async fn thread_lists_are_notified_when_room_cache_changes() {
 }
 
 #[tokio::test]
+async fn thread_actions_refuse_the_context_of_a_thread_root() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .on_builder(|builder| builder.with_threading_support(session::THREADING_SUPPORT))
+        .build()
+        .await;
+    let room_id = room_id!("!linked-root:example.org");
+    let root = event_id!("$root");
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    server
+        .sync_room(&client, JoinedRoomBuilder::new(room_id))
+        .await;
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .mock_room_event_context()
+        .match_event_id()
+        .ok(RoomContextResponseTemplate::new(
+            factory.text_msg("root").event_id(root).into_event(),
+        ))
+        .mount()
+        .await;
+    let core = core_for(&server, client).await;
+    let result = core
+        .run(SubscribeParams {
+            room_id: room_id.to_owned(),
+            focus: TimelineFocusView::Event {
+                event_id: root.to_owned(),
+            },
+            hidden_events: false,
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        core.subscribed_timeline(
+            &room_id.to_owned(),
+            Some(&root.to_owned()),
+            Some(result.subscription)
+        )
+        .await,
+        Err(RpcError {
+            code: RpcCode::UnknownSubscription,
+            ..
+        })
+    ));
+}
+
+#[tokio::test]
 async fn thread_actions_accept_linked_context_only_for_its_inferred_root() {
     let server = MatrixMockServer::new().await;
     let client = server

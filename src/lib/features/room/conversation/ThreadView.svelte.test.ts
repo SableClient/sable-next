@@ -201,6 +201,27 @@ test('a linked reply missing from the thread opens on its context', async () => 
   expect(paginate).not.toHaveBeenCalled();
 });
 
+test('a link to the root keeps the thread timeline while the root is not loaded', async () => {
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
+    this.items = [image('$reply', 'reply.png')];
+    this.hasSnapshot = true;
+    return Promise.resolve();
+  });
+  const start = vi.spyOn(RoomTimeline.prototype, 'start').mockResolvedValue();
+  vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
+  render(ThreadViewHarness, {
+    panel: {
+      roomId: '!room:example.org',
+      rootEventId: '$root',
+      focusEventId: '$root',
+      onClose: () => {},
+    },
+  });
+
+  expect(await screen.findByRole('button', { name: 'Open reply.png' })).toBeVisible();
+  expect(start).not.toHaveBeenCalled();
+});
+
 test('a linked reply already in the thread keeps the thread timeline', async () => {
   vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
     this.items = [image('$root', 'first.png'), image('$reply', 'reply.png')];
