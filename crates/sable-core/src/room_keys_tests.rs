@@ -1,0 +1,998 @@
+use std::{sync::Arc, time::Duration};
+
+use futures_util::StreamExt;
+use matrix_sdk::{
+    Client,
+    ruma::{RoomId, owned_device_id, room_id, serde::Raw, user_id},
+    test_utils::mocks::MatrixMockServer,
+};
+use matrix_sdk_base::crypto::{
+    encrypt_room_key_export,
+    olm::{
+        Account, EncryptionSettings, ExportedRoomKey, InboundGroupSession, OutboundGroupSession,
+        SenderData,
+    },
+    types::EventEncryptionAlgorithm,
+    vodozemac::Ed25519PublicKey,
+};
+use matrix_sdk_test::JoinedRoomBuilder;
+use matrix_sdk_ui::{sync_service::SyncService, timeline::TimelineItem};
+use serde_json::json;
+use tempfile::TempDir;
+
+use crate::{
+    Core,
+    api::encryption::ImportRoomKeysOk,
+    api::timeline::TimelineFocusView,
+    protocol::{RpcCode, RpcError},
+    session::Session,
+    store::MemorySessionStore,
+    timelines::build_room_timeline,
+};
+
+const ELEMENT_EXPORT: &str = "-----BEGIN MEGOLM SESSION DATA-----
+AWIEZVPUCHhsgGI7QxF6v7jY5mbnDpQkvE402UNF1lBfAAAD6D21Bj9tDCdiu+IdpF0gBVgsFZWmJEuuMjkO5ZBWbE9O1vVgqq3tdRP+Zo9oDKiTjr2WzaSk6oHoVDmd
+UsVerHOMZnXBYN9PU3zpyxTBCS0juJDK64vDn5/hnRuXR80h16a1kMsGoF3FE/L3lL3zcq9D9UXspr8Sut5kXGRGt6YFCtOPg3V/uc4MVRb4b2zD3oJzncfDiJ3cbetJ
+MBX7B4IP+aO41QIx0i9Ln1q3Hc9IO3JY5CoQ4a/bj0bWhWnKLXsId/XnDL3HD14tFQl1/KGaS0tQYRBO4c2OvjvG/B40WDjjhOBRMuJUSqSlu1p43PuSVx18Z5+CXh+y
+98/0nBthvP6smQP7JbYMHkgIBC+ialXucJtWTojQ/fYjxlPyceffR7v0zSUDV09mxpB6xhsxulum74kayhNzJE+iACYgH1eZy7Jx1VRhyEcwIYrvDlF38apoU2KR/1yR
+9dQ7ErNsfjjM1EAf5YCYzTXUxOOywlASWTzGSuYGEk1vZzhRwiHi+NyCTWgGWchHaptb+TqUzePn3YRKZv7IvhY2h3EGfYeje3jVdf+Yv17gB0qj4u+QbSX+xJZgqD3U
+ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhFoaktz4LWw0nPwBUS3L7fk9x15Yeua4qF4U3BunaHPhp3k10=
+-----END MEGOLM SESSION DATA-----";
+
+const ELEMENT_SESSION: &str = "gM8i47Xhu0q52xLfgUXzanCMpLinoyVyH7R58cBuVBU";
+
+#[tokio::test]
+async fn restored_backups_respect_the_account_preference() {
+    use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{method, path_regex},
+    };
+
+    for (status, preference, enabled) in [
+        (200, json!({"enabled": false}), false),
+        (200, json!({"enabled": true}), true),
+        (200, json!({}), true),
+        (
+            404,
+            json!({"errcode": "M_NOT_FOUND", "error": "No preference"}),
+            true,
+        ),
+        (
+            500,
+            json!({"errcode": "M_UNKNOWN", "error": "Unavailable"}),
+            true,
+        ),
+    ] {
+        let server = MatrixMockServer::new().await;
+        Mock::given(method("GET"))
+            .and(path_regex("/account_data/m.key_backup$"))
+            .respond_with(ResponseTemplate::new(status).set_body_json(preference))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(
+                "/account_data/m.org.matrix.custom.backup_disabled$",
+            ))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "No preference"})),
+            )
+            .mount(server.server())
+            .await;
+        let key = BackupDecryptionKey::new();
+        backup_metadata(&server, &key, 0).await;
+        let (core, client, _store) = core_for(&server).await;
+        unlock_backup(&client, &key).await;
+        core.honor_backup_preference(&client).await;
+        assert_eq!(
+            client.encryption().backups().are_enabled().await,
+            enabled,
+            "preference status {status}"
+        );
+        let keys = client
+            .olm_machine_for_testing()
+            .await
+            .as_ref()
+            .unwrap()
+            .store()
+            .load_backup_keys()
+            .await
+            .unwrap();
+        assert_eq!(keys.decryption_key.unwrap().to_base64(), key.to_base64());
+        assert_eq!(keys.backup_version.as_deref(), Some("1"));
+        let requests = server.server().received_requests().await.unwrap();
+        assert!(
+            requests
+                .iter()
+                .any(|request| request.url.path().ends_with("/account_data/m.key_backup"))
+        );
+    }
+}
+
+async fn core_for(server: &MatrixMockServer) -> (Arc<Core>, Client, TempDir) {
+    let store = tempfile::tempdir().unwrap();
+    let store_id = format!(
+        "{}-{}",
+        store.path().to_str().unwrap(),
+        ruma::TransactionId::new()
+    );
+    let client = crate::session::mock_account_client(server, &store_id).await;
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new(
+        store.path().to_str().unwrap(),
+        Box::new(MemorySessionStore::default()),
+    );
+    *core.accounts.lock().await = Some(crate::session::AccountRegistry::empty());
+    let persisted = crate::session::current_session(&client, server.server().uri()).unwrap();
+    core.persist("a1", &store_id, &persisted, None)
+        .await
+        .unwrap();
+    *core.session.write().await = Some(Session {
+        account_id: "a1".to_owned(),
+        client: client.clone(),
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    (core, client, store)
+}
+
+async fn session_ids(client: &Client) -> Vec<String> {
+    client
+        .olm_machine_for_testing()
+        .await
+        .as_ref()
+        .unwrap()
+        .store()
+        .export_room_keys(|_| true)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|key| key.session_id)
+        .collect()
+}
+
+async fn import(core: &Core, export: &str, passphrase: &str) -> Result<(u64, u64), RpcError> {
+    let ImportRoomKeysOk { imported, total } = core.import_room_keys(export, passphrase).await?;
+    Ok((imported, total))
+}
+
+fn outbound_session(room: &RoomId) -> (OutboundGroupSession, Ed25519PublicKey) {
+    let keys = Account::new(user_id!("@sender:example.org")).identity_keys();
+    let outbound = OutboundGroupSession::new(
+        owned_device_id!("SENDER"),
+        Arc::new(keys),
+        room,
+        EncryptionSettings::default(),
+    )
+    .unwrap();
+    (outbound, keys.ed25519)
+}
+
+async fn exported(
+    (outbound, signing_key): &(OutboundGroupSession, Ed25519PublicKey),
+) -> ExportedRoomKey {
+    InboundGroupSession::new(
+        outbound.sender_key(),
+        *signing_key,
+        outbound.room_id(),
+        &outbound.session_key().await,
+        SenderData::unknown(),
+        None,
+        EventEncryptionAlgorithm::MegolmV1AesSha2,
+        None,
+        false,
+    )
+    .unwrap()
+    .export()
+    .await
+}
+
+#[tokio::test]
+async fn a_replaced_device_carries_its_room_keys_to_the_new_one() {
+    let server = MatrixMockServer::new().await;
+    let directory = tempfile::tempdir().unwrap();
+    let old_store = directory.path().join("old");
+    let old = server
+        .client_builder()
+        .on_builder(|builder| builder.sqlite_store(old_store.join("store"), None))
+        .build()
+        .await;
+    let outbound = outbound_session(room_id!("!carry:example.org"));
+    old.olm_machine_for_testing()
+        .await
+        .as_ref()
+        .unwrap()
+        .store()
+        .import_exported_room_keys(vec![exported(&outbound).await], |_, _| ())
+        .await
+        .unwrap();
+    old.pause().await.unwrap();
+    drop(old);
+    let new_store = format!("{}-new", directory.path().display());
+    let new = crate::session::mock_account_client(&server, &new_store).await;
+    let base = crate::session::base_client(&new_store).unwrap();
+    let imported = crate::store_disposal::carry_room_keys(old_store.to_str().unwrap(), &base)
+        .await
+        .unwrap();
+    assert_eq!(imported, 1);
+    assert_eq!(
+        session_ids(&new).await,
+        vec![outbound.0.session_id().to_owned()]
+    );
+}
+
+#[tokio::test]
+async fn history_keys_use_the_spec_wire_field() {
+    let session = outbound_session(room_id!("!history:example.org"));
+    let mut key = exported(&session).await;
+    key.shared_history = true;
+    let wire = serde_json::to_value(&key).unwrap();
+    assert_eq!(wire["shared_history"], true);
+    assert!(wire.get("m.shared_history").is_none());
+}
+
+async fn backup_metadata(
+    server: &MatrixMockServer,
+    key: &matrix_sdk_base::crypto::store::types::BackupDecryptionKey,
+    count: u64,
+) {
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path_regex(
+            r"^/_matrix/client/(r0|v3)/room_keys/version$",
+        ))
+        .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({
+            "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
+            "auth_data": { "public_key": key.megolm_v1_public_key().to_base64() },
+            "version": "1", "count": count, "etag": "1"
+        })))
+        .mount(server.server())
+        .await;
+}
+
+async fn unlock_backup(
+    client: &Client,
+    key: &matrix_sdk_base::crypto::store::types::BackupDecryptionKey,
+) {
+    let machine = client.olm_machine_for_testing().await;
+    let machine = machine.as_ref().unwrap();
+    let public = key.megolm_v1_public_key();
+    public.set_version("1".to_owned());
+    machine
+        .backup_machine()
+        .enable_backup_v1(public)
+        .await
+        .unwrap();
+    machine
+        .backup_machine()
+        .save_decryption_key(Some(key.clone()), Some("1".to_owned()))
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn a_paused_backup_is_resumed_only_once_the_user_agrees() {
+    use crate::key_backup::ReadableBackup;
+    use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+    let server = MatrixMockServer::new().await;
+    let (core, client, _store) = core_for(&server).await;
+    let key = BackupDecryptionKey::new();
+    backup_metadata(&server, &key, 1).await;
+    let save = async |key: BackupDecryptionKey| {
+        let machine = client.olm_machine_for_testing().await;
+        machine
+            .as_ref()
+            .unwrap()
+            .backup_machine()
+            .save_decryption_key(Some(key), Some("1".to_owned()))
+            .await
+            .unwrap();
+    };
+
+    save(BackupDecryptionKey::new()).await;
+    assert_eq!(
+        core.resume_readable_backup(&client, true).await.unwrap(),
+        ReadableBackup::None
+    );
+    assert!(!client.encryption().backups().are_enabled().await);
+
+    // The account turned key backup off, as another client does on request.
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path_regex(
+            "/account_data/m.key_backup$",
+        ))
+        .respond_with(
+            wiremock::ResponseTemplate::new(200).set_body_json(json!({ "enabled": false })),
+        )
+        .mount(server.server())
+        .await;
+    wiremock::Mock::given(wiremock::matchers::method("PUT"))
+        .and(wiremock::matchers::path_regex(
+            "/account_data/(m.key_backup|m.org.matrix.custom.backup_disabled)$",
+        ))
+        .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(2)
+        .mount(server.server())
+        .await;
+    let written = async || {
+        let requests = server.server().received_requests().await.unwrap();
+        requests
+            .into_iter()
+            .find(|request| {
+                request.method == wiremock::http::Method::PUT
+                    && request.url.path().ends_with("/account_data/m.key_backup")
+            })
+            .map(|request| request.body_json::<serde_json::Value>().unwrap())
+    };
+    save(key.clone()).await;
+
+    assert_eq!(
+        core.resume_readable_backup(&client, false).await.unwrap(),
+        ReadableBackup::Paused
+    );
+    assert!(!client.encryption().backups().are_enabled().await);
+    assert_eq!(
+        written().await,
+        None,
+        "nothing changes until the user agrees"
+    );
+
+    assert_eq!(
+        core.resume_readable_backup(&client, true).await.unwrap(),
+        ReadableBackup::Resumed
+    );
+    assert!(client.encryption().backups().are_enabled().await);
+    assert_eq!(written().await, Some(json!({ "enabled": true })));
+}
+
+#[tokio::test]
+async fn a_utd_report_says_whether_the_backup_holds_the_key() {
+    use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+    let server = MatrixMockServer::new().await;
+    let (_core, client, _store) = core_for(&server).await;
+    let room_id = room_id!("!utd:example.org");
+    server
+        .sync_room(&client, JoinedRoomBuilder::new(room_id))
+        .await;
+    let room = client.get_room(room_id).unwrap();
+    assert_eq!(
+        crate::utd::backup_lookup(&room, "missing").await,
+        "no_backup_key"
+    );
+
+    let key = BackupDecryptionKey::new();
+    backup_metadata(&server, &key, 1).await;
+    unlock_backup(&client, &key).await;
+    let session = outbound_session(room_id);
+    let export = exported(&session).await;
+    let inbound = InboundGroupSession::from_export(&export).unwrap();
+    let encrypted = key.megolm_v1_public_key().encrypt(inbound).await.unwrap();
+    let session_id = export.session_id.clone();
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(move |request: &wiremock::Request| {
+            request
+                .url
+                .path_segments()
+                .and_then(Iterator::last)
+                .and_then(|segment| {
+                    percent_encoding::percent_decode_str(segment)
+                        .decode_utf8()
+                        .ok()
+                })
+                .is_some_and(|segment| segment == session_id)
+        })
+        .respond_with(
+            wiremock::ResponseTemplate::new(200)
+                .set_body_json(serde_json::to_value(encrypted).unwrap()),
+        )
+        .mount(server.server())
+        .await;
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path_regex("/room_keys/keys/.+/.+$"))
+        .respond_with(
+            wiremock::ResponseTemplate::new(404)
+                .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "No room_keys found"})),
+        )
+        .mount(server.server())
+        .await;
+
+    assert_eq!(
+        crate::utd::backup_lookup(&room, "missing").await,
+        "not_in_backup"
+    );
+    assert_eq!(
+        crate::utd::backup_lookup(&room, &export.session_id).await,
+        "imported"
+    );
+    assert_eq!(session_ids(&client).await, vec![export.session_id]);
+}
+
+#[tokio::test]
+async fn cloud_restore_batches_keys_preserves_backup_notifications_and_can_repeat() {
+    use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+    let server = MatrixMockServer::new().await;
+    let (core, client, _store) = core_for(&server).await;
+    let base = core.base_client().await.unwrap();
+    let key = BackupDecryptionKey::new();
+    backup_metadata(&server, &key, 103).await;
+    unlock_backup(&client, &key).await;
+    let room = room_id!("!backup:example.org");
+    let mut sessions = serde_json::Map::new();
+    for _ in 0..102 {
+        let export = exported(&outbound_session(room)).await;
+        let inbound = InboundGroupSession::from_export(&export).unwrap();
+        let encrypted = key.megolm_v1_public_key().encrypt(inbound).await.unwrap();
+        sessions.insert(export.session_id, serde_json::to_value(encrypted).unwrap());
+    }
+    sessions.insert("unreadable".to_owned(), json!({}));
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path_regex(
+            r"^/_matrix/client/(r0|v3)/room_keys/keys$",
+        ))
+        .and(wiremock::matchers::query_param("version", "1"))
+        .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({
+            "rooms": { room: { "sessions": sessions } }
+        })))
+        .mount(server.server())
+        .await;
+    let updates = parking_lot::Mutex::new(Vec::new());
+    let result = core
+        .download_all_room_keys(&base, &client, |update| updates.lock().push(update))
+        .await
+        .unwrap();
+    assert_eq!(
+        (
+            result.total,
+            result.processed,
+            result.imported,
+            result.failed
+        ),
+        (103, 103, 102, 1)
+    );
+    assert!(updates.lock().iter().any(|update| update.processed == 100));
+    assert_eq!(session_ids(&client).await.len(), 102);
+    let status = core.backup_status(&base, &client).await.unwrap();
+    assert_eq!(
+        (status.local_keys, status.backed_up_keys, status.cloud_keys),
+        (102, 102, Some(103))
+    );
+    assert!(status.can_restore);
+    let download = core.download_key_backup("retry".to_owned()).await.unwrap();
+    assert_eq!(
+        (download.processed, download.imported, download.failed),
+        (103, 0, 1)
+    );
+    assert_eq!(
+        download.state,
+        crate::protocol::KeyBackupDownloadState::Complete
+    );
+}
+
+#[tokio::test]
+async fn switching_accounts_during_restore_keeps_keys_and_progress_with_the_owner() {
+    use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+    let server = MatrixMockServer::new().await;
+    let (core, client, _store) = core_for(&server).await;
+    let key = BackupDecryptionKey::new();
+    backup_metadata(&server, &key, 1).await;
+    unlock_backup(&client, &key).await;
+    let room = room_id!("!restore:example.org");
+    let exported = exported(&outbound_session(room)).await;
+    let encrypted = key
+        .megolm_v1_public_key()
+        .encrypt(InboundGroupSession::from_export(&exported).unwrap())
+        .await
+        .unwrap();
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path_regex(
+            "/_matrix/client/(r0|v3)/room_keys/keys$",
+        ))
+        .respond_with(
+            wiremock::ResponseTemplate::new(200)
+                .set_delay(Duration::from_millis(100))
+                .set_body_json(json!({
+                    "rooms": {room: {"sessions": {exported.session_id: encrypted}}}
+                })),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let restore_core = core.clone();
+    let restore = tokio::spawn(async move {
+        restore_core
+            .download_key_backup("old-account".to_owned())
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if server
+                .server()
+                .received_requests()
+                .await
+                .unwrap()
+                .iter()
+                .any(|request| request.url.path().ends_with("/room_keys/keys"))
+            {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let other_store = format!("{}-other", core.store_id);
+    let other = crate::session::mock_account_client(&server, &other_store).await;
+    let persisted = crate::session::current_session(&other, server.server().uri()).unwrap();
+    core.persist("other", &other_store, &persisted, None)
+        .await
+        .unwrap();
+    core.lifecycle.set_current(2);
+    *core.session.write().await = Some(Session {
+        account_id: "other".to_owned(),
+        homeserver: server.server().uri(),
+        oauth: false,
+        sync_service: Arc::new(SyncService::builder(other.clone()).build().await.unwrap()),
+        client: other.clone(),
+    });
+    let download = restore.await.unwrap().unwrap();
+    assert_eq!(download.account_id, "a1");
+    assert_eq!(
+        download.state,
+        crate::protocol::KeyBackupDownloadState::Complete
+    );
+    assert_eq!(session_ids(&client).await.len(), 1);
+    assert_eq!(session_ids(&other).await, Vec::<String>::new());
+    let status = core.key_backup_status().await.unwrap();
+    assert!(status.download.is_none());
+}
+
+#[tokio::test]
+async fn cloud_restore_rejects_a_locked_or_mismatched_backup_before_downloading() {
+    use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+    let server = MatrixMockServer::new().await;
+    let (core, client, _store) = core_for(&server).await;
+    let base = core.base_client().await.unwrap();
+    let server_key = BackupDecryptionKey::new();
+    backup_metadata(&server, &server_key, 5).await;
+    assert!(
+        !core
+            .backup_status(&base, &client)
+            .await
+            .unwrap()
+            .can_restore
+    );
+    core.download_all_room_keys(&base, &client, |_| {})
+        .await
+        .unwrap_err();
+    unlock_backup(&client, &BackupDecryptionKey::new()).await;
+    assert!(
+        !core
+            .backup_status(&base, &client)
+            .await
+            .unwrap()
+            .can_restore
+    );
+    core.download_all_room_keys(&base, &client, |_| {})
+        .await
+        .unwrap_err();
+    let _permit = core.key_backup_downloads.acquire().await.unwrap();
+    assert!(matches!(
+        core.download_key_backup("duplicate".to_owned()).await,
+        Err(RpcError {
+            code: RpcCode::Unavailable,
+            ..
+        })
+    ));
+    assert!(
+        !server
+            .server()
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .any(|request| request.url.path().ends_with("/room_keys/keys"))
+    );
+}
+
+#[tokio::test]
+async fn absent_cloud_backup_is_distinct_from_network_failure() {
+    let server = MatrixMockServer::new().await;
+    let (core, client, _store) = core_for(&server).await;
+    let base = core.base_client().await.unwrap();
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path_regex(
+            r"^/_matrix/client/(r0|v3)/room_keys/version$",
+        ))
+        .respond_with(
+            wiremock::ResponseTemplate::new(404)
+                .set_body_json(json!({ "errcode": "M_NOT_FOUND", "error": "No backup" })),
+        )
+        .mount(server.server())
+        .await;
+    let status = core.backup_status(&base, &client).await.unwrap();
+    assert_eq!(status.cloud_keys, None);
+    assert!(!status.can_restore);
+    server.server().reset().await;
+    wiremock::Mock::given(wiremock::matchers::method("GET"))
+        .and(wiremock::matchers::path_regex(
+            r"^/_matrix/client/(r0|v3)/room_keys/version$",
+        ))
+        .respond_with(
+            wiremock::ResponseTemplate::new(403)
+                .set_body_json(json!({ "errcode": "M_FORBIDDEN", "error": "Denied" })),
+        )
+        .mount(server.server())
+        .await;
+    core.backup_status(&base, &client).await.unwrap_err();
+}
+
+#[tokio::test]
+async fn an_export_imports_into_another_device() {
+    let server = MatrixMockServer::new().await;
+    let (source, source_client, _source_store) = core_for(&server).await;
+    let (target, target_client, _target_store) = core_for(&server).await;
+    let outbound = outbound_session(room_id!("!keys:example.org"));
+    source_client
+        .olm_machine_for_testing()
+        .await
+        .as_ref()
+        .unwrap()
+        .store()
+        .import_exported_room_keys(vec![exported(&outbound).await], |_, _| ())
+        .await
+        .unwrap();
+
+    let export = source
+        .export_room_keys("correct horse", None)
+        .await
+        .unwrap();
+
+    assert!(export.starts_with("-----BEGIN MEGOLM SESSION DATA-----"));
+    assert!(
+        export
+            .trim_end()
+            .ends_with("-----END MEGOLM SESSION DATA-----")
+    );
+    assert_eq!(
+        import(&target, &export, "correct horse").await.unwrap(),
+        (1, 1)
+    );
+    assert_eq!(session_ids(&target_client).await, [outbound.0.session_id()]);
+    assert_eq!(
+        import(&target, &export, "correct horse").await.unwrap(),
+        (0, 1)
+    );
+}
+
+#[tokio::test]
+async fn an_export_for_one_room_leaves_the_others_out() {
+    let server = MatrixMockServer::new().await;
+    let (source, source_client, _source_store) = core_for(&server).await;
+    let (target, _target_client, _target_store) = core_for(&server).await;
+    let kept = room_id!("!kept:example.org");
+    source_client
+        .olm_machine_for_testing()
+        .await
+        .as_ref()
+        .unwrap()
+        .store()
+        .import_exported_room_keys(vec![exported(&outbound_session(kept)).await], |_, _| ())
+        .await
+        .unwrap();
+
+    let other = source
+        .export_room_keys("correct horse", Some(room_id!("!other:example.org")))
+        .await
+        .unwrap();
+    let wanted = source
+        .export_room_keys("correct horse", Some(kept))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        import(&target, &other, "correct horse").await.unwrap(),
+        (0, 0)
+    );
+    assert_eq!(
+        import(&target, &wanted, "correct horse").await.unwrap(),
+        (1, 1)
+    );
+}
+
+#[tokio::test]
+async fn an_element_export_imports() {
+    let server = MatrixMockServer::new().await;
+    let (core, client, _store) = core_for(&server).await;
+
+    assert_eq!(
+        import(&core, ELEMENT_EXPORT, "element passphrase")
+            .await
+            .unwrap(),
+        (1, 1)
+    );
+    assert_eq!(session_ids(&client).await, [ELEMENT_SESSION]);
+}
+
+#[tokio::test]
+async fn a_wrong_passphrase_is_denied_and_a_damaged_file_is_invalid() {
+    let server = MatrixMockServer::new().await;
+    let (core, client, store) = core_for(&server).await;
+    let listing = || {
+        let mut names: Vec<_> = std::fs::read_dir(store.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        names.sort();
+        names
+    };
+    let before = listing();
+
+    assert!(matches!(
+        import(&core, ELEMENT_EXPORT, "wrong").await,
+        Err(RpcError {
+            code: RpcCode::Denied,
+            ..
+        })
+    ));
+    assert!(matches!(
+        import(&core, "not a key export", "element passphrase").await,
+        Err(RpcError {
+            code: RpcCode::InvalidKeyExport,
+            ..
+        })
+    ));
+    let damaged =
+        "-----BEGIN MEGOLM SESSION DATA-----\nnot*base64\n-----END MEGOLM SESSION DATA-----";
+    assert!(matches!(
+        import(&core, damaged, "element passphrase").await,
+        Err(RpcError {
+            code: RpcCode::InvalidKeyExport,
+            ..
+        })
+    ));
+    assert_eq!(session_ids(&client).await, Vec::<String>::new());
+    assert_eq!(listing(), before);
+}
+
+#[tokio::test]
+async fn an_import_redecrypts_what_the_timeline_already_shows() {
+    let server = MatrixMockServer::new().await;
+    let (core, client, _store) = core_for(&server).await;
+    let room_id = room_id!("!encrypted:example.org");
+    let outbound = outbound_session(room_id);
+    let key = exported(&outbound).await;
+    let content = outbound
+        .0
+        .encrypt(
+            "m.room.message",
+            &serde_json::from_value(json!({"msgtype": "m.text", "body": "from v1"})).unwrap(),
+        )
+        .await
+        .content;
+    let event = Raw::from_json_string(
+        json!({"type": "m.room.encrypted", "event_id": "$utd",
+                "sender": "@sender:example.org", "origin_server_ts": 1, "content": content})
+        .to_string(),
+    )
+    .unwrap();
+
+    server
+        .mock_room_state_encryption()
+        .encrypted()
+        .mount()
+        .await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(event),
+        )
+        .await;
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
+    let (items, mut stream) = timeline.subscribe().await;
+    assert!(items.iter().any(|item| is_utd(item)));
+
+    let export = encrypt_room_key_export(&[key], "v1", 1000).unwrap();
+    assert_eq!(import(&core, &export, "v1").await.unwrap(), (1, 1));
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !timeline
+            .items()
+            .await
+            .iter()
+            .any(|item| body(item) == Some("from v1"))
+        {
+            stream.next().await.expect("open timeline stream");
+        }
+    })
+    .await
+    .expect("the imported key redecrypts the event");
+}
+
+#[tokio::test]
+async fn resuming_redecrypts_a_key_another_client_stored() {
+    let server = MatrixMockServer::new().await;
+    let store = tempfile::tempdir().unwrap();
+    let client = server
+        .client_builder()
+        .on_builder(|builder| builder.sqlite_store(store.path(), None))
+        .build()
+        .await;
+    let push = server
+        .client_builder()
+        .on_builder(|builder| builder.sqlite_store(store.path(), None))
+        .build()
+        .await;
+    let (core, _events) = Core::new(
+        store.path().to_str().unwrap(),
+        Box::new(MemorySessionStore::default()),
+    );
+    *core.session.write().await = Some(Session {
+        account_id: "a1".to_owned(),
+        client: client.clone(),
+        sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    let room_id = room_id!("!resumed:example.org");
+    let outbound = outbound_session(room_id);
+    let key = exported(&outbound).await;
+    let content = outbound
+        .0
+        .encrypt(
+            "m.room.message",
+            &serde_json::from_value(json!({"msgtype": "m.text", "body": "while away"})).unwrap(),
+        )
+        .await
+        .content;
+    let event = Raw::from_json_string(
+        json!({"type": "m.room.encrypted", "event_id": "$away",
+                "sender": "@sender:example.org", "origin_server_ts": 1, "content": content})
+        .to_string(),
+    )
+    .unwrap();
+    server
+        .mock_room_state_encryption()
+        .encrypted()
+        .mount()
+        .await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(event),
+        )
+        .await;
+    let timeline = core
+        .live_timeline(&room_id.to_owned(), false)
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(timeline.items().await.iter().any(|item| is_utd(item)));
+
+    push.olm_machine_for_testing()
+        .await
+        .as_ref()
+        .unwrap()
+        .store()
+        .import_exported_room_keys(vec![key], |_, _| {})
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(timeline.items().await.iter().any(|item| is_utd(item)));
+
+    core.retry_cached_decryption().await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !timeline
+            .items()
+            .await
+            .iter()
+            .any(|item| body(item) == Some("while away"))
+        {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// On iOS a push that wrote to the crypto store makes the app rebuild its machine on resume.
+#[tokio::test]
+async fn a_key_received_after_the_machine_is_rebuilt_redecrypts() {
+    let server = MatrixMockServer::new().await;
+    let directory = tempfile::tempdir().unwrap();
+    let store_id = directory.path().join("a1").display().to_string();
+    let client = crate::session::mock_account_client(&server, &store_id).await;
+    let (core, _events) = Core::new(
+        directory.path().to_str().unwrap(),
+        Box::new(MemorySessionStore::default()),
+    );
+    *core.accounts.lock().await = Some(crate::session::AccountRegistry::empty());
+    let persisted = crate::session::current_session(&client, server.server().uri()).unwrap();
+    core.persist("a1", &store_id, &persisted, None)
+        .await
+        .unwrap();
+    *core.session.write().await = Some(Session {
+        account_id: "a1".to_owned(),
+        client: client.clone(),
+        sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    core.watch_devices(&client, 1);
+    core.watch_room_keys(&client);
+    let room_id = room_id!("!rebuilt:example.org");
+    let outbound = outbound_session(room_id);
+    let key = exported(&outbound).await;
+    let content = outbound
+        .0
+        .encrypt(
+            "m.room.message",
+            &serde_json::from_value(json!({"msgtype": "m.text", "body": "after a push"})).unwrap(),
+        )
+        .await
+        .content;
+    let event = Raw::from_json_string(
+        json!({"type": "m.room.encrypted", "event_id": "$rebuilt",
+                "sender": "@sender:example.org", "origin_server_ts": 1, "content": content})
+        .to_string(),
+    )
+    .unwrap();
+    server
+        .mock_room_state_encryption()
+        .encrypted()
+        .mount()
+        .await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(event),
+        )
+        .await;
+    let timeline = core
+        .live_timeline(&room_id.to_owned(), false)
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(timeline.items().await.iter().any(|item| is_utd(item)));
+
+    core.base_client()
+        .await
+        .unwrap()
+        .regenerate_olm(None)
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    client
+        .olm_machine_for_testing()
+        .await
+        .as_ref()
+        .unwrap()
+        .store()
+        .import_exported_room_keys(vec![key], |_, _| {})
+        .await
+        .unwrap();
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !timeline
+            .items()
+            .await
+            .iter()
+            .any(|item| body(item) == Some("after a push"))
+        {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the key the rebuilt machine received redecrypts the event");
+}
+
+fn is_utd(item: &TimelineItem) -> bool {
+    item.as_event()
+        .is_some_and(|event| event.content().is_unable_to_decrypt())
+}
+
+fn body(item: &TimelineItem) -> Option<&str> {
+    Some(item.as_event()?.content().as_message()?.body())
+}
