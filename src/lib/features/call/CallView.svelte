@@ -693,7 +693,8 @@
     display: flex;
     flex: 1;
     min-height: 0;
-    padding: var(--space-300);
+    padding: calc(var(--space-200) + var(--control-height-300) + var(--space-200)) var(--space-300)
+      var(--space-300);
   }
 
   .media.with-notice {
@@ -707,6 +708,10 @@
       var(--control-height-500) + var(--space-150) * 3 + var(--border-width) * 2 +
         var(--space-300) * 2 + var(--space-500)
     );
+  }
+
+  .resting .media:not(.with-notice) {
+    padding-block-start: var(--space-300);
   }
 
   .failed {
