@@ -1337,37 +1337,39 @@
       onExit={exitSelection}
     />
   {:else if revealed && unread.active && !unread.loading && (!unreadInView || unreadError !== null)}
-    <div class="unread-bar">
-      <Button
-        class="jump-to-unread"
-        variant="ghost"
-        loading={jumpingUnread}
-        disabled={markingRead}
-        aria-label={i18n.t('timeline.jumpToUnread')}
-        onclick={() => void jumpToUnread()}
-      >
-        <ArrowUpIcon />
-        <span
-          >{unreadCount > 0
-            ? i18n.t('timeline.unreadCount', { count: unreadCount })
-            : i18n.t('timeline.newMessagesUnknown')}</span
+    <div class="unread-float">
+      <div class="unread-bar">
+        <Button
+          class="jump-to-unread"
+          variant="ghost"
+          loading={jumpingUnread}
+          disabled={markingRead}
+          aria-label={i18n.t('timeline.jumpToUnread')}
+          onclick={() => void jumpToUnread()}
         >
-        <span class="unread-action">{i18n.t('timeline.jumpToUnread')}</span>
-      </Button>
-      {#if onMarkRead}
-        <Button variant="ghost" loading={markingRead} onclick={() => void markAllRead()}>
-          <span>{i18n.t('common.markAsRead')}</span>
-          <CheckIcon />
+          <ArrowUpIcon />
+          <span
+            >{unreadCount > 0
+              ? i18n.t('timeline.unreadCount', { count: unreadCount })
+              : i18n.t('timeline.newMessagesUnknown')}</span
+          >
+          <span class="unread-action">{i18n.t('timeline.jumpToUnread')}</span>
         </Button>
+        {#if onMarkRead}
+          <Button variant="ghost" loading={markingRead} onclick={() => void markAllRead()}>
+            <span>{i18n.t('common.markAsRead')}</span>
+            <CheckIcon />
+          </Button>
+        {/if}
+      </div>
+      {#if unreadError !== null}
+        <Alert variant="critical" role="alert"
+          >{i18n.t(
+            unreadError === 'jump' ? 'timeline.unreadJumpFailed' : 'timeline.markReadFailed'
+          )}</Alert
+        >
       {/if}
     </div>
-    {#if unreadError !== null}
-      <Alert variant="critical" role="alert"
-        >{i18n.t(
-          unreadError === 'jump' ? 'timeline.unreadJumpFailed' : 'timeline.markReadFailed'
-        )}</Alert
-      >
-    {/if}
   {/if}
 
   <div class="timeline-stage">
@@ -1735,6 +1737,13 @@
 
   .layout-bubble .item {
     padding-bottom: 0;
+  }
+
+  .unread-float {
+    inset-block-start: 0;
+    inset-inline: 0 var(--timeline-scrollbar-size);
+    position: absolute;
+    z-index: 2;
   }
 
   .unread-bar {
