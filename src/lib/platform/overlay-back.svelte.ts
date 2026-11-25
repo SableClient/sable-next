@@ -23,15 +23,21 @@ function popEntries(count: number): void {
     const total = queued;
     queued = 0;
     if (total === 0) return;
+    const target = pushed;
     popped = new Promise((resolve) => {
-      addEventListener(
-        'popstate',
-        () => {
-          resolve();
-        },
-        { once: true }
-      );
-      setTimeout(resolve, POP_FALLBACK_MS);
+      let stop: (() => void) | undefined;
+      const done = (): void => {
+        clearTimeout(timer);
+        stop?.();
+        stop = undefined;
+        resolve();
+      };
+      const timer = setTimeout(done, POP_FALLBACK_MS);
+      stop = $effect.root(() => {
+        $effect(() => {
+          if (overlayBackDepth(page.state) <= target) queueMicrotask(done);
+        });
+      });
     });
     history.go(-total);
   });

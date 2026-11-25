@@ -161,17 +161,44 @@ export function isRoomSwitch(href: string): boolean {
   );
 }
 
+function withoutThread(url: URL): string {
+  const clean = new URL(url.href);
+  clean.searchParams.delete('thread');
+  return `${clean.pathname}${clean.search}${clean.hash}`;
+}
+
+function revealMobileRoom(href: string, hasThread: boolean): void {
+  if (!hasThread) {
+    setMobileDrawerOpen(false);
+    return;
+  }
+  // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
+  void goto(href, {
+    replace: false,
+    reset: false,
+    state: { ...page.state, mobileDrawer: 'closed', mobileDrawerBack: true },
+    persistState: true,
+  });
+}
+
 export function goToPage(href: string): void {
   const url = new URL(href, page.url.href);
   const target = url.pathname;
   const mobile = !matchesAppLayout();
+  const hasThread = url.searchParams.has('thread');
   if (target === page.url.pathname && mobile) {
-    if (url.searchParams.get('thread') !== page.url.searchParams.get('thread')) {
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
-      void goto(href, { replace: true, state: { ...page.state }, persistState: true }).then(() => {
-        if (page.url.pathname === target) setMobileDrawerOpen(false);
+    if (page.url.searchParams.has('thread')) {
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- withoutThread() preserves the resolved route
+      void goto(withoutThread(url), {
+        replace: true,
+        state: { ...page.state },
+        persistState: true,
+      }).then(() => {
+        if (page.url.pathname === target) revealMobileRoom(href, hasThread);
       });
-    } else setMobileDrawerOpen(false);
+    } else {
+      revealMobileRoom(href, hasThread);
+    }
     return;
   }
   if (mobile) {
@@ -197,12 +224,12 @@ export function goToPage(href: string): void {
   if (roomSwitch || (mobile && ROOM_PATH.test(target) && fromList)) {
     // The list entry must hold the open room, or Back reloads the previous one under the drawer.
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- callers pass a resolved href
-    void goto(href, {
+    void goto(hasThread ? withoutThread(url) : href, {
       replace: roomSwitch,
       state: { mobileDrawer: 'open' },
       persistState: true,
     }).then(() => {
-      if (page.url.pathname === target) setMobileDrawerOpen(false);
+      if (page.url.pathname === target) revealMobileRoom(href, hasThread);
     });
     return;
   }

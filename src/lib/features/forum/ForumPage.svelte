@@ -94,8 +94,10 @@
     return null;
   });
   let linkedEventId = $derived(page.url.searchParams.get('event') ?? page.state.notified ?? null);
+  let drawerCovered = $derived(appLayout.drawerCovers(page.state));
   let linkedThreadId = $derived(page.url.searchParams.get('thread'));
   let openedLinkedThread: string | null = null;
+  let handledLinkedThread: string | null = null;
   let threadEventId = $state<string | null>(null);
   const sidePanels = new MediaQuery(BREAKPOINTS.sidePanels);
   let threadInPanel = $derived(sidePanels.current && preferences.threadPresentation === 'panel');
@@ -161,6 +163,8 @@
     untrack(() => conversation.followRoom());
     composing = false;
     query = '';
+    openedLinkedThread = null;
+    handledLinkedThread = null;
   });
 
   $effect(() => {
@@ -178,13 +182,15 @@
   $effect(() => {
     const root = linkedThreadId;
     if (root?.startsWith('$')) {
-      if (!appLayout.drawerCovers(page.state)) {
+      if (!drawerCovered && handledLinkedThread !== root) {
+        handledLinkedThread = root;
         openedLinkedThread = root;
         threadRootId = root;
         threadEventId = null;
       }
       return;
     }
+    handledLinkedThread = null;
     if (openedLinkedThread !== null) {
       if (untrack(() => threadRootId) === openedLinkedThread) {
         threadRootId = null;
@@ -345,7 +351,10 @@
     threadRootId = null;
     threadEventId = null;
     openedLinkedThread = null;
-    void afterOverlayPops().then(clearLinkedEvent);
+    const { href } = page.url;
+    void afterOverlayPops().then(() => {
+      if (href === page.url.href) void clearLinkedEvent();
+    });
   }
 
   function clearLinkedEvent(): Promise<void> | undefined {
@@ -353,8 +362,14 @@
     const url = new URL(page.url.href);
     url.searchParams.delete('event');
     url.searchParams.delete('thread');
+    const state = page.state.notified ? { ...page.state, notified: undefined } : page.state;
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current, already resolved URL
-    return goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
+    return goto(`${url.pathname}${url.search}`, {
+      replace: true,
+      reset: false,
+      state,
+      persistState: page.state.mobileDrawer !== undefined,
+    });
   }
 
   function loadMoreThreads(): void {

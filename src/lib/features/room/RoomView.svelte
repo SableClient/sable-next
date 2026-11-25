@@ -194,6 +194,7 @@
   const threads = new ThreadRoots(core, { lazyPreviews: true });
   let linkedThread = $derived(page.url.searchParams.get('thread'));
   let openedLinkedThread: string | null = null;
+  let handledLinkedThread: string | null = null;
   let roomJoined = $derived(resolvedRoom?.state === 'joined');
 
   $effect(() => {
@@ -247,6 +248,19 @@
 
   holdOverlayBack(() => panels.threadRootId !== null, closeThread);
 
+  $effect(() => {
+    void resolvedRoomId;
+    memberLoader.reset();
+    untrack(() => conversation.followRoom());
+    conversation.forgetRequestedDetails();
+    receiptsOpen = false;
+    panels.reset();
+    threadEventId = null;
+    openedLinkedThread = null;
+    handledLinkedThread = null;
+    closeProfile();
+  });
+
   function clearLinkedThread(): void {
     if (linkedThread === null) return;
     const { href } = page.url;
@@ -255,7 +269,12 @@
       const url = new URL(href);
       url.searchParams.delete('thread');
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- rewrites the query of the current URL
-      return goto(url, { replace: true, reset: false, state: page.state });
+      return goto(url, {
+        replace: true,
+        reset: false,
+        state: page.state,
+        persistState: page.state.mobileDrawer !== undefined,
+      });
     });
   }
 
@@ -268,11 +287,14 @@
 
   $effect(() => {
     const rootId = linkedThread;
-    const ready = !appLayout.drawerCovers(page.state);
-    if (ready && rootId?.startsWith('$')) {
+    if (!drawerCovered && rootId?.startsWith('$')) {
+      if (handledLinkedThread === rootId) return;
+      handledLinkedThread = rootId;
       openedLinkedThread = rootId;
       untrack(() => openThread(rootId));
-    } else if (rootId === null && openedLinkedThread !== null) {
+    } else if (rootId === null) {
+      handledLinkedThread = null;
+      if (openedLinkedThread === null) return;
       const previous = openedLinkedThread;
       openedLinkedThread = null;
       untrack(() => {
@@ -509,6 +531,7 @@
   );
   let pageTitle = $derived(mentionCount > 0 ? `(${mentionCount}) ${roomName}` : roomName);
   const appLayout = new AppLayout();
+  let drawerCovered = $derived(appLayout.drawerCovers(page.state));
   let phone = $derived(!appLayout.current);
   let mobileThreads = $derived(
     phone &&
@@ -527,16 +550,6 @@
       ? []
       : typingUserIds.map((userId) => ({ userId, name: memberName(memberLoader.members, userId) }))
   );
-
-  $effect(() => {
-    void resolvedRoomId;
-    memberLoader.reset();
-    untrack(() => conversation.followRoom());
-    conversation.forgetRequestedDetails();
-    receiptsOpen = false;
-    panels.reset();
-    closeProfile();
-  });
 
   $effect(() => {
     roomSession.sync(resolvedRoomId, isTombstoned, memberListChanges.version);
