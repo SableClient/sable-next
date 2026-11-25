@@ -277,6 +277,12 @@ Extract it into your web root to serve the app yourself; see
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+## Translations
+
+<a href="https://translate.ow-ops.eu/projects/sable-next/"><img alt="Translation status" src="https://translate.ow-ops.eu/widget/sable-next/svg-badge.svg"></a>
+
+Help translate Sable on [Weblate](https://translate.ow-ops.eu/projects/sable-next/). Translations sync back to this repository, so don't edit the locale files directly.
+
 ## License
 
 AGPL-3.0-or-later, with an additional permission for App Store executables under MPL 2.0 (See [`LICENSE`](LICENSE)). The Sable name and logo are covered by [`TRADEMARKS.md`](TRADEMARKS.md).
