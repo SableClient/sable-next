@@ -236,6 +236,7 @@ const REPORTED_FIELDS: &[&str] = &[
     "log_id",
     "source",
     "cause",
+    "reason",
     "age",
     "delay",
     "own_identity_trusted",
