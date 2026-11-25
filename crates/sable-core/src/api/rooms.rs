@@ -467,6 +467,39 @@ async fn canonical_parent(
     Some(InitialStateEvent::new(space_id.clone(), parent).to_raw_any())
 }
 
+fn configure_voice_room(
+    request: &mut create_room::v3::Request,
+    encrypted: bool,
+    core: &Core,
+) -> Result<(), RpcError> {
+    // The override is a shallow merge: naming `events` drops the
+    // server's default map, so it is re-stated.
+    request.power_level_content_override = Some(
+        Raw::new(&voice_power_level_override())
+            .or_failed(core, "create_room_call_power_levels")?
+            .cast_unchecked(),
+    );
+    request.initial_state.push(
+        Raw::new(&StateEventOut {
+            kind: view::CALL_TYPE,
+            state_key: "",
+            content: crate::room_settings::EmptyContent {},
+        })
+        .or_failed(core, "create_room_call_state")?
+        .cast_unchecked(),
+    );
+    request.initial_state.push(
+        Raw::new(&StateEventOut {
+            kind: view::RTC_SLOT_TYPE,
+            state_key: view::CALL_SLOT_ID,
+            content: crate::calls::OpenSlot::new(encrypted),
+        })
+        .or_failed(core, "create_room_call_slot")?
+        .cast_unchecked(),
+    );
+    Ok(())
+}
+
 impl Handler for CreateParams {
     type Ok = String;
 
@@ -540,37 +573,14 @@ impl Handler for CreateParams {
         }
         request.initial_state.extend(canonical_parent(&client, self.parent_space.as_ref()).await);
 
-        if matches!(self.kind, RoomKind::Voice) {
-            // The override is a shallow merge: naming `events` drops the
-            // server's default map, so it is re-stated.
-            request.power_level_content_override = Some(
-                Raw::new(&voice_power_level_override())
-                    .or_failed(core, "create_room_call_power_levels")?
-                    .cast_unchecked(),
-            );
-            request.initial_state.push(
-                Raw::new(&StateEventOut {
-                    kind: view::CALL_TYPE,
-                    state_key: "",
-                    content: crate::room_settings::EmptyContent {},
-                })
-                .or_failed(core, "create_room_call_state")?
-                .cast_unchecked(),
-            );
-            request.initial_state.push(
-                Raw::new(&StateEventOut {
-                    kind: view::RTC_SLOT_TYPE,
-                    state_key: view::CALL_SLOT_ID,
-                    content: crate::calls::OpenSlot::new(self.encrypted && !self.public),
-                })
-                .or_failed(core, "create_room_call_slot")?
-                .cast_unchecked(),
-            );
-        }
-
         // Anyone can join and read a public room, so encryption only
         // breaks previews.
-        if self.encrypted && !self.public {
+        let encrypted = self.encrypted && !self.public;
+        if matches!(self.kind, RoomKind::Voice) {
+            configure_voice_room(&mut request, encrypted, core)?;
+        }
+
+        if encrypted {
             request.initial_state.push(
                 InitialStateEvent::with_empty_state_key(
                     RoomEncryptionEventContent::with_recommended_defaults(),
