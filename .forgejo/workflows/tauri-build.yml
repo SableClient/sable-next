@@ -64,9 +64,14 @@ jobs:
       - name: Skip scheduled build without new commits
         id: gate
         if: ${{ github.event_name == 'schedule' }}
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
         run: |
           age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
-          if [ "$age" -gt 43200 ]; then echo 'skip=true' >> "$GITHUB_OUTPUT"; fi
+          if [ "$age" -gt 43200 ] || curl -fsS -o /dev/null \
+            "$FORGEJO_URL/api/v1/repos/$FORGEJO_REPOSITORY/releases/tags/$TAG"; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          fi
       - name: Wait for release to exist
         if: ${{ steps.meta.outputs.nightly != 'true' }}
         env:
