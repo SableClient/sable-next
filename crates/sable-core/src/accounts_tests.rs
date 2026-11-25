@@ -1448,36 +1448,18 @@ async fn tokens_sealed_with_another_key_ask_to_sign_in_again_once() {
 }
 
 #[tokio::test]
-async fn missing_login_tokens_preserve_the_registry_until_storage_recovers() {
-    use crate::session::AccountRegistry;
+async fn a_missing_login_token_file_asks_to_sign_in_again_on_the_same_device() {
     let (_server, _base, core, account, _events) = restorable_core().await;
-    let bytes = core.sessions.load().await.unwrap().unwrap();
-    let (mut registry, _) = AccountRegistry::from_bytes(&bytes, &core.store_id).unwrap();
-    assert_eq!(
-        registry.accounts[0]
-            .session
-            .credentials
-            .tokens()
-            .access_token,
-        ""
-    );
     let logins = crate::credentials::LoginTokens::new(std::path::Path::new(&core.store_id));
     core.accounts().await.unwrap();
     logins.forget(&account.account_id);
 
-    assert!(!core.load_login_tokens(&mut registry).await.unwrap());
-    core.restore().await.unwrap_err();
-    assert_eq!(core.list_accounts().await.unwrap().len(), 1);
-    assert_eq!(serde_json::to_vec(&registry).unwrap(), bytes);
-    assert_eq!(core.sessions.load().await.unwrap().unwrap(), bytes);
-
-    core.save_login_tokens(&account).await.unwrap();
-    core.load_login_tokens(&mut registry).await.unwrap();
-    assert_eq!(
-        registry.accounts[0].session.credentials.tokens(),
-        account.session.credentials.tokens()
-    );
-    assert_eq!(core.restore().await.unwrap().unwrap().account_id, "first");
+    assert!(core.restore().await.unwrap().is_none());
+    let accounts = core.accounts().await.unwrap();
+    assert!(!accounts.accounts[0].state.usable());
+    assert!(!accounts.accounts[0].state.device_gone());
+    assert!(std::path::Path::new(&account.store_id).exists());
+    assert!(core.restore().await.unwrap().is_none());
     core.shutdown().await;
 }
 

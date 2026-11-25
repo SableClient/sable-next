@@ -31,11 +31,6 @@ impl MissingTokens {
             Self::OtherKey => "sealed_with_another_key",
         }
     }
-
-    /// A file may come back once storage recovers; a lost key never does.
-    pub(crate) const fn is_lost(self) -> bool {
-        !matches!(self, Self::NoFile)
-    }
 }
 
 /// One file per login: whichever process refreshes a login rewrites only its file, under the

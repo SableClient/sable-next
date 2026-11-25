@@ -860,14 +860,11 @@ impl Core {
                 .or_failed(self, "restore_login_tokens")?
             {
                 Ok(tokens) => tokens,
-                Err(missing) if missing.is_lost() => {
+                // Token files are replaced atomically and the registry keeps no copy once one
+                // exists, so a missing file never comes back.
+                Err(missing) => {
                     self.sign_in_again(&account.account_id, missing).await?;
                     return Err(RpcCode::NotLoggedIn.into());
-                }
-                Err(_) => {
-                    return Err(
-                        self.failed("restore_login_tokens", "saved login tokens are missing")
-                    );
                 }
             };
             if tokens.access_token.is_empty() {
