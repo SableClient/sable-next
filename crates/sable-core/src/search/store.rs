@@ -114,12 +114,16 @@ fn text(row: &[Value], column: usize) -> Option<&str> {
 #[derive(Clone)]
 pub(crate) struct Store {
     exec: Arc<Exec>,
+    #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+    file: Option<Arc<(Location, Option<crate::secrets::Key>)>>,
 }
 
 impl Store {
     pub(super) fn from_exec(exec: Exec) -> Self {
         Self {
             exec: Arc::new(exec),
+            #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+            file: None,
         }
     }
 
@@ -133,7 +137,9 @@ impl Store {
     pub(super) fn memory() -> Self {
         let connection =
             open_connection(&Location::Memory, None).expect("an in-memory database opens");
-        Self::from_exec(Exec::Native(Arc::new(parking_lot::Mutex::new(connection))))
+        Self::from_exec(Exec::Native(Arc::new(parking_lot::Mutex::new(Some(
+            connection,
+        )))))
     }
 
     #[cfg(target_family = "wasm")]
@@ -151,19 +157,61 @@ impl Store {
             }
         };
         let directory = std::path::Path::new(store_id).join(DIRECTORY);
+        #[cfg(any(target_os = "ios", test))]
+        let file = Arc::new((Location::File(directory.join(DATABASE)), key.clone()));
         let opened = tokio::task::spawn_blocking(move || {
             std::fs::create_dir_all(&directory)?;
             open_or_start_over(&directory, key.as_ref()).map_err(std::io::Error::other)
         })
         .await;
         match opened {
-            Ok(Ok(connection)) => {
-                Self::from_exec(Exec::Native(Arc::new(parking_lot::Mutex::new(connection))))
-            }
+            Ok(Ok(connection)) => Self {
+                exec: Arc::new(Exec::Native(Arc::new(parking_lot::Mutex::new(Some(
+                    connection,
+                ))))),
+                #[cfg(any(target_os = "ios", test))]
+                file: Some(file),
+            },
             Ok(Err(error)) => {
                 tracing::warn!("the search index keeps to memory: {error}");
                 Self::memory()
             }
+            Err(error) => std::panic::resume_unwind(error.into_panic()),
+        }
+    }
+
+    /// iOS kills a suspended app that still holds a lock on a file in the App Group container.
+    #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+    pub(crate) async fn close(&self) {
+        let (Exec::Native(connection), Some(_)) = (&*self.exec, &self.file) else {
+            return;
+        };
+        let connection = connection.clone();
+        if let Err(error) =
+            tokio::task::spawn_blocking(move || drop(connection.lock().take())).await
+        {
+            std::panic::resume_unwind(error.into_panic());
+        }
+    }
+
+    #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+    pub(crate) async fn reopen(&self) {
+        let (Exec::Native(connection), Some(file)) = (&*self.exec, &self.file) else {
+            return;
+        };
+        let connection = connection.clone();
+        let file = file.clone();
+        let reopened = tokio::task::spawn_blocking(move || {
+            let mut connection = connection.lock();
+            if connection.is_none() {
+                *connection = Some(open_connection(&file.0, file.1.as_ref())?);
+            }
+            Ok::<_, sable_sql::OpenError>(())
+        })
+        .await;
+        match reopened {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => tracing::warn!("the search database did not reopen: {error}"),
             Err(error) => std::panic::resume_unwind(error.into_panic()),
         }
     }

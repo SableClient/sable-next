@@ -13,7 +13,7 @@ use crate::secrets::Key;
 fn file_store(location: &Location, key: Option<&Key>) -> Result<Store, sable_sql::OpenError> {
     let connection = open_connection(location, key)?;
     Ok(Store::from_exec(Exec::Native(Arc::new(
-        parking_lot::Mutex::new(connection),
+        parking_lot::Mutex::new(Some(connection)),
     ))))
 }
 

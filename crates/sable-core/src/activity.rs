@@ -369,6 +369,7 @@ impl Core {
         transition.set_stores_open(false);
         let clients = self.store_clients().await;
         let _closing = self.activity.stores.write().await;
+        self.search_store().await.close().await;
         for client in clients {
             if let Err(error) = client.pause().await {
                 tracing::warn!("closing the stores before suspension failed: {error}");
@@ -391,6 +392,7 @@ impl Core {
             }
         }
         self.activity.reopen_failures.store(0, Ordering::SeqCst);
+        self.search_store().await.reopen().await;
         transition.set_stores_open(true);
         true
     }

@@ -108,10 +108,16 @@ impl Core {
 
     /// Replaces the index with the account's own database, and forgets the rooms left since.
     pub(super) async fn open_search_index(&self, client: &matrix_sdk::Client, store_id: &str) {
-        let store = Store::open_account(store_id).await;
+        // Opened while the stores are open, so a suspension closes it with them.
+        let store = self
+            .with_open_stores(async || {
+                let store = Store::open_account(store_id).await;
+                self.search_index.lock().await.replace_store(store.clone());
+                store
+            })
+            .await;
         persist::purge_legacy(&store, client, store_id).await;
-        let mut index = self.search_index.lock().await;
-        index.replace_store(store);
+        let index = self.search_index.lock().await;
         for room_id in index.rooms().await {
             if client
                 .get_room(&room_id)
@@ -146,7 +152,7 @@ impl Core {
         }
     }
 
-    pub(super) async fn search_store(&self) -> Store {
+    pub(crate) async fn search_store(&self) -> Store {
         self.search_index.lock().await.store().clone()
     }
 

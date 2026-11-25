@@ -18,8 +18,9 @@ pub(super) struct SqlError(pub(super) String);
 pub(super) type Result<T> = std::result::Result<T, SqlError>;
 
 pub(super) enum Exec {
+    /// `None` while the app is suspended.
     #[cfg(not(target_family = "wasm"))]
-    Native(Arc<Mutex<Connection>>),
+    Native(Arc<Mutex<Option<Connection>>>),
     /// Like `Native`, but every batch crosses the wire format first, as it does to the worker.
     #[cfg(all(test, not(target_family = "wasm")))]
     Wire(Arc<Mutex<Connection>>),
@@ -61,18 +62,15 @@ impl Exec {
             #[cfg(all(not(target_family = "wasm"), not(test)))]
             Self::Native(connection) => {
                 let connection = connection.clone();
-                match tokio::task::spawn_blocking(move || {
-                    sable_sql::run_batch(&mut connection.lock(), &statements)
-                })
-                .await
+                match tokio::task::spawn_blocking(move || run_native(&connection, &statements))
+                    .await
                 {
-                    Ok(answers) => answers.map_err(|error| SqlError(error.to_string())),
+                    Ok(answers) => answers,
                     Err(error) => std::panic::resume_unwind(error.into_panic()),
                 }
             }
             #[cfg(all(not(target_family = "wasm"), test))]
-            Self::Native(connection) => sable_sql::run_batch(&mut connection.lock(), &statements)
-                .map_err(|error| SqlError(error.to_string())),
+            Self::Native(connection) => run_native(connection, &statements),
             #[cfg(all(test, not(target_family = "wasm")))]
             Self::Wire(connection) => {
                 let request = sable_sql::Request {
@@ -102,6 +100,18 @@ impl Exec {
             }
         }
     }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn run_native(
+    connection: &Mutex<Option<Connection>>,
+    statements: &[Statement],
+) -> Result<Vec<Rows>> {
+    let mut connection = connection.lock();
+    let connection = connection.as_mut().ok_or_else(|| {
+        SqlError("the search database is closed while the app is suspended".to_owned())
+    })?;
+    sable_sql::run_batch(connection, statements).map_err(|error| SqlError(error.to_string()))
 }
 
 /// Runs a future that never waits, which is every future of an inline executor.

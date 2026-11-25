@@ -296,3 +296,29 @@ async fn test_a_room_whose_latest_event_is_classified_needs_no_priming() {
     index.mark_classified(&room, event_id!("$latest"), 1);
     assert!(index.latest_indexed(&room, &latest).await);
 }
+
+#[async_test]
+async fn test_a_closed_database_keeps_its_rooms_after_reopening() {
+    let directory = tempfile::tempdir().unwrap();
+    let room = room_id!("!suspended:localhost").to_owned();
+    let index = MessageIndex::with_store(
+        crate::search::store::Store::open_account(&store_id(&directory)).await,
+    );
+    index.upsert(
+        &room,
+        document(
+            "one",
+            "kept across suspension",
+            "@kris:localhost",
+            1,
+            None,
+            Vec::new(),
+        ),
+    );
+
+    index.store().close().await;
+    index.store().rooms().await.unwrap_err();
+
+    index.store().reopen().await;
+    assert_eq!(index.store().rooms().await.unwrap(), vec![room]);
+}
