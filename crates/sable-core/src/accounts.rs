@@ -268,6 +268,8 @@ impl Core {
         self: &Arc<Self>,
         SwitchAccountParams { account_id }: SwitchAccountParams,
     ) -> Result<SessionInfo, RpcError> {
+        let _stalled = self.report_stalled_switch();
+        self.session_step("waiting for the restore lock");
         let _restoring = self.lifecycle.restoring().await;
         if let Some(session) = self.active_session_info()
             && session.account_id == account_id
@@ -283,7 +285,9 @@ impl Core {
         if !account.state.usable() {
             return Err(RpcCode::NotLoggedIn.into());
         }
+        self.session_step("waiting for the store lease");
         let lease = session::store_lease(&account.store_id).await;
+        self.session_step("opening the account");
         let client = self.saved_account_client(&account, &lease).await?;
         let persisted = account.session;
         let info = SessionInfo {
@@ -298,6 +302,7 @@ impl Core {
             needs_reauth: false,
         };
 
+        self.session_step("claiming the session");
         let generation = self.claim_session_generation().await;
         self.pending_registration.lock().await.take();
         self.pending_login.lock().await.take();
@@ -1193,15 +1198,20 @@ impl Core {
     }
 
     async fn detach_session(&self) -> Option<Session> {
+        self.session_step("ending calls");
         self.end_all_calls().await;
         let client = self.session.current(|session| session.client.clone());
         if let Some(client) = client {
+            self.session_step("saving the inbox");
             self.flush_inbox(&client).await;
         }
         // Lock order: room subscriptions, then the session. Opening a room reads the session under
         // the first.
+        self.session_step("locking room subscriptions");
         let mut room_subscriptions = self.room_subscriptions.lock().await;
+        self.session_step("locking the session");
         let mut session = self.session.write().await;
+        self.session_step("clearing the session state");
         self.session_handlers.lock().clear();
         self.session_tasks.lock().clear();
         self.to_device_inbox.lock().take();
@@ -1225,7 +1235,9 @@ impl Core {
             .send_replace(crate::nicknames::Nicknames::default());
         *self.probed_state() = crate::probed_state::ProbedState::default();
         *self.recent_state.lock() = crate::probed_state::RecentState::default();
+        self.session_step("closing the search index");
         *self.search_index.lock().await = search::MessageIndex::new();
+        self.session_step("clearing the session state");
         self.search_crawl.lock().await.reset();
         self.server_search.lock().await.reset();
         session.take()
@@ -1350,6 +1362,7 @@ impl Core {
     ) -> Result<(), RpcError> {
         let generation = claimed.value();
         let oauth = client.oauth().full_session().is_some();
+        self.session_step("preparing sync");
         if let Err(error) = session::repair_room_key_sharing(&client).await {
             tracing::warn!(%error, "repairing room key sharing failed");
         }
@@ -1359,20 +1372,24 @@ impl Core {
             .await
             .or_failed(self, "start_sync")?;
 
+        self.session_step("swapping the session");
         let Some(swap) = claimed.swap().await else {
             sync_service.stop().await;
             return Err(RpcCode::Unavailable.into());
         };
 
+        self.session_step("preparing the account client");
         self.prepare_account_client(&client, &homeserver, &account_id)
             .await?;
 
         // Do not disrupt the active session unless its replacement started
         // successfully. `take_session` also aborts its owned watcher tasks.
         if let Some(previous) = self.take_session().await {
+            self.session_step("stopping the previous sync");
             previous.sync_service.stop().await;
         }
 
+        self.session_step("starting the session");
         self.watch_ephemeral(&client, generation);
         self.watch_account_data(&client, generation);
         self.watch_incoming_calls(&client, generation);
@@ -1445,9 +1462,20 @@ impl Core {
         self.watch_backup_preference(&client);
         // Before the start: the subscriber yields only changes, so it would miss the first `Running`.
         self.watch_sync_state(&client, &sync_service, generation);
-        sync_service.start().await;
+        self.run_started_session(&client, &sync_service).await;
+        Ok(())
+    }
+
+    async fn run_started_session(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        sync: &matrix_sdk_ui::sync_service::SyncService,
+    ) {
+        self.session_step("starting sync");
+        sync.start().await;
 
         client.send_queue().enable_upload_progress(true);
+        self.session_step("resending queued messages");
         client
             .send_queue()
             .respawn_tasks_for_rooms_with_unsent_requests()
@@ -1455,10 +1483,28 @@ impl Core {
 
         self.watch_activity_health();
 
-        self.refresh_own_identity(&client);
+        self.refresh_own_identity(client);
 
+        self.session_step("applying the app activity");
         self.apply_activity_after_session_start().await;
-        Ok(())
+        self.session_step("idle");
+    }
+
+    pub(crate) fn session_step(&self, step: &'static str) {
+        *self.session_step.lock() = step;
+    }
+
+    /// A switch that never ends shows only a spinner, so it reports the step it is stuck on.
+    fn report_stalled_switch(self: &Arc<Self>) -> impl Drop {
+        let core = Arc::downgrade(self);
+        spawn(async move {
+            matrix_sdk::sleep::sleep(STALLED_SWITCH).await;
+            if let Some(core) = core.upgrade() {
+                let step = *core.session_step.lock();
+                tracing::warn!(reported = true, step, "an account switch has not finished");
+            }
+        })
+        .abort_on_drop()
     }
 
     /// The SDK rotates the OAuth refresh token when it refreshes. Without
@@ -1679,6 +1725,7 @@ fn oauth_account_deactivate_url(
 }
 
 const LOG_OUT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+const STALLED_SWITCH: std::time::Duration = std::time::Duration::from_secs(20);
 
 #[cfg(not(target_family = "wasm"))]
 const CACHE_DATABASES: [&str; 3] = [

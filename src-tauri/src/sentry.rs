@@ -237,6 +237,7 @@ const REPORTED_FIELDS: &[&str] = &[
     "source",
     "cause",
     "reason",
+    "step",
     "age",
     "delay",
     "own_identity_trusted",
