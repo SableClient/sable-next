@@ -178,7 +178,9 @@ function withDefaultAt(homeservers: HomeserversConfig, index: unknown): Homeserv
 
 export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   const result = v.safeParse(RuntimeSchema, raw);
-  return result.success ? result.output : EMPTY_RUNTIME_CONFIG;
+  if (result.success) return result.output;
+  if (raw !== null) console.warn('[sable config] invalid config.json', v.flatten(result.issues));
+  return EMPTY_RUNTIME_CONFIG;
 }
 
 let loading: Promise<RuntimeConfig> | null = null;

@@ -1,5 +1,4 @@
-import { embedServiceUrl } from '#lib/config/embed-service.js';
-import { runtimeConfig } from '#lib/config/runtime-config.js';
+import { embedService, embedServiceUrl } from '#lib/config/embed-service.js';
 import type {
   DearrowThumbnailFallback,
   YoutubeThumbnailPosition,
@@ -95,9 +94,7 @@ export function parseYoutubeLink(href: string): YoutubeVideo | null {
 }
 
 export async function youtubePlayerUrl(video: YoutubeVideo): Promise<string> {
-  const service = ['http:', 'https:'].includes(location.protocol)
-    ? null
-    : (await runtimeConfig()).embeds.serviceUrl;
+  const service = ['http:', 'https:'].includes(location.protocol) ? null : await embedService();
   let url: URL;
   if (service !== null) {
     url = new URL(`${service}/_soliditas/embed/youtube`);
@@ -202,7 +199,7 @@ export async function loadDetails(
   fallbackType: DearrowThumbnailFallback,
   youtubePosition: YoutubeThumbnailPosition
 ): Promise<YoutubeEmbed | null> {
-  const service = (await runtimeConfig()).embeds.serviceUrl;
+  const service = await embedService();
   if (service === null) return null;
   const [youtube, dearrow] = await Promise.all([
     loadYoutubeDetails(service, id),

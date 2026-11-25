@@ -3,7 +3,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { isCoreError } from '#src/transport';
 
-import { runtimeConfig } from '#lib/config/runtime-config.js';
+import { embedService } from '#lib/config/embed-service.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { UrlPreviewView, Rpc } from '#src/generated/protocol';
 
@@ -91,10 +91,8 @@ export async function resolveUrlPreview(
   sources: PreviewSources,
   tunnel = false
 ): Promise<UrlPreviewView | null> {
-  const config = sources.client ? await runtimeConfig() : null;
-  const fromClient = config
-    ? await loadUrlPreview(messages, url, true, config.embeds.serviceUrl, tunnel)
-    : null;
+  const service = sources.client ? await embedService() : null;
+  const fromClient = service ? await loadUrlPreview(messages, url, true, service, tunnel) : null;
   if (fromClient !== null || !sources.server || !homeserverCanPreview(url)) return fromClient;
   return loadUrlPreview(messages, url, false);
 }
@@ -106,8 +104,7 @@ export async function scrapedPostVideo(
   index: number,
   tunnel: boolean
 ): Promise<string | null> {
-  const config = await runtimeConfig();
-  const preview = await loadUrlPreview(messages, url, true, config.embeds.serviceUrl, tunnel);
+  const preview = await loadUrlPreview(messages, url, true, await embedService(), tunnel);
   const post = quote ? preview?.post?.quote : preview?.post;
   const videos = post?.media.filter((media) => media.kind !== 'image') ?? [];
   return videos[index]?.source ?? null;

@@ -1,5 +1,4 @@
-import { embedServiceUrl } from '#lib/config/embed-service.js';
-import { runtimeConfig } from '#lib/config/runtime-config.js';
+import { embedService, embedServiceUrl } from '#lib/config/embed-service.js';
 
 const HOSTS = new Set(['tiktok.com', 'www.tiktok.com', 'm.tiktok.com']);
 const SHORT_HOSTS = new Set(['vm.tiktok.com', 'vt.tiktok.com']);
@@ -58,7 +57,7 @@ export function isTiktokShortLink(href: string): boolean {
 const resolved = new Map<string, Promise<TiktokPost | null>>();
 
 async function fetchShortLink(href: string): Promise<TiktokPost | null> {
-  const service = (await runtimeConfig()).embeds.serviceUrl;
+  const service = await embedService();
   if (service === null) return null;
   const response = await fetch(embedServiceUrl(service, 'embed/tiktok', { url: href }));
   if (!response.ok) return null;
