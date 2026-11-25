@@ -443,6 +443,69 @@ async fn a_room_receipt_reads_thread_replies_in_a_room_without_notifications() {
     assert_eq!(read, [("$new", false), ("$seen", true)]);
 }
 
+#[tokio::test]
+async fn a_mention_after_the_receipt_stays_unread_when_the_server_clears_its_counts() {
+    let server = MatrixMockServer::new().await;
+    let (core, client, room) = setup(&server, 0).await;
+    let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room.room_id()).add_receipt(
+                factory
+                    .read_receipts()
+                    .add(
+                        event_id!("$read"),
+                        client.user_id().unwrap(),
+                        ReceiptType::Read,
+                        ReceiptThread::Unthreaded,
+                    )
+                    .into_event(),
+            ),
+        )
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex("/event/.*read$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(message("$read", 150, None)))
+        .mount(server.server())
+        .await;
+    let mention = |event: &str, ts| Entry {
+        highlight: true,
+        ..entry(event, ts)
+    };
+    core.record_inbox(
+        &client,
+        vec![
+            mention("seen", 100),
+            mention("ping", 200),
+            entry("after", 300),
+        ],
+        BTreeMap::new(),
+        BTreeMap::new(),
+    )
+    .await
+    .unwrap();
+
+    let (items, _) = core
+        .inbox_notifications(
+            InboxFilter::Mentions,
+            false,
+            30,
+            None,
+            InboxScope::default(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        items
+            .iter()
+            .map(|item| item.event_id.as_str())
+            .collect::<Vec<_>>(),
+        ["$ping"]
+    );
+}
+
 #[test]
 fn an_entry_stored_before_threads_were_recorded_is_not_in_a_thread() {
     let stored = json!({"room_id": "!room:example.org", "event_id": "$old", "ts": 1,

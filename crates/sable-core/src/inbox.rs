@@ -324,14 +324,40 @@ async fn thread_read_ts(
     let thread = core
         .with_open_stores(async || thread_receipt_ts(room, thread_root).await)
         .await;
-    let room_ts = if let Some(ts) = room_receipts.get(room.room_id()) {
-        *ts
-    } else {
-        let ts = room_receipt_ts(core, room).await?;
-        room_receipts.insert(room.room_id().to_owned(), ts);
-        ts
+    Ok(thread.max(cached_room_receipt_ts(core, room, room_receipts).await?))
+}
+
+/// Continuwuity zeroes the counts on any receipt, so a mention after the receipt stays unread.
+async fn main_unread(
+    core: &Core,
+    client: &matrix_sdk::Client,
+    entry: &Entry,
+    read: &mut RoomReadState,
+    room_receipts: &mut HashMap<OwnedRoomId, u64>,
+) -> Result<bool, RpcError> {
+    let counted = is_unread(entry, read);
+    let Some(room) = client.get_room(&entry.room_id).filter(|_| entry.highlight) else {
+        return Ok(counted);
     };
-    Ok(thread.max(room_ts))
+    let receipt_ts = cached_room_receipt_ts(core, &room, room_receipts).await?;
+    Ok(if receipt_ts == 0 {
+        counted
+    } else {
+        entry.ts > receipt_ts
+    })
+}
+
+async fn cached_room_receipt_ts(
+    core: &Core,
+    room: &Room,
+    room_receipts: &mut HashMap<OwnedRoomId, u64>,
+) -> Result<u64, RpcError> {
+    if let Some(ts) = room_receipts.get(room.room_id()) {
+        return Ok(*ts);
+    }
+    let ts = room_receipt_ts(core, room).await?;
+    room_receipts.insert(room.room_id().to_owned(), ts);
+    Ok(ts)
 }
 
 async fn resolve_receipt_ts(room: &Room, stored: StoredReceipts) -> matrix_sdk::Result<u64> {
@@ -782,7 +808,7 @@ impl Core {
                     };
                     entry.ts > thread_read_ts
                 }
-                None => is_unread(&entry, read),
+                None => main_unread(self, &client, &entry, read, &mut room_receipts).await?,
             };
             if !matches(&entry, filter)
                 || (!unread && !include_read)
