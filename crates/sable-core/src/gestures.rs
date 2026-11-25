@@ -1,8 +1,9 @@
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId};
 use serde::Serialize;
 
+use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{GestureView, RpcError};
-use crate::{Core, ResultExt};
 
 #[derive(Serialize)]
 pub(crate) struct MentionsOut {
@@ -66,7 +67,7 @@ pub(crate) fn gesture_content(gesture: GestureView, target: Option<&OwnedUserId>
     }
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn send_gesture(
         &self,
         room_id: &OwnedRoomId,
@@ -75,18 +76,17 @@ impl Core {
         persona: Option<&crate::protocol::PerMessageProfileView>,
     ) -> Result<(), RpcError> {
         let mut content = serde_json::to_value(gesture_content(gesture, target))
-            .or_failed(self, "send_gesture")?;
+            .or_failed(self.core(), "send_gesture")?;
         if let Some(profile) = persona {
             crate::personas::stamp_profile(
                 &mut content,
                 &crate::personas::without_fallback(profile),
             );
         }
-        self.room(room_id)
-            .await?
+        self.room(room_id)?
             .send_raw("m.room.message", content)
             .await
-            .or_failed(self, "send_gesture")?;
+            .or_failed(self.core(), "send_gesture")?;
         Ok(())
     }
 }

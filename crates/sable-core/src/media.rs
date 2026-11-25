@@ -1,6 +1,7 @@
 use crate::now_ms;
 use backon::Retryable;
 use std::io::Read;
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -21,6 +22,7 @@ use matrix_sdk_base::media::store::IgnoreMediaRetentionPolicy;
 use mime::Mime;
 
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::media_health::Admission;
 use crate::messages::outgoing_mentions;
 use crate::outgoing::thread_reply;
@@ -90,31 +92,99 @@ fn attachment_data(bytes: &mut &[u8]) -> Result<(Vec<u8>, Option<Thumbnail>), Rp
 }
 
 impl Core {
-    pub(crate) async fn max_upload_size(&self) -> Result<u64, RpcError> {
-        self.client()
-            .await?
-            .load_or_fetch_max_upload_size()
-            .await
-            .map(u64::from)
-            .or_failed(self, "media_config")
-    }
-
     /// Downloads a persona avatar over native HTTP and uploads it to Matrix.
     ///
     /// # Errors
     ///
     /// Returns an error if the download or Matrix upload fails.
     #[cfg(not(target_family = "wasm"))]
-    pub async fn import_persona_avatar(&self, url: String) -> Result<String, RpcError> {
-        self.client().await?;
-        let (mime, bytes) = download_persona_avatar(&url).await?;
-        self.upload_media(mime, bytes).await
+    pub async fn import_persona_avatar(self: &Arc<Self>, url: String) -> Result<String, RpcError> {
+        self.signed_in()?.import_persona_avatar(url).await
     }
 
     /// # Errors
     ///
     /// Returns an error for invalid media, missing sessions, or failed downloads.
     pub async fn fetch_media(
+        self: &Arc<Self>,
+        source: String,
+        width: u32,
+        height: u32,
+        background: bool,
+    ) -> Result<Vec<u8>, RpcError> {
+        self.signed_in()?
+            .fetch_media(source, width, height, background)
+            .await
+    }
+
+    /// Drops every stored copy of a source, so the next fetch asks the homeserver.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the media URI is invalid, the user is logged out,
+    /// or the media store cannot be written.
+    pub async fn forget_media(self: &Arc<Self>, source: String) -> Result<(), RpcError> {
+        self.signed_in()?.forget_media(source).await
+    }
+
+    /// For avatar commands; `send_attachment` keeps its upload in the event's queue entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the MIME type is invalid, the user is logged out,
+    /// or the upload fails.
+    pub async fn upload_media(
+        self: &Arc<Self>,
+        mime: String,
+        bytes: Vec<u8>,
+    ) -> Result<String, RpcError> {
+        self.signed_in()?.upload_media(mime, bytes).await
+    }
+
+    /// Returns once queued. Progress and failure arrive as
+    /// `send_state` on the local echo.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an attachment field is invalid, the room is
+    /// unavailable, or queuing the upload fails.
+    pub async fn send_attachment(
+        self: &Arc<Self>,
+        request: SendAttachmentRequest,
+        payload: Vec<u8>,
+    ) -> Result<(), RpcError> {
+        self.signed_in()?.send_attachment(request, payload).await
+    }
+
+    /// # Errors
+    ///
+    /// Returns an error when an attachment is invalid, the room is unavailable,
+    /// or queuing the gallery fails.
+    pub async fn send_gallery(
+        self: &Arc<Self>,
+        request: SendGalleryRequest,
+        bytes: Vec<u8>,
+    ) -> Result<(), RpcError> {
+        self.signed_in()?.send_gallery(request, bytes).await
+    }
+}
+
+impl SignedIn {
+    pub(crate) async fn max_upload_size(&self) -> Result<u64, RpcError> {
+        self.client()
+            .load_or_fetch_max_upload_size()
+            .await
+            .map(u64::from)
+            .or_failed(self.core(), "media_config")
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) async fn import_persona_avatar(&self, url: String) -> Result<String, RpcError> {
+        let (mime, bytes) = download_persona_avatar(&url).await?;
+        self.upload_media(mime, bytes).await
+    }
+
+    pub(crate) async fn fetch_media(
         &self,
         source: String,
         width: u32,
@@ -144,22 +214,23 @@ impl Core {
             return Err(RpcCode::InvalidMedia.into());
         }
 
-        let client = self.client().await?;
-        if let Some(bytes) = cached_media(&client, &source, width, height).await {
+        let client = self.client();
+        if let Some(bytes) = cached_media(client, &source, width, height).await {
             return Ok(bytes);
         }
         let _download = if background {
             None
         } else {
-            let permit = match self.media_downloads.try_acquire() {
+            let permit = match self.core().media_downloads.try_acquire() {
                 Ok(permit) => permit,
                 Err(tokio::sync::TryAcquireError::NoPermits) => {
                     let permit = self
+                        .core()
                         .media_downloads
                         .acquire()
                         .await
                         .map_err(|_| RpcCode::Unavailable)?;
-                    if let Some(bytes) = cached_media(&client, &source, width, height).await {
+                    if let Some(bytes) = cached_media(client, &source, width, height).await {
                         return Ok(bytes);
                     }
                     permit
@@ -179,7 +250,7 @@ impl Core {
         let mut probe = None;
         if let Some((server, media_id)) = &origin {
             let now = now_ms();
-            let admission = self.media_health.lock().admit(server, media_id, now);
+            let admission = self.core().media_health.lock().admit(server, media_id, now);
             match admission {
                 Admission::Refused { retry_after_ms } => {
                     tracing::warn!(
@@ -191,7 +262,7 @@ impl Core {
                 }
                 Admission::Probe => {
                     probe = Some(ProbeGuard {
-                        core: self,
+                        core: self.core(),
                         server,
                         armed: true,
                     });
@@ -201,7 +272,8 @@ impl Core {
         }
 
         let result = self
-            .media_bytes(&client, &key, source, width, height, &media)
+            .core()
+            .media_bytes(client, &key, source, width, height, &media)
             .await;
         if let Err(error) = &result {
             tracing::warn!(
@@ -214,7 +286,7 @@ impl Core {
             );
         }
         if let Some((server, media_id)) = &origin {
-            let mut health = self.media_health.lock();
+            let mut health = self.core().media_health.lock();
             match &result {
                 Ok(_) => health.succeeded(server, media_id),
                 Err(error) if is_not_found(error) => {
@@ -232,60 +304,7 @@ impl Core {
         result.map_err(|error| media_code(&error).into())
     }
 
-    async fn media_bytes(
-        &self,
-        client: &MatrixClient,
-        key: &str,
-        source: MediaSource,
-        width: u32,
-        height: u32,
-        media: &str,
-    ) -> matrix_sdk::Result<Vec<u8>> {
-        if width == 0 || height == 0 || matches!(source, MediaSource::Encrypted(_)) {
-            return self
-                .original_media(client, key, source, false)
-                .await
-                .inspect_err(|error| tracing::warn!(%media, "media unavailable: {error}"));
-        }
-
-        let request = MediaRequestParameters {
-            source: source.clone(),
-            format: MediaFormat::Thumbnail(MediaThumbnailSettings::new(
-                width.into(),
-                height.into(),
-            )),
-        };
-
-        let thumbnail = with_retries(|| async {
-            media_timeout(MEDIA_THUMBNAIL_TIMEOUT, fetch_sdk_media(client, &request))
-                .await
-                .and_then(|result| result)
-        })
-        .await;
-        match thumbnail {
-            Ok(bytes) => Ok(bytes),
-            Err(error) if answered_by_server(&error) || maybe_hidden_by_browser(&error) => {
-                tracing::warn!(%media, "thumbnail refused, falling back to the original: {error}");
-                self.original_media(client, key, source, true)
-                    .await
-                    .inspect_err(|error| {
-                        tracing::warn!(%media, "the original is unavailable too: {error}");
-                    })
-            }
-            Err(error) => {
-                tracing::warn!(%media, width, height, "media unavailable: {error}");
-                Err(error)
-            }
-        }
-    }
-
-    /// Drops every stored copy of a source, so the next fetch asks the homeserver.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the media URI is invalid, the user is logged out,
-    /// or the media store cannot be written.
-    pub async fn forget_media(&self, source: String) -> Result<(), RpcError> {
+    pub(crate) async fn forget_media(&self, source: String) -> Result<(), RpcError> {
         let source: MediaSource = serde_json::from_str(&source)
             .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(source)));
         let uri = match source {
@@ -295,165 +314,32 @@ impl Core {
         if uri.parts().is_err() {
             return Err(RpcCode::InvalidMedia.into());
         }
-        let client = self.client().await?;
+        let client = self.client();
         client
             .media()
             .remove_media_content_for_uri(&uri)
             .await
-            .or_failed(self, "forget_media")
+            .or_failed(self.core(), "forget_media")
     }
 
-    async fn original_media(
+    pub(crate) async fn upload_media(
         &self,
-        client: &MatrixClient,
-        key: &str,
-        source: MediaSource,
-        read_cache: bool,
-    ) -> matrix_sdk::Result<Vec<u8>> {
-        let request = MediaRequestParameters {
-            source,
-            format: MediaFormat::File,
-        };
-        if read_cache
-            && let Some(content) = client
-                .media_store()
-                .lock()
-                .await?
-                .get_media_content(&request)
-                .await?
-            && !content.is_empty()
-        {
-            return Ok(content);
-        }
-
-        let uri = match &request.source {
-            MediaSource::Plain(uri) => uri,
-            MediaSource::Encrypted(file) => &file.url,
-        };
-        let authenticated = authenticated_media::get_content::v1::Request::PATH_BUILDER
-            .is_supported(&client.supported_versions().await?);
-        let (Some(token), Ok((server, media_id)), true) =
-            (client.access_token(), uri.parts(), authenticated)
-        else {
-            return fetch_sdk_media(client, &request).await;
-        };
-        let Some(url) = download_url(client, &AUTHENTICATED_DOWNLOAD, server, media_id) else {
-            return fetch_sdk_media(client, &request).await;
-        };
-
-        let downloaded = with_retries(|| self.download(client, key, &url, Some(&token))).await;
-        let content = match downloaded {
-            Ok(content) => content,
-            Err(error) if status_of(&error) == Some(reqwest::StatusCode::UNAUTHORIZED) => {
-                return fetch_sdk_media(client, &request).await;
-            }
-            Err(error)
-                if status_of(&error)
-                    .is_some_and(|status| status != reqwest::StatusCode::TOO_MANY_REQUESTS) =>
-            {
-                tracing::warn!(
-                    media = %media_label(&request.source),
-                    "authenticated download refused, trying the legacy endpoint: {error}"
-                );
-                let Some(url) = download_url(client, &LEGACY_DOWNLOAD, server, media_id) else {
-                    return Err(error);
-                };
-                self.download(client, key, &url, None)
-                    .await
-                    .map_err(|_| error)?
-            }
-            Err(error) => return Err(error),
-        };
-
-        let content = match &request.source {
-            MediaSource::Encrypted(file) => {
-                let mut decrypted = Vec::with_capacity(content.len());
-                let mut cursor = std::io::Cursor::new(content);
-                let mut reader = matrix_sdk_base::crypto::AttachmentDecryptor::new(
-                    &mut cursor,
-                    file.as_ref().clone().into(),
-                )?;
-                reader.read_to_end(&mut decrypted)?;
-                decrypted
-            }
-            MediaSource::Plain(_) => content,
-        };
-        store_media(client, &request, &content).await?;
-        Ok(content)
-    }
-
-    async fn download(
-        &self,
-        client: &MatrixClient,
-        key: &str,
-        url: &url::Url,
-        token: Option<&str>,
-    ) -> matrix_sdk::Result<Vec<u8>> {
-        let mut request = client
-            .http_client()
-            .get(url.clone())
-            .timeout(MEDIA_DOWNLOAD_TIMEOUT);
-        if let Some(token) = token {
-            request = request.bearer_auth(token);
-        }
-        let response = media_timeout(MEDIA_FIRST_BYTE_TIMEOUT, request.send())
-            .await??
-            .error_for_status()?;
-        let total = response.content_length().unwrap_or(0);
-        let mut content = Vec::with_capacity(
-            usize::try_from(total)
-                .unwrap_or(0)
-                .min(MAX_INITIAL_DOWNLOAD_CAPACITY),
-        );
-        let mut chunks = response.bytes_stream();
-        let mut reported = 0;
-        while let Some(chunk) = media_timeout(MEDIA_STALL_TIMEOUT, chunks.next()).await? {
-            content.extend_from_slice(&chunk?);
-            let current = u64::try_from(content.len()).unwrap_or(u64::MAX);
-            let step = current
-                .saturating_mul(100)
-                .checked_div(total)
-                .unwrap_or(current / UNSIZED_PROGRESS_STEP);
-            if step > reported {
-                reported = step;
-                self.emit(CoreEvent::MediaProgress {
-                    source: key.to_owned(),
-                    current,
-                    total,
-                });
-            }
-        }
-        Ok(content)
-    }
-
-    /// For avatar commands; `send_attachment` keeps its upload in the event's queue entry.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the MIME type is invalid, the user is logged out,
-    /// or the upload fails.
-    pub async fn upload_media(&self, mime: String, bytes: Vec<u8>) -> Result<String, RpcError> {
+        mime: String,
+        bytes: Vec<u8>,
+    ) -> Result<String, RpcError> {
         let mime: Mime = mime.parse().map_err(|_| RpcCode::InvalidMedia)?;
 
         let response = self
             .client()
-            .await?
             .media()
             .upload(&mime, bytes, None)
             .await
-            .or_failed(self, "upload_media")?;
+            .or_failed(self.core(), "upload_media")?;
 
         Ok(response.content_uri.to_string())
     }
 
-    /// Returns once queued. Progress and failure arrive as
-    /// `send_state` on the local echo.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when an attachment field is invalid, the room is
-    /// unavailable, or queuing the upload fails.
-    pub async fn send_attachment(
+    pub(crate) async fn send_attachment(
         &self,
         request: SendAttachmentRequest,
         payload: Vec<u8>,
@@ -521,22 +407,18 @@ impl Core {
             ..AttachmentConfig::default()
         };
 
-        let room = self.room(&request.room_id).await?;
+        let room = self.room(&request.room_id)?;
         Box::pin(
             room.send_queue()
                 .send_attachment(request.filename, mime, bytes, config),
         )
         .await
-        .or_failed(self, "send_attachment")?;
+        .or_failed(self.core(), "send_attachment")?;
 
         Ok(())
     }
 
-    /// # Errors
-    ///
-    /// Returns an error when an attachment is invalid, the room is unavailable,
-    /// or queuing the gallery fails.
-    pub async fn send_gallery(
+    pub(crate) async fn send_gallery(
         &self,
         request: SendGalleryRequest,
         bytes: Vec<u8>,
@@ -600,12 +482,11 @@ impl Core {
             });
         }
 
-        self.room(&request.room_id)
-            .await?
+        self.room(&request.room_id)?
             .send_queue()
             .send_gallery(gallery)
             .await
-            .or_failed(self, "send_gallery")?;
+            .or_failed(self.core(), "send_gallery")?;
         Ok(())
     }
 }
@@ -1074,6 +955,178 @@ pub(crate) fn mxc_only(url: &str) -> Option<String> {
     uri.parts()
         .is_ok_and(|(_, media_id)| !media_id.is_empty())
         .then(|| url.to_owned())
+}
+
+impl Core {
+    async fn media_bytes(
+        &self,
+        client: &MatrixClient,
+        key: &str,
+        source: MediaSource,
+        width: u32,
+        height: u32,
+        media: &str,
+    ) -> matrix_sdk::Result<Vec<u8>> {
+        if width == 0 || height == 0 || matches!(source, MediaSource::Encrypted(_)) {
+            return self
+                .original_media(client, key, source, false)
+                .await
+                .inspect_err(|error| tracing::warn!(%media, "media unavailable: {error}"));
+        }
+
+        let request = MediaRequestParameters {
+            source: source.clone(),
+            format: MediaFormat::Thumbnail(MediaThumbnailSettings::new(
+                width.into(),
+                height.into(),
+            )),
+        };
+
+        let thumbnail = with_retries(|| async {
+            media_timeout(MEDIA_THUMBNAIL_TIMEOUT, fetch_sdk_media(client, &request))
+                .await
+                .and_then(|result| result)
+        })
+        .await;
+        match thumbnail {
+            Ok(bytes) => Ok(bytes),
+            Err(error) if answered_by_server(&error) || maybe_hidden_by_browser(&error) => {
+                tracing::warn!(%media, "thumbnail refused, falling back to the original: {error}");
+                self.original_media(client, key, source, true)
+                    .await
+                    .inspect_err(|error| {
+                        tracing::warn!(%media, "the original is unavailable too: {error}");
+                    })
+            }
+            Err(error) => {
+                tracing::warn!(%media, width, height, "media unavailable: {error}");
+                Err(error)
+            }
+        }
+    }
+
+    async fn original_media(
+        &self,
+        client: &MatrixClient,
+        key: &str,
+        source: MediaSource,
+        read_cache: bool,
+    ) -> matrix_sdk::Result<Vec<u8>> {
+        let request = MediaRequestParameters {
+            source,
+            format: MediaFormat::File,
+        };
+        if read_cache
+            && let Some(content) = client
+                .media_store()
+                .lock()
+                .await?
+                .get_media_content(&request)
+                .await?
+            && !content.is_empty()
+        {
+            return Ok(content);
+        }
+
+        let uri = match &request.source {
+            MediaSource::Plain(uri) => uri,
+            MediaSource::Encrypted(file) => &file.url,
+        };
+        let authenticated = authenticated_media::get_content::v1::Request::PATH_BUILDER
+            .is_supported(&client.supported_versions().await?);
+        let (Some(token), Ok((server, media_id)), true) =
+            (client.access_token(), uri.parts(), authenticated)
+        else {
+            return fetch_sdk_media(client, &request).await;
+        };
+        let Some(url) = download_url(client, &AUTHENTICATED_DOWNLOAD, server, media_id) else {
+            return fetch_sdk_media(client, &request).await;
+        };
+
+        let downloaded = with_retries(|| self.download(client, key, &url, Some(&token))).await;
+        let content = match downloaded {
+            Ok(content) => content,
+            Err(error) if status_of(&error) == Some(reqwest::StatusCode::UNAUTHORIZED) => {
+                return fetch_sdk_media(client, &request).await;
+            }
+            Err(error)
+                if status_of(&error)
+                    .is_some_and(|status| status != reqwest::StatusCode::TOO_MANY_REQUESTS) =>
+            {
+                tracing::warn!(
+                    media = %media_label(&request.source),
+                    "authenticated download refused, trying the legacy endpoint: {error}"
+                );
+                let Some(url) = download_url(client, &LEGACY_DOWNLOAD, server, media_id) else {
+                    return Err(error);
+                };
+                self.download(client, key, &url, None)
+                    .await
+                    .map_err(|_| error)?
+            }
+            Err(error) => return Err(error),
+        };
+
+        let content = match &request.source {
+            MediaSource::Encrypted(file) => {
+                let mut decrypted = Vec::with_capacity(content.len());
+                let mut cursor = std::io::Cursor::new(content);
+                let mut reader = matrix_sdk_base::crypto::AttachmentDecryptor::new(
+                    &mut cursor,
+                    file.as_ref().clone().into(),
+                )?;
+                reader.read_to_end(&mut decrypted)?;
+                decrypted
+            }
+            MediaSource::Plain(_) => content,
+        };
+        store_media(client, &request, &content).await?;
+        Ok(content)
+    }
+
+    async fn download(
+        &self,
+        client: &MatrixClient,
+        key: &str,
+        url: &url::Url,
+        token: Option<&str>,
+    ) -> matrix_sdk::Result<Vec<u8>> {
+        let mut request = client
+            .http_client()
+            .get(url.clone())
+            .timeout(MEDIA_DOWNLOAD_TIMEOUT);
+        if let Some(token) = token {
+            request = request.bearer_auth(token);
+        }
+        let response = media_timeout(MEDIA_FIRST_BYTE_TIMEOUT, request.send())
+            .await??
+            .error_for_status()?;
+        let total = response.content_length().unwrap_or(0);
+        let mut content = Vec::with_capacity(
+            usize::try_from(total)
+                .unwrap_or(0)
+                .min(MAX_INITIAL_DOWNLOAD_CAPACITY),
+        );
+        let mut chunks = response.bytes_stream();
+        let mut reported = 0;
+        while let Some(chunk) = media_timeout(MEDIA_STALL_TIMEOUT, chunks.next()).await? {
+            content.extend_from_slice(&chunk?);
+            let current = u64::try_from(content.len()).unwrap_or(u64::MAX);
+            let step = current
+                .saturating_mul(100)
+                .checked_div(total)
+                .unwrap_or(current / UNSIZED_PROGRESS_STEP);
+            if step > reported {
+                reported = step;
+                self.emit(CoreEvent::MediaProgress {
+                    source: key.to_owned(),
+                    current,
+                    total,
+                });
+            }
+        }
+        Ok(content)
+    }
 }
 
 #[cfg(test)]

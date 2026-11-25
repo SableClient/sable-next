@@ -5,6 +5,7 @@ use std::sync::{
 };
 use std::time::Duration;
 
+use crate::tasks::JoinHandleExt;
 use base64::Engine;
 use futures_util::StreamExt;
 use matrix_sdk::EncryptionState;
@@ -14,7 +15,7 @@ use matrix_sdk::encryption::verification::{
     VerificationRequest, VerificationRequestState,
 };
 use matrix_sdk::encryption::{CrossSigningResetAuthType, recovery::RecoveryState};
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 use matrix_sdk::ruma::events::key::verification::VerificationMethod;
@@ -27,6 +28,7 @@ use qrcode::bits::Bits;
 use qrcode::{Color, EcLevel, QrCode, Version};
 
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{
     CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep, QrCodeView,
     RecoveryStateView, RpcCode, RpcError, SignOutSafetyView, SigningKeysView, UserDeviceView,
@@ -49,10 +51,10 @@ pub(crate) struct PendingIdentityReset {
     handle: Arc<IdentityResetHandle>,
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn reset_identity(&self) -> Result<IdentityResetStep, RpcError> {
-        let client = self.client().await?;
-        let generation = self.lifecycle.current();
+        let client = self.client();
+        let generation = self.generation();
         self.cancel_identity_reset().await;
 
         let Some(handle) = client
@@ -60,10 +62,10 @@ impl Core {
             .recovery()
             .reset_identity()
             .await
-            .or_failed(self, "reset_identity")?
+            .or_failed(self.core(), "reset_identity")?
         else {
             return Ok(IdentityResetStep::Done {
-                recovery_key: self.enable_reset_recovery(&client).await?,
+                recovery_key: self.enable_reset_recovery().await?,
             });
         };
 
@@ -82,7 +84,7 @@ impl Core {
             )
         )]
         let handle = Arc::new(handle);
-        *self.pending_identity_reset.lock().await =
+        *self.state().pending_identity_reset.lock() =
             Some(PendingIdentityReset { generation, handle });
         Ok(step)
     }
@@ -91,9 +93,9 @@ impl Core {
         &self,
         ContinueIdentityResetParams { password }: ContinueIdentityResetParams,
     ) -> Result<String, RpcError> {
-        let client = self.client().await?;
-        let generation = self.lifecycle.current();
-        let handle = match &*self.pending_identity_reset.lock().await {
+        let client = self.client();
+        let generation = self.generation();
+        let handle = match &*self.state().pending_identity_reset.lock() {
             Some(pending) if pending.generation == generation => pending.handle.clone(),
             _ => return Err(RpcCode::Unavailable.into()),
         };
@@ -118,11 +120,11 @@ impl Core {
             RecoveryError::Sdk(sdk) if sdk.as_uiaa_response().is_some() => {
                 crate::errors::coded("reset_identity_auth", RpcCode::Denied, &error)
             }
-            _ => self.failed_with("reset_identity_auth", &error),
+            _ => self.core().failed_with("reset_identity_auth", &error),
         })?;
 
         {
-            let mut pending = self.pending_identity_reset.lock().await;
+            let mut pending = self.state().pending_identity_reset.lock();
             if !pending
                 .as_ref()
                 .is_some_and(|pending| Arc::ptr_eq(&pending.handle, &handle))
@@ -132,30 +134,25 @@ impl Core {
             pending.take();
         }
 
-        self.enable_reset_recovery(&client).await
+        self.enable_reset_recovery().await
     }
 
-    pub(crate) async fn cancel_identity_reset(&self) {
-        let pending = self.pending_identity_reset.lock().await.take();
-        if let Some(pending) = pending {
-            pending.handle.cancel().await;
-        }
-    }
-
-    async fn enable_reset_recovery(&self, client: &matrix_sdk::Client) -> Result<String, RpcError> {
+    async fn enable_reset_recovery(&self) -> Result<String, RpcError> {
+        let client = self.client();
         let recovery_key = client
             .encryption()
             .recovery()
             .enable()
             .await
-            .or_failed(self, "reset_identity_enable_recovery")?;
-        self.adopt_account_data_key(client, &recovery_key).await;
+            .or_failed(self.core(), "reset_identity_enable_recovery")?;
+        self.adopt_account_data_key(&recovery_key).await;
         Ok(recovery_key)
     }
 
     /// Self-verification travels to-device, verifying someone else as a DM
     /// message, so both need a handler or one direction never prompts.
-    pub(crate) fn watch_incoming_verifications(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_incoming_verifications(&self) {
+        let client = self.client();
         let handle = client.add_event_handler({
             let core = self.clone();
             move |event: ToDeviceKeyVerificationRequestEvent, client: matrix_sdk::Client| {
@@ -207,13 +204,13 @@ impl Core {
         self.track_session_handler(client, handle);
     }
 
-    fn receive_verification_request(self: &Arc<Self>, request: VerificationRequest) {
+    fn receive_verification_request(&self, request: VerificationRequest) {
         self.watch_verification(request);
     }
 
     /// The request and the SAS it becomes are two objects with two state enums.
     /// Both funnel into one event stream keyed by the flow id.
-    pub(crate) fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
+    pub(crate) fn watch_verification(&self, request: VerificationRequest) {
         let core = self.clone();
         let task = spawn(async move {
             let user_id = request.other_user_id().to_owned();
@@ -237,7 +234,8 @@ impl Core {
                         let qr = match request.generate_qr_code().await {
                             Ok(qr) => qr,
                             Err(error) => {
-                                core.failed_with("verification_generate_qr_code", &error);
+                                core.core()
+                                    .failed_with("verification_generate_qr_code", &error);
                                 None
                             }
                         };
@@ -246,10 +244,14 @@ impl Core {
                             if request.we_started()
                                 && let Err(error) = request.start_sas().await
                             {
-                                core.failed_with("verification_start_sas", &error);
+                                core.core().failed_with("verification_start_sas", &error);
                             }
 
-                            core.emit_verification(&user_id, &flow_id, VerificationView::Waiting);
+                            core.core().emit_verification(
+                                &user_id,
+                                &flow_id,
+                                VerificationView::Waiting,
+                            );
                             continue;
                         }
 
@@ -257,7 +259,7 @@ impl Core {
                         if let Some(qr) = qr {
                             core.watch_qr(user_id.clone(), flow_id.clone(), qr);
                         }
-                        core.emit_verification(
+                        core.core().emit_verification(
                             &user_id,
                             &flow_id,
                             VerificationView::Choose {
@@ -288,7 +290,7 @@ impl Core {
                             VerificationView::Done | VerificationView::Cancelled { .. }
                         );
                         if current_sas.load(Ordering::SeqCst) == 0 {
-                            core.emit_verification(&user_id, &flow_id, view);
+                            core.core().emit_verification(&user_id, &flow_id, view);
                         }
 
                         if done {
@@ -303,7 +305,7 @@ impl Core {
     }
 
     fn watch_sas(
-        self: &Arc<Self>,
+        &self,
         user_id: OwnedUserId,
         flow_id: String,
         sas: SasVerification,
@@ -313,14 +315,15 @@ impl Core {
         let core = self.clone();
         let task = spawn(async move {
             let mut changes = sas.changes();
-            core.emit_verification(&user_id, &flow_id, sas_view(&sas, &sas.state()));
+            core.core()
+                .emit_verification(&user_id, &flow_id, sas_view(&sas, &sas.state()));
 
             if let Err(error) = sas.accept().await {
-                core.failed_with("verification_accept_sas", &error);
+                core.core().failed_with("verification_accept_sas", &error);
                 if let Err(error) = sas.cancel().await {
-                    core.failed_with("verification_cancel_sas", &error);
+                    core.core().failed_with("verification_cancel_sas", &error);
                 }
-                core.emit_verification(
+                core.core().emit_verification(
                     &user_id,
                     &flow_id,
                     VerificationView::Cancelled {
@@ -348,7 +351,7 @@ impl Core {
                 } else {
                     view
                 };
-                core.emit_verification(&user_id, &flow_id, view);
+                core.core().emit_verification(&user_id, &flow_id, view);
 
                 if done {
                     break;
@@ -359,12 +362,7 @@ impl Core {
         self.track_session_task(task);
     }
 
-    pub(crate) fn watch_qr(
-        self: &Arc<Self>,
-        user_id: OwnedUserId,
-        flow_id: String,
-        qr: QrVerification,
-    ) {
+    pub(crate) fn watch_qr(&self, user_id: OwnedUserId, flow_id: String, qr: QrVerification) {
         let core = self.clone();
         let task = spawn(async move {
             let changes = qr.changes();
@@ -394,7 +392,7 @@ impl Core {
                 } else {
                     view
                 };
-                core.emit_verification(&user_id, &flow_id, view);
+                core.core().emit_verification(&user_id, &flow_id, view);
 
                 if done {
                     break;
@@ -405,30 +403,15 @@ impl Core {
         self.track_session_task(task);
     }
 
-    fn emit_verification(&self, user_id: &UserId, flow_id: &str, state: VerificationView) {
-        tracing::info!(
-            operation = "verification",
-            phase = verification_phase(&state),
-            "verification state changed"
-        );
-        self.emit(CoreEvent::Verification {
-            user_id: user_id.to_owned(),
-            flow_id: flow_id.to_owned(),
-            state,
-        });
-    }
-
     /// A signed device that finished a verification without the other one
     /// getting signed is the side that could not sign.
     async fn unsigned_after_done(&self) -> VerificationView {
-        let signed = match self.client().await {
-            Ok(client) => client
-                .encryption()
-                .get_own_device()
-                .await
-                .is_ok_and(|device| device.is_some_and(|device| device.is_cross_signed_by_owner())),
-            Err(_) => false,
-        };
+        let signed = self
+            .client()
+            .encryption()
+            .get_own_device()
+            .await
+            .is_ok_and(|device| device.is_some_and(|device| device.is_cross_signed_by_owner()));
         if signed {
             could_not_sign()
         } else {
@@ -437,9 +420,7 @@ impl Core {
     }
 
     pub(crate) async fn verified_after_done(&self, user_id: &UserId, device_id: &DeviceId) -> bool {
-        let Ok(client) = self.client().await else {
-            return false;
-        };
+        let client = self.client();
         if client.user_id() != Some(user_id) {
             return true;
         }
@@ -449,7 +430,8 @@ impl Core {
                 matrix_sdk::sleep::sleep(Duration::from_millis(delay_ms)).await;
             }
             if let Err(error) = client.encryption().request_user_identity(user_id).await {
-                self.failed_with("verification_refresh_identity", &error);
+                self.core()
+                    .failed_with("verification_refresh_identity", &error);
             }
             let encryption = client.encryption();
             let (own, other) = (
@@ -473,7 +455,6 @@ impl Core {
         flow_id: &str,
     ) -> Result<VerificationRequest, RpcError> {
         self.client()
-            .await?
             .encryption()
             .get_verification_request(user_id, flow_id)
             .await
@@ -481,7 +462,7 @@ impl Core {
     }
 
     pub(crate) async fn scan_verification_qr(
-        self: &Arc<Self>,
+        &self,
         user_id: OwnedUserId,
         flow_id: String,
         data: &str,
@@ -496,7 +477,7 @@ impl Core {
             .await?
             .scan_qr_code(data)
             .await
-            .or_failed(self, "scan_verification_qr")?
+            .or_failed(self.core(), "scan_verification_qr")?
             .ok_or(RpcCode::Unavailable)?;
         self.watch_qr(user_id, flow_id, qr);
         Ok(())
@@ -508,7 +489,6 @@ impl Core {
         flow_id: &str,
     ) -> Result<QrVerification, RpcError> {
         self.client()
-            .await?
             .encryption()
             .get_verification(user_id, flow_id)
             .await
@@ -522,12 +502,18 @@ impl Core {
         flow_id: &str,
     ) -> Result<SasVerification, RpcError> {
         self.client()
-            .await?
             .encryption()
             .get_verification(user_id, flow_id)
             .await
             .and_then(matrix_sdk::encryption::verification::Verification::sas)
             .ok_or_else(|| RpcCode::UnknownVerification.into())
+    }
+
+    pub(crate) async fn cancel_identity_reset(&self) {
+        let pending = self.state().pending_identity_reset.lock().take();
+        if let Some(pending) = pending {
+            pending.handle.cancel().await;
+        }
     }
 }
 
@@ -706,10 +692,11 @@ fn sort_devices(views: &mut [DeviceView]) {
 }
 
 pub(crate) async fn user_security(
-    core: &Core,
+    signed_in: &SignedIn,
     user_id: &UserId,
 ) -> Result<UserSecurityView, RpcError> {
-    let client = core.client().await?;
+    let core = signed_in.core();
+    let client = signed_in.client();
     let encryption = client.encryption();
     let identity = match encryption
         .get_user_identity(user_id)
@@ -757,18 +744,17 @@ pub(crate) async fn user_security(
 }
 
 pub(crate) async fn set_device_blocked(
-    core: &Core,
+    core: &SignedIn,
     user_id: &UserId,
     device_id: &DeviceId,
     blocked: bool,
 ) -> Result<(), RpcError> {
     let device = core
         .client()
-        .await?
         .encryption()
         .get_device(user_id, device_id)
         .await
-        .or_failed(core, "set_device_blocked_device")?
+        .or_failed(core.core(), "set_device_blocked_device")?
         .ok_or(RpcCode::Unavailable)?;
     if device.is_blacklisted() == blocked {
         return Ok(());
@@ -780,7 +766,7 @@ pub(crate) async fn set_device_blocked(
             LocalTrust::Unset
         })
         .await
-        .or_failed(core, "set_device_blocked")
+        .or_failed(core.core(), "set_device_blocked")
 }
 
 fn not_cross_signed() -> VerificationView {
@@ -842,7 +828,10 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
     }
 }
 
-pub(crate) async fn sign_out_safety(core: &Core, client: &matrix_sdk::Client) -> SignOutSafetyView {
+pub(crate) async fn sign_out_safety(
+    core: &SignedIn,
+    client: &matrix_sdk::Client,
+) -> SignOutSafetyView {
     let encryption = client.encryption();
     let backups = encryption.backups();
     let backup_uploaded = tokio::select! {
@@ -855,6 +844,7 @@ pub(crate) async fn sign_out_safety(core: &Core, client: &matrix_sdk::Client) ->
 
     SignOutSafetyView {
         encryption: core
+            .core()
             .with_open_stores(async || encryption_status(client).await)
             .await,
         backup_enabled: backups.are_enabled().await,
@@ -887,6 +877,21 @@ async fn recovery_passphrase(client: &matrix_sdk::Client) -> bool {
     };
     key.get_field::<serde_json::Value>("passphrase")
         .is_ok_and(|passphrase| passphrase.is_some_and(|value| !value.is_null()))
+}
+
+impl Core {
+    fn emit_verification(&self, user_id: &UserId, flow_id: &str, state: VerificationView) {
+        tracing::info!(
+            operation = "verification",
+            phase = verification_phase(&state),
+            "verification state changed"
+        );
+        self.emit(CoreEvent::Verification {
+            user_id: user_id.to_owned(),
+            flow_id: flow_id.to_owned(),
+            state,
+        });
+    }
 }
 
 #[cfg(test)]

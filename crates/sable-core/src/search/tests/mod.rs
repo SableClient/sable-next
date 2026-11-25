@@ -221,12 +221,16 @@ pub(super) async fn logged_in(
         account_id,
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    *core.session.write().await = Some(crate::session::Session {
-        account_id: account_id.to_owned(),
-        client: client.clone(),
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(crate::session::Session {
+            account_id: account_id.to_owned(),
+            client: client.clone(),
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
     core
 }

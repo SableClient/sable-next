@@ -83,8 +83,9 @@ async fn restored_backups_respect_the_account_preference() {
         let key = BackupDecryptionKey::new();
         backup_metadata(&server, &key, 0).await;
         let (core, client, _store) = core_for(&server).await;
+        let session = core.signed_in().unwrap();
         unlock_backup(&client, &key).await;
-        core.honor_backup_preference(&client).await;
+        session.honor_backup_preference().await;
         assert_eq!(
             client.encryption().backups().are_enabled().await,
             enabled,
@@ -128,13 +129,17 @@ async fn core_for(server: &MatrixMockServer) -> (Arc<Core>, Client, TempDir) {
     core.persist("a1", &store_id, &persisted, None)
         .await
         .unwrap();
-    *core.session.write().await = Some(Session {
-        account_id: "a1".to_owned(),
-        client: client.clone(),
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "a1".to_owned(),
+            client: client.clone(),
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
     (core, client, store)
 }
 
@@ -153,8 +158,9 @@ async fn session_ids(client: &Client) -> Vec<String> {
         .collect()
 }
 
-async fn import(core: &Core, export: &str, passphrase: &str) -> Result<(u64, u64), RpcError> {
-    let ImportRoomKeysOk { imported, total } = core.import_room_keys(export, passphrase).await?;
+async fn import(core: &Arc<Core>, export: &str, passphrase: &str) -> Result<(u64, u64), RpcError> {
+    let session = core.signed_in().unwrap();
+    let ImportRoomKeysOk { imported, total } = session.import_room_keys(export, passphrase).await?;
     Ok((imported, total))
 }
 
@@ -277,6 +283,7 @@ async fn a_paused_backup_is_resumed_only_once_the_user_agrees() {
     use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
     let server = MatrixMockServer::new().await;
     let (core, client, _store) = core_for(&server).await;
+    let session = core.signed_in().unwrap();
     let key = BackupDecryptionKey::new();
     backup_metadata(&server, &key, 1).await;
     let save = async |key: BackupDecryptionKey| {
@@ -292,7 +299,7 @@ async fn a_paused_backup_is_resumed_only_once_the_user_agrees() {
 
     save(BackupDecryptionKey::new()).await;
     assert_eq!(
-        core.resume_readable_backup(&client, true).await.unwrap(),
+        session.resume_readable_backup(true).await.unwrap(),
         ReadableBackup::None
     );
     assert!(!client.encryption().backups().are_enabled().await);
@@ -328,7 +335,7 @@ async fn a_paused_backup_is_resumed_only_once_the_user_agrees() {
     save(key.clone()).await;
 
     assert_eq!(
-        core.resume_readable_backup(&client, false).await.unwrap(),
+        session.resume_readable_backup(false).await.unwrap(),
         ReadableBackup::Paused
     );
     assert!(!client.encryption().backups().are_enabled().await);
@@ -339,7 +346,7 @@ async fn a_paused_backup_is_resumed_only_once_the_user_agrees() {
     );
 
     assert_eq!(
-        core.resume_readable_backup(&client, true).await.unwrap(),
+        session.resume_readable_backup(true).await.unwrap(),
         ReadableBackup::Resumed
     );
     assert!(client.encryption().backups().are_enabled().await);
@@ -413,7 +420,8 @@ async fn cloud_restore_batches_keys_preserves_backup_notifications_and_can_repea
     use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
     let server = MatrixMockServer::new().await;
     let (core, client, _store) = core_for(&server).await;
-    let base = core.base_client().await.unwrap();
+    let session = core.signed_in().unwrap();
+    let base = session.base_client().await.unwrap();
     let key = BackupDecryptionKey::new();
     backup_metadata(&server, &key, 103).await;
     unlock_backup(&client, &key).await;
@@ -437,8 +445,8 @@ async fn cloud_restore_batches_keys_preserves_backup_notifications_and_can_repea
         .mount(server.server())
         .await;
     let updates = parking_lot::Mutex::new(Vec::new());
-    let result = core
-        .download_all_room_keys(&base, &client, |update| updates.lock().push(update))
+    let result = session
+        .download_all_room_keys(&base, |update| updates.lock().push(update))
         .await
         .unwrap();
     assert_eq!(
@@ -452,13 +460,16 @@ async fn cloud_restore_batches_keys_preserves_backup_notifications_and_can_repea
     );
     assert!(updates.lock().iter().any(|update| update.processed == 100));
     assert_eq!(session_ids(&client).await.len(), 102);
-    let status = core.backup_status(&base, &client).await.unwrap();
+    let status = session.core().backup_status(&base, &client).await.unwrap();
     assert_eq!(
         (status.local_keys, status.backed_up_keys, status.cloud_keys),
         (102, 102, Some(103))
     );
     assert!(status.can_restore);
-    let download = core.download_key_backup("retry".to_owned()).await.unwrap();
+    let download = session
+        .download_key_backup("retry".to_owned())
+        .await
+        .unwrap();
     assert_eq!(
         (download.processed, download.imported, download.failed),
         (103, 0, 1)
@@ -499,8 +510,9 @@ async fn switching_accounts_during_restore_keeps_keys_and_progress_with_the_owne
         .mount(server.server())
         .await;
     let restore_core = core.clone();
+    let restore_core_session = restore_core.signed_in().unwrap();
     let restore = tokio::spawn(async move {
-        restore_core
+        restore_core_session
             .download_key_backup("old-account".to_owned())
             .await
     });
@@ -528,13 +540,18 @@ async fn switching_accounts_during_restore_keeps_keys_and_progress_with_the_owne
         .await
         .unwrap();
     core.lifecycle.set_current(2);
-    *core.session.write().await = Some(Session {
-        account_id: "other".to_owned(),
-        homeserver: server.server().uri(),
-        oauth: false,
-        sync_service: Arc::new(SyncService::builder(other.clone()).build().await.unwrap()),
-        client: other.clone(),
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "other".to_owned(),
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+            sync_service: Arc::new(SyncService::builder(other.clone()).build().await.unwrap()),
+            client: other.clone(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
     let download = restore.await.unwrap().unwrap();
     assert_eq!(download.account_id, "a1");
     assert_eq!(
@@ -543,7 +560,7 @@ async fn switching_accounts_during_restore_keeps_keys_and_progress_with_the_owne
     );
     assert_eq!(session_ids(&client).await.len(), 1);
     assert_eq!(session_ids(&other).await, Vec::<String>::new());
-    let status = core.key_backup_status().await.unwrap();
+    let status = session.key_backup_status().await.unwrap();
     assert!(status.download.is_none());
 }
 
@@ -552,33 +569,43 @@ async fn cloud_restore_rejects_a_locked_or_mismatched_backup_before_downloading(
     use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
     let server = MatrixMockServer::new().await;
     let (core, client, _store) = core_for(&server).await;
-    let base = core.base_client().await.unwrap();
+    let session = core.signed_in().unwrap();
+    let base = session.base_client().await.unwrap();
     let server_key = BackupDecryptionKey::new();
     backup_metadata(&server, &server_key, 5).await;
     assert!(
-        !core
+        !session
+            .core()
             .backup_status(&base, &client)
             .await
             .unwrap()
             .can_restore
     );
-    core.download_all_room_keys(&base, &client, |_| {})
+    session
+        .download_all_room_keys(&base, |_| {})
         .await
         .unwrap_err();
     unlock_backup(&client, &BackupDecryptionKey::new()).await;
     assert!(
-        !core
+        !session
+            .core()
             .backup_status(&base, &client)
             .await
             .unwrap()
             .can_restore
     );
-    core.download_all_room_keys(&base, &client, |_| {})
+    session
+        .download_all_room_keys(&base, |_| {})
         .await
         .unwrap_err();
-    let _permit = core.key_backup_downloads.acquire().await.unwrap();
+    let _permit = session
+        .state()
+        .key_backup_downloads
+        .acquire()
+        .await
+        .unwrap();
     assert!(matches!(
-        core.download_key_backup("duplicate".to_owned()).await,
+        session.download_key_backup("duplicate".to_owned()).await,
         Err(RpcError {
             code: RpcCode::Unavailable,
             ..
@@ -599,7 +626,8 @@ async fn cloud_restore_rejects_a_locked_or_mismatched_backup_before_downloading(
 async fn absent_cloud_backup_is_distinct_from_network_failure() {
     let server = MatrixMockServer::new().await;
     let (core, client, _store) = core_for(&server).await;
-    let base = core.base_client().await.unwrap();
+    let session = core.signed_in().unwrap();
+    let base = session.base_client().await.unwrap();
     wiremock::Mock::given(wiremock::matchers::method("GET"))
         .and(wiremock::matchers::path_regex(
             r"^/_matrix/client/(r0|v3)/room_keys/version$",
@@ -610,7 +638,7 @@ async fn absent_cloud_backup_is_distinct_from_network_failure() {
         )
         .mount(server.server())
         .await;
-    let status = core.backup_status(&base, &client).await.unwrap();
+    let status = session.core().backup_status(&base, &client).await.unwrap();
     assert_eq!(status.cloud_keys, None);
     assert!(!status.can_restore);
     server.server().reset().await;
@@ -624,13 +652,18 @@ async fn absent_cloud_backup_is_distinct_from_network_failure() {
         )
         .mount(server.server())
         .await;
-    core.backup_status(&base, &client).await.unwrap_err();
+    session
+        .core()
+        .backup_status(&base, &client)
+        .await
+        .unwrap_err();
 }
 
 #[tokio::test]
 async fn an_export_imports_into_another_device() {
     let server = MatrixMockServer::new().await;
     let (source, source_client, _source_store) = core_for(&server).await;
+    let source_session = source.signed_in().unwrap();
     let (target, target_client, _target_store) = core_for(&server).await;
     let outbound = outbound_session(room_id!("!keys:example.org"));
     source_client
@@ -643,7 +676,7 @@ async fn an_export_imports_into_another_device() {
         .await
         .unwrap();
 
-    let export = source
+    let export = source_session
         .export_room_keys("correct horse", None)
         .await
         .unwrap();
@@ -669,6 +702,7 @@ async fn an_export_imports_into_another_device() {
 async fn an_export_for_one_room_leaves_the_others_out() {
     let server = MatrixMockServer::new().await;
     let (source, source_client, _source_store) = core_for(&server).await;
+    let source_session = source.signed_in().unwrap();
     let (target, _target_client, _target_store) = core_for(&server).await;
     let kept = room_id!("!kept:example.org");
     source_client
@@ -681,11 +715,11 @@ async fn an_export_for_one_room_leaves_the_others_out() {
         .await
         .unwrap();
 
-    let other = source
+    let other = source_session
         .export_room_keys("correct horse", Some(room_id!("!other:example.org")))
         .await
         .unwrap();
-    let wanted = source
+    let wanted = source_session
         .export_room_keys("correct horse", Some(kept))
         .await
         .unwrap();
@@ -829,13 +863,18 @@ async fn resuming_redecrypts_a_key_another_client_stored() {
         store.path().to_str().unwrap(),
         Box::new(MemorySessionStore::default()),
     );
-    *core.session.write().await = Some(Session {
-        account_id: "a1".to_owned(),
-        client: client.clone(),
-        sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "a1".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
     let room_id = room_id!("!resumed:example.org");
     let outbound = outbound_session(room_id);
     let key = exported(&outbound).await;
@@ -864,7 +903,7 @@ async fn resuming_redecrypts_a_key_another_client_stored() {
             JoinedRoomBuilder::new(room_id).add_timeline_event(event),
         )
         .await;
-    let timeline = core
+    let timeline = session
         .live_timeline(&room_id.to_owned(), false)
         .await
         .unwrap();
@@ -882,7 +921,7 @@ async fn resuming_redecrypts_a_key_another_client_stored() {
     tokio::time::sleep(Duration::from_millis(500)).await;
     assert!(timeline.items().await.iter().any(|item| is_utd(item)));
 
-    core.retry_cached_decryption().await;
+    session.retry_cached_decryption().await;
     tokio::time::timeout(Duration::from_secs(5), async {
         while !timeline
             .items()
@@ -913,15 +952,20 @@ async fn a_key_received_after_the_machine_is_rebuilt_redecrypts() {
     core.persist("a1", &store_id, &persisted, None)
         .await
         .unwrap();
-    *core.session.write().await = Some(Session {
-        account_id: "a1".to_owned(),
-        client: client.clone(),
-        sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
-    core.watch_devices(&client, 1);
-    core.watch_room_keys(&client);
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "a1".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
+    session.watch_devices(1);
+    session.watch_room_keys();
     let room_id = room_id!("!rebuilt:example.org");
     let outbound = outbound_session(room_id);
     let key = exported(&outbound).await;
@@ -950,14 +994,15 @@ async fn a_key_received_after_the_machine_is_rebuilt_redecrypts() {
             JoinedRoomBuilder::new(room_id).add_timeline_event(event),
         )
         .await;
-    let timeline = core
+    let timeline = session
         .live_timeline(&room_id.to_owned(), false)
         .await
         .unwrap();
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(timeline.items().await.iter().any(|item| is_utd(item)));
 
-    core.base_client()
+    session
+        .base_client()
         .await
         .unwrap()
         .regenerate_olm(None)

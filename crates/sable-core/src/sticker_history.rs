@@ -1,7 +1,7 @@
 use sable_model::emote_picker::RecentUse;
 use serde_json::Value;
 
-use crate::Core;
+use crate::SignedIn;
 use crate::protocol::RpcError;
 use crate::usage_history::Kind;
 
@@ -32,7 +32,7 @@ fn recent_uses(entries: &[Value], now: u64) -> Vec<RecentUse> {
         .collect()
 }
 
-impl Core {
+impl SignedIn {
     /// `legacy` is this device's old list and `synced` the one older builds still share.
     pub(crate) async fn recent_stickers(
         &self,
@@ -117,9 +117,12 @@ mod tests {
     async fn nothing_leaves_the_device_until_settings_sync_is_on() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
-        core.remember_sticker("wave", false).await.unwrap();
-        core.remember_sticker("wave", false).await.unwrap();
-        let local = core.recent_stickers(false, &keys(&["party"]), None).await;
+        let session = core.signed_in().unwrap();
+        session.remember_sticker("wave", false).await.unwrap();
+        session.remember_sticker("wave", false).await.unwrap();
+        let local = session
+            .recent_stickers(false, &keys(&["party"]), None)
+            .await;
         assert_eq!(shown(&local.unwrap()), [("wave", 2), ("party", 1)]);
         let requests = server.server().received_requests().await.unwrap();
         assert!(
@@ -130,7 +133,7 @@ mod tests {
 
         let _stored = stored(&server, Some(document(&[("cat", 7), ("wave", 4)]))).await;
         writable(&server).await;
-        core.recent_stickers(true, &[], None).await.unwrap();
+        session.recent_stickers(true, &[], None).await.unwrap();
         assert_eq!(
             uploads(&server).await,
             [document(&[("wave", 6), ("cat", 7), ("party", 1)])]
@@ -141,13 +144,14 @@ mod tests {
     async fn two_devices_keep_both_counts() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let before = stored(&server, Some(document(&[("wave", 1)]))).await;
-        core.recent_stickers(true, &[], None).await.unwrap();
+        session.recent_stickers(true, &[], None).await.unwrap();
         drop(before);
 
         let _after = stored(&server, Some(document(&[("party", 5), ("wave", 3)]))).await;
         writable(&server).await;
-        core.remember_sticker("wave", true).await.unwrap();
+        session.remember_sticker("wave", true).await.unwrap();
         assert_eq!(
             uploads(&server).await,
             [document(&[("wave", 4), ("party", 5)])]
@@ -158,17 +162,24 @@ mod tests {
     async fn an_older_builds_list_migrates_in_order_then_adds_its_new_picks_in_front() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         writable(&server).await;
         let empty = stored(&server, None).await;
         let list = keys(&["wave", "party"]);
-        core.recent_stickers(true, &[], Some(&list)).await.unwrap();
+        session
+            .recent_stickers(true, &[], Some(&list))
+            .await
+            .unwrap();
         let migrated = document(&[("wave", 1), ("party", 1)]);
         assert_eq!(uploads(&server).await, std::slice::from_ref(&migrated));
         drop(empty);
 
         let _stored = stored(&server, Some(migrated)).await;
         let list = keys(&["cat", "wave", "party"]);
-        let recent = core.recent_stickers(true, &[], Some(&list)).await.unwrap();
+        let recent = session
+            .recent_stickers(true, &[], Some(&list))
+            .await
+            .unwrap();
         assert_eq!(shown(&recent), [("cat", 1), ("wave", 1), ("party", 1)]);
     }
 
@@ -176,14 +187,21 @@ mod tests {
     async fn a_stale_list_does_not_bring_back_what_was_dropped() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let list = keys(&["wave", "dropped"]);
         let before = stored(&server, Some(document(&[("wave", 1), ("dropped", 1)]))).await;
-        core.recent_stickers(true, &[], Some(&list)).await.unwrap();
+        session
+            .recent_stickers(true, &[], Some(&list))
+            .await
+            .unwrap();
         drop(before);
 
         let _after = stored(&server, Some(document(&[("wave", 2)]))).await;
         writable(&server).await;
-        let recent = core.recent_stickers(true, &[], Some(&list)).await.unwrap();
+        let recent = session
+            .recent_stickers(true, &[], Some(&list))
+            .await
+            .unwrap();
         assert_eq!(shown(&recent), [("wave", 2)]);
         assert_eq!(uploads(&server).await, Vec::<Value>::new());
     }
@@ -192,17 +210,18 @@ mod tests {
     async fn a_locked_history_is_never_overwritten() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let key = AccountDataKey::from_bytes([7; 32]);
         let sealed = key
             .seal(STICKERS.event_type, &document(&[("cat", 7)]))
             .unwrap();
         let _stored = stored(&server, Some(sealed)).await;
         writable(&server).await;
-        core.remember_sticker("wave", true).await.unwrap();
+        session.remember_sticker("wave", true).await.unwrap();
         assert_eq!(uploads(&server).await, Vec::<Value>::new());
 
-        cache_key(&core.client().await.unwrap(), &key).await;
-        core.recent_stickers(true, &[], None).await.unwrap();
+        cache_key(&core.signed_in().unwrap().client().clone(), &key).await;
+        session.recent_stickers(true, &[], None).await.unwrap();
         let written = uploads(&server).await;
         assert_eq!(
             key.open(STICKERS.event_type, written.first().unwrap())
@@ -215,11 +234,12 @@ mod tests {
     async fn plain_history_is_sealed_once_there_is_a_key() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let key = AccountDataKey::from_bytes([7; 32]);
-        cache_key(&core.client().await.unwrap(), &key).await;
+        cache_key(&core.signed_in().unwrap().client().clone(), &key).await;
         let _stored = stored(&server, Some(document(&[("cat", 7)]))).await;
         writable(&server).await;
-        core.recent_stickers(true, &[], None).await.unwrap();
+        session.recent_stickers(true, &[], None).await.unwrap();
         let written = uploads(&server).await;
         assert_eq!(
             key.open(STICKERS.event_type, written.first().unwrap())
@@ -244,12 +264,12 @@ mod tests {
             )
             .mount_as_scoped(first.server())
             .await;
+        let session = core.signed_in().unwrap();
         let switch = async {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            let session = other.session.read().await.clone();
-            *core.session.write().await = session;
+            crate::test_support::set_session(&core, other.session.snapshot());
         };
-        let (picked, ()) = tokio::join!(core.remember_sticker("wave", true), switch);
+        let (picked, ()) = tokio::join!(session.remember_sticker("wave", true), switch);
         picked.unwrap();
         assert_eq!(
             uploads(&first).await,

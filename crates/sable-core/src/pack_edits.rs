@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, VecSkipError, serde_as};
 
+use crate::ResultExt;
+use crate::SignedIn;
 use crate::image_packs::{
     EMOTE_ROOMS, EmoteRooms, IMAGE_PACK_ROOMS, ROOM_EMOTES, ROOM_IMAGE_PACK, USER_EMOTES,
 };
@@ -16,7 +18,6 @@ use crate::protocol::{
     RpcError,
 };
 use crate::room_settings::EmptyContent;
-use crate::{Core, ResultExt};
 
 const ALL_USAGES: [ImageUsageView; 2] = [ImageUsageView::Emoticon, ImageUsageView::Sticker];
 
@@ -244,7 +245,7 @@ struct NewPackOut {
     images: EmptyContent,
 }
 
-impl Core {
+impl SignedIn {
     async fn room_pack_state_keys(
         &self,
         room_id: &OwnedRoomId,
@@ -303,7 +304,7 @@ impl Core {
                     let content = pack_content(draft, current.as_ref())?;
                     serde_json::to_value(content)
                         .map(Some)
-                        .or_failed(self, "save_image_pack")
+                        .or_failed(self.core(), "save_image_pack")
                 })
                 .await?;
             }
@@ -418,7 +419,7 @@ impl Core {
         self.update_account_data(&[USER_EMOTES], "add_account_pack_images", async |current| {
             let merged = merged_pack_content(current, images)
                 .and_then(serde_json::to_value)
-                .or_failed(self, "add_account_pack_images")?;
+                .or_failed(self.core(), "add_account_pack_images")?;
             Ok(Some(merged))
         })
         .await?;
@@ -426,11 +427,10 @@ impl Core {
     }
 
     pub(crate) async fn pack_subscriptions(&self) -> Result<Vec<PackAddressView>, RpcError> {
-        let client = self.client().await?;
         let (raw, _) = self
-            .subscribed_pack_rooms(&client, true)
+            .subscribed_pack_rooms(true)
             .await
-            .or_failed(self, "pack_subscriptions")?;
+            .or_failed(self.core(), "pack_subscriptions")?;
         Ok(raw
             .and_then(|raw| raw.deserialize_as_unchecked::<EmoteRooms>().ok())
             .map(|rooms| subscription_addresses(&rooms))
@@ -448,13 +448,13 @@ impl Core {
             let current = match current {
                 Some(content) => EmoteRooms::deserialize(content)
                     .map(|rooms| subscription_addresses(&rooms))
-                    .or_failed(self, label)?,
+                    .or_failed(self.core(), label)?,
                 None => Vec::new(),
             };
             next = with_subscriptions(&current, added, removed);
             serde_json::to_value(subscriptions_content(&next))
                 .map(Some)
-                .or_failed(self, label)
+                .or_failed(self.core(), label)
         })
         .await?;
         Ok(next)

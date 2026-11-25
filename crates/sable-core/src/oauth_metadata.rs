@@ -1,10 +1,10 @@
-use std::sync::Arc;
-
+use crate::tasks::JoinHandleExt;
 use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AuthorizationServerMetadata;
 
 use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{CoreEvent, OAuthMetadataView, RpcError};
 
 pub(crate) fn view(metadata: &AuthorizationServerMetadata) -> OAuthMetadataView {
@@ -37,14 +37,12 @@ impl Core {
             Err(error) => Err(self.failed_with(operation, &error)),
         }
     }
+}
 
-    pub(crate) fn watch_oauth_metadata(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
+impl SignedIn {
+    pub(crate) fn watch_oauth_metadata(&self, generation: u64) {
         let core = self.clone();
-        let client = client.clone();
+        let client = self.client().clone();
         self.track_session_task(
             spawn(async move {
                 let mut failures = 0u32;
@@ -65,7 +63,8 @@ impl Core {
                         }
                     }
                 };
-                core.emit_if_current(generation, CoreEvent::OAuthMetadata { metadata });
+                core.core()
+                    .emit_if_current(generation, CoreEvent::OAuthMetadata { metadata });
             })
             .abort_on_drop(),
         );
@@ -88,7 +87,8 @@ mod tests {
         server.mock_versions().ok().mount().await;
         let client = server.client_builder().no_server_versions().build().await;
         let (core, mut events) = signed_in_core(server, client.clone()).await;
-        core.watch_oauth_metadata(&client, core.lifecycle.current());
+        let session = core.signed_in().unwrap();
+        session.watch_oauth_metadata(core.lifecycle.current());
         let metadata = tokio::time::timeout(std::time::Duration::from_secs(10), async {
             loop {
                 if let CoreEvent::OAuthMetadata { metadata } = events.recv().await.unwrap() {

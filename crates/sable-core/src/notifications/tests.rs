@@ -272,20 +272,6 @@ fn core_of(data_dir: &std::path::Path) -> std::sync::Arc<crate::Core> {
     .0
 }
 
-async fn waits_for(lease_holder: impl FnOnce(), store_id: &str) {
-    let opening = tokio::spawn({
-        let store_id = store_id.to_owned();
-        async move { drop(crate::session::store_lease(&store_id).await) }
-    });
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    assert!(!opening.is_finished());
-    lease_holder();
-    tokio::time::timeout(std::time::Duration::from_secs(5), opening)
-        .await
-        .unwrap()
-        .unwrap();
-}
-
 #[tokio::test]
 async fn a_push_decrypts_on_the_client_the_core_opens_for_its_login() {
     let data_dir = tempfile::tempdir().unwrap();
@@ -294,9 +280,7 @@ async fn a_push_decrypts_on_the_client_the_core_opens_for_its_login() {
     let account = saved_login(&server, data_dir.path()).await;
     let core = core_of(data_dir.path());
     core.accounts().await.unwrap();
-    let lease = crate::session::store_lease(&account.store_id).await;
-    let client = core.saved_account_client(&account, &lease).await.unwrap();
-    drop(lease);
+    let client = core.open_saved_account(&account).await.unwrap();
     server
         .mock_sync()
         .ok_and_run(&client, |builder| {
@@ -346,12 +330,7 @@ async fn pusher_upkeep_uses_the_client_of_the_core_in_the_process() {
     .await
     .unwrap();
 
-    assert!(
-        core.account_clients
-            .lock()
-            .await
-            .contains_key(&account.account_id)
-    );
+    assert!(core.clients.contains(&account.account_id));
     assert!(crate::session::base_client(&account.store_id).is_some());
     drop(upkeep);
 }
@@ -361,7 +340,7 @@ async fn a_core_opens_a_store_only_once_the_push_that_opened_it_is_done() {
     let data_dir = tempfile::tempdir().unwrap();
     let server = MatrixMockServer::new().await;
     server.mock_versions().ok().mount().await;
-    let account = saved_login(&server, data_dir.path()).await;
+    saved_login(&server, data_dir.path()).await;
     let cold = restore_push_client(
         &cold_push_store_dir(data_dir.path()),
         "@alice:example.org",
@@ -376,8 +355,7 @@ async fn a_core_opens_a_store_only_once_the_push_that_opened_it_is_done() {
     );
     let open = async {
         let accounts = core.accounts().await.unwrap();
-        let lease = crate::session::store_lease(&account.store_id).await;
-        core.saved_account_client(&accounts.accounts[0], &lease)
+        core.open_saved_account(&accounts.accounts[0])
             .await
             .unwrap();
     };
@@ -400,7 +378,7 @@ async fn a_core_drops_an_idle_cached_push_client_before_opening_its_store() {
     let data_dir = tempfile::tempdir().unwrap();
     let server = MatrixMockServer::new().await;
     server.mock_versions().ok().mount().await;
-    let account = saved_login(&server, data_dir.path()).await;
+    saved_login(&server, data_dir.path()).await;
     let base = cold_push_store_dir(data_dir.path());
     let cached = cold_host(&base, "@alice:example.org", "A").await.unwrap();
     assert!(matches!(*cached, PushHost::Own(_)));
@@ -412,8 +390,7 @@ async fn a_core_drops_an_idle_cached_push_client_before_opening_its_store() {
     );
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let accounts = core.accounts().await.unwrap();
-        let lease = crate::session::store_lease(&account.store_id).await;
-        core.saved_account_client(&accounts.accounts[0], &lease)
+        core.open_saved_account(&accounts.accounts[0])
             .await
             .unwrap();
     })
@@ -422,12 +399,12 @@ async fn a_core_drops_an_idle_cached_push_client_before_opening_its_store() {
 }
 
 #[tokio::test]
-async fn the_core_cannot_activate_a_login_while_a_push_runs_on_its_client() {
+async fn a_push_on_the_cores_client_leaves_its_store_free_for_the_core() {
     let data_dir = tempfile::tempdir().unwrap();
     let server = MatrixMockServer::new().await;
     server.mock_versions().ok().mount().await;
     let account = saved_login(&server, data_dir.path()).await;
-    let _core = core_of(data_dir.path());
+    let core = core_of(data_dir.path());
     let host = push_host(
         &cold_push_store_dir(data_dir.path()),
         "@alice:example.org",
@@ -437,7 +414,19 @@ async fn the_core_cannot_activate_a_login_while_a_push_runs_on_its_client() {
     .await;
     assert!(matches!(host, Some(PushHost::Shared { .. })));
 
-    waits_for(|| drop(host), &account.store_id).await;
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        crate::session::store_lease(&account.store_id),
+    )
+    .await
+    .expect("the push shares the core's client instead of reserving its store");
+    let session_client = core.open_saved_account(&account).await.unwrap();
+    let Some(PushHost::Shared { client, .. }) = &host else {
+        unreachable!();
+    };
+    assert_eq!(session_client.device_id(), client.device_id());
+    assert!(core.clients.contains(&account.account_id));
+    drop(host);
 }
 
 #[tokio::test]
@@ -455,20 +444,13 @@ async fn a_push_for_an_inactive_account_leaves_no_client_or_open_store_behind() 
     )
     .await;
     assert!(matches!(host, Some(PushHost::Shared { .. })));
-    assert!(
-        core.account_clients
-            .lock()
-            .await
-            .contains_key(&account.account_id)
-    );
+    assert!(core.clients.contains(&account.account_id));
 
     drop(host);
 
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            if core.account_clients.lock().await.is_empty()
-                && crate::session::base_client(&account.store_id).is_none()
-            {
+            if core.clients.is_empty() && crate::session::base_client(&account.store_id).is_none() {
                 break;
             }
             tokio::task::yield_now().await;
@@ -2380,11 +2362,7 @@ impl SharedLogin {
     }
 
     async fn app_client(&self) -> matrix_sdk::Client {
-        let lease = crate::session::store_lease(&self.account.store_id).await;
-        self.core
-            .saved_account_client(&self.account, &lease)
-            .await
-            .unwrap()
+        self.core.open_saved_account(&self.account).await.unwrap()
     }
 
     async fn push_client(&self) -> super::PushClient {

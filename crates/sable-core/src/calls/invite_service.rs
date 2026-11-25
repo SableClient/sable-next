@@ -7,8 +7,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::tasks::JoinHandleExt as _;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
-use matrix_sdk::executor::{JoinHandleExt as _, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::OwnedUserId;
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncStateEvent, TimelineEventType};
 use matrix_sdk::ruma::serde::Raw;
@@ -28,6 +29,7 @@ use super::{
     invites::{Invitations, Invite},
     notify, sticky,
 };
+use crate::SignedIn;
 use crate::{Core, protocol::CoreEvent};
 
 type Event = (Room, Value, Instant);
@@ -184,7 +186,7 @@ async fn enqueue<T>(send: &UnboundedSender<Event>, room: Room, raw: &Raw<T>) {
     }
 }
 
-pub(super) fn watch(core: &Arc<Core>, client: &Client, generation: u64) {
+pub(super) fn watch(core: &SignedIn, client: &Client, generation: u64) {
     let (send, receive) = unbounded_channel();
     let messages = send.clone();
     let handler = client.add_event_handler(move |raw: Raw<AnySyncMessageLikeEvent>, room: Room| {
@@ -202,7 +204,13 @@ pub(super) fn watch(core: &Arc<Core>, client: &Client, generation: u64) {
     });
     core.track_session_handler(client, handler);
     core.track_session_task(
-        spawn(run(core.clone(), client.clone(), generation, receive)).abort_on_drop(),
+        spawn(run(
+            Arc::clone(core.core()),
+            client.clone(),
+            generation,
+            receive,
+        ))
+        .abort_on_drop(),
     );
 }
 

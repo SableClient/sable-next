@@ -3,9 +3,9 @@ use matrix_sdk::ruma::RoomId;
 use matrix_sdk_base::crypto::{Device, OlmMachine, UserIdentity};
 use serde_json::{Value, json};
 
-use crate::Core;
+use crate::SignedIn;
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn encryption_details(
         &self,
         room_id: &RoomId,

@@ -7,7 +7,7 @@ use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, RoomId};
 use matrix_sdk::{Room, RoomMemberships, RoomState};
 use serde_json::{Map, Value, json};
 
-use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{
     PresenceHintView, PresencePromptView, PresenceSharingEdit, PresenceSharingView,
     PresenceUserSharingView, RpcError,
@@ -259,9 +259,9 @@ pub(crate) fn carried_prompted(
         .flatten()
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn presence_keys(&self) -> Option<Keys> {
-        let client = self.client().await.ok()?;
+        let client = self.client();
         let features = client.unstable_features().await.ok()?;
         let advertised: Vec<&str> = [STABLE_FEATURE, FEATURE]
             .into_iter()
@@ -271,9 +271,10 @@ impl Core {
     }
 
     async fn presence_keys_or_unsupported(&self, label: &str) -> Result<Keys, RpcError> {
-        self.presence_keys()
-            .await
-            .ok_or_else(|| self.failed(label, "the homeserver does not support selective presence"))
+        self.presence_keys().await.ok_or_else(|| {
+            self.core()
+                .failed(label, "the homeserver does not support selective presence")
+        })
     }
 
     /// A server that moved to the stable identifiers may still hold the unstable key.
@@ -387,7 +388,7 @@ impl Core {
         let Some(keys) = self.presence_keys().await else {
             return Ok(None);
         };
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         if room.state() != RoomState::Joined
             || hint(self.hint_content(room_id, keys).await?.as_ref()) != PresenceHintView::Suggest
         {
@@ -406,7 +407,7 @@ impl Core {
             .sharing_document(keys, Document::Prompted, "presence_prompt")
             .await?;
         let view = sharing_view(keys, sharing.as_ref(), prompted.as_ref());
-        let predecessors = self.verified_predecessors(&room).await;
+        let predecessors = self.verified_predecessors(&room);
         Ok((!answered(&view, &prompt, &predecessors)).then_some(prompt))
     }
 
@@ -442,10 +443,8 @@ impl Core {
     }
 
     /// A create event can name any room as its predecessor, so the old room's tombstone must point back.
-    async fn verified_predecessors(&self, room: &Room) -> Vec<OwnedRoomId> {
-        let Ok(client) = self.client().await else {
-            return Vec::new();
-        };
+    fn verified_predecessors(&self, room: &Room) -> Vec<OwnedRoomId> {
+        let client = self.client();
         let mut chain = Vec::new();
         let mut seen = HashSet::from([room.room_id().to_owned()]);
         let mut current = room.clone();
@@ -473,9 +472,7 @@ impl Core {
         let Some(keys) = self.presence_keys().await else {
             return;
         };
-        let Ok(client) = self.client().await else {
-            return;
-        };
+        let client = self.client();
         let replaced = client
             .get_room(old)
             .and_then(|room| room.successor_room())
@@ -507,9 +504,7 @@ impl Core {
     }
 
     pub(crate) async fn follow_presence_upgrade(&self, room_id: &OwnedRoomId) {
-        let Ok(client) = self.client().await else {
-            return;
-        };
+        let client = self.client();
         let request = get_state_event_for_key::v3::Request::new(
             room_id.clone(),
             StateEventType::RoomCreate,
@@ -537,9 +532,7 @@ impl Core {
         let Ok(Some(content)) = self.hint_content(old, keys).await else {
             return;
         };
-        let Ok(client) = self.client().await else {
-            return;
-        };
+        let client = self.client();
         let existing = client
             .send(get_state_event_for_key::v3::Request::new(
                 new.clone(),

@@ -65,7 +65,8 @@ async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
         )
         .await;
     let core = logged_in(&server, &client, "search-hydrate").await;
-    core.search_index.lock().await.upsert(
+    let session = core.signed_in().unwrap();
+    session.state().search_index.lock().await.upsert(
         &room_id,
         document(
             "image",
@@ -77,7 +78,7 @@ async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
         ),
     );
 
-    let (items, _) = core
+    let (items, _) = session
         .attachment_page(
             &room_id,
             crate::protocol::RoomAttachmentKind::Media,
@@ -94,7 +95,8 @@ async fn test_the_gallery_fills_in_media_for_a_migrated_message() {
             ..
         }] if source == "mxc://localhost/beach"
     ));
-    let index = core.search_index.lock().await;
+    let session_state = session.state();
+    let index = session_state.search_index.lock().await;
     let stored = index
         .document(&room_id, &event_id!("$image").to_owned())
         .await
@@ -157,15 +159,21 @@ async fn test_room_attachments_sort_the_index_into_media_files_and_links() {
         .await;
 
     let core = logged_in(&server, &client, "room-attachments").await;
+    let session = core.signed_in().unwrap();
     let (cache, _drop_handles) = client
         .event_cache()
         .unwrap()
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(
+        &*session.state().search_index.lock().await,
+        &cache,
+        &room_id,
+    )
+    .await;
 
-    let (media, next) = core
+    let (media, next) = session
         .room_attachments(&room_id, RoomAttachmentKind::Media, 10, None)
         .await
         .expect("media");
@@ -178,7 +186,7 @@ async fn test_room_attachments_sort_the_index_into_media_files_and_links() {
         }] if filename == "beach.png" && source == "mxc://localhost/beach"
     ));
 
-    let (files, _) = core
+    let (files, _) = session
         .room_attachments(&room_id, RoomAttachmentKind::File, 10, None)
         .await
         .expect("files");
@@ -190,7 +198,7 @@ async fn test_room_attachments_sort_the_index_into_media_files_and_links() {
         }] if filename == "notes.pdf"
     ));
 
-    let (links, _) = core
+    let (links, _) = session
         .room_attachments(&room_id, RoomAttachmentKind::Link, 10, None)
         .await
         .expect("links");
@@ -255,15 +263,21 @@ async fn test_room_attachments_list_each_gallery_item_under_its_tab() {
         .await;
 
     let core = logged_in(&server, &client, "gallery-attachments").await;
+    let session = core.signed_in().unwrap();
     let (cache, _drop_handles) = client
         .event_cache()
         .unwrap()
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(
+        &*session.state().search_index.lock().await,
+        &cache,
+        &room_id,
+    )
+    .await;
 
-    let (media, _) = core
+    let (media, _) = session
         .room_attachments(&room_id, RoomAttachmentKind::Media, 10, None)
         .await
         .expect("media");
@@ -275,7 +289,7 @@ async fn test_room_attachments_list_each_gallery_item_under_its_tab() {
     assert_eq!(media[1]["gallery_index"], 2);
     assert_eq!(media[1]["content"]["kind"], "video");
 
-    let (files, _) = core
+    let (files, _) = session
         .room_attachments(&room_id, RoomAttachmentKind::File, 10, None)
         .await
         .expect("files");
@@ -289,7 +303,7 @@ async fn test_room_attachments_list_each_gallery_item_under_its_tab() {
         rooms: vec![room_id.clone()],
         ..crate::search::IndexFilter::default()
     };
-    let hits = core
+    let hits = session
         .search_messages(
             "notes",
             &filter,

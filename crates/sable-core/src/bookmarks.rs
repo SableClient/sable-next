@@ -4,8 +4,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_with::{DefaultOnError, VecSkipError, serde_as};
 
-use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::BookmarkView;
 use crate::protocol::{RpcCode, RpcError};
 use crate::room_settings::EmptyContent;
@@ -120,7 +120,7 @@ fn item_event(id: &str) -> GlobalAccountDataEventType {
     GlobalAccountDataEventType::from(format!("{ITEM_PREFIX}{id}"))
 }
 
-impl Core {
+impl SignedIn {
     async fn bookmark_account_data<T: DeserializeOwned>(
         &self,
         event_type: GlobalAccountDataEventType,
@@ -187,7 +187,7 @@ impl Core {
             let index = current
                 .map(IndexIn::deserialize)
                 .transpose()
-                .or_failed(self, "bookmarks")?
+                .or_failed(self.core(), "bookmarks")?
                 .unwrap_or_default();
             let revision = index.revision.unwrap_or(0);
             let mut ids = unique_ids(index.bookmark_ids);
@@ -214,7 +214,7 @@ impl Core {
                 bookmark_ids: ids,
             })
             .map(Some)
-            .or_failed(self, "bookmarks")
+            .or_failed(self.core(), "bookmarks")
         })
         .await?;
 
@@ -228,12 +228,12 @@ impl Core {
         event_id: &OwnedEventId,
         now_ms: u64,
     ) -> Result<(), RpcError> {
-        let room = self.room(room_id).await?;
-        let encrypted = self.room_is_encrypted(&room).await?;
+        let room = self.room(room_id)?;
+        let encrypted = self.core().room_is_encrypted(&room).await?;
         let event = room
             .event(event_id, None)
             .await
-            .or_failed(self, "set_bookmark")?;
+            .or_failed(self.core(), "set_bookmark")?;
         let raw = event
             .raw()
             .deserialize_as_unchecked::<SourceEventIn>()

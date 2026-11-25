@@ -24,6 +24,7 @@ use matrix_sdk_ui::{
     },
 };
 
+use crate::SignedIn;
 use crate::protocol::{
     MembershipChangeView, MentionView, MessageShieldCode, MessageShieldView, PerMessageProfileView,
     ReactionGroup, SendBlockView, SendStateView, SharedByView, ThreadSummaryView,
@@ -477,8 +478,8 @@ pub fn aggregation_item(
     }
 }
 
-pub async fn standalone_item(
-    core: &crate::Core,
+pub(crate) async fn standalone_item(
+    core: &SignedIn,
     room: &Room,
     event: TimelineEvent,
     latest: Option<TimelineEvent>,
@@ -565,7 +566,7 @@ pub async fn standalone_item(
         forwarded: original.content.as_ref().and_then(forward_meta),
         ..TimelineItemView::bare(event_id.to_string(), timestamp.0.into(), view_content)
     };
-    core.nicknames().apply_item(&mut item);
+    core.core().nicknames().apply_item(&mut item);
     Some(item)
 }
 

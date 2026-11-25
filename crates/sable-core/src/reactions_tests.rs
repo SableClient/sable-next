@@ -111,8 +111,9 @@ async fn reaction_ids_follow_pages_and_match_sender_and_key() {
         .mount(server.server())
         .await;
     let core = crate::test_support::signed_in_core(&server, client).await.0;
+    let session = core.signed_in().unwrap();
 
-    let ids = core
+    let ids = session
         .reaction_event_ids(
             &room_id.to_owned(),
             &event_id!("$target").to_owned(),
@@ -159,17 +160,19 @@ async fn a_reaction_outside_the_timeline_is_sent_then_taken_back() {
         .mount(server.server())
         .await;
     let core = crate::test_support::signed_in_core(&server, client).await.0;
+    let session = core.signed_in().unwrap();
     let toggle = |extra| {
-        let core = &core;
+        let session = &session;
         async move {
-            core.toggle_reaction_outside_timeline(
-                &room_id.to_owned(),
-                &event_id!("$post").to_owned(),
-                "👍",
-                extra,
-            )
-            .await
-            .unwrap()
+            session
+                .toggle_reaction_outside_timeline(
+                    &room_id.to_owned(),
+                    &event_id!("$post").to_owned(),
+                    "👍",
+                    extra,
+                )
+                .await
+                .unwrap()
         }
     };
 
@@ -275,8 +278,9 @@ async fn reaction_pagination_that_repeats_a_token_fails() {
         .mount(server.server())
         .await;
     let core = crate::test_support::signed_in_core(&server, client).await.0;
+    let session = core.signed_in().unwrap();
 
-    let result = core
+    let result = session
         .reaction_event_ids(
             &room_id.to_owned(),
             &event_id!("$target").to_owned(),
@@ -413,25 +417,33 @@ async fn nested_reactions_are_ignored() {
         );
 
         let (core, _events) = Core::new("reactions-test", Box::new(MemorySessionStore::default()));
-        *core.session.write().await = Some(Session {
-            account_id: "test".to_owned(),
-            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-            client,
-            homeserver: server.server().uri(),
-            oauth: false,
-        });
-        core.ensure_reaction_target(&room_id.to_owned(), &original.to_owned())
+        crate::test_support::set_session(
+            &core,
+            Some(Session {
+                account_id: "test".to_owned(),
+                sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+                client,
+                homeserver: server.server().uri(),
+                oauth: false,
+                state: Arc::default(),
+            }),
+        );
+        let session = core.signed_in().unwrap();
+        session
+            .ensure_reaction_target(&room_id.to_owned(), &original.to_owned())
             .await
             .unwrap();
         assert!(
-            core.reaction_shortcodes(&room_id.to_owned(), &original.to_owned())
+            session
+                .reaction_shortcodes(&room_id.to_owned(), &original.to_owned())
                 .await
                 .unwrap()
                 .is_empty()
         );
         for target in [annotation, replacement, edit, reaction] {
             assert!(
-                core.reaction_shortcodes(&room_id.to_owned(), &target.to_owned())
+                session
+                    .reaction_shortcodes(&room_id.to_owned(), &target.to_owned())
                     .await
                     .unwrap()
                     .is_empty()

@@ -253,6 +253,8 @@ async fn a_room_is_fetched_once_and_served_from_the_cache() {
     let space_id = room_id!("!space:example.org");
     let client = joined(&server, &[room_id, space_id]).await;
     let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     serve_state(
         &server,
         room_id,
@@ -277,8 +279,8 @@ async fn a_room_is_fetched_once_and_served_from_the_cache() {
     let room = client.get_room(room_id).unwrap();
 
     for _ in 0..2 {
-        let found = core
-            .cosmetics_for(&client, &room, Some(space_id.to_owned()))
+        let found = session
+            .cosmetics_for(&room, Some(space_id.to_owned()))
             .await;
         assert_eq!(found.space_id.as_deref(), Some(space_id));
         assert_eq!(found.users.len(), 1);
@@ -294,6 +296,8 @@ async fn concurrent_reads_of_one_room_share_a_single_fetch() {
     let space_id = room_id!("!space:example.org");
     let client = joined(&server, &[room_id, space_id]).await;
     let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     serve_state(
         &server,
         room_id,
@@ -305,7 +309,7 @@ async fn concurrent_reads_of_one_room_share_a_single_fetch() {
     let room = client.get_room(room_id).unwrap();
 
     let found = futures_util::future::join_all(
-        (0..5).map(|_| core.cosmetics_for(&client, &room, Some(space_id.to_owned()))),
+        (0..5).map(|_| session.cosmetics_for(&room, Some(space_id.to_owned()))),
     )
     .await;
 
@@ -407,6 +411,8 @@ async fn without_a_space_the_first_parent_is_used() {
         )
         .await;
     let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     serve_state(&server, room_id, json!([]), 1).await;
     serve_state(
         &server,
@@ -416,8 +422,8 @@ async fn without_a_space_the_first_parent_is_used() {
     )
     .await;
 
-    let found = core
-        .cosmetics_for(&client, &client.get_room(room_id).unwrap(), None)
+    let found = session
+        .cosmetics_for(&client.get_room(room_id).unwrap(), None)
         .await;
 
     assert_eq!(found.space_id.as_deref(), Some(space_id));
@@ -430,11 +436,13 @@ async fn a_synced_change_updates_the_cache_and_is_announced() {
     let room_id = room_id!("!room:example.org");
     let client = joined(&server, &[room_id]).await;
     let (core, mut events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
-    core.watch_cosmetics(&client, 1);
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_cosmetics(1);
     serve_state(&server, room_id, json!([]), 1).await;
     let room = client.get_room(room_id).unwrap();
     assert_eq!(
-        core.cosmetics_for(&client, &room, None).await.users,
+        session.cosmetics_for(&room, None).await.users,
         Vec::<SenderCosmeticsView>::new()
     );
 
@@ -456,7 +464,7 @@ async fn a_synced_change_updates_the_cache_and_is_announced() {
         })
         .collect();
     assert_eq!(announced, [room_id.to_owned()]);
-    let found = core.cosmetics_for(&client, &room, None).await;
+    let found = session.cosmetics_for(&room, None).await;
     assert_eq!(found.users[0].color_on_light.as_deref(), Some("#123456"));
 }
 
@@ -467,7 +475,9 @@ async fn a_rename_in_one_room_refreshes_the_cached_space() {
     let space_id = room_id!("!space:example.org");
     let client = joined(&server, &[room_id, space_id]).await;
     let (core, mut events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
-    core.watch_cosmetics(&client, 1);
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_cosmetics(1);
     let old = json!({ "membership": "join", "displayname": "Old Alice" });
     let new = json!({ "membership": "join", "displayname": "New Alice" });
     serve_state(
@@ -487,7 +497,8 @@ async fn a_rename_in_one_room_refreshes_the_cached_space() {
     serve_member(&server, space_id, &new, 1).await;
     let room = client.get_room(room_id).unwrap();
     assert_eq!(
-        core.cosmetics_for(&client, &room, Some(space_id.to_owned()))
+        session
+            .cosmetics_for(&room, Some(space_id.to_owned()))
             .await
             .users,
         Vec::<SenderCosmeticsView>::new()
@@ -504,8 +515,8 @@ async fn a_rename_in_one_room_refreshes_the_cached_space() {
             break;
         }
     }
-    let found = core
-        .cosmetics_for(&client, &room, Some(space_id.to_owned()))
+    let found = session
+        .cosmetics_for(&room, Some(space_id.to_owned()))
         .await;
     assert!(found.users.is_empty(), "{:?}", found.users);
 }
@@ -517,7 +528,9 @@ async fn a_resent_member_state_re_reads_a_differing_layer_once() {
     let space_id = room_id!("!space:example.org");
     let client = joined(&server, &[room_id, space_id]).await;
     let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
-    core.watch_cosmetics(&client, 1);
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_cosmetics(1);
     let member = json!({ "membership": "join", "displayname": "Alice" });
     let space = json!({ "membership": "join", "displayname": "Space Alice" });
     serve_state(
@@ -536,7 +549,8 @@ async fn a_resent_member_state_re_reads_a_differing_layer_once() {
     .await;
     serve_member(&server, space_id, &space, 1).await;
     let room = client.get_room(room_id).unwrap();
-    core.cosmetics_for(&client, &room, Some(space_id.to_owned()))
+    session
+        .cosmetics_for(&room, Some(space_id.to_owned()))
         .await;
 
     for _ in 0..3 {
@@ -561,7 +575,9 @@ async fn a_rename_leaves_a_space_name_set_on_purpose() {
     let space_id = room_id!("!space:example.org");
     let client = joined(&server, &[room_id, space_id]).await;
     let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
-    core.watch_cosmetics(&client, 1);
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_cosmetics(1);
     let old = json!({ "membership": "join", "displayname": "Alice" });
     let new = json!({ "membership": "join", "displayname": "New Alice" });
     let space = json!({ "membership": "join", "displayname": "Space Alice" });
@@ -581,13 +597,14 @@ async fn a_rename_leaves_a_space_name_set_on_purpose() {
     .await;
     serve_member(&server, space_id, &space, 0).await;
     let room = client.get_room(room_id).unwrap();
-    core.cosmetics_for(&client, &room, Some(space_id.to_owned()))
+    session
+        .cosmetics_for(&room, Some(space_id.to_owned()))
         .await;
 
     rename(&server, &client, room_id, &old, &new).await;
 
-    let found = core
-        .cosmetics_for(&client, &room, Some(space_id.to_owned()))
+    let found = session
+        .cosmetics_for(&room, Some(space_id.to_owned()))
         .await;
     assert_eq!(
         found.users[0].space_display_name.as_deref(),

@@ -3,7 +3,8 @@ use std::sync::Arc;
 use matrix_sdk::ruma::OwnedRoomId;
 use serde::Deserialize;
 
-use super::{Handler, Json};
+use super::{Handler, SessionHandler, Json};
+use crate::SignedIn;
 use crate::Core;
 use crate::protocol::RpcError;
 
@@ -33,12 +34,12 @@ pub struct SendDelayedEventParams {
     pub sticky_duration_ms: Option<u32>,
 }
 
-impl Handler for SendDelayedEventParams {
+impl SessionHandler for SendDelayedEventParams {
     /// The delay id.
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.widget_send_delayed_event(
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.widget_send_delayed_event(
             &self.room_id,
             &self.event_type,
             self.state_key,
@@ -62,12 +63,12 @@ pub struct SendStickyEventParams {
     pub sticky_duration_ms: u32,
 }
 
-impl Handler for SendStickyEventParams {
+impl SessionHandler for SendStickyEventParams {
     /// The event id.
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.widget_send_sticky_event(
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.widget_send_sticky_event(
             &self.room_id,
             &self.event_type,
             self.content,
@@ -84,11 +85,11 @@ pub struct RestartDelayedEventParams {
     pub delay_id: String,
 }
 
-impl Handler for RestartDelayedEventParams {
+impl SessionHandler for RestartDelayedEventParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.restart_delayed_event(self).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.restart_delayed_event(self).await
     }
 }
 
@@ -101,11 +102,11 @@ pub struct SendToDeviceParams {
     pub messages: serde_json::Value,
 }
 
-impl Handler for SendToDeviceParams {
+impl SessionHandler for SendToDeviceParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.widget_send_to_device(&self.event_type, self.encrypted, self.messages)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.widget_send_to_device(&self.event_type, self.encrypted, self.messages)
             .await
     }
 }
@@ -120,10 +121,12 @@ pub struct RoomStickyEventsParams {
 impl Handler for RoomStickyEventsParams {
     type Ok = Vec<Json>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<Json>, RpcError> {
-        core.room_sticky_events(&self.room_id)
-            .await
-            .map(|events| events.into_iter().map(Json).collect())
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<Vec<Json>, RpcError>> {
+        std::future::ready(
+            core.signed_in()
+                .and_then(|session| session.room_sticky_events(&self.room_id))
+                .map(|events| events.into_iter().map(Json).collect()),
+        )
     }
 }
 

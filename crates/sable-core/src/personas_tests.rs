@@ -464,20 +464,25 @@ async fn an_unreachable_server_serves_the_stored_catalog() {
         })
         .await;
     let (core, _events) = Core::new("offline-personas", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "test".into(),
-        client: client.clone(),
-        sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "test".into(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
     let _unreachable = Mock::given(method("GET"))
         .and(path_regex("/account_data/"))
         .respond_with(ResponseTemplate::new(500))
         .mount_as_scoped(server.server())
         .await;
 
-    let catalog = core.personas().await.unwrap();
+    let catalog = session.personas().await.unwrap();
 
     assert_eq!(catalog.personas.len(), 1);
     assert_eq!(catalog.personas[0].id, "kris");

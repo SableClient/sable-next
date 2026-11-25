@@ -1,14 +1,15 @@
+use crate::SignedIn;
 use crate::api::session::SearchTuning;
 use crate::now_ms;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::Arc;
 use std::time::Duration;
 
+use crate::tasks::JoinHandleExt;
 use matrix_sdk::deserialized_responses::{
     TimelineEvent, UnableToDecryptInfo, UnableToDecryptReason,
 };
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::message::get_message_events;
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
@@ -20,7 +21,6 @@ use tracing::warn;
 
 use super::persist::{self, Cover, Hole, StoredCrawlRoom};
 use super::sharing::DISCOVERY;
-use crate::Core;
 use crate::protocol::{
     CoreEvent, SearchCoverageState, SearchCoverageView, SearchCrawlPhase, SearchMetricsView,
 };
@@ -448,48 +448,50 @@ impl CrawlProgress {
     }
 }
 
-impl Core {
-    pub(crate) fn watch_search_crawl(self: &Arc<Self>, client: &matrix_sdk::Client) {
+impl SignedIn {
+    pub(crate) fn watch_search_crawl(&self) {
         let core = self.clone();
-        let client = client.clone();
 
-        self.track_session_task(spawn(async move { core.crawl(&client).await }).abort_on_drop());
+        self.track_session_task(spawn(async move { core.crawl().await }).abort_on_drop());
     }
 
-    async fn crawl(self: Arc<Self>, client: &matrix_sdk::Client) {
+    async fn crawl(self) {
         let mut reported: Option<(SearchCoverageView, web_time::Instant)> = None;
 
         let stored = persist::load_crawl(&self.search_store().await).await;
         {
-            let mut progress = self.search_crawl.lock().await;
+            let mut progress = self.state().search_crawl.lock();
             progress.restore(stored.rooms);
             progress.metrics.started_ms.get_or_insert_with(now_ms);
         }
 
-        self.report_coverage(client, &mut reported).await;
-        if self.search_sharing.discovering() {
+        self.report_coverage(&mut reported).await;
+        if self.discovering_peers() {
             let deadline = web_time::Instant::now() + DISCOVERY;
-            while self.search_sharing.discovering() && web_time::Instant::now() < deadline {
+            while self.discovering_peers() && web_time::Instant::now() < deadline {
                 matrix_sdk::sleep::sleep(Duration::from_millis(100)).await;
             }
         }
 
         loop {
-            self.report_coverage(client, &mut reported).await;
+            self.report_coverage(&mut reported).await;
 
             if self.held_back().await {
                 continue;
             }
 
-            let Some(room_id) = self.next_room_to_crawl(client).await else {
+            let Some(room_id) = self.next_room_to_crawl().await else {
                 self.save_changed_checkpoints().await;
-                self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
+                self.state()
+                    .search_crawl
+                    .lock()
+                    .enter(SearchCrawlPhase::Idle);
                 matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
                 continue;
             };
 
             {
-                let mut progress = self.search_crawl.lock().await;
+                let mut progress = self.state().search_crawl.lock();
                 let phase = if progress.trickling() {
                     SearchCrawlPhase::Trickling
                 } else {
@@ -497,17 +499,17 @@ impl Core {
                 };
                 progress.enter(phase);
             }
-            let pause = match self.crawl_once(client, &room_id).await {
+            let pause = match self.crawl_once(&room_id).await {
                 Ok(CrawlOutcome::Paused) => continue,
                 Ok(CrawlOutcome::Unwritten) => CRAWL_IDLE,
                 Ok(CrawlOutcome::Batch(outcome)) if outcome.reached_start => {
-                    let mut progress = self.search_crawl.lock().await;
+                    let mut progress = self.state().search_crawl.lock();
                     progress.steady(&room_id);
                     progress.settle(room_id, outcome.exhausted);
                     outcome.pause(&progress.tuning)
                 }
                 Ok(CrawlOutcome::Batch(outcome)) => {
-                    let mut progress = self.search_crawl.lock().await;
+                    let mut progress = self.state().search_crawl.lock();
                     progress.steady(&room_id);
                     if progress.blinded(&room_id, outcome.undecryptable) {
                         progress.settle(room_id, false);
@@ -515,10 +517,10 @@ impl Core {
                     outcome.pause(&progress.tuning)
                 }
                 Err(error) => {
-                    if let Some(delay) = self.settle_pushback(&room_id, &error).await {
-                        self.search_crawl
+                    if let Some(delay) = self.settle_pushback(&room_id, &error) {
+                        self.state()
+                            .search_crawl
                             .lock()
-                            .await
                             .enter(SearchCrawlPhase::BackingOff);
                         matrix_sdk::sleep::sleep(delay).await;
                         continue;
@@ -527,60 +529,68 @@ impl Core {
                 }
             };
 
-            let pause = self.search_crawl.lock().await.paced(pause);
+            let pause = self.state().search_crawl.lock().paced(pause);
             matrix_sdk::sleep::sleep(pause).await;
         }
     }
 
     /// Waits out whatever keeps the crawler from its next room, and says whether it did.
     async fn held_back(&self) -> bool {
-        if !self.search_index.lock().await.ready() {
-            self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
+        if !self.state().search_index.lock().await.ready() {
+            self.state()
+                .search_crawl
+                .lock()
+                .enter(SearchCrawlPhase::Idle);
             matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
             return true;
         }
 
         if !self
+            .core()
+            .settings
             .search_crawler_enabled
             .load(std::sync::atomic::Ordering::Relaxed)
         {
-            self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
+            self.state()
+                .search_crawl
+                .lock()
+                .enter(SearchCrawlPhase::Idle);
             matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
             return true;
         }
 
-        if !self.checkpoint_batch_open().await {
+        if !self.checkpoint_batch_open() {
             self.save_changed_checkpoints().await;
         }
 
-        if !self.search_crawl_active() {
+        if !self.core().search_crawl_active() {
             self.save_changed_checkpoints().await;
-            self.search_crawl
+            self.state()
+                .search_crawl
                 .lock()
-                .await
                 .enter(SearchCrawlPhase::Paused);
-            if self.activity.app_active() {
+            if self.core().activity.app_active() {
                 matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
             } else {
-                self.wait_until_active().await;
+                self.core().wait_until_active().await;
             }
             return true;
         }
 
-        if self.foreground_paginations() > 0 {
-            self.search_crawl
+        if self.core().foreground_paginations() > 0 {
+            self.state()
+                .search_crawl
                 .lock()
-                .await
                 .enter(SearchCrawlPhase::Yielding);
             matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
             return true;
         }
 
-        let spent = self.search_crawl.lock().await.spent();
-        let full = self.search_index.lock().await.is_full().await;
+        let spent = self.state().search_crawl.lock().spent();
+        let full = self.state().search_index.lock().await.is_full().await;
         if spent || full {
             self.save_changed_checkpoints().await;
-            self.search_crawl.lock().await.enter(if spent {
+            self.state().search_crawl.lock().enter(if spent {
                 SearchCrawlPhase::BudgetSpent
             } else {
                 SearchCrawlPhase::IndexFull
@@ -592,24 +602,15 @@ impl Core {
         false
     }
 
-    /// Whether the last save is recent enough that this change may join the next batch.
-    async fn checkpoint_batch_open(&self) -> bool {
-        self.search_crawl
-            .lock()
-            .await
-            .checkpointed
-            .is_some_and(|at| at.elapsed() < CHECKPOINT_INTERVAL)
-    }
-
     pub(super) async fn save_changed_checkpoints(&self) {
-        let Some(checkpoints) = self.search_crawl.lock().await.changed_checkpoints() else {
+        let Some(checkpoints) = self.state().search_crawl.lock().changed_checkpoints() else {
             return;
         };
-        if checkpoints == self.search_crawl.lock().await.saved {
+        if checkpoints == self.state().search_crawl.lock().saved {
             return;
         }
         if persist::save_crawl(&self.search_store().await, checkpoints.clone()).await {
-            let mut progress = self.search_crawl.lock().await;
+            let mut progress = self.state().search_crawl.lock();
             progress.saved = checkpoints;
             progress.checkpointed = Some(web_time::Instant::now());
             #[cfg(test)]
@@ -617,48 +618,15 @@ impl Core {
                 progress.checkpoint_writes += 1;
             }
         } else {
-            self.search_crawl.lock().await.changed = true;
+            self.state().search_crawl.lock().changed = true;
         }
-    }
-
-    async fn settle_pushback(
-        &self,
-        room_id: &OwnedRoomId,
-        error: &matrix_sdk::Error,
-    ) -> Option<Duration> {
-        let mut progress = self.search_crawl.lock().await;
-        if error
-            .as_client_api_error()
-            .is_some_and(|api| api.status_code.as_u16() == 400)
-            && progress.reject_shared_resume(room_id)
-        {
-            return Some(Duration::ZERO);
-        }
-
-        let Pushback::Transient(retry_after) = pushback(error) else {
-            progress.fail(room_id.clone());
-            warn!(%room_id, "search crawl pagination failed: {error}");
-            return None;
-        };
-
-        progress.visit(room_id);
-        progress.metrics.pushbacks = progress.metrics.pushbacks.saturating_add(1);
-        let Some(delay) = progress.stall(room_id, retry_after) else {
-            progress.fail(room_id.clone());
-            warn!(%room_id, "search crawl stopped after repeated pushback: {error}");
-            return None;
-        };
-
-        warn!(%room_id, "search crawl backing off {delay:?}: {error}");
-        Some(delay)
     }
 
     async fn report_coverage(
         &self,
-        client: &matrix_sdk::Client,
         reported: &mut Option<(SearchCoverageView, web_time::Instant)>,
     ) {
-        let coverage = self.search_coverage(client).await;
+        let coverage = self.search_coverage().await;
         if let Some((last, at)) = reported.as_ref() {
             let progress_only =
                 last.state == coverage.state && last.rooms_failed == coverage.rooms_failed;
@@ -667,19 +635,21 @@ impl Core {
             }
         }
         *reported = Some((coverage, web_time::Instant::now()));
-        self.emit(CoreEvent::SearchCoverage { coverage });
+        self.core().emit(CoreEvent::SearchCoverage { coverage });
     }
 
-    pub(crate) async fn search_coverage(&self, client: &matrix_sdk::Client) -> SearchCoverageView {
-        let index = self.search_index.lock().await;
+    pub(crate) async fn search_coverage(&self) -> SearchCoverageView {
+        let client = self.client();
+        let session_state = self.state();
+        let index = session_state.search_index.lock().await;
         let documents = index.documents().await;
         let full = index.is_full().await;
         drop(index);
 
-        let progress = self.search_crawl.lock().await;
-        let rooms_pending = client
-            .joined_rooms()
-            .into_iter()
+        let joined = client.joined_rooms();
+        let progress = self.state().search_crawl.lock();
+        let rooms_pending = joined
+            .iter()
             .filter(|room| !progress.skips(room.room_id()))
             .count();
         let rooms_failed = progress.failed.len();
@@ -687,6 +657,8 @@ impl Core {
         let stopped = full
             || progress.spent()
             || !self
+                .core()
+                .settings
                 .search_crawler_enabled
                 .load(std::sync::atomic::Ordering::Relaxed);
         drop(progress);
@@ -709,15 +681,17 @@ impl Core {
         }
     }
 
-    pub(crate) async fn search_metrics(&self, client: &matrix_sdk::Client) -> SearchMetricsView {
-        let index = self.search_index.lock().await;
+    pub(crate) async fn search_metrics(&self) -> SearchMetricsView {
+        let client = self.client();
+        let session_state = self.state();
+        let index = session_state.search_index.lock().await;
         let stats = index.stats().await.unwrap_or_default();
         let disk_budget = index.disk_budget();
         let rooms_indexed = index.rooms().await.len();
         drop(index);
 
         let rooms = client.joined_rooms();
-        let progress = self.search_crawl.lock().await;
+        let progress = self.state().search_crawl.lock();
         let metrics = &progress.metrics;
 
         SearchMetricsView {
@@ -752,15 +726,13 @@ impl Core {
         }
     }
 
-    pub(super) async fn next_room_to_crawl(
-        &self,
-        client: &matrix_sdk::Client,
-    ) -> Option<OwnedRoomId> {
+    pub(super) async fn next_room_to_crawl(&self) -> Option<OwnedRoomId> {
+        let client = self.client();
         let rooms = client.joined_rooms();
         self.settle_one_encryption_state(&rooms).await;
 
         let candidates: Vec<(&RoomId, bool, usize, bool)> = {
-            let progress = self.search_crawl.lock().await;
+            let progress = self.state().search_crawl.lock();
             let tiered = rooms.iter().all(|room| {
                 !room.encryption_state().is_unknown() || progress.probed.contains(room.room_id())
             });
@@ -769,7 +741,7 @@ impl Core {
                 .iter()
                 .filter(|room| {
                     !progress.skips(room.room_id())
-                        && !self.search_sharing.restoring(room.room_id())
+                        && !self.state().search_peers.restoring(room.room_id())
                 })
                 .map(|room| {
                     (
@@ -782,7 +754,8 @@ impl Core {
                 .collect()
         };
 
-        let index = self.search_index.lock().await;
+        let session_state = self.state();
+        let index = session_state.search_index.lock().await;
         let mut ranked = Vec::with_capacity(candidates.len());
         for (room_id, first, visits, holed) in candidates {
             ranked.push((
@@ -801,39 +774,6 @@ impl Core {
             .map(|(_, room_id)| room_id.to_owned())
     }
 
-    async fn settle_one_encryption_state(&self, rooms: &[Room]) {
-        let unsettled = {
-            let progress = self.search_crawl.lock().await;
-            rooms
-                .iter()
-                .find(|room| {
-                    room.encryption_state().is_unknown()
-                        && !progress.probed.contains(room.room_id())
-                })
-                .cloned()
-        };
-        let Some(room) = unsettled else {
-            return;
-        };
-
-        let Some(result) = self
-            .search_network
-            .run(room.request_encryption_state())
-            .await
-        else {
-            return;
-        };
-        self.search_crawl
-            .lock()
-            .await
-            .probed
-            .insert(room.room_id().to_owned());
-
-        if let Err(error) = result {
-            warn!(room_id = %room.room_id(), "could not settle a room's encryption state: {error}");
-        }
-    }
-
     async fn crawl_page(
         &self,
         room: &Room,
@@ -850,117 +790,14 @@ impl Core {
         })
     }
 
-    async fn crawl_event(&self, room: &Room, event: Raw<AnyTimelineEvent>) -> TimelineEvent {
-        let Some(session_id) = megolm_session(&event) else {
-            return TimelineEvent::from_plaintext(event.cast());
-        };
-        let session = (room.room_id().to_owned(), session_id);
-        if self
-            .search_crawl
-            .lock()
-            .await
-            .lost_sessions
-            .contains(&session)
-        {
-            return TimelineEvent::from_utd(
-                event.cast(),
-                UnableToDecryptInfo {
-                    session_id: Some(session.1),
-                    reason: UnableToDecryptReason::MissingMegolmSession {
-                        withheld_code: None,
-                    },
-                },
-            );
-        }
-        let result = room
-            .decrypt_event_without_key_request(event.cast_ref_unchecked())
-            .await;
-        if result
-            .as_ref()
-            .is_ok_and(|decrypted| decrypted.kind.is_utd())
-        {
-            self.search_crawl.lock().await.lost_sessions.insert(session);
-        }
-        decrypted_or_utd(event, result)
-    }
-
-    async fn below_floor(
-        &self,
-        room_id: &OwnedRoomId,
-        chunk: &[TimelineEvent],
-        stop: u64,
-    ) -> Option<CrawlOutcome> {
-        let floor = self
-            .search_index
-            .lock()
-            .await
-            .floor_of(room_id)
-            .await
-            .max(now_ms().saturating_sub(CRAWL_MAX_AGE_MS));
-        let below = |floor: u64| {
-            floor > 0
-                && !chunk.is_empty()
-                && chunk.iter().all(|event| {
-                    event
-                        .timestamp_raw()
-                        .is_some_and(|ts| u64::from(ts.get()) < floor)
-                })
-        };
-        let anchor = self
-            .search_crawl
-            .lock()
-            .await
-            .cover_of(room_id)
-            .filter(|cover| cover.stops)
-            .and_then(|cover| cover.anchor.clone());
-        if let Some(anchor) = anchor {
-            let mut progress = self.search_crawl.lock().await;
-            if progress.anchored.contains(room_id) {
-                let jumped = progress.jump(room_id);
-                return Some(CrawlOutcome::Batch(CrawlBatch {
-                    reached_start: !jumped,
-                    exhausted: !jumped,
-                    undecryptable: 0,
-                    readable: true,
-                }));
-            }
-            if chunk
-                .iter()
-                .any(|event| event.event_id() == Some(anchor.as_ref()))
-            {
-                progress.anchored.insert(room_id.clone());
-            }
-            return below(floor).then_some(CrawlOutcome::Batch(CrawlBatch {
-                reached_start: true,
-                exhausted: true,
-                undecryptable: 0,
-                readable: true,
-            }));
-        }
-        if !below(floor) && below(stop) && self.search_crawl.lock().await.jump(room_id) {
-            return Some(CrawlOutcome::Batch(CrawlBatch {
-                reached_start: false,
-                exhausted: false,
-                undecryptable: 0,
-                readable: true,
-            }));
-        }
-        below(floor.max(stop)).then_some(CrawlOutcome::Batch(CrawlBatch {
-            reached_start: true,
-            exhausted: true,
-            undecryptable: 0,
-            readable: true,
-        }))
-    }
-
     pub(super) async fn crawl_once(
         &self,
-        client: &matrix_sdk::Client,
         room_id: &OwnedRoomId,
     ) -> matrix_sdk::Result<CrawlOutcome> {
-        let hole = self.search_crawl.lock().await.holes.get(room_id).cloned();
+        let client = self.client();
+        let hole = self.state().search_crawl.lock().holes.get(room_id).cloned();
         let Some(hole) = hole else {
-            return self.crawl_back(client, room_id).await;
+            return self.crawl_back(room_id).await;
         };
         let event_cache = client
             .event_cache()
@@ -971,11 +808,8 @@ impl Core {
         self.fill_hole(event_cache, &room, hole).await
     }
 
-    async fn crawl_back(
-        &self,
-        client: &matrix_sdk::Client,
-        room_id: &OwnedRoomId,
-    ) -> matrix_sdk::Result<CrawlOutcome> {
+    async fn crawl_back(&self, room_id: &OwnedRoomId) -> matrix_sdk::Result<CrawlOutcome> {
+        let client = self.client();
         let event_cache = client
             .event_cache()
             .ok_or_else(|| matrix_sdk::Error::UnknownError("event cache is disabled".into()))?;
@@ -984,7 +818,7 @@ impl Core {
         };
 
         let (from, batch, stop) = {
-            let progress = self.search_crawl.lock().await;
+            let progress = self.state().search_crawl.lock();
             (
                 progress.token_or(room_id, room.last_prev_batch()),
                 progress.tuning.batch,
@@ -999,6 +833,7 @@ impl Core {
         request.filter.not_types = vec!["m.reaction".to_owned()];
         let requested = now_ms();
         let Some(messages) = self
+            .core()
             .search_network
             .run(self.crawl_page(&room, request))
             .await
@@ -1008,7 +843,7 @@ impl Core {
         let messages = messages?;
 
         {
-            let mut progress = self.search_crawl.lock().await;
+            let mut progress = self.state().search_crawl.lock();
             progress.visit(room_id);
             progress.metrics.request(now_ms().saturating_sub(requested));
         }
@@ -1033,9 +868,9 @@ impl Core {
         };
 
         if messages.chunk.is_empty() {
-            self.search_crawl
+            self.state()
+                .search_crawl
                 .lock()
-                .await
                 .advance(room_id, messages.end);
         } else {
             let (cache, _drop_handles) = event_cache.room(room_id).await?;
@@ -1054,31 +889,100 @@ impl Core {
                 return Ok(CrawlOutcome::Unwritten);
             };
 
-            let mut progress = self.search_crawl.lock().await;
-            progress.advance(room_id, messages.end);
-            if gap {
-                progress.gapped.insert(room_id.clone());
-            }
-            if !progress.gapped.contains(room_id)
-                && let Some(frontier) = frontier
             {
-                progress
-                    .frontiers
-                    .entry(room_id.clone())
-                    .and_modify(|previous| *previous = (*previous).min(frontier))
-                    .or_insert(frontier);
+                let mut progress = self.state().search_crawl.lock();
+                progress.advance(room_id, messages.end);
+                if gap {
+                    progress.gapped.insert(room_id.clone());
+                }
+                if !progress.gapped.contains(room_id)
+                    && let Some(frontier) = frontier
+                {
+                    progress
+                        .frontiers
+                        .entry(room_id.clone())
+                        .and_modify(|previous| *previous = (*previous).min(frontier))
+                        .or_insert(frontier);
+                }
+                progress.events = progress.events.saturating_add(fresh);
             }
-            progress.events = progress.events.saturating_add(fresh);
-            drop(progress);
             self.settle_bans(&room, bans).await;
             self.refetch_unedited(&room, &cache, &rules).await;
         }
 
         Ok(CrawlOutcome::Batch(outcome))
     }
-}
 
-impl Core {
+    async fn below_floor(
+        &self,
+        room_id: &OwnedRoomId,
+        chunk: &[TimelineEvent],
+        stop: u64,
+    ) -> Option<CrawlOutcome> {
+        let floor = self
+            .state()
+            .search_index
+            .lock()
+            .await
+            .floor_of(room_id)
+            .await
+            .max(now_ms().saturating_sub(CRAWL_MAX_AGE_MS));
+        let below = |floor: u64| {
+            floor > 0
+                && !chunk.is_empty()
+                && chunk.iter().all(|event| {
+                    event
+                        .timestamp_raw()
+                        .is_some_and(|ts| u64::from(ts.get()) < floor)
+                })
+        };
+        let anchor = self
+            .state()
+            .search_crawl
+            .lock()
+            .cover_of(room_id)
+            .filter(|cover| cover.stops)
+            .and_then(|cover| cover.anchor.clone());
+        if let Some(anchor) = anchor {
+            let mut progress = self.state().search_crawl.lock();
+            if progress.anchored.contains(room_id) {
+                let jumped = progress.jump(room_id);
+                return Some(CrawlOutcome::Batch(CrawlBatch {
+                    reached_start: !jumped,
+                    exhausted: !jumped,
+                    undecryptable: 0,
+                    readable: true,
+                }));
+            }
+            if chunk
+                .iter()
+                .any(|event| event.event_id() == Some(anchor.as_ref()))
+            {
+                progress.anchored.insert(room_id.clone());
+            }
+            return below(floor).then_some(CrawlOutcome::Batch(CrawlBatch {
+                reached_start: true,
+                exhausted: true,
+                undecryptable: 0,
+                readable: true,
+            }));
+        }
+        if !below(floor) && below(stop) && self.state().search_crawl.lock().jump(room_id) {
+            return Some(CrawlOutcome::Batch(CrawlBatch {
+                reached_start: false,
+                exhausted: false,
+                undecryptable: 0,
+                readable: true,
+            }));
+        }
+        below(floor.max(stop)).then_some(CrawlOutcome::Batch(CrawlBatch {
+            reached_start: true,
+            exhausted: true,
+            undecryptable: 0,
+            readable: true,
+        }))
+    }
+
     async fn ingest_page(
         &self,
         room_id: &OwnedRoomId,
@@ -1086,14 +990,15 @@ impl Core {
         cache: &matrix_sdk::event_cache::RoomEventCache,
         rules: &ruma::room_version_rules::RedactionRules,
     ) -> Option<usize> {
-        self.search_crawl.lock().await.ingesting = Some(room_id.clone());
+        self.state().search_crawl.lock().ingesting = Some(room_id.clone());
         let ingested = self
+            .state()
             .search_index
             .lock()
             .await
             .ingest_with(room_id, events, cache, rules, true)
             .await;
-        self.search_crawl.lock().await.ingesting = None;
+        self.state().search_crawl.lock().ingesting = None;
         ingested
             .inspect_err(|error| {
                 warn!(%room_id, "the search index could not take a crawled page: {error}");
@@ -1101,6 +1006,132 @@ impl Core {
             .ok()
     }
 
+    fn checkpoint_batch_open(&self) -> bool {
+        self.state()
+            .search_crawl
+            .lock()
+            .checkpointed
+            .is_some_and(|at| at.elapsed() < CHECKPOINT_INTERVAL)
+    }
+
+    fn close_hole(&self, room_id: &OwnedRoomId) -> CrawlOutcome {
+        let mut progress = self.state().search_crawl.lock();
+        progress.holes.remove(room_id);
+        progress.changed = true;
+        CrawlOutcome::Batch(CrawlBatch {
+            reached_start: false,
+            exhausted: false,
+            undecryptable: 0,
+            readable: true,
+        })
+    }
+
+    async fn crawl_event(&self, room: &Room, event: Raw<AnyTimelineEvent>) -> TimelineEvent {
+        let Some(session_id) = megolm_session(&event) else {
+            return TimelineEvent::from_plaintext(event.cast());
+        };
+        let session = (room.room_id().to_owned(), session_id);
+        if self
+            .state()
+            .search_crawl
+            .lock()
+            .lost_sessions
+            .contains(&session)
+        {
+            return TimelineEvent::from_utd(
+                event.cast(),
+                UnableToDecryptInfo {
+                    session_id: Some(session.1),
+                    reason: UnableToDecryptReason::MissingMegolmSession {
+                        withheld_code: None,
+                    },
+                },
+            );
+        }
+        let result = room
+            .decrypt_event_without_key_request(event.cast_ref_unchecked())
+            .await;
+        if result
+            .as_ref()
+            .is_ok_and(|decrypted| decrypted.kind.is_utd())
+        {
+            self.state()
+                .search_crawl
+                .lock()
+                .lost_sessions
+                .insert(session);
+        }
+        decrypted_or_utd(event, result)
+    }
+
+    async fn settle_one_encryption_state(&self, rooms: &[Room]) {
+        let unsettled = {
+            let progress = self.state().search_crawl.lock();
+            rooms
+                .iter()
+                .find(|room| {
+                    room.encryption_state().is_unknown()
+                        && !progress.probed.contains(room.room_id())
+                })
+                .cloned()
+        };
+        let Some(room) = unsettled else {
+            return;
+        };
+
+        let Some(result) = self
+            .core()
+            .search_network
+            .run(room.request_encryption_state())
+            .await
+        else {
+            return;
+        };
+        self.state()
+            .search_crawl
+            .lock()
+            .probed
+            .insert(room.room_id().to_owned());
+
+        if let Err(error) = result {
+            warn!(room_id = %room.room_id(), "could not settle a room's encryption state: {error}");
+        }
+    }
+
+    fn settle_pushback(
+        &self,
+        room_id: &OwnedRoomId,
+        error: &matrix_sdk::Error,
+    ) -> Option<Duration> {
+        let mut progress = self.state().search_crawl.lock();
+        if error
+            .as_client_api_error()
+            .is_some_and(|api| api.status_code.as_u16() == 400)
+            && progress.reject_shared_resume(room_id)
+        {
+            return Some(Duration::ZERO);
+        }
+
+        let Pushback::Transient(retry_after) = pushback(error) else {
+            progress.fail(room_id.clone());
+            warn!(%room_id, "search crawl pagination failed: {error}");
+            return None;
+        };
+
+        progress.visit(room_id);
+        progress.metrics.pushbacks = progress.metrics.pushbacks.saturating_add(1);
+        let Some(delay) = progress.stall(room_id, retry_after) else {
+            progress.fail(room_id.clone());
+            warn!(%room_id, "search crawl stopped after repeated pushback: {error}");
+            return None;
+        };
+
+        warn!(%room_id, "search crawl backing off {delay:?}: {error}");
+        Some(delay)
+    }
+}
+
+impl SignedIn {
     /// Pages forward from the newest event indexed before a limited sync until
     /// the batch that sync delivered, which the live pass has indexed already.
     async fn fill_hole(
@@ -1114,6 +1145,7 @@ impl Core {
             token
         } else {
             let Some(context) = self
+                .core()
                 .search_network
                 .run(room.event_with_context(&hole.anchor, false, UInt::MIN, None))
                 .await
@@ -1122,25 +1154,26 @@ impl Core {
             };
             match context.map(|context| context.next_batch_token) {
                 Ok(Some(token)) => token,
-                Ok(None) => return Ok(self.close_hole(&room_id).await),
+                Ok(None) => return Ok(self.close_hole(&room_id)),
                 Err(error)
                     if error
                         .as_client_api_error()
                         .is_some_and(|api| api.status_code.as_u16() == 404) =>
                 {
-                    return Ok(self.close_hole(&room_id).await);
+                    return Ok(self.close_hole(&room_id));
                 }
                 Err(error) => return Err(error),
             }
         };
 
-        let batch = self.search_crawl.lock().await.tuning.batch;
+        let batch = self.state().search_crawl.lock().tuning.batch;
         let mut request = get_message_events::v3::Request::new(room_id.clone(), Direction::Forward);
         request.from = Some(from);
         request.limit = UInt::from(batch);
         request.filter.not_types = vec!["m.reaction".to_owned()];
         let requested = now_ms();
         let Some(messages) = self
+            .core()
             .search_network
             .run(self.crawl_page(room, request))
             .await
@@ -1149,7 +1182,7 @@ impl Core {
         };
         let messages = messages?;
         {
-            let mut progress = self.search_crawl.lock().await;
+            let mut progress = self.state().search_crawl.lock();
             progress.visit(&room_id);
             progress.metrics.request(now_ms().saturating_sub(requested));
         }
@@ -1176,7 +1209,7 @@ impl Core {
             return Ok(CrawlOutcome::Unwritten);
         };
         {
-            let mut progress = self.search_crawl.lock().await;
+            let mut progress = self.state().search_crawl.lock();
             if gap {
                 progress.gapped.insert(room_id.clone());
             }
@@ -1197,18 +1230,6 @@ impl Core {
             undecryptable: 0,
             readable,
         }))
-    }
-
-    async fn close_hole(&self, room_id: &OwnedRoomId) -> CrawlOutcome {
-        let mut progress = self.search_crawl.lock().await;
-        progress.holes.remove(room_id);
-        progress.changed = true;
-        CrawlOutcome::Batch(CrawlBatch {
-            reached_start: false,
-            exhausted: false,
-            undecryptable: 0,
-            readable: true,
-        })
     }
 }
 
@@ -1419,15 +1440,18 @@ mod tests {
             "crawl-metrics",
             Box::new(crate::store::MemorySessionStore::default()),
         );
-        core.crawl_once(&client, &room_id)
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session
+            .crawl_once(&room_id)
             .await
             .expect("the first batch should land");
-        let Err(error) = core.crawl_once(&client, &room_id).await else {
+        let Err(error) = session.crawl_once(&room_id).await else {
             panic!("the mocked server error should have surfaced");
         };
-        core.settle_pushback(&room_id, &error).await;
+        session.settle_pushback(&room_id, &error);
 
-        let metrics = core.search_metrics(&client).await;
+        let metrics = session.search_metrics().await;
         assert_eq!(metrics.batches, 1);
         assert_eq!(metrics.pushbacks, 1);
         assert!(metrics.last_request_ms.is_some());
@@ -1484,18 +1508,21 @@ mod tests {
             "crawl-lost-sessions",
             Box::new(crate::store::MemorySessionStore::default()),
         );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
 
         for _ in 0..2 {
-            let Ok(CrawlOutcome::Batch(batch)) = core.crawl_once(&client, &room_id).await else {
+            let Ok(CrawlOutcome::Batch(batch)) = session.crawl_once(&room_id).await else {
                 panic!("the batch should land");
             };
             assert!(!batch.readable);
         }
 
         assert!(
-            core.search_crawl
+            session
+                .state()
+                .search_crawl
                 .lock()
-                .await
                 .lost_sessions
                 .contains(&(room_id, "lost".to_owned()))
         );
@@ -1520,9 +1547,13 @@ mod tests {
             "disabled-search-crawler",
             Box::new(crate::store::MemorySessionStore::default()),
         );
-        core.search_crawler_enabled.store(false, Ordering::Relaxed);
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        core.settings
+            .search_crawler_enabled
+            .store(false, Ordering::Relaxed);
 
-        let coverage = core.search_coverage(&client).await;
+        let coverage = session.search_coverage().await;
 
         assert_eq!(
             coverage.state,
@@ -1546,19 +1577,17 @@ mod tests {
             "metered-search-crawler",
             Box::new(crate::store::MemorySessionStore::default()),
         );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
 
         core.search_network.set_unmetered(false);
-        core.crawl_once(&client, &room_id)
-            .await
-            .expect("paused crawl");
-        assert_eq!(core.search_crawl.lock().await.metrics.batches, 0);
-        assert!(core.search_crawl.lock().await.tokens.is_empty());
+        session.crawl_once(&room_id).await.expect("paused crawl");
+        assert_eq!(session.state().search_crawl.lock().metrics.batches, 0);
+        assert!(session.state().search_crawl.lock().tokens.is_empty());
 
         core.search_network.set_unmetered(true);
-        core.crawl_once(&client, &room_id)
-            .await
-            .expect("resumed crawl");
-        assert_eq!(core.search_crawl.lock().await.metrics.batches, 1);
+        session.crawl_once(&room_id).await.expect("resumed crawl");
+        assert_eq!(session.state().search_crawl.lock().metrics.batches, 1);
 
         server
             .mock_room_messages()
@@ -1568,22 +1597,19 @@ mod tests {
             .mount()
             .await;
         core.search_network.set_unmetered(false);
-        let outcome = core
-            .crawl_once(&client, &room_id)
-            .await
-            .expect("paused again");
+        let outcome = session.crawl_once(&room_id).await.expect("paused again");
         assert!(matches!(outcome, CrawlOutcome::Paused));
-        assert_eq!(core.search_crawl.lock().await.metrics.batches, 1);
+        assert_eq!(session.state().search_crawl.lock().metrics.batches, 1);
         assert_eq!(
-            core.search_crawl.lock().await.tokens[&room_id].as_deref(),
+            session.state().search_crawl.lock().tokens[&room_id].as_deref(),
             Some("older")
         );
 
         core.search_network.set_unmetered_only(false);
-        core.crawl_once(&client, &room_id).await.expect("opted out");
-        assert_eq!(core.search_crawl.lock().await.metrics.batches, 2);
+        session.crawl_once(&room_id).await.expect("opted out");
+        assert_eq!(session.state().search_crawl.lock().metrics.batches, 2);
         assert_eq!(
-            core.search_crawl.lock().await.tokens[&room_id].as_deref(),
+            session.state().search_crawl.lock().tokens[&room_id].as_deref(),
             Some("oldest")
         );
     }
@@ -1605,6 +1631,8 @@ mod tests {
             "metered-search-request",
             Box::new(crate::store::MemorySessionStore::default()),
         );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
         core.search_network.set_unmetered(true);
 
         let switch_network = async {
@@ -1625,7 +1653,7 @@ mod tests {
             core.search_network.set_unmetered(false);
         };
         let (outcome, ()) = tokio::time::timeout(Duration::from_secs(2), async {
-            tokio::join!(core.crawl_once(&client, &room_id), switch_network)
+            tokio::join!(session.crawl_once(&room_id), switch_network)
         })
         .await
         .expect("request cancelled before the response");
@@ -1634,7 +1662,7 @@ mod tests {
             outcome.expect("paused crawl"),
             CrawlOutcome::Paused
         ));
-        let progress = core.search_crawl.lock().await;
+        let progress = session.state().search_crawl.lock();
         assert_eq!(progress.metrics.batches, 0);
         assert!(progress.tokens.is_empty());
         assert!(progress.failed.is_empty());
@@ -1664,8 +1692,11 @@ mod tests {
             "crawl-prev-batch",
             Box::new(crate::store::MemorySessionStore::default()),
         );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
 
-        core.crawl_once(&client, &room_id)
+        session
+            .crawl_once(&room_id)
             .await
             .expect("the first batch should start from the sync's prev_batch");
 
@@ -1730,12 +1761,14 @@ mod tests {
             "crawl",
             Box::new(crate::store::MemorySessionStore::default()),
         );
-        let Err(error) = core.crawl_once(&client, &room_id).await else {
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        let Err(error) = session.crawl_once(&room_id).await else {
             panic!("the mocked server error should have surfaced");
         };
 
-        assert!(core.settle_pushback(&room_id, &error).await.is_some());
-        assert!(!core.search_crawl.lock().await.skips(&room_id));
+        assert!(session.settle_pushback(&room_id, &error).is_some());
+        assert!(!session.state().search_crawl.lock().skips(&room_id));
     }
 
     #[test]
@@ -1887,22 +1920,23 @@ mod tests {
             "crawl-quiescent",
             Box::new(crate::store::MemorySessionStore::default()),
         );
-        core.crawl_once(&client, &room_id)
-            .await
-            .expect("crawl one batch");
-        core.save_changed_checkpoints().await;
-        assert_eq!(core.search_crawl.lock().await.checkpoint_writes, 1);
-        assert!(core.checkpoint_batch_open().await, "a busy crawl batches");
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.crawl_once(&room_id).await.expect("crawl one batch");
+        session.save_changed_checkpoints().await;
+        assert_eq!(session.state().search_crawl.lock().checkpoint_writes, 1);
+        assert!(session.checkpoint_batch_open(), "a busy crawl batches");
 
         for _ in 0..3 {
-            core.save_changed_checkpoints().await;
+            session.save_changed_checkpoints().await;
         }
-        core.crawl_once(&client, &room_id)
+        session
+            .crawl_once(&room_id)
             .await
             .expect("crawl the same batch again");
-        core.save_changed_checkpoints().await;
+        session.save_changed_checkpoints().await;
         assert_eq!(
-            core.search_crawl.lock().await.checkpoint_writes,
+            session.state().search_crawl.lock().checkpoint_writes,
             1,
             "nothing new, so nothing is written"
         );
@@ -1944,16 +1978,16 @@ mod tests {
             "crawl-floor",
             Box::new(crate::store::MemorySessionStore::default()),
         );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
         {
-            let index = core.search_index.lock().await;
+            let session_state = session.state();
+            let index = session_state.search_index.lock().await;
             crate::search::exec::block_on(index.store().set_floor(&room_id, super::now_ms()))
                 .unwrap();
         }
 
-        let outcome = core
-            .crawl_once(&client, &room_id)
-            .await
-            .expect("crawl one batch");
+        let outcome = session.crawl_once(&room_id).await.expect("crawl one batch");
         assert!(matches!(
             outcome,
             CrawlOutcome::Batch(CrawlBatch {
@@ -1961,7 +1995,10 @@ mod tests {
                 ..
             })
         ));
-        assert_eq!(core.search_index.lock().await.documents().await, 0);
+        assert_eq!(
+            session.state().search_index.lock().await.documents().await,
+            0
+        );
 
         drop(joined);
     }
@@ -2000,7 +2037,9 @@ mod tests {
             "crawl-covered",
             Box::new(crate::store::MemorySessionStore::default()),
         );
-        core.search_crawl.lock().await.cover(
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.state().search_crawl.lock().cover(
             &room_id,
             super::super::persist::Cover {
                 anchor: None,
@@ -2011,10 +2050,7 @@ mod tests {
             },
         );
 
-        let outcome = core
-            .crawl_once(&client, &room_id)
-            .await
-            .expect("crawl one batch");
+        let outcome = session.crawl_once(&room_id).await.expect("crawl one batch");
         assert!(matches!(
             outcome,
             CrawlOutcome::Batch(CrawlBatch {
@@ -2022,7 +2058,10 @@ mod tests {
                 ..
             })
         ));
-        assert_eq!(core.search_index.lock().await.documents().await, 0);
+        assert_eq!(
+            session.state().search_index.lock().await.documents().await,
+            0
+        );
 
         drop(joined);
     }
@@ -2061,7 +2100,9 @@ mod tests {
             "crawl-resume",
             Box::new(crate::store::MemorySessionStore::default()),
         );
-        core.search_crawl.lock().await.cover(
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.state().search_crawl.lock().cover(
             &room_id,
             super::super::persist::Cover {
                 anchor: None,
@@ -2072,10 +2113,7 @@ mod tests {
             },
         );
 
-        let outcome = core
-            .crawl_once(&client, &room_id)
-            .await
-            .expect("crawl one batch");
+        let outcome = session.crawl_once(&room_id).await.expect("crawl one batch");
         assert!(matches!(
             outcome,
             CrawlOutcome::Batch(CrawlBatch {
@@ -2083,7 +2121,7 @@ mod tests {
                 ..
             })
         ));
-        let progress = core.search_crawl.lock().await;
+        let progress = session.state().search_crawl.lock();
         assert_eq!(
             progress.token_or(&room_id, None).as_deref(),
             Some("resume-here")
@@ -2126,15 +2164,15 @@ mod tests {
             "crawl-age",
             Box::new(crate::store::MemorySessionStore::default()),
         );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
         {
-            let index = core.search_index.lock().await;
+            let session_state = session.state();
+            let index = session_state.search_index.lock().await;
             index.ensure_room(&room_id);
         }
 
-        let outcome = core
-            .crawl_once(&client, &room_id)
-            .await
-            .expect("crawl one batch");
+        let outcome = session.crawl_once(&room_id).await.expect("crawl one batch");
         assert!(matches!(
             outcome,
             CrawlOutcome::Batch(CrawlBatch {
@@ -2142,7 +2180,10 @@ mod tests {
                 ..
             })
         ));
-        assert_eq!(core.search_index.lock().await.documents().await, 0);
+        assert_eq!(
+            session.state().search_index.lock().await.documents().await,
+            0
+        );
 
         drop(joined);
     }
@@ -2156,8 +2197,10 @@ mod tests {
             "crawl-gone",
             Box::new(crate::store::MemorySessionStore::default()),
         );
-        let outcome = core
-            .crawl_once(&client, &room())
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        let outcome = session
+            .crawl_once(&room())
             .await
             .expect("a missing room is not an error");
 
@@ -2218,22 +2261,24 @@ mod tests {
             "search-crawl-priority",
             Box::new(crate::store::MemorySessionStore::default()),
         );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
 
         {
-            let mut progress = core.search_crawl.lock().await;
+            let mut progress = session.state().search_crawl.lock();
             progress.visit(&secret_id);
             progress.visit(&secret_id);
         }
 
         assert_eq!(
-            core.next_room_to_crawl(&client).await.as_ref(),
+            session.next_room_to_crawl().await.as_ref(),
             Some(&secret_id),
             "the crawl is the only thing that can ever search an encrypted room"
         );
 
-        core.search_crawl.lock().await.settle(secret_id, true);
+        session.state().search_crawl.lock().settle(secret_id, true);
         assert_eq!(
-            core.next_room_to_crawl(&client).await.as_ref(),
+            session.next_room_to_crawl().await.as_ref(),
             Some(&plain_id),
             "a plain room is still crawled once the encrypted ones are done"
         );

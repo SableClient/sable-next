@@ -3,18 +3,21 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use std::time::Duration;
 
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use crate::tasks::JoinHandleExt;
+use matrix_sdk::executor::spawn;
 use matrix_sdk_ui::sync_service::SyncService;
-use tokio::sync::{Mutex, MutexGuard, Notify, RwLock, watch};
+use tokio::sync::{Notify, RwLock, watch};
 
 use crate::Core;
+use crate::SignedIn;
+use crate::supervisor::Supervised;
 
-const HEALTH_INTERVAL: Duration = Duration::from_secs(30);
-const STUCK_AFTER: Duration = Duration::from_secs(60);
-const STUCK_CONFIRMED_AFTER: Duration = Duration::from_secs(10);
-#[cfg(target_os = "ios")]
+const PRESENCE_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(not(target_family = "wasm"))]
+const STORE_PAUSE_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(not(target_family = "wasm"))]
 const REOPEN_RETRY: Duration = Duration::from_millis(250);
-#[cfg(target_os = "ios")]
+#[cfg(not(target_family = "wasm"))]
 const REOPEN_RETRY_MAX: Duration = Duration::from_secs(5);
 
 pub(crate) struct Activity {
@@ -23,19 +26,16 @@ pub(crate) struct Activity {
     wake: Notify,
     sync_suspended: AtomicBool,
     network_available: AtomicBool,
-    account_locked: AtomicBool,
-    #[cfg(target_os = "ios")]
+    locked_generation: AtomicU64,
+    session_generation: AtomicU64,
+    /// iOS kills a suspended app that still holds a lock in its App Group container.
+    #[cfg(not(target_family = "wasm"))]
+    closes_stores: AtomicBool,
+    #[cfg(not(target_family = "wasm"))]
     reopen_failures: std::sync::atomic::AtomicU32,
     stores_open: watch::Sender<bool>,
-    /// Separate from `transition`, so a store read never waits for sync to start or stop.
+    /// Held for reading by short store reads, so closing the stores waits for them to finish.
     stores: RwLock<()>,
-    transition: Mutex<()>,
-}
-
-/// Waiting for another transition while holding one deadlocks.
-pub(crate) struct Transition<'a> {
-    activity: &'a Activity,
-    _serial: MutexGuard<'a, ()>,
 }
 
 impl Activity {
@@ -46,34 +46,15 @@ impl Activity {
             wake: Notify::new(),
             sync_suspended: AtomicBool::new(false),
             network_available: AtomicBool::new(true),
-            account_locked: AtomicBool::new(false),
-            #[cfg(target_os = "ios")]
+            locked_generation: AtomicU64::new(0),
+            session_generation: AtomicU64::new(1),
+            #[cfg(not(target_family = "wasm"))]
+            closes_stores: AtomicBool::new(cfg!(target_os = "ios")),
+            #[cfg(not(target_family = "wasm"))]
             reopen_failures: std::sync::atomic::AtomicU32::new(0),
             stores_open: watch::Sender::new(true),
             stores: RwLock::new(()),
-            transition: Mutex::new(()),
         }
-    }
-
-    pub(crate) async fn transition(&self) -> Transition<'_> {
-        Transition {
-            activity: self,
-            _serial: self.transition.lock().await,
-        }
-    }
-
-    /// A process the OS froze wakes with the first wait already elapsed, so only a second one
-    /// proves the transition is stuck.
-    async fn stuck(&self, after: Duration, confirmed_after: Duration) -> bool {
-        for wait in [after, confirmed_after] {
-            if matrix_sdk::timeout::timeout(self.transition.lock(), wait)
-                .await
-                .is_ok()
-            {
-                return false;
-            }
-        }
-        true
     }
 
     pub(crate) fn app_active(&self) -> bool {
@@ -94,17 +75,22 @@ impl Activity {
     }
 
     pub(crate) fn account_locked(&self) -> bool {
-        self.account_locked.load(Ordering::SeqCst)
+        self.locked_generation.load(Ordering::SeqCst)
+            == self.session_generation.load(Ordering::SeqCst)
     }
 
-    /// Whether the account was already locked.
-    pub(crate) fn lock_account(&self) -> bool {
-        self.account_locked.swap(true, Ordering::SeqCst)
+    pub(crate) fn lock_account(&self, generation: u64) -> bool {
+        self.locked_generation.swap(generation, Ordering::SeqCst) == generation
     }
 
     pub(crate) fn unlock_account(&self) {
-        self.account_locked.store(false, Ordering::SeqCst);
+        self.locked_generation.store(0, Ordering::SeqCst);
         self.wake.notify_waiters();
+    }
+
+    pub(crate) fn session_started(&self, _: &Supervised<'_>, generation: u64) {
+        self.session_generation.store(generation, Ordering::SeqCst);
+        self.unlock_account();
     }
 
     pub(crate) fn sync_suspended(&self) -> bool {
@@ -121,6 +107,16 @@ impl Activity {
 
     pub(crate) fn subscribe_stores(&self) -> watch::Receiver<bool> {
         self.stores_open.subscribe()
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn closes_stores(&self) -> bool {
+        self.closes_stores.load(Ordering::SeqCst)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn close_stores_when_suspended(&self) {
+        self.closes_stores.store(true, Ordering::SeqCst);
     }
 
     #[cfg(test)]
@@ -144,38 +140,28 @@ impl Activity {
     }
 }
 
-impl Transition<'_> {
-    pub(crate) fn stores_open(&self) -> bool {
-        *self.activity.stores_open.borrow()
-    }
-
-    pub(crate) fn sync_allowed(&self) -> bool {
-        self.activity.sync_allowed()
-    }
-
-    pub(crate) async fn start_sync(&self, sync_service: &SyncService) {
+impl Activity {
+    pub(crate) async fn start_sync(&self, _: &Supervised<'_>, sync_service: &SyncService) {
         if self.sync_allowed() {
             sync_service.start().await;
         }
     }
 
     fn is_current(&self, active: bool, revision: Option<u64>) -> bool {
-        revision.is_none_or(|revision| self.activity.revision.load(Ordering::SeqCst) == revision)
-            && self.activity.app_active() == active
+        revision.is_none_or(|revision| self.revision.load(Ordering::SeqCst) == revision)
+            && self.app_active() == active
     }
 
-    fn suspend_sync(&self, suspended: bool) {
-        self.activity
-            .sync_suspended
-            .store(suspended, Ordering::SeqCst);
+    fn suspend_sync(&self, _: &Supervised<'_>, suspended: bool) {
+        self.sync_suspended.store(suspended, Ordering::SeqCst);
         if !suspended {
-            self.activity.wake.notify_waiters();
+            self.wake.notify_waiters();
         }
     }
 
-    #[cfg(target_os = "ios")]
-    fn set_stores_open(&self, open: bool) {
-        self.activity.stores_open.send_replace(open);
+    #[cfg(not(target_family = "wasm"))]
+    fn publish_stores_open(&self, _: &Supervised<'_>, open: bool) {
+        self.stores_open.send_replace(open);
     }
 }
 
@@ -191,10 +177,13 @@ impl Core {
 
     /// `Suspended` found no session to stop while this one was still starting, and a retry to
     /// reopen the stores ended with the previous session.
-    pub(crate) async fn apply_activity_after_session_start(self: &Arc<Self>) {
+    pub(crate) async fn apply_activity_after_session_start(
+        self: &Arc<Self>,
+        supervised: &Supervised<'_>,
+    ) {
         let active = self.activity.app_active();
         if !active || self.activity.sync_suspended() {
-            self.apply_activity(active, None).await;
+            self.reconcile_activity(supervised, active, None).await;
         }
     }
 
@@ -215,53 +204,19 @@ impl Core {
         if self.activity.app_active() != active {
             return;
         }
-        let transition = self.activity.transition().await;
-        if !transition.is_current(active, revision) {
-            return;
-        }
-        let should_sync = active || !self.call_sessions.lock().await.is_empty();
-        #[cfg(target_os = "ios")]
-        if should_sync && self.activity.sync_suspended() && !self.reopen_stores(&transition).await {
-            drop(transition);
-            self.retry_reopening_stores(active, revision);
-            return;
-        }
-        transition.suspend_sync(!should_sync);
-        let Ok(sync_service) = self.sync_service().await else {
-            // A login or registration still in progress holds open stores of its own.
-            #[cfg(target_os = "ios")]
-            if !should_sync {
-                self.close_stores(&transition).await;
-            }
-            return;
-        };
-        if should_sync {
-            // Starting a running service is a no-op, but from `Offline` it retries at once.
-            self.set_sync_presence(self.cached_sync_presence().await)
-                .await;
-            transition.start_sync(&sync_service).await;
-            if !self.sync_paused() && !self.activity.network_available() {
-                self.emit(crate::protocol::CoreEvent::SyncStatus(
-                    self.shown_sync_status(sync_service.state().get()),
-                ));
-            }
-            drop(transition);
-            self.retry_unsaved_tokens().await;
-            // Fetches replied-to events, which must not hold up local reads or the next pause.
-            Box::pin(self.until_stores_close(self.retry_cached_decryption())).await;
-        } else {
-            if let Ok(client) = self.client().await {
-                self.flush_inbox_locked(&client, &transition).await;
-            }
-            // Background push fetches must not report the user online.
-            self.set_sync_presence(ruma::presence::PresenceState::Offline)
-                .await;
-            sync_service.stop().await;
-            #[cfg(target_os = "ios")]
-            self.close_stores(&transition).await;
-        }
+        let _ = self
+            .supervise("app activity", move |core, supervised| {
+                Box::pin(async move {
+                    core.reconcile_activity(&supervised, active, revision).await;
+                })
+            })
+            .await;
     }
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "reports the sync state of whichever session is current"
+    )]
     pub async fn update_network_conditions(self: &Arc<Self>, available: bool, unmetered: bool) {
         let was_available = self
             .activity
@@ -274,48 +229,45 @@ impl Core {
         if !available
             && was_available
             && !self.sync_paused()
-            && let Ok(sync_service) = self.sync_service().await
+            && let Some(state) = self
+                .session
+                .current(|session| session.sync_service.state().get())
         {
             self.emit(crate::protocol::CoreEvent::SyncStatus(
-                self.shown_sync_status(sync_service.state().get()),
+                self.shown_sync_status(state),
             ));
         }
         self.refresh_search_peers().await;
     }
 
     /// For when the OS reports the network gone and is wrong, which would block every restart.
-    pub(crate) async fn retry_sync(&self, sync_service: &SyncService) {
+    pub(crate) async fn retry_sync(self: &Arc<Self>, sync_service: &Arc<SyncService>) {
         self.activity
             .network_available
             .store(true, Ordering::SeqCst);
         self.resume_sync(sync_service).await;
     }
 
-    pub(crate) fn watch_activity_health(self: &Arc<Self>) {
-        let core = self.clone();
-        self.track_session_task(
-            spawn(async move {
-                loop {
-                    matrix_sdk::sleep::sleep(HEALTH_INTERVAL).await;
-                    if core
-                        .activity
-                        .stuck(STUCK_AFTER, STUCK_CONFIRMED_AFTER)
-                        .await
-                    {
-                        tracing::error!("sync has been unable to start or stop for over a minute");
-                        return;
-                    }
-                }
-            })
-            .abort_on_drop(),
-        );
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "tells whether a session's sync is still the current one"
+    )]
+    pub(crate) fn is_current_sync(&self, sync_service: &Arc<SyncService>) -> bool {
+        self.session
+            .current(|session| Arc::ptr_eq(&session.sync_service, sync_service))
+            .unwrap_or(false)
     }
 
-    pub(crate) async fn resume_sync(&self, sync_service: &SyncService) {
-        self.activity
-            .transition()
-            .await
-            .start_sync(sync_service)
+    pub(crate) async fn resume_sync(self: &Arc<Self>, sync_service: &Arc<SyncService>) {
+        let sync_service = sync_service.clone();
+        let _ = self
+            .supervise("resume sync", move |core, supervised| {
+                Box::pin(async move {
+                    if core.is_current_sync(&sync_service) {
+                        core.activity.start_sync(&supervised, &sync_service).await;
+                    }
+                })
+            })
             .await;
     }
 
@@ -327,64 +279,75 @@ impl Core {
         self.activity.sync_allowed()
     }
 
-    async fn set_sync_presence(&self, presence: ruma::presence::PresenceState) {
-        if let Ok(client) = self.client().await
-            && let Err(error) = client.set_presence(presence, None, false).await
-        {
-            tracing::debug!("sync presence not applied: {error}");
-        }
-    }
-
-    #[cfg(any(target_os = "ios", test))]
+    #[cfg(not(target_family = "wasm"))]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "lists the stores to pause, whichever session is current"
+    )]
     pub(crate) async fn store_clients(&self) -> Vec<matrix_sdk::Client> {
-        let mut clients: Vec<_> = Vec::new();
+        let mut clients = self.clients.clients();
+        let active = self
+            .session
+            .current(|session| (session.account_id.clone(), session.client.clone()));
+        if let Some((account_id, client)) = active
+            && !self.clients.contains(&account_id)
         {
-            let accounts = self.account_clients.lock().await;
-            clients.extend(accounts.values().cloned());
-            // The active account's client is already one of them.
-            let active = self
-                .session
-                .current(|session| (session.account_id.clone(), session.client.clone()));
-            if let Some((account_id, client)) = active
-                && !accounts.contains_key(&account_id)
-            {
-                clients.push(client);
-            }
+            clients.push(client);
         }
-        if let Some(pending) = self.pending_login.lock().await.as_ref() {
+        if let Some(pending) = self.sign_in.pending_login.lock().await.as_ref() {
             clients.push(pending.client.clone());
         }
         clients.extend(
-            self.pending_registration
+            self.sign_in
+                .pending_registration
                 .lock()
-                .await
                 .as_ref()
                 .map(crate::registration::PendingRegistration::client),
         );
         clients
     }
 
-    #[cfg(target_os = "ios")]
-    async fn close_stores(&self, transition: &Transition<'_>) {
-        transition.set_stores_open(false);
+    #[cfg(not(target_family = "wasm"))]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "closes the current session's search store on suspension"
+    )]
+    async fn current_search_store(&self) -> Option<crate::search::Store> {
+        let state = self.session.current(|session| session.state.clone())?;
+        Some(state.search_store().await)
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    async fn close_stores(&self, supervised: &Supervised<'_>) {
+        self.activity.publish_stores_open(supervised, false);
         let clients = self.store_clients().await;
         let _closing = self.activity.stores.write().await;
-        self.search_store().await.close().await;
+        if let Some(search) = self.current_search_store().await {
+            search.close().await;
+        }
         for client in clients {
-            if let Err(error) = client.pause().await {
-                tracing::warn!("closing the stores before suspension failed: {error}");
+            match matrix_sdk::timeout::timeout(client.pause(), STORE_PAUSE_TIMEOUT).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    tracing::warn!("closing the stores before suspension failed: {error}");
+                }
+                Err(_) => tracing::warn!("closing the stores before suspension timed out"),
             }
         }
     }
 
     /// Whether every store reopened. A client whose reopen failed stays paused, so the stores
     /// must not be reported open: its locks would never be granted.
-    #[cfg(target_os = "ios")]
-    async fn reopen_stores(&self, transition: &Transition<'_>) -> bool {
+    #[cfg(not(target_family = "wasm"))]
+    async fn reopen_stores(&self, supervised: &Supervised<'_>) -> bool {
         let clients = self.store_clients().await;
         let _reopening = self.activity.stores.write().await;
         for client in clients {
-            if let Err(error) = client.resume().await {
+            let resumed = matrix_sdk::timeout::timeout(client.resume(), STORE_PAUSE_TIMEOUT)
+                .await
+                .map_err(|_| "timed out".to_owned())
+                .and_then(|resumed| resumed.map_err(|error| error.to_string()));
+            if let Err(error) = resumed {
                 if self.activity.reopen_failures.fetch_add(1, Ordering::SeqCst) == 0 {
                     tracing::error!("reopening the stores after suspension failed: {error}");
                 }
@@ -392,14 +355,37 @@ impl Core {
             }
         }
         self.activity.reopen_failures.store(0, Ordering::SeqCst);
-        self.search_store().await.reopen().await;
-        transition.set_stores_open(true);
+        if let Some(search) = self.current_search_store().await {
+            search.reopen().await;
+        }
+        self.activity.publish_stores_open(supervised, true);
         true
+    }
+
+    #[cfg_attr(
+        target_family = "wasm",
+        expect(
+            clippy::unused_async,
+            clippy::unused_async_trait_impl,
+            reason = "the web never closes its stores"
+        )
+    )]
+    pub(crate) async fn open_stores_for_session_start(
+        &self,
+        supervised: &Supervised<'_>,
+    ) -> Result<(), crate::protocol::RpcError> {
+        #[cfg(not(target_family = "wasm"))]
+        if !*self.activity.stores_open.borrow() && !self.reopen_stores(supervised).await {
+            return Err(crate::protocol::RpcCode::Unavailable.into());
+        }
+        #[cfg(target_family = "wasm")]
+        let _ = supervised;
+        Ok(())
     }
 
     /// Reopening is idempotent, so the clients that did reopen are safe to resume again. A session
     /// change ends the retries, and `start_session` applies the activity again.
-    #[cfg(target_os = "ios")]
+    #[cfg(not(target_family = "wasm"))]
     fn retry_reopening_stores(self: &Arc<Self>, active: bool, revision: Option<u64>) {
         let failures = self.activity.reopen_failures.load(Ordering::SeqCst);
         let delay = REOPEN_RETRY
@@ -411,16 +397,20 @@ impl Core {
             },
         ));
         let core = self.clone();
-        self.track_session_task(
-            spawn(async move {
-                matrix_sdk::sleep::sleep(delay).await;
-                core.apply_activity(active, revision).await;
-            })
-            .abort_on_drop(),
-        );
+        let retry = spawn(async move {
+            matrix_sdk::sleep::sleep(delay).await;
+            core.apply_activity(active, revision).await;
+        });
+        if let Ok(session) = self.signed_in() {
+            *session.state().reopen_retry.lock() = Some(retry.abort_on_drop());
+        }
     }
 
     pub(crate) async fn wait_for_stores(&self) {
+        if !*self.activity.stores_open.borrow() && self.supervisor.on_runner() {
+            tracing::error!("a lifecycle job waited for stores only a later job reopens");
+            debug_assert!(false, "a lifecycle job waited for closed stores");
+        }
         let _ = self
             .activity
             .subscribe_stores()
@@ -471,13 +461,109 @@ impl Core {
             woken.await;
         }
     }
+
+    async fn reconcile_activity(
+        self: &Arc<Self>,
+        supervised: &Supervised<'_>,
+        active: bool,
+        revision: Option<u64>,
+    ) {
+        if !self.activity.is_current(active, revision) {
+            return;
+        }
+        let signed_in = self.signed_in().ok();
+        let in_call = match &signed_in {
+            Some(session) => !session.state().calls.lock().await.is_empty(),
+            None => false,
+        };
+        let should_sync = active || in_call;
+        #[cfg(not(target_family = "wasm"))]
+        if self.activity.closes_stores()
+            && should_sync
+            && self.activity.sync_suspended()
+            && !self.reopen_stores(supervised).await
+        {
+            self.retry_reopening_stores(active, revision);
+            return;
+        }
+        self.activity.suspend_sync(supervised, !should_sync);
+        let Some(signed_in) = signed_in else {
+            // A login or registration still in progress holds open stores of its own.
+            #[cfg(not(target_family = "wasm"))]
+            if !should_sync && self.activity.closes_stores() {
+                self.close_stores(supervised).await;
+            }
+            return;
+        };
+        let sync_service = signed_in.sync_service();
+        if should_sync {
+            signed_in
+                .set_sync_presence(signed_in.cached_sync_presence().await)
+                .await;
+            self.activity.start_sync(supervised, &sync_service).await;
+            if !self.sync_paused() && !self.activity.network_available() {
+                self.emit(crate::protocol::CoreEvent::SyncStatus(
+                    self.shown_sync_status(sync_service.state().get()),
+                ));
+            }
+            let session = signed_in.clone();
+            *signed_in.state().foreground_work.lock() = Some(
+                spawn(async move {
+                    session.retry_unsaved_tokens().await;
+                    Box::pin(
+                        session
+                            .core()
+                            .until_stores_close(session.retry_cached_decryption()),
+                    )
+                    .await;
+                })
+                .abort_on_drop(),
+            );
+        } else {
+            // Background push fetches must not report the user online.
+            signed_in
+                .set_sync_presence(ruma::presence::PresenceState::Offline)
+                .await;
+            crate::sync_support::stop(&sync_service).await;
+            // After the sync stopped, so nothing it recorded is left unsaved.
+            self.flush_inbox_if_open(signed_in.session()).await;
+            #[cfg(not(target_family = "wasm"))]
+            if self.activity.closes_stores() {
+                self.close_stores(supervised).await;
+            }
+        }
+    }
+}
+
+impl SignedIn {
+    pub(crate) async fn apply_app_activity(&self, active: bool) {
+        self.until_ended(self.core().apply_app_activity(active))
+            .await;
+    }
+
+    pub(crate) async fn reapply_app_activity(&self) {
+        self.apply_app_activity(self.core().activity.app_active())
+            .await;
+    }
+
+    async fn set_sync_presence(&self, presence: ruma::presence::PresenceState) {
+        let client = self.client();
+        match matrix_sdk::timeout::timeout(
+            Box::pin(client.set_presence(presence, None, false)),
+            PRESENCE_TIMEOUT,
+        )
+        .await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => tracing::debug!("sync presence not applied: {error}"),
+            Err(_) => tracing::debug!("sync presence timed out"),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-
-    use super::Activity;
 
     #[tokio::test]
     async fn waiting_for_sync_ends_when_it_resumes_behind_a_backgrounded_app() {
@@ -486,8 +572,14 @@ mod tests {
             Box::new(crate::store::MemorySessionStore::default()),
         );
         core.set_app_active(false);
-        core.activity.transition().await.suspend_sync(true);
-        core.activity.lock_account();
+        core.supervise("test suspend", |core, supervised| {
+            Box::pin(async move {
+                core.activity.suspend_sync(&supervised, true);
+            })
+        })
+        .await
+        .unwrap();
+        core.activity.lock_account(1);
         let resumed = tokio::spawn({
             let core = core.clone();
             async move { core.wait_until_sync_resumes().await }
@@ -500,28 +592,17 @@ mod tests {
         assert!(!resumed.is_finished(), "sync is still suspended");
 
         // A call starts: sync resumes while the app stays in the background.
-        core.activity.transition().await.suspend_sync(false);
+        core.supervise("test resume", |core, supervised| {
+            Box::pin(async move {
+                core.activity.suspend_sync(&supervised, false);
+            })
+        })
+        .await
+        .unwrap();
         tokio::time::timeout(Duration::from_secs(1), resumed)
             .await
             .expect("resuming sync ends the wait")
             .unwrap();
         assert!(!core.is_app_active());
-    }
-
-    #[tokio::test]
-    async fn only_a_transition_that_stays_held_counts_as_stuck() {
-        let activity = Activity::new();
-        let wait = Duration::from_millis(20);
-        assert!(!activity.stuck(wait, wait).await);
-
-        let held = activity.transition().await;
-        assert!(activity.stuck(wait, wait).await);
-
-        let release = async {
-            tokio::time::sleep(Duration::from_millis(30)).await;
-            drop(held);
-        };
-        let (stuck, ()) = tokio::join!(activity.stuck(wait, Duration::from_secs(5)), release);
-        assert!(!stuck);
     }
 }

@@ -25,6 +25,9 @@ pub use errors::CoreError;
 pub(crate) use errors::ResultExt;
 #[cfg(target_family = "wasm")]
 pub use search::attach_search_port;
+pub use signed_in::SignedIn;
+pub(crate) use signed_in::WeakSignedIn;
+mod account_clients;
 pub mod image_packs;
 mod inbox;
 mod invites;
@@ -76,6 +79,8 @@ pub mod search;
 #[cfg(not(target_family = "wasm"))]
 pub mod secrets;
 pub mod session;
+mod settings;
+mod signed_in;
 mod space_parents;
 pub mod spaces;
 mod sticker_history;
@@ -86,7 +91,9 @@ mod store_encryption;
 #[cfg(test)]
 mod store_reads;
 mod subscriptions;
+mod supervisor;
 mod sync_support;
+mod tasks;
 #[cfg(test)]
 mod test_support;
 mod thread_receipts;
@@ -147,7 +154,7 @@ use std::{
     },
 };
 
-use matrix_sdk::executor::{AbortOnDrop, JoinHandleExt};
+use crate::tasks::JoinHandleExt;
 use matrix_sdk::ruma::events::call::member::CallMemberStateKey;
 use matrix_sdk::ruma::events::{AnyGlobalAccountDataEventContent, GlobalAccountDataEventType};
 use matrix_sdk::ruma::serde::Raw;
@@ -160,7 +167,7 @@ use protocol::{CoreEvent, RpcCode, RpcError, SubscriptionId};
 use session::AccountRegistry;
 use store::SessionStore;
 
-pub(crate) type Task = AbortOnDrop<()>;
+pub(crate) use tasks::Task;
 
 const TO_DEVICE_WORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
@@ -172,6 +179,8 @@ static CORES: parking_lot::Mutex<Vec<std::sync::Weak<Core>>> = parking_lot::Mute
 /// `CoreEvent`s out.
 pub struct Core {
     store_id: String,
+    settings: settings::Settings,
+    sign_in: auth::SignInFlows,
     persistent_event_cache: bool,
     sessions: Box<dyn SessionStore>,
     events: mpsc::UnboundedSender<CoreEvent>,
@@ -179,90 +188,29 @@ pub struct Core {
     next_log_id: AtomicU64,
     next_registration_attempt: AtomicU64,
     lifecycle: lifecycle::Lifecycle,
-    session_store_lock: Mutex<()>,
-    credential_writers: Mutex<HashMap<String, u64>>,
     /// Accounts whose rotated tokens could not be saved, which the SDK only logs.
     unsaved_tokens: parking_lot::Mutex<std::collections::HashSet<String>>,
+    #[cfg(not(target_family = "wasm"))]
+    unmoved_tokens: parking_lot::Mutex<std::collections::HashSet<String>>,
     next_credential_writer: AtomicU64,
     next_login_attempt: AtomicU64,
-    account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
-    session_handlers: parking_lot::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
-    probed_pinned_rooms: parking_lot::Mutex<HashMap<OwnedRoomId, Vec<OwnedEventId>>>,
-    pinned_caches: parking_lot::Mutex<
-        HashMap<
-            OwnedRoomId,
-            (
-                matrix_sdk::event_cache::PinnedEventsCache,
-                Arc<matrix_sdk::event_cache::EventCacheDropHandles>,
-            ),
-        >,
-    >,
-    cosmetics: parking_lot::Mutex<cosmetics::CosmeticsCache>,
+    clients: account_clients::AccountClients,
     nicknames: watch::Sender<nicknames::Nicknames>,
     nicknames_stale: tokio::sync::Notify,
     room_list_options: watch::Sender<protocol::RoomListOptionsView>,
     dm_spaces_changed: watch::Sender<()>,
-    cosmetics_fetches: parking_lot::Mutex<HashMap<OwnedRoomId, Arc<Mutex<()>>>>,
-    probed_state: parking_lot::Mutex<probed_state::ProbedState>,
-    recent_state: parking_lot::Mutex<probed_state::RecentState>,
     media_health: parking_lot::Mutex<media_health::MediaHealth>,
     media_downloads: tokio::sync::Semaphore,
     tunnel: tunnel::Tunnel,
-    key_backup_downloads: tokio::sync::Semaphore,
-    key_backup_download: parking_lot::Mutex<Option<protocol::KeyBackupDownloadView>>,
-    notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     accounts: Mutex<Option<AccountRegistry>>,
-    discovered_homeservers: Mutex<HashMap<String, Url>>,
     session: lifecycle::SessionSlot,
-    pending_login: Mutex<Option<PendingLogin>>,
-    pending_registration: Mutex<Option<registration::PendingRegistration>>,
-    qr_flow: Mutex<Option<qr_login::QrFlow>>,
-    pending_identity_reset: Mutex<Option<verification::PendingIdentityReset>>,
-    session_tasks: parking_lot::Mutex<Vec<Task>>,
-    to_device_inbox: parking_lot::Mutex<
-        Option<mpsc::UnboundedSender<matrix_sdk_common::BoxFuture<'static, ()>>>,
-    >,
-    subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
-    room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
-    warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
-    account_data_lock: Mutex<()>,
-    usage_history_lock: Mutex<()>,
-    /// Until sync echoes the acceptance, the room would read as unaccepted.
-    accepted_rules: parking_lot::Mutex<HashMap<(ruma::OwnedUserId, OwnedRoomId), i64>>,
-    inbox: Mutex<inbox::InboxCache>,
-    inbox_flush: Mutex<()>,
-    inbox_changed: tokio::sync::Notify,
-    account_data_types: Mutex<std::collections::BTreeSet<String>>,
-    pack_cache: Mutex<image_packs::PackCache>,
-    calendars: Mutex<HashMap<OwnedRoomId, calendar::RoomCalendar>>,
-    push_rules: Mutex<Option<Arc<push_rules::PushRules>>>,
-    timelines: Mutex<hashlink::LinkedHashMap<OwnedRoomId, CachedTimeline>>,
-    thread_timelines: Mutex<hashlink::LruCache<ThreadKey, CachedTimeline>>,
-    notification_content: AtomicBool,
-    notification_encrypted_content: AtomicBool,
-    notification_sounds: AtomicBool,
-    notify_once: AtomicBool,
-    private_receipts: AtomicBool,
-    widget_feed: AtomicBool,
-    scalar_tokens: parking_lot::Mutex<HashMap<(ruma::OwnedUserId, String), String>>,
-    notifications_enabled: AtomicBool,
-    in_app_banners: AtomicBool,
-    search_crawler_enabled: AtomicBool,
-    search_sharing: search::SearchSharing,
-    rtc: rtc::RtcSessions,
     search_network: search::CrawlNetwork,
     app_in_foreground: AtomicBool,
     shut_down: AtomicBool,
     activity: activity::Activity,
-    server_search_enabled: AtomicBool,
-    read_room: parking_lot::Mutex<Option<OwnedRoomId>>,
-    search_index: Mutex<search::MessageIndex>,
     session_step: parking_lot::Mutex<&'static str>,
-    search_crawl: Mutex<search::CrawlProgress>,
-    server_search: Mutex<search::ServerSearch>,
+    supervisor: supervisor::Supervisor,
     foreground_paginations: AtomicU32,
-    call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
-    desired_presence: parking_lot::Mutex<protocol::PresenceView>,
 }
 
 struct CallSession {
@@ -271,7 +219,7 @@ struct CallSession {
     delay_id: Arc<Mutex<calls::DelayState>>,
     postpone: Option<Task>,
     updates: Option<Task>,
-    state: Arc<Mutex<calls::CallRuntimeState>>,
+    state: Arc<parking_lot::Mutex<calls::CallRuntimeState>>,
     sticky_member: Option<String>,
     _handlers: Vec<matrix_sdk::event_handler::EventHandlerDropGuard>,
 }
@@ -289,6 +237,112 @@ impl Drop for ForegroundPagination {
 }
 
 type ThreadKey = (OwnedRoomId, OwnedEventId);
+
+pub(crate) struct SessionState {
+    ended: tokio_util::sync::CancellationToken,
+    /// Cancelled when a logout ends the session, so the methods still running on it stop.
+    discarded: tokio_util::sync::CancellationToken,
+    generation: AtomicU64,
+    session_handlers: parking_lot::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
+    probed_pinned_rooms: parking_lot::Mutex<HashMap<OwnedRoomId, Vec<OwnedEventId>>>,
+    pinned_caches: parking_lot::Mutex<
+        HashMap<
+            OwnedRoomId,
+            (
+                matrix_sdk::event_cache::PinnedEventsCache,
+                Arc<matrix_sdk::event_cache::EventCacheDropHandles>,
+            ),
+        >,
+    >,
+    cosmetics: Arc<parking_lot::Mutex<cosmetics::CosmeticsCache>>,
+    probed_state: Arc<parking_lot::Mutex<probed_state::ProbedState>>,
+    recent_state: Arc<parking_lot::Mutex<probed_state::RecentState>>,
+    session_tasks: parking_lot::Mutex<Vec<Task>>,
+    foreground_work: parking_lot::Mutex<Option<Task>>,
+    reopen_retry: parking_lot::Mutex<Option<Task>>,
+    to_device_inbox: parking_lot::Mutex<
+        Option<mpsc::UnboundedSender<matrix_sdk_common::BoxFuture<'static, ()>>>,
+    >,
+    subscriptions: parking_lot::Mutex<HashMap<SubscriptionId, Subscription>>,
+    room_subscriptions: Arc<Mutex<std::collections::BTreeSet<OwnedRoomId>>>,
+    warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
+    account_data_types: parking_lot::Mutex<std::collections::BTreeSet<String>>,
+    pack_cache: parking_lot::Mutex<image_packs::PackCache>,
+    calendars: parking_lot::Mutex<HashMap<OwnedRoomId, calendar::RoomCalendar>>,
+    push_rules: Mutex<Option<Arc<push_rules::PushRules>>>,
+    timelines: parking_lot::Mutex<hashlink::LinkedHashMap<OwnedRoomId, CachedTimeline>>,
+    thread_timelines: parking_lot::Mutex<hashlink::LruCache<ThreadKey, CachedTimeline>>,
+    read_room: parking_lot::Mutex<Option<OwnedRoomId>>,
+    search_index: Mutex<search::MessageIndex>,
+    inbox: inbox::Inbox,
+    account_data_writes: Mutex<()>,
+    usage_history_writes: Mutex<()>,
+    rtc: rtc::RtcSessions,
+    server_search: parking_lot::Mutex<search::ServerSearch>,
+    calls: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
+    search_crawl: parking_lot::Mutex<search::CrawlProgress>,
+    search_peers: search::SearchPeers,
+    pending_identity_reset: parking_lot::Mutex<Option<verification::PendingIdentityReset>>,
+    /// Until sync echoes the acceptance, the room would read as unaccepted.
+    accepted_rules: parking_lot::Mutex<HashMap<OwnedRoomId, i64>>,
+    scalar_tokens: parking_lot::Mutex<HashMap<String, String>>,
+    cosmetics_fetches: parking_lot::Mutex<HashMap<OwnedRoomId, Arc<Mutex<()>>>>,
+    key_backup_downloads: tokio::sync::Semaphore,
+    key_backup_download: parking_lot::Mutex<Option<protocol::KeyBackupDownloadView>>,
+    operations: std::sync::atomic::AtomicUsize,
+    operations_done: tokio::sync::Notify,
+    tasks_stopped: AtomicBool,
+}
+
+impl Default for SessionState {
+    fn default() -> Self {
+        Self {
+            ended: tokio_util::sync::CancellationToken::new(),
+            discarded: tokio_util::sync::CancellationToken::new(),
+            generation: AtomicU64::new(0),
+            session_handlers: parking_lot::Mutex::new(Vec::new()),
+            probed_pinned_rooms: parking_lot::Mutex::new(HashMap::new()),
+            pinned_caches: parking_lot::Mutex::new(HashMap::new()),
+            cosmetics: Arc::new(parking_lot::Mutex::new(cosmetics::CosmeticsCache::default())),
+            probed_state: Arc::new(parking_lot::Mutex::new(probed_state::ProbedState::default())),
+            recent_state: Arc::new(parking_lot::Mutex::new(probed_state::RecentState::default())),
+            session_tasks: parking_lot::Mutex::new(Vec::new()),
+            foreground_work: parking_lot::Mutex::new(None),
+            reopen_retry: parking_lot::Mutex::new(None),
+            to_device_inbox: parking_lot::Mutex::new(None),
+            subscriptions: parking_lot::Mutex::new(HashMap::new()),
+            room_subscriptions: Arc::new(Mutex::new(std::collections::BTreeSet::new())),
+            warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
+            account_data_types: parking_lot::Mutex::new(std::collections::BTreeSet::new()),
+            pack_cache: parking_lot::Mutex::new(image_packs::PackCache::default()),
+            calendars: parking_lot::Mutex::new(HashMap::new()),
+            push_rules: Mutex::new(None),
+            timelines: parking_lot::Mutex::new(hashlink::LinkedHashMap::new()),
+            thread_timelines: parking_lot::Mutex::new(hashlink::LruCache::new(
+                timelines::MAX_CACHED_THREAD_TIMELINES,
+            )),
+            read_room: parking_lot::Mutex::new(None),
+            search_index: Mutex::new(search::MessageIndex::new()),
+            inbox: inbox::Inbox::default(),
+            account_data_writes: Mutex::new(()),
+            usage_history_writes: Mutex::new(()),
+            rtc: rtc::RtcSessions::default(),
+            server_search: parking_lot::Mutex::new(search::ServerSearch::default()),
+            calls: Mutex::new(HashMap::new()),
+            search_crawl: parking_lot::Mutex::new(search::CrawlProgress::default()),
+            search_peers: search::SearchPeers::default(),
+            pending_identity_reset: parking_lot::Mutex::new(None),
+            accepted_rules: parking_lot::Mutex::new(HashMap::new()),
+            scalar_tokens: parking_lot::Mutex::new(HashMap::new()),
+            cosmetics_fetches: parking_lot::Mutex::new(HashMap::new()),
+            key_backup_downloads: tokio::sync::Semaphore::new(1),
+            key_backup_download: parking_lot::Mutex::new(None),
+            operations: std::sync::atomic::AtomicUsize::new(0),
+            operations_done: tokio::sync::Notify::new(),
+            tasks_stopped: AtomicBool::new(false),
+        }
+    }
+}
 
 struct CachedTimeline {
     timeline: Arc<Timeline>,
@@ -352,90 +406,42 @@ impl Core {
     ) -> (Arc<Self>, mpsc::UnboundedReceiver<CoreEvent>) {
         #[cfg(not(target_family = "wasm"))]
         tls::install_crypto_provider();
+        #[cfg(all(test, not(target_family = "wasm")))]
+        test_support::watch_for_deadlocks();
         let (events, rx) = mpsc::unbounded_channel();
         let core = Arc::new(Self {
             store_id: store_id.into(),
+            settings: settings::Settings::default(),
+            sign_in: auth::SignInFlows::default(),
             persistent_event_cache,
             sessions,
             events,
-            notification_content: AtomicBool::new(false),
-            notification_encrypted_content: AtomicBool::new(false),
-            notification_sounds: AtomicBool::new(true),
-            notify_once: AtomicBool::new(true),
-            private_receipts: AtomicBool::new(true),
-            widget_feed: AtomicBool::new(false),
-            scalar_tokens: parking_lot::Mutex::new(HashMap::new()),
-            notifications_enabled: AtomicBool::new(true),
-            in_app_banners: AtomicBool::new(false),
-            search_crawler_enabled: AtomicBool::new(true),
-            search_sharing: search::SearchSharing::default(),
-            rtc: rtc::RtcSessions::default(),
             search_network: search::CrawlNetwork::default(),
             app_in_foreground: AtomicBool::new(true),
             shut_down: AtomicBool::new(false),
             activity: activity::Activity::new(),
-            server_search_enabled: AtomicBool::new(true),
-            read_room: parking_lot::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
             foreground_paginations: AtomicU32::new(0),
             next_log_id: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
-            key_backup_downloads: tokio::sync::Semaphore::new(1),
-            key_backup_download: parking_lot::Mutex::new(None),
             lifecycle: lifecycle::Lifecycle::new(),
-            session_store_lock: Mutex::new(()),
-            credential_writers: Mutex::new(HashMap::new()),
             unsaved_tokens: parking_lot::Mutex::new(std::collections::HashSet::new()),
+            #[cfg(not(target_family = "wasm"))]
+            unmoved_tokens: parking_lot::Mutex::new(std::collections::HashSet::new()),
             next_credential_writer: AtomicU64::new(1),
             next_login_attempt: AtomicU64::new(1),
-            account_clients: Mutex::new(HashMap::new()),
-            session_handlers: parking_lot::Mutex::new(Vec::new()),
-            probed_pinned_rooms: parking_lot::Mutex::new(HashMap::new()),
-            pinned_caches: parking_lot::Mutex::new(HashMap::new()),
-            cosmetics: parking_lot::Mutex::new(cosmetics::CosmeticsCache::default()),
+            clients: account_clients::AccountClients::default(),
             nicknames: watch::Sender::new(nicknames::Nicknames::default()),
             nicknames_stale: tokio::sync::Notify::new(),
             room_list_options: watch::Sender::new(protocol::RoomListOptionsView::default()),
             dm_spaces_changed: watch::Sender::new(()),
-            cosmetics_fetches: parking_lot::Mutex::new(HashMap::new()),
-            probed_state: parking_lot::Mutex::new(probed_state::ProbedState::default()),
-            recent_state: parking_lot::Mutex::new(probed_state::RecentState::default()),
             media_health: parking_lot::Mutex::new(media_health::MediaHealth::default()),
             media_downloads: tokio::sync::Semaphore::new(media::MAX_MEDIA_DOWNLOADS),
             tunnel: tunnel::Tunnel::new(),
-            notification_routes: Mutex::new(HashMap::new()),
             accounts: Mutex::new(None),
-            discovered_homeservers: Mutex::new(HashMap::new()),
             session: lifecycle::SessionSlot::new(),
-            pending_login: Mutex::new(None),
-            pending_registration: Mutex::new(None),
-            qr_flow: Mutex::new(None),
-            pending_identity_reset: Mutex::new(None),
-            session_tasks: parking_lot::Mutex::new(Vec::new()),
-            to_device_inbox: parking_lot::Mutex::new(None),
-            subscriptions: Mutex::new(HashMap::new()),
-            room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
-            warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
-            account_data_lock: Mutex::new(()),
-            usage_history_lock: Mutex::new(()),
-            accepted_rules: parking_lot::Mutex::new(HashMap::new()),
-            inbox: Mutex::new(inbox::InboxCache::default()),
-            inbox_flush: Mutex::new(()),
-            inbox_changed: tokio::sync::Notify::new(),
-            account_data_types: Mutex::new(std::collections::BTreeSet::new()),
-            pack_cache: Mutex::new(image_packs::PackCache::default()),
-            calendars: Mutex::new(HashMap::new()),
-            push_rules: Mutex::new(None),
-            timelines: Mutex::new(hashlink::LinkedHashMap::new()),
-            thread_timelines: Mutex::new(hashlink::LruCache::new(
-                timelines::MAX_CACHED_THREAD_TIMELINES,
-            )),
-            search_index: Mutex::new(search::MessageIndex::new()),
             session_step: parking_lot::Mutex::new("idle"),
-            search_crawl: Mutex::new(search::CrawlProgress::default()),
-            server_search: Mutex::new(search::ServerSearch::default()),
-            call_sessions: Mutex::new(HashMap::new()),
-            desired_presence: parking_lot::Mutex::new(protocol::PresenceView::Online),
+            supervisor: supervisor::Supervisor::new(),
         });
         #[cfg(not(target_family = "wasm"))]
         CORES.lock().push(Arc::downgrade(&core));
@@ -461,46 +467,47 @@ impl Core {
 
     #[must_use]
     pub fn notification_content(&self) -> bool {
-        self.notification_content.load(Ordering::Relaxed)
+        self.settings.notification_content.load(Ordering::Relaxed)
     }
 
-    pub async fn user_id(&self) -> Option<ruma::OwnedUserId> {
-        self.client().await.ok()?.user_id().map(ToOwned::to_owned)
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "answers for whichever account is signed in"
+    )]
+    pub fn user_id(&self) -> Option<ruma::OwnedUserId> {
+        self.session
+            .current(|session| session.client.user_id().map(ToOwned::to_owned))
+            .flatten()
     }
 
     #[must_use]
     pub fn notification_encrypted_content(&self) -> bool {
-        self.notification_encrypted_content.load(Ordering::Relaxed)
+        self.settings
+            .notification_encrypted_content
+            .load(Ordering::Relaxed)
     }
 
     #[must_use]
     pub fn notification_sounds(&self) -> bool {
-        self.notification_sounds.load(Ordering::Relaxed)
+        self.settings.notification_sounds.load(Ordering::Relaxed)
     }
 
     #[must_use]
     pub fn notify_once(&self) -> bool {
-        self.notify_once.load(Ordering::Relaxed)
+        self.settings.notify_once.load(Ordering::Relaxed)
     }
 
     #[must_use]
     pub fn notifications_enabled(&self) -> bool {
-        self.notifications_enabled.load(Ordering::Relaxed)
+        self.settings.notifications_enabled.load(Ordering::Relaxed)
     }
 
     /// The open app shows this alert as an in-app banner, so the OS must not post it too.
     #[must_use]
     pub fn shows_banner(&self, view: &protocol::NotificationView) -> bool {
-        self.in_app_banners.load(Ordering::Relaxed) && self.is_app_active() && view.wants_banner()
-    }
-
-    pub(crate) fn set_read_room(&self, room_id: Option<OwnedRoomId>) {
-        *self.read_room.lock() = room_id;
-    }
-
-    #[must_use]
-    pub(crate) fn is_read_room(&self, room_id: &RoomId) -> bool {
-        self.read_room.lock().as_deref() == Some(room_id)
+        self.settings.in_app_banners.load(Ordering::Relaxed)
+            && self.is_app_active()
+            && view.wants_banner()
     }
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.
@@ -516,50 +523,6 @@ impl Core {
         let _ = self.events.send(event);
     }
 
-    /// Session tasks must outlive their spawn call. Dropping `Task` aborts it.
-    pub(crate) fn track_session_task(&self, task: Task) {
-        self.session_tasks.lock().push(task);
-    }
-
-    /// The SDK awaits event handlers before its next sync request.
-    pub(crate) fn defer_to_device(&self, work: matrix_sdk_common::BoxFuture<'static, ()>) {
-        let mut inbox = self.to_device_inbox.lock();
-        let work = match inbox.as_ref() {
-            Some(sender) => match sender.send(work) {
-                Ok(()) => return,
-                Err(mpsc::error::SendError(work)) => work,
-            },
-            None => work,
-        };
-        let (sender, mut receiver) = mpsc::unbounded_channel();
-        let _ = sender.send(work);
-        *inbox = Some(sender);
-        self.track_session_task(
-            matrix_sdk::executor::spawn(async move {
-                while let Some(work) = receiver.recv().await {
-                    // The wasm HTTP client ignores request timeouts.
-                    if matrix_sdk::timeout::timeout(work, TO_DEVICE_WORK_TIMEOUT)
-                        .await
-                        .is_err()
-                    {
-                        tracing::warn!("to-device work timed out");
-                    }
-                }
-            })
-            .abort_on_drop(),
-        );
-    }
-
-    pub(crate) fn track_session_handler(
-        &self,
-        client: &matrix_sdk::Client,
-        handle: matrix_sdk::event_handler::EventHandlerHandle,
-    ) {
-        self.session_handlers
-            .lock()
-            .push(client.event_handler_drop_guard(handle));
-    }
-
     pub(crate) fn emit_if_current(&self, generation: u64, event: CoreEvent) {
         if self.is_current(generation) {
             self.emit(event);
@@ -570,13 +533,13 @@ impl Core {
         self.foreground_paginations.load(Ordering::Relaxed)
     }
 
-    pub async fn update_app_in_foreground(&self, foreground: bool) {
+    pub async fn update_app_in_foreground(self: &Arc<Self>, foreground: bool) {
         self.app_in_foreground.store(foreground, Ordering::Relaxed);
         self.refresh_search_peers().await;
     }
 
     pub(crate) fn search_crawl_active(&self) -> bool {
-        !self.search_sharing.discovering()
+        !self.search_peers_discovering()
             && self.activity.app_active()
             && self.app_in_foreground.load(Ordering::Relaxed)
             && self.search_network.allows_crawl()
@@ -640,10 +603,10 @@ impl Core {
         Ok(registry)
     }
 
-    pub(crate) async fn remember_homeserver(&self, homeserver: &str, client: &matrix_sdk::Client) {
-        self.discovered_homeservers
+    pub(crate) fn remember_homeserver(&self, homeserver: &str, client: &matrix_sdk::Client) {
+        self.sign_in
+            .discovered_homeservers
             .lock()
-            .await
             .insert(homeserver.to_owned(), client.homeserver());
     }
 
@@ -653,9 +616,9 @@ impl Core {
         homeserver: &str,
     ) -> Result<matrix_sdk::Client, session::BuildError> {
         let resolved = self
+            .sign_in
             .discovered_homeservers
             .lock()
-            .await
             .get(homeserver)
             .cloned();
 
@@ -669,7 +632,6 @@ impl Core {
 
     pub(crate) async fn allocate_account(&self) -> Result<(String, String), RpcError> {
         self.accounts().await?;
-        let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
         let Some(registry) = accounts.as_mut() else {
             return Err(self.failed("allocate_account", "account registry is not initialized"));
@@ -695,26 +657,80 @@ impl Core {
         *registry = updated;
         Ok(allocated)
     }
+}
 
-    #[expect(
-        clippy::unused_async,
-        clippy::unused_async_trait_impl,
-        reason = "awaited at some 200 call sites, which a sync signature would all touch"
-    )]
-    pub(crate) async fn client(&self) -> Result<matrix_sdk::Client, RpcError> {
-        self.session
-            .current(|session| session.client.clone())
-            .ok_or_else(|| RpcCode::NotLoggedIn.into())
+impl SignedIn {
+    pub(crate) fn set_read_room(&self, room_id: Option<OwnedRoomId>) {
+        *self.state().read_room.lock() = room_id;
+    }
+
+    #[must_use]
+    pub(crate) fn is_read_room(&self, room_id: &RoomId) -> bool {
+        self.state().read_room.lock().as_deref() == Some(room_id)
+    }
+
+    /// A task tracked after its session ended is dropped, so it cannot keep the session alive.
+    pub(crate) fn track_session_task(&self, task: Task) {
+        let mut tasks = self.state().session_tasks.lock();
+        if !self.state().ended.is_cancelled() {
+            tasks.push(task);
+        }
+    }
+
+    /// The SDK awaits event handlers before its next sync request.
+    pub(crate) fn defer_to_device(&self, work: matrix_sdk_common::BoxFuture<'static, ()>) {
+        let session_state = self.state();
+        let mut inbox = session_state.to_device_inbox.lock();
+        if session_state.ended.is_cancelled() {
+            return;
+        }
+        let work = match inbox.as_ref() {
+            Some(sender) => match sender.send(work) {
+                Ok(()) => return,
+                Err(mpsc::error::SendError(work)) => work,
+            },
+            None => work,
+        };
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let _ = sender.send(work);
+        *inbox = Some(sender);
+        self.track_session_task(
+            matrix_sdk::executor::spawn(async move {
+                while let Some(work) = receiver.recv().await {
+                    // The wasm HTTP client ignores request timeouts.
+                    if matrix_sdk::timeout::timeout(work, TO_DEVICE_WORK_TIMEOUT)
+                        .await
+                        .is_err()
+                    {
+                        tracing::warn!("to-device work timed out");
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    pub(crate) fn track_session_handler(
+        &self,
+        client: &matrix_sdk::Client,
+        handle: matrix_sdk::event_handler::EventHandlerHandle,
+    ) {
+        let guard = client.event_handler_drop_guard(handle);
+        let mut handlers = self.state().session_handlers.lock();
+        if !self.has_ended() {
+            handlers.push(guard);
+        }
     }
 
     pub(crate) async fn account_data_types(&self) -> Result<Vec<String>, RpcError> {
-        let client = self.client().await?;
-        let mut types = self.account_data_types.lock().await.clone();
+        let client = self.client();
+        let mut types = self.state().account_data_types.lock().clone();
         types.extend(
-            self.with_open_stores(async || account_data::stored_types(&client).await)
+            self.core()
+                .with_open_stores(async || account_data::stored_types(client).await)
                 .await,
         );
-        match account_data::server_types(&client, self.sync_presence().await).await {
+        match account_data::server_types(client, self.sync_presence().await).await {
             Ok(listed) => {
                 for event_type in listed {
                     if !types.contains(&event_type) {
@@ -730,6 +746,7 @@ impl Core {
                 continue;
             }
             if let Ok(Some(_)) = self
+                .core()
                 .with_open_stores(async || {
                     client
                         .state_store()
@@ -747,17 +764,15 @@ impl Core {
     pub(crate) async fn remember_account_data_type(&self, event_type: impl Into<String>) {
         let event_type = event_type.into();
         if !self
+            .state()
             .account_data_types
             .lock()
-            .await
             .insert(event_type.clone())
         {
             return;
         }
-        let Ok(client) = self.client().await else {
-            return;
-        };
-        let mut stored = account_data::stored_types(&client).await;
+        let client = self.client();
+        let mut stored = account_data::stored_types(client).await;
         if !stored.insert(event_type) {
             return;
         }
@@ -779,11 +794,10 @@ impl Core {
         label: &str,
     ) -> Result<Option<Raw<AnyGlobalAccountDataEventContent>>, RpcError> {
         self.client()
-            .await?
             .account()
             .fetch_account_data(event_type)
             .await
-            .or_failed(self, label)
+            .or_failed(self.core(), label)
     }
 
     pub(crate) async fn put_global_account_data(
@@ -794,14 +808,13 @@ impl Core {
     ) -> Result<(), RpcError> {
         let raw = serde_json::value::to_raw_value(content)
             .map(Raw::<AnyGlobalAccountDataEventContent>::from_json)
-            .or_failed(self, label)?;
+            .or_failed(self.core(), label)?;
 
         self.client()
-            .await?
             .account()
             .set_account_data_raw(event_type, raw)
             .await
-            .or_failed(self, label)?;
+            .or_failed(self.core(), label)?;
 
         Ok(())
     }
@@ -819,12 +832,11 @@ impl Core {
             Option<serde_json::Value>,
         ) -> Result<Option<serde_json::Value>, RpcError>,
     ) -> Result<Option<serde_json::Value>, RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+        let _guard = self.state().account_data_writes.lock().await;
         self.update_account_data_locked(event_types, label, update)
             .await
     }
 
-    /// For callers that already hold `account_data_lock`.
     pub(crate) async fn update_account_data_locked(
         &self,
         event_types: &[&str],
@@ -839,7 +851,7 @@ impl Core {
         };
         let target = event_types
             .first()
-            .ok_or_else(|| self.failed(label, "no account data type to write"))?;
+            .ok_or_else(|| self.core().failed(label, "no account data type to write"))?;
         self.set_account_data(target, &content).await?;
         Ok(Some(content))
     }
@@ -859,48 +871,41 @@ impl Core {
             };
             return match raw.deserialize_as::<serde_json::Value>() {
                 Ok(content @ serde_json::Value::Object(_)) => Ok(Some(content)),
-                _ => Err(self.failed(label, format_args!("{event_type} is not a JSON object"))),
+                _ => Err(self
+                    .core()
+                    .failed(label, format_args!("{event_type} is not a JSON object"))),
             };
         }
         Ok(None)
     }
 
     pub(crate) async fn push_rules(&self) -> Result<Arc<push_rules::PushRules>, RpcError> {
-        let client = self.client().await?;
-        let mut cached = self.push_rules.lock().await;
+        let client = self.client();
+        let session_state = self.state();
+        let mut cached = session_state.push_rules.lock().await;
         if let Some(rules) = cached.as_ref() {
             return Ok(rules.clone());
         }
         let rules = self
-            .with_open_stores(async || push_rules::PushRules::load(&client).await)
+            .core()
+            .with_open_stores(async || push_rules::PushRules::load(client).await)
             .await;
         *cached = Some(rules.clone());
         Ok(rules)
     }
 
     pub(crate) async fn every_encrypted_event_pushed(&self) -> bool {
-        match self.push_rules().await {
-            Ok(rules) => rules.pushes_every_encrypted_event().await,
-            Err(_) => false,
-        }
+        self.push_rules()
+            .await
+            .is_ok_and(|rules| rules.pushes_every_encrypted_event())
     }
 
-    #[expect(
-        clippy::unused_async,
-        clippy::unused_async_trait_impl,
-        reason = "awaited at some 200 call sites, which a sync signature would all touch"
-    )]
-    pub(crate) async fn sync_service(
-        &self,
-    ) -> Result<Arc<matrix_sdk_ui::sync_service::SyncService>, RpcError> {
-        self.session
-            .current(|session| session.sync_service.clone())
-            .ok_or_else(|| RpcCode::NotLoggedIn.into())
+    pub(crate) fn sync_service(&self) -> Arc<matrix_sdk_ui::sync_service::SyncService> {
+        self.session().sync_service.clone()
     }
 
-    pub(crate) async fn room(&self, room_id: &OwnedRoomId) -> Result<matrix_sdk::Room, RpcError> {
+    pub(crate) fn room(&self, room_id: &OwnedRoomId) -> Result<matrix_sdk::Room, RpcError> {
         self.client()
-            .await?
             .get_room(room_id)
             .ok_or_else(|| RpcCode::UnknownRoom.into())
     }
@@ -913,19 +918,19 @@ mod tests {
 
     #[tokio::test]
     async fn to_device_work_runs_in_order_without_blocking_the_caller() {
-        let (core, _events) = Core::new(
-            "to-device-inbox",
-            Box::new(store::MemorySessionStore::default()),
-        );
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let (core, _events) = test_support::signed_in_core(&server, client).await;
+        let session = core.signed_in().unwrap();
         let (release, released) = tokio::sync::oneshot::channel::<()>();
         let (done, mut finished) = mpsc::unbounded_channel();
         let first = done.clone();
-        core.defer_to_device(Box::pin(async move {
+        session.defer_to_device(Box::pin(async move {
             released.await.unwrap();
             first.send(1).unwrap();
         }));
         let second = done.clone();
-        core.defer_to_device(Box::pin(async move {
+        session.defer_to_device(Box::pin(async move {
             second.send(2).unwrap();
         }));
         tokio::task::yield_now().await;
@@ -934,9 +939,9 @@ mod tests {
         assert_eq!(finished.recv().await, Some(1));
         assert_eq!(finished.recv().await, Some(2));
 
-        core.session_tasks.lock().clear();
-        core.to_device_inbox.lock().take();
-        core.defer_to_device(Box::pin(async move {
+        session.state().session_tasks.lock().clear();
+        session.state().to_device_inbox.lock().take();
+        session.defer_to_device(Box::pin(async move {
             done.send(3).unwrap();
         }));
         assert_eq!(finished.recv().await, Some(3));
@@ -1007,16 +1012,28 @@ mod tests {
             }
         }
 
-        let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let (core, _rx) = test_support::signed_in_core(&server, client).await;
+        let session = core.signed_in().unwrap();
         let old = core.allocate_subscription();
-        core.subscriptions.lock().await.insert(old, subscription());
-        let dropping = core.drop_open_subscriptions();
+        session
+            .state()
+            .subscriptions
+            .lock()
+            .insert(old, subscription());
+        let dropping = session.drop_open_subscriptions();
 
         let new = core.allocate_subscription();
-        core.subscriptions.lock().await.insert(new, subscription());
+        session
+            .state()
+            .subscriptions
+            .lock()
+            .insert(new, subscription());
         dropping.await;
 
-        let open = core.subscriptions.lock().await;
+        let session_state = session.state();
+        let open = session_state.subscriptions.lock();
         assert!(!open.contains_key(&old));
         assert!(open.contains_key(&new));
     }
@@ -1076,9 +1093,26 @@ mod tests {
         assert_eq!(*bytes.lock().await, None);
     }
 
+    async fn ended_reason(events: &mut mpsc::UnboundedReceiver<CoreEvent>) -> Option<String> {
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(event) = events.recv().await {
+                if let CoreEvent::SessionEnded { reason } = event {
+                    return Some(reason);
+                }
+            }
+            None
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
     #[tokio::test]
     async fn rejected_token_after_a_refresh_still_ends_the_session() {
-        let (core, mut events) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+        let (core, mut events) =
+            test_support::signed_in_core(&server, server.client_builder().build().await).await;
+        let session = core.signed_in().unwrap();
         let (changes, receiver) = tokio::sync::broadcast::channel(1);
 
         changes
@@ -1089,20 +1123,20 @@ mod tests {
                 ruma::api::error::UnknownTokenErrorData::new(),
             ))
             .unwrap();
-        core.watch_session_changes(receiver, 1);
+        session.watch_session_changes(receiver, 1);
 
-        assert!(matches!(
-            tokio::time::timeout(std::time::Duration::from_secs(1), events.recv())
-                .await
-                .ok()
-                .flatten(),
-            Some(CoreEvent::SessionEnded { reason }) if reason == "token_rejected"
-        ));
+        assert_eq!(
+            ended_reason(&mut events).await.as_deref(),
+            Some("token_rejected")
+        );
     }
 
     #[tokio::test]
     async fn a_soft_logout_ends_the_session_with_its_own_reason() {
-        let (core, mut events) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+        let (core, mut events) =
+            test_support::signed_in_core(&server, server.client_builder().build().await).await;
+        let session = core.signed_in().unwrap();
         let (changes, receiver) = tokio::sync::broadcast::channel(1);
 
         let mut data = ruma::api::error::UnknownTokenErrorData::new();
@@ -1110,15 +1144,12 @@ mod tests {
         changes
             .send(matrix_sdk::SessionChange::UnknownToken(data))
             .unwrap();
-        core.watch_session_changes(receiver, 1);
+        session.watch_session_changes(receiver, 1);
 
-        assert!(matches!(
-            tokio::time::timeout(std::time::Duration::from_secs(1), events.recv())
-                .await
-                .ok()
-                .flatten(),
-            Some(CoreEvent::SessionEnded { reason }) if reason == "soft_logout"
-        ));
+        assert_eq!(
+            ended_reason(&mut events).await.as_deref(),
+            Some("soft_logout")
+        );
     }
 
     #[test]
@@ -1226,9 +1257,7 @@ mod tests {
         );
 
         core.accounts().await.unwrap();
-        core.mark_account_needs_reauth(Some("a1"), false)
-            .await
-            .unwrap();
+        core.needs_reauth(Some("a1"), false).await.unwrap();
 
         let stored: serde_json::Value =
             serde_json::from_slice(bytes.lock().await.as_deref().unwrap()).unwrap();

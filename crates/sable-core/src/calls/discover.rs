@@ -10,6 +10,7 @@ use super::membership::{self, CallMember, StickyMemberships};
 use super::runtime::merge_sticky;
 use super::{sfu, sticky};
 use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{CallMode, CallModeReason, CallSessionId, RpcCode, RpcError};
 
 fn select_mode(
@@ -111,7 +112,7 @@ fn select_wire(
 }
 
 async fn resolve_service(
-    core: &Core,
+    core: &SignedIn,
     room: &Room,
     members: &[CallMember],
     configured: Option<String>,
@@ -203,7 +204,7 @@ fn own_member(
 }
 
 pub(super) async fn discover(
-    core: &Core,
+    core: &SignedIn,
     room: &Room,
     session: CallSessionId,
     configured: Option<String>,
@@ -212,7 +213,7 @@ pub(super) async fn discover(
     let client = room.client();
     let user = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
     let device = client.device_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
-    let encrypted = core.room_is_encrypted(room).await?;
+    let encrypted = core.core().room_is_encrypted(room).await?;
     let features = client.unstable_features().await.unwrap_or_default();
     let (mut sticky_members, sticky_sync) = if features.contains(&"org.matrix.msc4354".into()) {
         sync_sticky(room, session, encrypted).await
@@ -230,7 +231,7 @@ pub(super) async fn discover(
         Vec::new()
     };
     let wire = select_wire(stable_supported, &sticky_candidates, &stable_services);
-    let slot_closed = sticky_sync.is_some() && room_slot_closed(core, room, wire).await?;
+    let slot_closed = sticky_sync.is_some() && room_slot_closed(core.core(), room, wire).await?;
     let mut members = membership::active_members(room).await;
     if !slot_closed {
         merge_sticky(

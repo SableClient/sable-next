@@ -2,12 +2,12 @@ use sable_model::text::visible_name;
 
 use crate::api::notifications::InboxFilter;
 use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use crate::tasks::JoinHandleExt;
 use matrix_sdk::Room;
 use matrix_sdk::deserialized_responses::TimelineEvent;
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::events::receipt::{ReceiptThread, ReceiptType};
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
@@ -20,10 +20,12 @@ use tracing::warn;
 
 use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::notifications;
 use crate::preview;
 use crate::protocol::{CoreEvent, InboxItemView, PreviewEmote, RpcCode, RpcError};
 use crate::push_rules;
+use crate::session::Session;
 
 const SCHEMA: u32 = 1;
 const KEY: &[u8] = b"sable.inbox.notifications";
@@ -182,23 +184,46 @@ const fn matches(entry: &Entry, filter: InboxFilter) -> bool {
 }
 
 #[derive(Default)]
-pub(crate) struct InboxCache {
+pub(crate) struct Inbox {
+    cache: tokio::sync::Mutex<InboxCache>,
+    /// The revision last written. Held while writing, so saves land in revision order.
+    saved: tokio::sync::Mutex<u64>,
+    changed: tokio::sync::Notify,
+}
+
+#[derive(Default)]
+struct InboxCache {
     stored: Option<Stored>,
     revision: u64,
-    saved: u64,
-    resets: u64,
 }
 
 impl InboxCache {
     fn stored(&mut self) -> &mut Stored {
         self.stored.get_or_insert_default()
     }
+}
 
-    pub(crate) fn reset(&mut self) {
-        *self = Self {
-            resets: self.resets + 1,
-            ..Self::default()
+impl Inbox {
+    async fn save(&self, write: impl AsyncFnOnce(Vec<u8>) -> Result<(), RpcError>) {
+        let mut saved = self.saved.lock().await;
+        let (revision, bytes) = {
+            let mut cache = self.cache.lock().await;
+            if cache.revision == *saved {
+                return;
+            }
+            let Some(stored) = cache.stored.as_mut() else {
+                return;
+            };
+            let Ok(bytes) = encode(stored) else {
+                return;
+            };
+            (cache.revision, bytes)
         };
+        if write(bytes).await.is_ok() {
+            *saved = (*saved).max(revision);
+        } else {
+            self.changed.notify_one();
+        }
     }
 }
 
@@ -510,8 +535,12 @@ async fn backfill_candidates(
 
 impl Core {
     fn shows_inbox_body(&self, encrypted: bool) -> bool {
-        self.notification_content.load(Ordering::Relaxed)
-            && (!encrypted || self.notification_encrypted_content.load(Ordering::Relaxed))
+        self.settings.notification_content.load(Ordering::Relaxed)
+            && (!encrypted
+                || self
+                    .settings
+                    .notification_encrypted_content
+                    .load(Ordering::Relaxed))
     }
 
     fn inbox_body(&self, event: &AnySyncTimelineEvent, encrypted: bool) -> Option<String> {
@@ -578,10 +607,43 @@ impl Core {
             reply: is_reply(raw),
         })
     }
+}
+
+fn event_ts(event: &TimelineEvent) -> Option<u64> {
+    event.timestamp().map(|ts| u64::from(ts.get()))
+}
+
+impl Core {
+    /// For lifecycle jobs: closed stores reopen only in a later job, so waiting for them here would
+    /// wait forever. The changes stay unsaved until the next flush.
+    pub(crate) async fn flush_inbox_if_open(&self, session: &Session) {
+        if *self.activity.subscribe_stores().borrow() {
+            session
+                .state
+                .inbox
+                .save(async |bytes| write(&session.client, bytes).await)
+                .await;
+        }
+    }
+}
+
+impl SignedIn {
+    pub(crate) fn watch_inbox_persist(&self) {
+        let session = self.clone();
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    session.state().inbox.changed.notified().await;
+                    matrix_sdk::sleep::sleep(INBOX_FLUSH_INTERVAL).await;
+                    session.flush_inbox().await;
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
 
     async fn record_inbox(
         &self,
-        client: &matrix_sdk::Client,
         fresh: Vec<Entry>,
         cursors: BTreeMap<OwnedRoomId, Option<String>>,
         unread_scans: BTreeMap<OwnedRoomId, UnreadScan>,
@@ -589,99 +651,48 @@ impl Core {
         if fresh.is_empty() && cursors.is_empty() && unread_scans.is_empty() {
             return Ok(0);
         }
-        let mut inbox = self.loaded_inbox(client).await?;
+        let mut inbox = self.loaded_inbox().await?;
         let stored = inbox.stored();
         let added = merge(&mut stored.entries, fresh);
         stored.cursors.extend(cursors);
         stored.unread_scans.extend(unread_scans);
         inbox.revision += 1;
-        self.inbox_changed.notify_one();
+        self.state().inbox.changed.notify_one();
         Ok(added)
     }
 
-    async fn stored_inbox(&self, client: &matrix_sdk::Client) -> Result<Stored, RpcError> {
-        Ok(self.loaded_inbox(client).await?.stored().clone())
+    async fn stored_inbox(&self) -> Result<Stored, RpcError> {
+        Ok(self.loaded_inbox().await?.stored().clone())
     }
 
     /// Suspension flushes the inbox before it closes the stores, so the store read must not hold
     /// the inbox while it waits for them.
-    async fn loaded_inbox(
-        &self,
-        client: &matrix_sdk::Client,
-    ) -> Result<tokio::sync::MutexGuard<'_, InboxCache>, RpcError> {
-        let resets = {
-            let inbox = self.inbox.lock().await;
+    async fn loaded_inbox(&self) -> Result<tokio::sync::MutexGuard<'_, InboxCache>, RpcError> {
+        let cache = &self.state().inbox.cache;
+        {
+            let inbox = cache.lock().await;
             if inbox.stored.is_some() {
                 return Ok(inbox);
             }
-            inbox.resets
-        };
-        let loaded = self.with_open_stores(async || load(client).await).await?;
-        let mut inbox = self.inbox.lock().await;
-        // The session changed during the read, so `loaded` belongs to the previous account.
-        if inbox.resets != resets {
-            return Err(RpcCode::Unavailable.into());
         }
+        let loaded = self
+            .core()
+            .with_open_stores(async || load(self.client()).await)
+            .await?;
+        let mut inbox = cache.lock().await;
         inbox.stored.get_or_insert(loaded);
         Ok(inbox)
     }
 
-    pub(crate) async fn flush_inbox(&self, client: &matrix_sdk::Client) {
-        self.save_inbox(async |bytes| {
-            self.with_open_stores(async || write(client, bytes).await)
-                .await
-        })
-        .await;
-    }
-
-    /// For a suspension, where `with_open_stores` would wait for stores it has already closed.
-    pub(crate) async fn flush_inbox_locked(
-        &self,
-        client: &matrix_sdk::Client,
-        transition: &crate::activity::Transition<'_>,
-    ) {
-        if transition.stores_open() {
-            self.save_inbox(async |bytes| write(client, bytes).await)
-                .await;
-        }
-    }
-
-    async fn save_inbox(&self, write: impl AsyncFnOnce(Vec<u8>) -> Result<(), RpcError>) {
-        let _writing = self.inbox_flush.lock().await;
-        let (revision, bytes) = {
-            let mut inbox = self.inbox.lock().await;
-            if inbox.revision == inbox.saved {
-                return;
-            }
-            let Some(stored) = inbox.stored.as_mut() else {
-                return;
-            };
-            let Ok(bytes) = encode(stored) else {
-                return;
-            };
-            (inbox.revision, bytes)
-        };
-        if write(bytes).await.is_ok() {
-            let mut inbox = self.inbox.lock().await;
-            inbox.saved = inbox.saved.max(revision);
-        } else {
-            self.inbox_changed.notify_one();
-        }
-    }
-
-    pub(crate) fn watch_inbox_persist(self: &Arc<Self>, client: &matrix_sdk::Client) {
-        let core = self.clone();
-        let client = client.clone();
-        self.track_session_task(
-            spawn(async move {
-                loop {
-                    core.inbox_changed.notified().await;
-                    matrix_sdk::sleep::sleep(INBOX_FLUSH_INTERVAL).await;
-                    core.flush_inbox(&client).await;
-                }
+    pub(crate) async fn flush_inbox(&self) {
+        self.state()
+            .inbox
+            .save(async |bytes| {
+                self.core()
+                    .with_open_stores(async || write(self.client(), bytes).await)
+                    .await
             })
-            .abort_on_drop(),
-        );
+            .await;
     }
 
     pub(crate) async fn record_live_inbox(
@@ -691,20 +702,16 @@ impl Core {
         actions: &[Action],
         generation: u64,
     ) {
-        let Some(entry) = self.inbox_entry(room, raw, actions).await else {
+        let Some(entry) = self.core().inbox_entry(room, raw, actions).await else {
             return;
         };
         match self
-            .record_inbox(
-                &room.client(),
-                vec![entry],
-                BTreeMap::new(),
-                BTreeMap::new(),
-            )
+            .record_inbox(vec![entry], BTreeMap::new(), BTreeMap::new())
             .await
         {
             Ok(changed) if changed > 0 => {
-                self.emit_if_current(generation, CoreEvent::InboxChanged);
+                self.core()
+                    .emit_if_current(generation, CoreEvent::InboxChanged);
             }
             Err(error) => warn!(?error, "recording an inbox notification failed"),
             _ => {}
@@ -721,9 +728,8 @@ impl Core {
         let Some(event_id) = event.event_id() else {
             return;
         };
-        let client = room.client();
         let undecryptable = {
-            self.loaded_inbox(&client).await.is_ok_and(|mut inbox| {
+            self.loaded_inbox().await.is_ok_and(|mut inbox| {
                 inbox
                     .stored()
                     .entries
@@ -746,8 +752,8 @@ impl Core {
         before_ts: Option<u64>,
         scope: InboxScope<'_>,
     ) -> Result<(Vec<InboxItemView>, bool), RpcError> {
-        let client = self.client().await?;
-        let stored = self.stored_inbox(&client).await?;
+        let client = self.client();
+        let stored = self.stored_inbox().await?;
         let mut rooms: HashMap<OwnedRoomId, Option<(bool, RoomReadState)>> = HashMap::new();
         let mut threads: HashMap<OwnedEventId, u64> = HashMap::new();
         let mut room_receipts: HashMap<OwnedRoomId, u64> = HashMap::new();
@@ -768,7 +774,7 @@ impl Core {
                 continue;
             }
             if let Some(query) = &query
-                && !contains_query(&entry, query, self.shows_inbox_body(entry.encrypted))
+                && !contains_query(&entry, query, self.core().shows_inbox_body(entry.encrypted))
             {
                 continue;
             }
@@ -778,9 +784,11 @@ impl Core {
                     .filter(|room| room.state() == matrix_sdk::RoomState::Joined);
                 let state = match joined {
                     Some(room) => {
-                        let read = read_state(self, &room).await?;
+                        let read = read_state(self.core(), &room).await?;
                         Some((
-                            self.with_open_stores(async || is_dm(&room).await).await,
+                            self.core()
+                                .with_open_stores(async || is_dm(&room).await)
+                                .await,
                             read,
                         ))
                     }
@@ -799,7 +807,8 @@ impl Core {
                     } else {
                         let ts = match client.get_room(&entry.room_id) {
                             Some(room) => {
-                                thread_read_ts(self, &room, thread_root, &mut room_receipts).await?
+                                thread_read_ts(self.core(), &room, thread_root, &mut room_receipts)
+                                    .await?
                             }
                             None => 0,
                         };
@@ -808,7 +817,7 @@ impl Core {
                     };
                     entry.ts > thread_read_ts
                 }
-                None => main_unread(self, &client, &entry, read, &mut room_receipts).await?,
+                None => main_unread(self.core(), client, &entry, read, &mut room_receipts).await?,
             };
             if !matches(&entry, filter)
                 || (!unread && !include_read)
@@ -820,7 +829,7 @@ impl Core {
                 has_more = true;
                 break;
             }
-            let shows_body = self.shows_inbox_body(entry.encrypted);
+            let shows_body = self.core().shows_inbox_body(entry.encrypted);
             items.push(InboxItemView {
                 room_id: entry.room_id.to_string(),
                 event_id: entry.event_id.to_string(),
@@ -846,13 +855,14 @@ impl Core {
         include_read: bool,
         room_id: Option<&RoomId>,
     ) -> Result<(u32, bool), RpcError> {
-        let client = self.client().await?;
-        crate::rooms::fill_own_members(&client)
+        let client = self.client();
+        crate::rooms::fill_own_members(client)
             .await
-            .or_failed(self, "inbox_memberships")?;
-        let stored = self.stored_inbox(&client).await?;
+            .or_failed(self.core(), "inbox_memberships")?;
+        let stored = self.stored_inbox().await?;
         let every_encrypted = self.every_encrypted_event_pushed().await;
-        let candidates = backfill_candidates(self, &client, &stored, include_read, room_id).await?;
+        let candidates =
+            backfill_candidates(self.core(), client, &stored, include_read, room_id).await?;
         drop(stored);
 
         let mut fresh = Vec::new();
@@ -875,7 +885,7 @@ impl Core {
                     Ok(messages) => messages,
                     Err(error) => {
                         warn!(room_id = %room.room_id(), "inbox backfill failed: {error}");
-                        failure = Some(self.failed_with("inbox_backfill", &error));
+                        failure = Some(self.core().failed_with("inbox_backfill", &error));
                         continue 'rooms;
                     }
                 };
@@ -894,7 +904,8 @@ impl Core {
                         event.push_actions().unwrap_or_default().to_vec(),
                     )
                     .await;
-                    if let Some(entry) = self.inbox_entry(&room, event.raw(), &actions).await {
+                    if let Some(entry) = self.core().inbox_entry(&room, event.raw(), &actions).await
+                    {
                         fresh.push(entry);
                         scan.found = scan.found.saturating_add(1);
                     }
@@ -920,11 +931,9 @@ impl Core {
             }
         }
 
-        let added = self
-            .record_inbox(&client, fresh, cursors, unread_scans)
-            .await?;
+        let added = self.record_inbox(fresh, cursors, unread_scans).await?;
         if added > 0 {
-            self.emit(CoreEvent::InboxChanged);
+            self.core().emit(CoreEvent::InboxChanged);
         }
         if added > 0 || failure.is_some() {
             tracing::info!(
@@ -942,10 +951,6 @@ impl Core {
         }
         Ok((u32::try_from(added).unwrap_or(u32::MAX), has_more))
     }
-}
-
-fn event_ts(event: &TimelineEvent) -> Option<u64> {
-    event.timestamp().map(|ts| u64::from(ts.get()))
 }
 
 #[cfg(test)]

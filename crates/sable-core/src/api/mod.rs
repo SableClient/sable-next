@@ -10,8 +10,8 @@ use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 use web_time::Instant;
 
-use crate::Core;
 use crate::protocol::{RpcCode, RpcError};
+use crate::{Core, SignedIn};
 
 /// Registers a domain's methods by wire name; `user_profile` is handled by `UserProfileParams`.
 macro_rules! domain {
@@ -98,6 +98,36 @@ pub trait Handler: DeserializeOwned {
     type Ok: Serialize;
 
     fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<Self::Ok, RpcError>>;
+}
+
+/// A method of the signed-in account. It runs to completion on the session it started with, so a
+/// switch never cuts its server writes in half.
+pub trait SessionHandler: DeserializeOwned {
+    type Ok: Serialize;
+
+    /// For long reads only: they stop with `NotLoggedIn` once their session ends.
+    const ENDS_WITH_SESSION: bool = false;
+
+    fn run(self, session: &SignedIn) -> impl Future<Output = Result<Self::Ok, RpcError>>;
+}
+
+impl<H: SessionHandler> Handler for H {
+    type Ok = H::Ok;
+
+    async fn run(self, core: &Arc<Core>) -> Result<Self::Ok, RpcError> {
+        let session = core.signed_in()?;
+        let _operation = session.begin_operation();
+        if !H::ENDS_WITH_SESSION {
+            return session
+                .until_discarded(SessionHandler::run(self, &session))
+                .await
+                .unwrap_or_else(|| Err(RpcCode::NotLoggedIn.into()));
+        }
+        session
+            .until_ended(SessionHandler::run(self, &session))
+            .await
+            .unwrap_or_else(|| Err(RpcCode::NotLoggedIn.into()))
+    }
 }
 
 #[cfg(feature = "typegen")]

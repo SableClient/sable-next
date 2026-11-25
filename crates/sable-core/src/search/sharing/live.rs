@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use matrix_sdk::Client;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::ruma::OwnedRoomId;
@@ -45,28 +47,40 @@ pub(super) async fn crawled_room(base: &str, user_id: &str) -> (Client, OwnedRoo
     (publisher, room.room_id().to_owned())
 }
 
-pub(super) async fn crawl_to_start(core: &Core, client: &Client, room_id: &OwnedRoomId) {
+pub(super) async fn crawl_to_start(core: &Arc<Core>, client: &Client, room_id: &OwnedRoomId) {
+    let session = core.signed_in().unwrap();
     let (cache, _drop) = client.event_cache().unwrap().room(room_id).await.unwrap();
     let events = cache.events().await.unwrap();
-    core.search_index
+    session
+        .state()
+        .search_index
         .lock()
         .await
         .ingest(room_id, events, &cache, &RedactionRules::V11)
         .await;
     loop {
-        let CrawlOutcome::Batch(batch) = core.crawl_once(client, room_id).await.unwrap() else {
+        let CrawlOutcome::Batch(batch) = session.crawl_once(room_id).await.unwrap() else {
             continue;
         };
         if batch.reached_start {
-            core.search_crawl
+            session
+                .state()
+                .search_crawl
                 .lock()
-                .await
                 .settle(room_id.clone(), batch.exhausted);
             break;
         }
     }
 }
 
-pub(super) async fn needles(core: &Core, room_id: &OwnedRoomId) -> usize {
-    in_room(&*core.search_index.lock().await, room_id, "needle", 100, 0).len()
+pub(super) async fn needles(core: &Arc<Core>, room_id: &OwnedRoomId) -> usize {
+    let session = core.signed_in().unwrap();
+    in_room(
+        &*session.state().search_index.lock().await,
+        room_id,
+        "needle",
+        100,
+        0,
+    )
+    .len()
 }

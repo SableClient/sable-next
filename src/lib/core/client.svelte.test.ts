@@ -417,6 +417,71 @@ test("logging out forgets that account's recent searches and keeps the others'",
   expect(recentSearches(otherSession.user_id)).toEqual(['rollback plan']);
 });
 
+test('a logout that fails with the session still running changes nothing', async () => {
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': [session, otherSession],
+    'session.logout': () => Promise.reject(new CoreError(transportFailure('e21'))),
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+
+  await expect(core.logout()).rejects.toThrow(CoreError);
+
+  expect(core.session).toEqual(session);
+  expect(core.status).toBe('ready');
+  expect(fake.called.map((call) => call.method)).not.toContain('session.switch_account');
+  core.stop();
+});
+
+test('a logout that fails after the session ended signs out and keeps the account data', async () => {
+  const accounts = { accounts: [session, otherSession] };
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': () => accounts.accounts,
+    'session.switch_account': otherSession,
+    'session.logout': () => {
+      accounts.accounts = [{ ...session, needs_reauth: true }, otherSession];
+      return Promise.reject(new CoreError(transportFailure('e22')));
+    },
+  });
+  const core = createCoreClient(() => fake.transport);
+  rememberSearch(session.user_id, 'salary review');
+  await core.start();
+  vi.mocked(removeAccountConfiguration).mockClear();
+
+  await expect(core.logout()).rejects.toThrow(CoreError);
+
+  expect(core.session).toEqual(otherSession);
+  expect(core.status).toBe('ready');
+  expect(core.accounts).toEqual(accounts.accounts);
+  expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+  expect(removeAccountConfiguration).not.toHaveBeenCalled();
+  expect(recentSearches(session.user_id)).toEqual(['salary review']);
+  core.stop();
+});
+
+test('a logout that fails after the session ended with no other account ends signed out', async () => {
+  const accounts = { accounts: [session] };
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': () => accounts.accounts,
+    'session.logout': () => {
+      accounts.accounts = [{ ...session, needs_reauth: true }];
+      return Promise.reject(new CoreError(transportFailure('e23')));
+    },
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+
+  await expect(core.logout()).rejects.toThrow(CoreError);
+
+  expect(core.session).toBeNull();
+  expect(core.status).toBe('signed-out');
+  expect(core.accounts).toEqual(accounts.accounts);
+  core.stop();
+});
+
 test('removing an account forgets its recent searches', async () => {
   const accounts = { accounts: [session, otherSession] };
   const fake = fakeTransport({
@@ -1384,6 +1449,51 @@ test('soft logout retains the account to reauthenticate', async () => {
   });
   expect(core.reauthenticationAccountId).toBe(session.account_id);
   expect(core.session).toBeNull();
+  core.stop();
+});
+
+test('a session ended by a failed lifecycle step does not ask to sign in again', async () => {
+  const fake = fakeTransport({
+    'session.restore': session,
+    'session.list_accounts': [session],
+  });
+  const call = fake.call.getMockImplementation();
+  if (!call) throw new Error('missing transport handler');
+  fake.call.mockImplementation((method, params) =>
+    method === 'session.switch_account'
+      ? Promise.reject(new CoreError(transportFailure('e24')))
+      : call(method, params)
+  );
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  fake.emit({ type: 'session_ended', reason: 'lifecycle_failed' });
+  expect(core.session).toBeNull();
+  expect(core.reauthenticationAccountId).toBeNull();
+  await vi.waitFor(() => {
+    expect(core.status).not.toBe('authenticating');
+  });
+  expect(core.reauthenticationAccountId).toBeNull();
+  core.stop();
+});
+
+test('a session ended by a failed lifecycle step opens the same account again', async () => {
+  const fake = fakeTransport({
+    'session.restore': otherSession,
+    'session.list_accounts': [session, otherSession],
+    'session.switch_account': otherSession,
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  fake.emit({ type: 'session_ended', reason: 'lifecycle_failed' });
+  await vi.waitFor(() => {
+    expect(core.session?.account_id).toBe(otherSession.account_id);
+  });
+  expect(fake.call).toHaveBeenCalledWith('session.switch_account', {
+    account_id: otherSession.account_id,
+  });
+  expect(fake.call).not.toHaveBeenCalledWith('session.switch_account', {
+    account_id: session.account_id,
+  });
   core.stop();
 });
 

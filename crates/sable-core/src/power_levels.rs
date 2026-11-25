@@ -7,12 +7,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, serde_as};
 
+use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{
     PowerLevelAction, PowerLevelLocation, PowerLevelTagView, PowerLevelTagsView,
     RoomPowerLevelsView, RpcCode, RpcError,
 };
 use crate::view;
-use crate::{Core, ResultExt};
 
 pub(crate) const POWER_LEVELS_EVENT: &str = "m.room.power_levels";
 
@@ -285,19 +286,19 @@ pub(crate) struct ChildSync {
     pub(crate) skipped: u32,
 }
 
-impl Core {
+impl SignedIn {
     async fn power_levels_view(
         &self,
         room_id: &OwnedRoomId,
     ) -> Result<RoomPowerLevelsView, RpcError> {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         Ok(view::room_power_levels(
             &room.power_levels_or_default().await,
         ))
     }
 
     async fn own_power_level(&self, room_id: &OwnedRoomId) -> Result<(String, i64), RpcError> {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let user_id = room
             .client()
             .user_id()
@@ -369,7 +370,7 @@ impl Core {
         tag: Option<&PowerLevelTagView>,
     ) -> Result<PowerLevelTagsView, RpcError> {
         let next = with_tag(self.state_content(&room_id, TAGS_EVENT).await?, level, tag)
-            .or_failed(self, "power_level_tag")?;
+            .or_failed(self.core(), "power_level_tag")?;
         self.send_state(room_id, TAGS_EVENT, "", &next).await?;
         Ok(parse_tags(Some(&next)))
     }

@@ -1,13 +1,13 @@
 //! Counts of use shared through account data, which has no compare and swap.
 //! A change is saved here before any request, then replayed onto what the server holds.
 
-use matrix_sdk::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{CoreEvent, RpcCode, RpcError};
 use crate::sealed_account_data::{cached_key, is_sealed, read_account_data};
-use crate::{Core, ResultExt};
 
 mod window;
 
@@ -341,7 +341,7 @@ impl History {
     }
 }
 
-impl Core {
+impl SignedIn {
     /// `change` is durable before the network is touched. Without `sync` it stays on this device.
     pub(crate) async fn update_usage_history(
         &self,
@@ -350,22 +350,21 @@ impl Core {
         change: impl FnOnce(&mut History),
     ) -> Result<Vec<Value>, RpcError> {
         // One client throughout, so switching accounts cannot cross their histories.
-        let client = self.client().await?;
         let before = self
-            .edit_usage_history(&client, kind, |history| {
+            .edit_usage_history(kind, |history| {
                 let before = history.entries(kind);
                 change(history);
                 before
             })
             .await?;
         if sync {
-            self.sync_usage_history(&client, kind).await?;
+            self.sync_usage_history(kind).await?;
         }
         let entries = self
-            .edit_usage_history(&client, kind, |history| history.entries(kind))
+            .edit_usage_history(kind, |history| history.entries(kind))
             .await?;
         if entries != before {
-            self.emit(CoreEvent::AccountDataChanged {
+            self.core().emit(CoreEvent::AccountDataChanged {
                 event_type: kind.event_type.to_owned(),
             });
         }
@@ -378,7 +377,7 @@ impl Core {
         key: &str,
         sync: bool,
     ) -> Result<(), RpcError> {
-        let client = self.client().await?;
+        let client = self.client();
         let device = client.device_id().ok_or(RpcCode::Unavailable)?;
         self.update_usage_history(kind, sync, |history| {
             history.pick(kind, key, device.as_str(), crate::now_ms());
@@ -387,42 +386,44 @@ impl Core {
         .map(|_| ())
     }
 
-    /// Its lock is never held across a request, unlike `account_data_lock`.
     async fn edit_usage_history<T>(
         &self,
-        client: &Client,
         kind: &Kind,
         edit: impl FnOnce(&mut History) -> T,
     ) -> Result<T, RpcError> {
-        let _guard = self.usage_history_lock.lock().await;
-        self.with_open_stores(async || {
-            let stored = client
-                .state_store()
-                .get_custom_value(kind.store_key)
-                .await
-                .or_failed(self, "usage_history")?;
-            let mut history = stored
-                .as_deref()
-                .map(|bytes| History::restore(kind, bytes))
-                .unwrap_or_default();
-            let result = edit(&mut history);
-            let bytes = serde_json::to_vec(&history).or_failed(self, "usage_history")?;
-            if stored.as_ref() != Some(&bytes) {
-                client
+        let client = self.client();
+        let _guard = self.state().usage_history_writes.lock().await;
+        self.core()
+            .with_open_stores(async || {
+                let stored = client
                     .state_store()
-                    .set_custom_value_no_read(kind.store_key, bytes)
+                    .get_custom_value(kind.store_key)
                     .await
-                    .or_failed(self, "usage_history")?;
-            }
-            Ok(result)
-        })
-        .await
+                    .or_failed(self.core(), "usage_history")?;
+                let mut history = stored
+                    .as_deref()
+                    .map(|bytes| History::restore(kind, bytes))
+                    .unwrap_or_default();
+                let result = edit(&mut history);
+                let bytes = serde_json::to_vec(&history).or_failed(self.core(), "usage_history")?;
+                if stored.as_ref() != Some(&bytes) {
+                    client
+                        .state_store()
+                        .set_custom_value_no_read(kind.store_key, bytes)
+                        .await
+                        .or_failed(self.core(), "usage_history")?;
+                }
+                Ok(result)
+            })
+            .await
     }
 
-    async fn sync_usage_history(&self, client: &Client, kind: &Kind) -> Result<(), RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+    async fn sync_usage_history(&self, kind: &Kind) -> Result<(), RpcError> {
+        let client = self.client();
+        let _guard = self.state().account_data_writes.lock().await;
         let key = if kind.sealed {
-            self.with_open_stores(async || cached_key(client).await)
+            self.core()
+                .with_open_stores(async || cached_key(client).await)
                 .await
         } else {
             None
@@ -454,7 +455,7 @@ impl Core {
             },
         };
         let Some(upload) = self
-            .edit_usage_history(client, kind, |history| {
+            .edit_usage_history(kind, |history| {
                 history.receive(kind, remote, crate::now_ms())
             })
             .await?
@@ -464,11 +465,11 @@ impl Core {
         let upload = match &key {
             Some(key) => key
                 .seal(kind.event_type, &upload)
-                .or_failed(self, "usage_history_seal")?,
+                .or_failed(self.core(), "usage_history_seal")?,
             None => upload,
         };
         let raw = ruma::serde::Raw::new(&upload)
-            .or_failed(self, "usage_history")?
+            .or_failed(self.core(), "usage_history")?
             .cast_unchecked();
         if let Err(error) = client
             .account()
@@ -481,8 +482,7 @@ impl Core {
             );
             return Ok(());
         }
-        self.edit_usage_history(client, kind, History::uploaded)
-            .await
+        self.edit_usage_history(kind, History::uploaded).await
     }
 }
 
@@ -616,13 +616,17 @@ pub(crate) mod testing {
         client: matrix_sdk::Client,
     ) -> Arc<Core> {
         let (core, _events) = Core::new("history-test", Box::new(MemorySessionStore::default()));
-        *core.session.write().await = Some(Session {
-            account_id: "test".into(),
-            client: client.clone(),
-            sync_service: Arc::new(SyncService::builder(client).build().await.unwrap()),
-            homeserver: server.server().uri(),
-            oauth: false,
-        });
+        crate::test_support::set_session(
+            &core,
+            Some(Session {
+                account_id: "test".into(),
+                client: client.clone(),
+                sync_service: Arc::new(SyncService::builder(client).build().await.unwrap()),
+                homeserver: server.server().uri(),
+                oauth: false,
+                state: Arc::default(),
+            }),
+        );
         core
     }
 

@@ -3,7 +3,8 @@ use std::sync::Arc;
 use matrix_sdk::ruma::OwnedRoomId;
 use serde::{Deserialize, Serialize};
 
-use super::{Handler, Json};
+use super::{Handler, SessionHandler, Json};
+use crate::SignedIn;
 use crate::Core;
 use crate::protocol::{CallBackendView, CallCompatibilityView, CallIntent, CallMode, CallModeReason, CallSessionId, CallSupportView, RpcError, TurnServerView};
 
@@ -31,11 +32,11 @@ pub enum RtcLivekitEndpoint {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct TurnServerParams {}
 
-impl Handler for TurnServerParams {
+impl SessionHandler for TurnServerParams {
     type Ok = TurnServerView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<TurnServerView, RpcError> {
-        core.turn_server().await
+    async fn run(self, session: &SignedIn) -> Result<TurnServerView, RpcError> {
+        session.turn_server().await
     }
 }
 
@@ -43,11 +44,11 @@ impl Handler for TurnServerParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct RtcTransportsParams {}
 
-impl Handler for RtcTransportsParams {
+impl SessionHandler for RtcTransportsParams {
     type Ok = Json;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Json, RpcError> {
-        core.rtc_transports().await.map(Json)
+    async fn run(self, session: &SignedIn) -> Result<Json, RpcError> {
+        session.rtc_transports().await.map(Json)
     }
 }
 
@@ -59,11 +60,11 @@ pub struct RtcLivekitParams {
     pub body: serde_json::Value,
 }
 
-impl Handler for RtcLivekitParams {
+impl SessionHandler for RtcLivekitParams {
     type Ok = Json;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Json, RpcError> {
-        core.rtc_livekit(self.endpoint, &self.body).await.map(Json)
+    async fn run(self, session: &SignedIn) -> Result<Json, RpcError> {
+        session.rtc_livekit(self.endpoint, &self.body).await.map(Json)
     }
 }
 
@@ -97,11 +98,11 @@ pub struct JoinOk {
     pub backends: Vec<CallBackendView>,
 }
 
-impl Handler for JoinParams {
+impl SessionHandler for JoinParams {
     type Ok = JoinOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<JoinOk, RpcError> {
-        core.join_call(
+    async fn run(self, session: &SignedIn) -> Result<JoinOk, RpcError> {
+        session.join_call(
             self.room_id,
             self.livekit_service_url,
             self.mode,
@@ -115,11 +116,11 @@ impl Handler for JoinParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct CompatibilityParams {}
 
-impl Handler for CompatibilityParams {
+impl SessionHandler for CompatibilityParams {
     type Ok = CallCompatibilityView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<CallCompatibilityView, RpcError> {
-        core.call_compatibility().await
+    async fn run(self, session: &SignedIn) -> Result<CallCompatibilityView, RpcError> {
+        session.call_compatibility().await
     }
 }
 
@@ -132,11 +133,11 @@ pub struct SupportParams {
     pub livekit_service_url: Option<String>,
 }
 
-impl Handler for SupportParams {
+impl SessionHandler for SupportParams {
     type Ok = CallSupportView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<CallSupportView, RpcError> {
-        core.call_support(self)
+    async fn run(self, session: &SignedIn) -> Result<CallSupportView, RpcError> {
+        session.call_support(self)
             .await
     }
 }
@@ -151,7 +152,7 @@ impl Handler for LeaveParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.leave_call(self.session).await
+        core.signed_in()?.leave_call(self.session).await
     }
 }
 
@@ -162,11 +163,11 @@ pub struct SetScreenSharingParams {
     pub active: bool,
 }
 
-impl Handler for SetScreenSharingParams {
+impl SessionHandler for SetScreenSharingParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_call_screen_sharing(self)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_call_screen_sharing(self)
             .await
     }
 }
@@ -179,11 +180,11 @@ pub struct DeclineParams {
     pub notification_event_id: String,
 }
 
-impl Handler for DeclineParams {
+impl SessionHandler for DeclineParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.decline_call(self)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.decline_call(self)
             .await
     }
 }

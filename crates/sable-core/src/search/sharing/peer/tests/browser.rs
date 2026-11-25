@@ -3,9 +3,9 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::tasks::JoinHandleExt as _;
 use matrix_sdk::Client;
 use matrix_sdk::config::SyncSettings;
-use matrix_sdk::executor::JoinHandleExt as _;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
@@ -64,11 +64,12 @@ pub(super) async fn exchange(
             Some(request) = requests.recv() => {
                 let side = request["side"].as_u64().unwrap();
                 let core = if side == 0 { cores[0] } else { cores[1] };
+                let session = core.signed_in().unwrap();
                 let method = request["method"].as_str().unwrap();
                 let result = if method == "rtc_data" {
                     let params = &request["params"];
                     let frame: Vec<u8> = serde_json::from_value(params["frame"].clone()).unwrap();
-                    core.rtc_data(params["session_id"].as_str().unwrap(), &frame)
+                    session.rtc_data(params["session_id"].as_str().unwrap(), &frame)
                         .await
                         .map(|reply| serde_json::value::to_raw_value(&reply).unwrap())
                 } else {

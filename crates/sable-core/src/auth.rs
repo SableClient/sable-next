@@ -15,6 +15,9 @@ use matrix_sdk::ruma::api::client::uiaa::{
     EmailUserIdentifier, MatrixUserIdentifier, UserIdentifier,
 };
 use matrix_sdk::utils::UrlOrQuery;
+use std::collections::HashMap;
+
+use tokio::sync::Mutex;
 use url::Url;
 
 use crate::ResultExt;
@@ -25,9 +28,18 @@ use crate::session::{AccountState, Credentials, PersistedSession};
 use crate::{Core, LoginMethod, PendingLogin};
 use crate::{protocol, session};
 
+#[derive(Default)]
+pub(crate) struct SignInFlows {
+    pub(crate) pending_login: Mutex<Option<PendingLogin>>,
+    pub(crate) pending_registration:
+        parking_lot::Mutex<Option<crate::registration::PendingRegistration>>,
+    pub(crate) qr_flow: parking_lot::Mutex<Option<crate::qr_login::QrFlow>>,
+    pub(crate) discovered_homeservers: parking_lot::Mutex<HashMap<String, Url>>,
+}
+
 impl Core {
     async fn reauthentication_account(
-        &self,
+        self: &Arc<Self>,
         account_id: Option<String>,
     ) -> Result<Option<session::PersistedAccount>, RpcError> {
         let Some(account_id) = account_id else {
@@ -55,8 +67,7 @@ impl Core {
                 Ok(()) => {}
                 Err(error) if let Some(reason) = error.invalid_reason() => {
                     tracing::warn!(reason, "reauthenticating on a new device");
-                    self.mark_account_needs_reauth(Some(&account_id), true)
-                        .await?;
+                    self.require_sign_in(&account_id, true).await?;
                     account.state = AccountState::DeviceGone;
                     account.session.credentials.discard_tokens();
                 }
@@ -97,7 +108,7 @@ impl Core {
     }
 
     async fn validate_reauthentication(
-        &self,
+        self: &Arc<Self>,
         expected: Option<&session::PersistedAccount>,
         client: &matrix_sdk::Client,
     ) -> Result<(), RpcError> {
@@ -150,12 +161,13 @@ impl Core {
             homeserver,
             "building Matrix client"
         );
+        // Before the lease: the queue this waits on may itself be waiting for the lease.
+        if reauth.is_some() {
+            self.release_account_client(&account_id).await?;
+        }
         // Held until the session starts, so no push or switch opens the store the reauthentication
         // reuses while its new client is built and signs in.
         let lease = session::store_lease(&account_store_id).await;
-        if reauth.is_some() {
-            self.invalidate_account_client(&account_id).await;
-        }
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await?;
@@ -192,29 +204,28 @@ impl Core {
         let user_id = matrix.meta.user_id.clone();
         self.validate_reauthentication(reauth.as_ref(), &client)
             .await?;
-        let _activation = self
-            .finish_sign_in_leased(
-                client,
-                account_id.clone(),
-                &account_store_id,
-                PersistedSession {
-                    oauth_issuer: None,
-                    oauth_redirect_uri: None,
-                    resolved_homeserver: Some(endpoint),
-                    homeserver: homeserver.clone(),
-                    credentials: Credentials::Password(matrix),
-                },
-                reauth.as_ref(),
-                Some(lease),
-            )
-            .await?;
+        self.finish_sign_in_leased(
+            client,
+            account_id.clone(),
+            &account_store_id,
+            PersistedSession {
+                oauth_issuer: None,
+                oauth_redirect_uri: None,
+                resolved_homeserver: Some(endpoint),
+                homeserver: homeserver.clone(),
+                credentials: Credentials::Password(matrix),
+            },
+            reauth.as_ref(),
+            Some(lease),
+        )
+        .await?;
         tracing::info!(
             operation = "password_login",
             homeserver,
             "session persisted; starting sync"
         );
-        self.pending_login.lock().await.take();
-        self.pending_registration.lock().await.take();
+        self.sign_in.pending_login.lock().await.take();
+        self.sign_in.pending_registration.lock().take();
 
         tracing::info!(operation = "password_login", "login completed");
         Ok(user_id)
@@ -232,7 +243,7 @@ impl Core {
         let client = session::discovery_client(&homeserver)
             .await
             .map_err(|error| self.discovery_error(error))?;
-        self.remember_homeserver(&homeserver, &client).await;
+        self.remember_homeserver(&homeserver, &client);
         self.require_sliding_sync(&client).await?;
         let mut flows = protocol::LoginFlowsView {
             password: false,
@@ -337,8 +348,7 @@ impl Core {
         {
             // The server ties the device to the client that created it.
             tracing::warn!("reauthenticating on a new device: the OAuth client cannot be reused");
-            self.mark_account_needs_reauth(Some(&account.account_id), true)
-                .await?;
+            self.require_sign_in(&account.account_id, true).await?;
             account.state = AccountState::DeviceGone;
             account.session.credentials.discard_tokens();
         }
@@ -347,6 +357,9 @@ impl Core {
             .map_or(homeserver, |account| account.session.homeserver.clone());
         let (account_id, account_store_id) = self.authentication_store(reauth.as_ref()).await?;
         tracing::info!(operation = "oidc_login", intent = ?intent, "starting OAuth login");
+        if reauth.is_some() {
+            self.release_account_client(&account_id).await?;
+        }
 
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
@@ -399,7 +412,7 @@ impl Core {
             .query_pairs_mut()
             .append_pair("response_mode", response_mode(&redirect_uri));
         let authorization_url = authorization_url.to_string();
-        let mut pending = self.pending_login.lock().await;
+        let mut pending = self.sign_in.pending_login.lock().await;
         if pending
             .as_ref()
             .is_some_and(|pending| pending.method == LoginMethod::Sso)
@@ -436,7 +449,7 @@ impl Core {
         let url = Url::parse(&callback_url).or_failed(self, "complete_oidc_login_callback_url")?;
 
         let (attempt, client) = {
-            let pending = self.pending_login.lock().await;
+            let pending = self.sign_in.pending_login.lock().await;
             let Some(PendingLogin {
                 attempt,
                 redirect_uri: expected_redirect_uri,
@@ -467,7 +480,7 @@ impl Core {
             .oauth()
             .finish_login(authorization_response(&url))
             .await;
-        let mut pending = self.pending_login.lock().await;
+        let mut pending = self.sign_in.pending_login.lock().await;
         if pending
             .as_ref()
             .is_none_or(|pending| pending.attempt != attempt)
@@ -485,8 +498,7 @@ impl Core {
                 tracing::warn!(
                     "the server refused the saved device: the next sign-in uses a new one"
                 );
-                self.mark_account_needs_reauth(Some(&account.account_id), true)
-                    .await?;
+                self.require_sign_in(&account.account_id, true).await?;
             }
             return Err(self.rpc_error("complete_oidc_login", &error));
         }
@@ -514,23 +526,22 @@ impl Core {
         self.validate_reauthentication(reauth.as_ref(), &client)
             .await?;
         let endpoint = client.homeserver();
-        let _activation = self
-            .finish_sign_in(
-                client,
-                account_id.clone(),
-                &account_store_id,
-                PersistedSession {
-                    oauth_issuer: None,
-                    oauth_redirect_uri: Some(session::registration_redirect_uri(&redirect_uri)),
-                    resolved_homeserver: Some(endpoint),
-                    homeserver,
-                    credentials: Credentials::oauth(full),
-                },
-                reauth.as_ref(),
-            )
-            .await?;
-        self.pending_login.lock().await.take();
-        self.pending_registration.lock().await.take();
+        self.finish_sign_in(
+            client,
+            account_id.clone(),
+            &account_store_id,
+            PersistedSession {
+                oauth_issuer: None,
+                oauth_redirect_uri: Some(session::registration_redirect_uri(&redirect_uri)),
+                resolved_homeserver: Some(endpoint),
+                homeserver,
+                credentials: Credentials::oauth(full),
+            },
+            reauth.as_ref(),
+        )
+        .await?;
+        self.sign_in.pending_login.lock().await.take();
+        self.sign_in.pending_registration.lock().take();
 
         tracing::info!(operation = "oidc_login", "OAuth login completed");
         Ok(user_id)
@@ -561,6 +572,9 @@ impl Core {
             return Err(RpcCode::Denied.into());
         }
 
+        if reauth.is_some() {
+            self.release_account_client(&account_id).await?;
+        }
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await?;
@@ -582,7 +596,7 @@ impl Core {
             },
         );
 
-        let mut pending = self.pending_login.lock().await;
+        let mut pending = self.sign_in.pending_login.lock().await;
         if pending.is_some() {
             return Err(RpcCode::Unavailable.into());
         }
@@ -620,7 +634,7 @@ impl Core {
             return Err(RpcCode::Denied.into());
         }
 
-        let mut pending = self.pending_login.lock().await;
+        let mut pending = self.sign_in.pending_login.lock().await;
         let Some(PendingLogin {
             redirect_uri: expected_redirect_uri,
             ..
@@ -675,23 +689,22 @@ impl Core {
 
         self.validate_reauthentication(reauth.as_ref(), &client)
             .await?;
-        let _activation = self
-            .finish_sign_in(
-                client,
-                account_id.clone(),
-                &account_store_id,
-                PersistedSession {
-                    oauth_issuer: None,
-                    oauth_redirect_uri: None,
-                    resolved_homeserver: Some(endpoint),
-                    homeserver,
-                    credentials: Credentials::Password(matrix),
-                },
-                reauth.as_ref(),
-            )
-            .await?;
-        self.pending_login.lock().await.take();
-        self.pending_registration.lock().await.take();
+        self.finish_sign_in(
+            client,
+            account_id.clone(),
+            &account_store_id,
+            PersistedSession {
+                oauth_issuer: None,
+                oauth_redirect_uri: None,
+                resolved_homeserver: Some(endpoint),
+                homeserver,
+                credentials: Credentials::Password(matrix),
+            },
+            reauth.as_ref(),
+        )
+        .await?;
+        self.sign_in.pending_login.lock().await.take();
+        self.sign_in.pending_registration.lock().take();
 
         tracing::info!(operation = "sso_login", "SSO login completed");
         Ok(user_id)

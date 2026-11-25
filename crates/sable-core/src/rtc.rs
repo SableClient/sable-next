@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::EncryptionInfo;
 use matrix_sdk::ruma::{OwnedDeviceId, OwnedUserId};
 use sable_frostbite::{
@@ -10,6 +9,7 @@ use sable_frostbite::{
 };
 
 use crate::Core;
+use crate::SignedIn;
 use crate::now_ms;
 use crate::protocol::{CoreEvent, RpcCode, RpcError, RtcSignal};
 use crate::sealed_account_data::verified_own_sender;
@@ -93,12 +93,6 @@ fn frame(message: &[u8]) -> Result<Vec<u8>, RpcError> {
 #[derive(Default)]
 pub(crate) struct RtcSessions(parking_lot::Mutex<HashMap<String, Session>>);
 
-impl RtcSessions {
-    pub(crate) fn clear(&self) {
-        self.0.lock().clear();
-    }
-}
-
 struct Incoming {
     sender: OwnedUserId,
     session: String,
@@ -107,31 +101,6 @@ struct Incoming {
 }
 
 impl Core {
-    pub(crate) fn open_rtc(
-        &self,
-        purpose: RtcPurpose,
-        session: String,
-        device: OwnedDeviceId,
-        sender: bool,
-    ) -> bool {
-        let mut sessions = self.rtc.0.lock();
-        if sessions.contains_key(&session) {
-            return false;
-        }
-        sessions.insert(
-            session,
-            Session {
-                device,
-                sender,
-                purpose,
-                touched: now_ms(),
-                candidates: 0,
-                channel: Channel::default(),
-            },
-        );
-        true
-    }
-
     /// Takes one data channel frame of a session and returns the bytes to
     /// send back, empty when there is nothing to send yet.
     ///
@@ -144,11 +113,21 @@ impl Core {
         session_id: &str,
         frame_bytes: &[u8],
     ) -> Result<Vec<u8>, RpcError> {
-        if self.shut_down.load(Ordering::SeqCst) {
+        self.signed_in()?.rtc_data(session_id, frame_bytes).await
+    }
+}
+
+impl SignedIn {
+    pub(crate) async fn rtc_data(
+        &self,
+        session_id: &str,
+        frame_bytes: &[u8],
+    ) -> Result<Vec<u8>, RpcError> {
+        if self.core().shut_down.load(Ordering::SeqCst) {
             return Err(RpcCode::Unavailable.into());
         }
         let (purpose, inbound) = {
-            let mut sessions = self.rtc.0.lock();
+            let mut sessions = self.state().rtc.0.lock();
             let entry = sessions.get_mut(session_id).ok_or(RpcCode::Unavailable)?;
             if now_ms().saturating_sub(entry.touched) > SESSION_MS {
                 sessions.remove(session_id);
@@ -170,53 +149,17 @@ impl Core {
         reply.map_or_else(|| Ok(Vec::new()), |reply| frame(&reply))
     }
 
-    pub(crate) fn close_rtc(&self, session: &str) {
-        self.rtc.0.lock().remove(session);
-    }
-
-    pub(crate) fn close_rtc_purpose(&self, purpose: RtcPurpose) {
-        let closed: Vec<String> = {
-            let mut sessions = self.rtc.0.lock();
-            let closed = sessions
-                .iter()
-                .filter(|(_, session)| session.purpose == purpose)
-                .map(|(id, _)| id.clone())
-                .collect();
-            sessions.retain(|_, session| session.purpose != purpose);
-            closed
-        };
-        for session_id in closed {
-            self.emit(CoreEvent::Rtc {
-                session_id,
-                purpose,
-                sender: false,
-                signal: RtcSignal::Close,
-            });
-        }
-    }
-
-    pub(crate) fn rtc_device(&self, session: &str) -> Option<(OwnedDeviceId, bool)> {
-        let mut sessions = self.rtc.0.lock();
-        let entry = sessions.get_mut(session)?;
-        if now_ms().saturating_sub(entry.touched) > SESSION_MS {
-            sessions.remove(session);
-            return None;
-        }
-        entry.touched = now_ms();
-        Some((entry.device.clone(), entry.sender))
-    }
-
     pub(crate) async fn signal_rtc(
         &self,
         session: &str,
         signal: RtcSignal,
     ) -> Result<(), RpcError> {
-        let client = self.client().await?;
+        let client = self.client();
         let (device, sender) = self.rtc_device(session).ok_or(RpcCode::Unavailable)?;
         let sent = match signal {
             RtcSignal::Negotiate { description } if description.valid_from(sender) => {
                 sable_frostbite::send(
-                    &client,
+                    client,
                     &device,
                     &NegotiateEventContent {
                         session: session.to_owned(),
@@ -228,7 +171,7 @@ impl Core {
             }
             RtcSignal::Candidate { candidate } if candidate.valid() => {
                 sable_frostbite::send(
-                    &client,
+                    client,
                     &device,
                     &CandidateEventContent {
                         session: session.to_owned(),
@@ -245,8 +188,8 @@ impl Core {
         })
     }
 
-    pub(crate) fn watch_rtc(self: &Arc<Self>, client: &Client, generation: u64) {
-        self.watch_rtc_event(client, generation, |event: NegotiateEvent| {
+    pub(crate) fn watch_rtc(&self, generation: u64) {
+        self.watch_rtc_event(generation, |event: NegotiateEvent| {
             let content = event.content;
             Incoming {
                 sender: event.sender,
@@ -257,7 +200,7 @@ impl Core {
                 },
             }
         });
-        self.watch_rtc_event(client, generation, |event: CandidateEvent| {
+        self.watch_rtc_event(generation, |event: CandidateEvent| {
             let content = event.content;
             Incoming {
                 sender: event.sender,
@@ -270,37 +213,80 @@ impl Core {
         });
     }
 
-    fn watch_rtc_event<E>(
-        self: &Arc<Self>,
-        client: &Client,
-        generation: u64,
-        incoming: fn(E) -> Incoming,
-    ) where
+    fn watch_rtc_event<E>(&self, generation: u64, incoming: fn(E) -> Incoming)
+    where
         E: matrix_sdk::event_handler::SyncEvent + serde::de::DeserializeOwned + Send + 'static,
     {
-        let weak = Arc::downgrade(self);
-        let handle = client.add_event_handler(
-            move |event: E, encryption: Option<EncryptionInfo>, client: Client| {
+        let client = self.client();
+        let weak = self.downgrade();
+        let handle =
+            client.add_event_handler(move |event: E, encryption: Option<EncryptionInfo>| {
                 let weak = weak.clone();
                 let incoming = incoming(event);
                 async move {
                     if let Some(core) = weak.upgrade() {
                         let deferred = core.clone();
                         core.defer_to_device(Box::pin(async move {
-                            deferred
-                                .receive_rtc(&client, generation, encryption, incoming)
-                                .await;
+                            deferred.receive_rtc(generation, encryption, incoming).await;
                         }));
                     }
                 }
+            });
+        self.track_session_handler(client, handle);
+    }
+
+    pub(crate) fn close_rtc(&self, session: &str) {
+        self.state().rtc.0.lock().remove(session);
+    }
+
+    pub(crate) fn close_rtc_purpose(&self, purpose: RtcPurpose) {
+        let closed: Vec<String> = {
+            let mut sessions = self.state().rtc.0.lock();
+            let closed = sessions
+                .iter()
+                .filter(|(_, session)| session.purpose == purpose)
+                .map(|(id, _)| id.clone())
+                .collect();
+            sessions.retain(|_, session| session.purpose != purpose);
+            closed
+        };
+        for session_id in closed {
+            self.core().emit(CoreEvent::Rtc {
+                session_id,
+                purpose,
+                sender: false,
+                signal: RtcSignal::Close,
+            });
+        }
+    }
+
+    pub(crate) fn open_rtc(
+        &self,
+        purpose: RtcPurpose,
+        session: String,
+        device: OwnedDeviceId,
+        sender: bool,
+    ) -> bool {
+        let mut sessions = self.state().rtc.0.lock();
+        if sessions.contains_key(&session) {
+            return false;
+        }
+        sessions.insert(
+            session,
+            Session {
+                device,
+                sender,
+                purpose,
+                touched: now_ms(),
+                candidates: 0,
+                channel: Channel::default(),
             },
         );
-        self.track_session_handler(client, handle);
+        true
     }
 
     async fn receive_rtc(
         &self,
-        client: &Client,
         generation: u64,
         encryption: Option<EncryptionInfo>,
         Incoming {
@@ -310,9 +296,10 @@ impl Core {
             signal,
         }: Incoming,
     ) {
-        if !self.is_current(generation)
+        let client = self.client();
+        if !self.core().is_current(generation)
             || timestamp.is_some_and(|ts| now_ms().abs_diff(ts) > SESSION_MS)
-            || !self.rtc.0.lock().contains_key(&session)
+            || !self.state().rtc.0.lock().contains_key(&session)
         {
             return;
         }
@@ -320,7 +307,7 @@ impl Core {
             return;
         };
         let (purpose, local_sender) = {
-            let mut sessions = self.rtc.0.lock();
+            let mut sessions = self.state().rtc.0.lock();
             let Some(entry) = sessions.get_mut(&session) else {
                 return;
             };
@@ -345,7 +332,7 @@ impl Core {
             entry.touched = now_ms();
             (entry.purpose, entry.sender)
         };
-        self.emit_if_current(
+        self.core().emit_if_current(
             generation,
             CoreEvent::Rtc {
                 session_id: session,
@@ -355,6 +342,17 @@ impl Core {
             },
         );
     }
+
+    pub(crate) fn rtc_device(&self, session: &str) -> Option<(OwnedDeviceId, bool)> {
+        let mut sessions = self.state().rtc.0.lock();
+        let entry = sessions.get_mut(session)?;
+        if now_ms().saturating_sub(entry.touched) > SESSION_MS {
+            sessions.remove(session);
+            return None;
+        }
+        entry.touched = now_ms();
+        Some((entry.device.clone(), entry.sender))
+    }
 }
 
 #[cfg(test)]
@@ -363,13 +361,16 @@ mod tests {
 
     #[tokio::test]
     async fn sessions_close_by_purpose_and_expire() {
+        let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
         let (core, mut events) =
-            Core::new("rtc", Box::new(crate::store::MemorySessionStore::default()));
-        assert!(core.open_rtc(RtcPurpose::SearchSharing, "a".into(), "DEV".into(), true));
-        assert!(!core.open_rtc(RtcPurpose::SearchSharing, "a".into(), "DEV".into(), false));
-        assert_eq!(core.rtc_device("a"), Some(("DEV".into(), true)));
-        core.close_rtc_purpose(RtcPurpose::SearchSharing);
-        assert_eq!(core.rtc_device("a"), None);
+            crate::test_support::signed_in_core(&server, server.client_builder().build().await)
+                .await;
+        let session = core.signed_in().unwrap();
+        assert!(session.open_rtc(RtcPurpose::SearchSharing, "a".into(), "DEV".into(), true));
+        assert!(!session.open_rtc(RtcPurpose::SearchSharing, "a".into(), "DEV".into(), false));
+        assert_eq!(session.rtc_device("a"), Some(("DEV".into(), true)));
+        session.close_rtc_purpose(RtcPurpose::SearchSharing);
+        assert_eq!(session.rtc_device("a"), None);
         assert!(matches!(
             events.recv().await,
             Some(CoreEvent::Rtc {
@@ -377,7 +378,7 @@ mod tests {
                 ..
             })
         ));
-        core.rtc.0.lock().insert(
+        session.state().rtc.0.lock().insert(
             "old".into(),
             Session {
                 device: "DEV".into(),
@@ -388,7 +389,7 @@ mod tests {
                 channel: Channel::default(),
             },
         );
-        assert_eq!(core.rtc_device("old"), None);
+        assert_eq!(session.rtc_device("old"), None);
     }
 
     #[test]

@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use std::time::Duration;
 
+use crate::tasks::JoinHandleExt;
 use futures_util::stream::{self, StreamExt};
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::OwnedUserId;
 use matrix_sdk::ruma::api::FeatureFlag;
 use matrix_sdk::ruma::api::client::filter::{FilterDefinition, RoomFilter};
@@ -14,6 +14,7 @@ use matrix_sdk::ruma::presence::PresenceState;
 use serde_json::{Map, Value};
 
 use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{CoreEvent, PresenceOverrideView, PresenceView, RpcError};
 
 const POLL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -218,17 +219,9 @@ fn presence_filter() -> FilterDefinition {
     filter
 }
 
-impl Core {
-    pub(crate) fn desired_presence(&self) -> PresenceView {
-        *self.desired_presence.lock()
-    }
-
-    pub(crate) fn set_desired_presence(&self, presence: PresenceView) {
-        *self.desired_presence.lock() = presence;
-    }
-
+impl SignedIn {
     pub(crate) async fn revised_presence(&self) -> Option<Revised> {
-        let features = self.client().await.ok()?.unstable_features().await.ok()?;
+        let features = self.client().unstable_features().await.ok()?;
         Revised::from_features(
             features.contains(&FeatureFlag::from(STABLE_FEATURE)),
             features.contains(&FeatureFlag::from(FEATURE)),
@@ -242,10 +235,12 @@ impl Core {
 
     /// Reads the server features from the cache only, for a caller that cannot wait on a request.
     pub(crate) async fn cached_sync_presence(&self) -> PresenceState {
-        let cached = match self.client().await {
-            Ok(client) => client.supported_versions_cached().await.ok().flatten(),
-            Err(_) => None,
-        };
+        let cached = self
+            .client()
+            .supported_versions_cached()
+            .await
+            .ok()
+            .flatten();
         let revised = cached.is_some_and(|supported| {
             Revised::from_features(
                 supported
@@ -258,19 +253,11 @@ impl Core {
         self.sync_presence_for(revised).await
     }
 
-    async fn sync_presence_for(&self, revised: bool) -> PresenceState {
-        let desired = self.desired_presence();
-        let in_call = matches!(desired, PresenceView::Online | PresenceView::Unavailable)
-            && revised
-            && !self.call_sessions.lock().await.is_empty();
-        state(if in_call { PresenceView::Busy } else { desired }, revised)
-    }
-
     pub(crate) async fn publish_presence(
         &self,
-        client: &matrix_sdk::Client,
         status_message: Option<String>,
     ) -> matrix_sdk::Result<()> {
+        let client = self.client();
         let revised = self.revised_presence().await.is_some();
         let presence = self.sync_presence_for(revised).await;
         if revised {
@@ -296,9 +283,7 @@ impl Core {
             return;
         }
         let presence = self.sync_presence().await;
-        if let Ok(client) = self.client().await
-            && let Err(error) = client.set_presence(presence, None, true).await
-        {
+        if let Err(error) = self.client().set_presence(presence, None, true).await {
             tracing::debug!("presence not refreshed: {error}");
         }
     }
@@ -319,7 +304,8 @@ impl Core {
     ) -> Result<PresenceOverrideView, RpcError> {
         let label = "set_presence_override";
         let revised = self.revised_presence().await.ok_or_else(|| {
-            self.failed(label, "the homeserver does not support revised presence")
+            self.core()
+                .failed(label, "the homeserver does not support revised presence")
         })?;
         let content = self
             .update_account_data(revised.persistent_candidates(), label, async |stored| {
@@ -346,18 +332,19 @@ impl Core {
         Ok(None)
     }
 
-    pub(crate) fn watch_presence(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+    pub(crate) fn watch_presence(&self, generation: u64) {
+        let client = self.client();
         let core = self.clone();
         let client = client.clone();
 
         self.track_session_task(
             spawn(async move {
-                let mut since = stored_since(&core, &client).await;
+                let mut since = stored_since(core.core(), &client).await;
                 let revised = core.revised_presence().await.is_some();
                 let mut failures = 0u32;
 
                 loop {
-                    core.wait_until_active().await;
+                    core.core().wait_until_active().await;
                     let mut request = sync_events::v3::Request::new();
                     request.filter =
                         Some(sync_events::v3::Filter::FilterDefinition(presence_filter()));
@@ -380,10 +367,11 @@ impl Core {
                                 let Ok(event) = raw.deserialize() else {
                                     continue;
                                 };
-                                core.emit_if_current(generation, presence_event(&event));
+                                core.core()
+                                    .emit_if_current(generation, presence_event(&event));
                             }
                             if since.as_deref() != Some(response.next_batch.as_str()) {
-                                store_since(&core, &client, &response.next_batch).await;
+                                store_since(core.core(), &client, &response.next_batch).await;
                                 since = Some(response.next_batch);
                             }
                         }
@@ -400,7 +388,7 @@ impl Core {
                         }
                     }
 
-                    if !core.is_current(generation) {
+                    if !core.core().is_current(generation) {
                         break;
                     }
 
@@ -414,11 +402,9 @@ impl Core {
         );
     }
 
-    pub(crate) async fn fetch_presence(self: &Arc<Self>, user_ids: Vec<OwnedUserId>) {
-        let Ok(client) = self.client().await else {
-            return;
-        };
-        let generation = self.lifecycle.current();
+    pub(crate) async fn fetch_presence(&self, user_ids: Vec<OwnedUserId>) {
+        let client = self.client();
+        let generation = self.generation();
 
         stream::iter(user_ids)
             .for_each_concurrent(FETCH_CONCURRENCY, |user_id| {
@@ -433,7 +419,7 @@ impl Core {
                         return;
                     };
 
-                    core.emit_if_current(
+                    core.core().emit_if_current(
                         generation,
                         CoreEvent::Presence {
                             user_id,
@@ -447,6 +433,14 @@ impl Core {
                 }
             })
             .await;
+    }
+
+    async fn sync_presence_for(&self, revised: bool) -> PresenceState {
+        let desired = self.core().desired_presence();
+        let in_call = matches!(desired, PresenceView::Online | PresenceView::Unavailable)
+            && revised
+            && !self.state().calls.lock().await.is_empty();
+        state(if in_call { PresenceView::Busy } else { desired }, revised)
     }
 }
 
@@ -491,6 +485,16 @@ fn presence_event(event: &PresenceEvent) -> CoreEvent {
         presence: view(&event.content.presence, event.content.currently_active),
         status_message: event.content.status.msg.clone(),
         last_active_ago: event.content.last_active_ago.map(Into::into),
+    }
+}
+
+impl Core {
+    pub(crate) fn desired_presence(&self) -> PresenceView {
+        *self.settings.desired_presence.lock()
+    }
+
+    pub(crate) fn set_desired_presence(&self, presence: PresenceView) {
+        *self.settings.desired_presence.lock() = presence;
     }
 }
 
@@ -618,10 +622,11 @@ mod tests {
         let client = server.client_builder().no_server_versions().build().await;
         advertise(&server, json!({})).await;
         let (core, _) = crate::test_support::signed_in_core(&server, client).await;
-        core.set_desired_presence(PresenceView::Busy);
+        let session = core.signed_in().unwrap();
+        session.core().set_desired_presence(PresenceView::Busy);
 
-        assert_eq!(core.presence_override().await.unwrap(), None);
-        assert_eq!(core.sync_presence().await, PresenceState::Unavailable);
+        assert_eq!(session.presence_override().await.unwrap(), None);
+        assert_eq!(session.sync_presence().await, PresenceState::Unavailable);
     }
 
     #[tokio::test]
@@ -665,12 +670,13 @@ mod tests {
             .mount(server.server())
             .await;
         let (core, _) = crate::test_support::signed_in_core(&server, client).await;
+        let session = core.signed_in().unwrap();
 
-        let current = core.presence_override().await.unwrap().unwrap();
+        let current = session.presence_override().await.unwrap().unwrap();
         assert_eq!(current.state, Some(PresenceView::Busy));
         assert_eq!(current.status_message.as_deref(), Some("away"));
 
-        let saved = core
+        let saved = session
             .set_presence_override(&PresenceOverrideView {
                 state: None,
                 status_message: Some("back".to_owned()),
@@ -691,7 +697,7 @@ mod tests {
             serde_json::from_slice::<serde_json::Value>(&put.body).unwrap(),
             json!({"status": {"msg": "back", "emoji": "x"}})
         );
-        assert_eq!(core.sync_presence().await, PresenceState::Active);
+        assert_eq!(session.sync_presence().await, PresenceState::Active);
     }
 
     #[test]

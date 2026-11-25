@@ -8,14 +8,14 @@ use matrix_sdk::ruma::api::client::push::{
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::push_rules::PushRulesEvent;
 use matrix_sdk::ruma::push::{Action, NewPushRule, RuleKind, Ruleset};
-use tokio::sync::{RwLock, broadcast};
+use tokio::sync::broadcast;
 
 use super::pushes_every_encrypted_event;
 use crate::errors::{CoreError, ReportExt};
 
 pub struct PushRules {
     client: Client,
-    rules: Arc<RwLock<Ruleset>>,
+    rules: Arc<parking_lot::RwLock<Ruleset>>,
     changes: broadcast::Sender<()>,
     _handler: EventHandlerDropGuard,
 }
@@ -34,7 +34,7 @@ impl PushRules {
             .push_rules()
             .await
             .unwrap_or_else(|_| Ruleset::new());
-        let rules = Arc::new(RwLock::new(initial));
+        let rules = Arc::new(parking_lot::RwLock::new(initial));
         let changes = broadcast::Sender::new(16);
         let handle = client.add_event_handler({
             let rules = rules.clone();
@@ -43,7 +43,7 @@ impl PushRules {
                 let rules = rules.clone();
                 let changes = changes.clone();
                 async move {
-                    *rules.write().await = event.content.global;
+                    *rules.write() = event.content.global;
                     let _ = changes.send(());
                 }
             }
@@ -57,12 +57,14 @@ impl PushRules {
         })
     }
 
-    pub async fn snapshot(&self) -> Ruleset {
-        self.rules.read().await.clone()
+    #[must_use]
+    pub fn snapshot(&self) -> Ruleset {
+        self.rules.read().clone()
     }
 
-    pub async fn pushes_every_encrypted_event(&self) -> bool {
-        pushes_every_encrypted_event(&*self.rules.read().await)
+    #[must_use]
+    pub fn pushes_every_encrypted_event(&self) -> bool {
+        pushes_every_encrypted_event(&self.rules.read())
     }
 
     #[must_use]
@@ -82,7 +84,7 @@ impl PushRules {
                 result = Err(error);
                 break;
             }
-            write.apply_to(&mut *self.rules.write().await);
+            write.apply_to(&mut self.rules.write());
             applied += 1;
         }
         if applied > 0 {

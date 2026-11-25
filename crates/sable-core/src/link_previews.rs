@@ -1,4 +1,4 @@
-use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{
     PostAuthorView, PostMediaKindView, PostMediaView, PostSensitivityView, PostStatsView, PostView,
     RpcError, UrlPreviewVideoView, UrlPreviewView,
@@ -368,13 +368,9 @@ pub(crate) fn bundled_link_previews(
     serde_json::to_value(bundles).ok()
 }
 
-impl Core {
-    async fn preview_image_bytes(
-        &self,
-        client: &matrix_sdk::Client,
-        image: &str,
-        max_bytes: usize,
-    ) -> Option<Vec<u8>> {
+impl SignedIn {
+    async fn preview_image_bytes(&self, image: &str, max_bytes: usize) -> Option<Vec<u8>> {
+        let client = self.client();
         if !is_mxc(image) {
             return self.tunnel_media(image, max_bytes).await?.ok();
         }
@@ -405,10 +401,10 @@ impl Core {
         if wanted.is_empty() {
             return images;
         }
-        let Ok(room) = self.room(room_id).await else {
+        let Ok(room) = self.room(room_id) else {
             return images;
         };
-        let Ok(encrypted) = self.room_is_encrypted(&room).await else {
+        let Ok(encrypted) = self.core().room_is_encrypted(&room).await else {
             return images;
         };
         let client = room.client();
@@ -418,7 +414,7 @@ impl Core {
             max_bytes,
         } in wanted
         {
-            let Some(data) = self.preview_image_bytes(&client, image, max_bytes).await else {
+            let Some(data) = self.preview_image_bytes(image, max_bytes).await else {
                 continue;
             };
             if data.is_empty() || data.len() > max_bytes {

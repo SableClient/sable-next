@@ -6585,7 +6585,9 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cfff060068cc18aa7815010fcaf80c68c7fb9e85fc7f5c0f9bf142c21d19826"
 dependencies = [
+ "backtrace",
  "libc",
+ "petgraph",
  "redox_syscall 0.9.5",
  "smallvec",
  "windows-link 0.2.1",
@@ -6725,6 +6727,7 @@ dependencies = [
  "fixedbitset",
  "hashbrown 0.15.5",
  "indexmap 2.14.2",
+ "serde",
 ]
 
 [[package]]
@@ -8150,6 +8153,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tracing",
  "tracing-error",
  "tracing-subscriber",

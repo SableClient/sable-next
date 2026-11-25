@@ -30,8 +30,9 @@ use crate::api::calls::SupportParams;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::tasks::JoinHandleExt;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::api::client::delayed_events::update_delayed_event::UpdateAction;
 use matrix_sdk::ruma::api::client::rtc::RtcTransport;
 use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
@@ -53,7 +54,7 @@ use crate::protocol::{
     CallCompatibilityView, CallMemberView, CallMode, CallSessionId, CallSupportView, RpcCode,
     RpcError, RtcTransportSource,
 };
-use crate::{CallSession, Core};
+use crate::{CallSession, Core, SignedIn};
 
 use membership::CallMember;
 use sfu::ProvisionError;
@@ -555,24 +556,56 @@ fn member_views(members: &[CallMember]) -> Vec<CallMemberView> {
 }
 
 impl Core {
-    pub(crate) async fn join_call(
-        self: &Arc<Self>,
-        room_id: OwnedRoomId,
-        livekit_service_url: Option<String>,
-        mode: Option<CallMode>,
-        intent: Option<crate::protocol::CallIntent>,
-    ) -> Result<JoinOk, RpcError> {
-        runtime::join(self, room_id, livekit_service_url, mode, intent).await
+    fn provision_error(&self, service_url: &str, error: &ProvisionError) -> RpcError {
+        match error {
+            ProvisionError::NotLoggedIn => RpcCode::NotLoggedIn.into(),
+            ProvisionError::Unreachable | ProvisionError::OpenIdUnavailable => {
+                tracing::warn!(service_url, "{error}");
+                RpcCode::Unavailable.into()
+            }
+            ProvisionError::Refused(_) | ProvisionError::MalformedResponse => self.failed_report(
+                "join_call_provision",
+                crate::errors::CoreError::new(error).wrap(service_url),
+            ),
+        }
+    }
+
+    pub async fn end_all_calls(self: &Arc<Self>) {
+        if let Ok(session) = self.signed_in() {
+            session.end_calls().await;
+        }
+    }
+}
+
+impl SignedIn {
+    pub(crate) async fn end_calls(&self) {
+        let calls: Vec<CallSession> = self
+            .state()
+            .calls
+            .lock()
+            .await
+            .drain()
+            .map(|(_, call)| call)
+            .collect();
+
+        for mut call in calls {
+            drop(call.updates.take());
+            drop(call.postpone.take());
+            let result = self.hang_up(&call).await;
+            if let Err(error) = result {
+                tracing::warn!(?error, room_id = %call.room_id, "could not hang up on session end");
+            }
+        }
     }
 
     pub(crate) async fn call_compatibility(&self) -> Result<CallCompatibilityView, RpcError> {
-        let client = self.client().await?;
+        let client = self.client();
         let features = client
             .unstable_features()
             .await
-            .or_failed(self, "call_compatibility")?;
+            .or_failed(self.core(), "call_compatibility")?;
         let endpoint = (features.contains(&"org.matrix.msc4143.stable".into())
-            && !stable_transports(&client).await.is_empty())
+            && !stable_transports(client).await.is_empty())
             || client
                 .discover_rtc_transports()
                 .await
@@ -604,7 +637,7 @@ impl Core {
             livekit_service_url,
         }: SupportParams,
     ) -> Result<CallSupportView, RpcError> {
-        let room = self.room(&room_id).await?;
+        let room = self.room(&room_id)?;
         let user_id = room
             .client()
             .user_id()
@@ -626,8 +659,8 @@ impl Core {
         let sticky_available =
             (!has_focus || !state_allowed) && features.contains(&"org.matrix.msc4354".into());
         if !has_focus && sticky_available {
-            let encrypted = self.room_is_encrypted(&room).await?;
-            let mut sync = sticky::StickySync::new(self.allocate_subscription().0);
+            let encrypted = self.core().room_is_encrypted(&room).await?;
+            let mut sync = sticky::StickySync::new(self.core().allocate_subscription().0);
             if let Ok(events) = sync.sync(&room, Duration::ZERO).await {
                 let mut sticky_members = membership::StickyMemberships::default();
                 for event in events {
@@ -676,13 +709,10 @@ impl Core {
         pick_focus(&[], &services, configured).or_else(|| sfu_urls.into_iter().next())
     }
 
-    pub(crate) fn watch_incoming_calls(self: &Arc<Self>, client: &Client, generation: u64) {
-        invite_service::watch(self, client, generation);
-    }
-
     /// The well-known fallback in `discovered_foci` retries a server name that may serve
     /// nothing, so it is fetched here rather than on the first room header.
-    pub(crate) fn prefetch_call_well_known(&self, client: &Client) {
+    pub(crate) fn prefetch_call_well_known(&self) {
+        let client = self.client();
         let client = client.clone();
         self.track_session_task(
             spawn(async move {
@@ -716,12 +746,7 @@ impl Core {
         clippy::indexing_slicing,
         reason = "serde_json::Value indexing returns Null for missing fields"
     )]
-    async fn announce_call(
-        self: &Arc<Self>,
-        room: &Room,
-        membership_event_id: &EventId,
-        own: &CallMember,
-    ) {
+    async fn announce_call(&self, room: &Room, membership_event_id: &EventId, own: &CallMember) {
         if room.room_type() == Some(RoomType::Call) {
             return;
         }
@@ -753,7 +778,7 @@ impl Core {
         if supported
             && ensure_open_slot(
                 room,
-                self.room_is_encrypted(room).await.unwrap_or(true),
+                self.core().room_is_encrypted(room).await.unwrap_or(true),
                 own.wire,
             )
             .await
@@ -875,8 +900,9 @@ impl Core {
             notification_event_id,
         }: DeclineParams,
     ) -> Result<(), RpcError> {
-        let event_id = EventId::parse(&notification_event_id).or_failed(self, "decline_call")?;
-        let room = self.room(&room_id).await?;
+        let event_id =
+            EventId::parse(&notification_event_id).or_failed(self.core(), "decline_call")?;
+        let room = self.room(&room_id)?;
         let value = if let Some(value) = sticky::live_events(&room)
             .into_iter()
             .map(sticky::Event::into_value)
@@ -887,19 +913,25 @@ impl Core {
             let event = room
                 .load_or_fetch_event(&event_id, None)
                 .await
-                .or_failed(self, "decline_call")?;
+                .or_failed(self.core(), "decline_call")?;
             serde_json::from_str::<Value>(event.raw().json().get())
-                .or_failed(self, "decline_call")?
+                .or_failed(self.core(), "decline_call")?
         };
         let value = invite_service::invite_event(&room, &value)
             .await
-            .ok_or_else(|| self.failed("decline_call", "could not read the invitation"))?;
+            .ok_or_else(|| {
+                self.core()
+                    .failed("decline_call", "could not read the invitation")
+            })?;
         if (value["content"].get("slot_id").is_some() || value["type"] == "m.rtc.invite")
             && invites::Invite::parse(&value, crate::now_ms()).is_none_or(|invite| invite.modern)
         {
             let (invite, _) = invite_service::active_invite(&room, &value)
                 .await
-                .ok_or_else(|| self.failed("decline_call", "the invitation is not active"))?;
+                .ok_or_else(|| {
+                    self.core()
+                        .failed("decline_call", "the invitation is not active")
+                })?;
             let content = serde_json::json!({
                 "m.relates_to": {"rel_type": "m.reference", "event_id": event_id},
                 "m.mentions": {},
@@ -914,63 +946,28 @@ impl Core {
             room.send_raw(notify::DECLINE_EVENT_TYPE, content)
                 .with_sticky_duration(Duration::from_millis(sticky_duration))
                 .await
-                .or_failed(self, "decline_call")?;
+                .or_failed(self.core(), "decline_call")?;
         } else {
             let content = notify::make_decline_event(&room, &event_id)
                 .await
-                .or_failed(self, "decline_call")?;
+                .or_failed(self.core(), "decline_call")?;
             let content = Raw::new(&notify::DeclineOut {
                 content,
                 mentions: serde_json::Map::new(),
             })
-            .or_failed(self, "decline_call")?
+            .or_failed(self.core(), "decline_call")?
             .cast_unchecked();
             room.send_raw(notify::DECLINE_EVENT_TYPE, content)
                 .await
-                .or_failed(self, "decline_call")?;
+                .or_failed(self.core(), "decline_call")?;
         }
         Ok(())
     }
 
-    fn provision_error(&self, service_url: &str, error: &ProvisionError) -> RpcError {
-        match error {
-            ProvisionError::NotLoggedIn => RpcCode::NotLoggedIn.into(),
-            ProvisionError::Unreachable | ProvisionError::OpenIdUnavailable => {
-                tracing::warn!(service_url, "{error}");
-                RpcCode::Unavailable.into()
-            }
-            ProvisionError::Refused(_) | ProvisionError::MalformedResponse => self.failed_report(
-                "join_call_provision",
-                crate::errors::CoreError::new(error).wrap(service_url),
-            ),
-        }
-    }
-
-    pub async fn end_all_calls(&self) {
-        let calls: Vec<CallSession> = self
-            .call_sessions
-            .lock()
-            .await
-            .drain()
-            .map(|(_, call)| call)
-            .collect();
-
-        for mut call in calls {
-            drop(call.updates.take());
-            drop(call.postpone.take());
-            let result = self.hang_up(&call).await;
-            if let Err(error) = result {
-                tracing::warn!(?error, room_id = %call.room_id, "could not hang up on session end");
-            }
-        }
-    }
-
-    pub(crate) async fn leave_call(
-        self: &Arc<Self>,
-        session: CallSessionId,
-    ) -> Result<(), RpcError> {
+    pub(crate) async fn leave_call(&self, session: CallSessionId) -> Result<(), RpcError> {
         let mut call = self
-            .call_sessions
+            .state()
+            .calls
             .lock()
             .await
             .remove(&session)
@@ -990,7 +987,7 @@ impl Core {
         SetScreenSharingParams { session, active }: SetScreenSharingParams,
     ) -> Result<(), RpcError> {
         let (room_id, state, delay) = {
-            let calls = self.call_sessions.lock().await;
+            let calls = self.state().calls.lock().await;
             let call = calls.get(&session).ok_or(RpcCode::UnknownCall)?;
             (
                 call.room_id.clone(),
@@ -998,25 +995,25 @@ impl Core {
                 call.delay_id.clone(),
             )
         };
-        let room = self.room(&room_id).await?;
+        let room = self.room(&room_id)?;
         runtime::set_screen_sharing(&room, &state, &delay, active)
             .await
-            .or_failed(self, "set_call_screen_sharing")?;
+            .or_failed(self.core(), "set_call_screen_sharing")?;
         Ok(())
     }
 
     async fn fire_hangup(&self, delay_id: String) -> Result<(), RpcError> {
-        delayed_events::update(&self.client().await?, delay_id, UpdateAction::Send)
+        delayed_events::update(self.client(), delay_id, UpdateAction::Send)
             .await
-            .or_failed(self, "leave_call")
+            .or_failed(self.core(), "leave_call")
     }
 
     async fn hang_up(&self, call: &CallSession) -> Result<(), RpcError> {
         let (slot_closed, own) = {
-            let state = call.state.lock().await;
+            let state = call.state.lock();
             (state.left_because_slot_closed(), state.own_member())
         };
-        if let Ok(room) = self.room(&call.room_id).await {
+        if let Ok(room) = self.room(&call.room_id) {
             self.withdraw_call_invite(&room, &own, slot_closed).await;
         }
         let delay_id = {
@@ -1030,9 +1027,8 @@ impl Core {
         if call.sticky_member.is_some() {
             let result = self.send_left_membership(call, slot_closed).await;
             if result.is_ok()
-                && let Ok(client) = self.client().await
                 && let Err(error) =
-                    delayed_events::update(&client, delay_id, UpdateAction::Cancel).await
+                    delayed_events::update(self.client(), delay_id, UpdateAction::Cancel).await
             {
                 tracing::debug!("could not cancel the delayed leave: {error}");
             }
@@ -1050,8 +1046,8 @@ impl Core {
         slot_closed: bool,
     ) -> Result<(), RpcError> {
         if let Some(member_id) = &call.sticky_member {
-            let room = self.room(&call.room_id).await?;
-            let wire = call.state.lock().await.wire();
+            let room = self.room(&call.room_id)?;
+            let wire = call.state.lock().wire();
             let code = if slot_closed {
                 sticky::LeaveCode::SlotClosed
             } else {
@@ -1063,14 +1059,13 @@ impl Core {
                 wire,
             )
             .await
-            .or_failed(self, "leave_call")?;
+            .or_failed(self.core(), "leave_call")?;
             return Ok(());
         }
-        self.room(&call.room_id)
-            .await?
+        self.room(&call.room_id)?
             .send_state_event_for_key(&call.state_key, left_membership())
             .await
-            .or_failed(self, "leave_call")?;
+            .or_failed(self.core(), "leave_call")?;
 
         Ok(())
     }
@@ -1093,7 +1088,7 @@ impl Core {
             sticky_duration_ms: None,
         };
 
-        match delayed_events::send(&self.client().await.ok()?, support, event).await {
+        match delayed_events::send(self.client(), support, event).await {
             Ok(delay_id) => Some(delay_id),
             Err(error) => {
                 tracing::warn!(
@@ -1110,12 +1105,10 @@ impl Core {
         let mut spent = Duration::ZERO;
 
         loop {
-            let Ok(client) = self.client().await else {
-                return Postponed::Unreachable;
-            };
+            let client = self.client();
 
             let Err(error) =
-                delayed_events::update(&client, delay_id.to_owned(), UpdateAction::Restart).await
+                delayed_events::update(client, delay_id.to_owned(), UpdateAction::Restart).await
             else {
                 return Postponed::Restarted;
             };
@@ -1139,7 +1132,7 @@ impl Core {
         }
     }
 
-    fn spawn_postpone_loop(self: &Arc<Self>, delay_id: String) -> crate::Task {
+    fn spawn_postpone_loop(&self, delay_id: String) -> crate::Task {
         let core = self.clone();
 
         spawn(async move {
@@ -1155,7 +1148,7 @@ impl Core {
     }
 
     fn spawn_managed_postpone_loop(
-        self: &Arc<Self>,
+        &self,
         delay: Arc<tokio::sync::Mutex<DelayState>>,
         wake: Arc<tokio::sync::Notify>,
     ) -> crate::Task {
@@ -1182,6 +1175,21 @@ impl Core {
             }
         })
         .abort_on_drop()
+    }
+
+    pub(crate) async fn join_call(
+        &self,
+        room_id: OwnedRoomId,
+        livekit_service_url: Option<String>,
+        mode: Option<CallMode>,
+        intent: Option<crate::protocol::CallIntent>,
+    ) -> Result<JoinOk, RpcError> {
+        runtime::join(self, room_id, livekit_service_url, mode, intent).await
+    }
+
+    pub(crate) fn watch_incoming_calls(&self, generation: u64) {
+        let client = self.client();
+        invite_service::watch(self, client, generation);
     }
 }
 

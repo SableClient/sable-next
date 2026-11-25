@@ -60,13 +60,17 @@ async fn widget_sends_return_the_created_event_id() {
         .mount(server.server())
         .await;
     let (core, _events) = Core::new("widgets", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "widgets".to_owned(),
-        homeserver: server.server().uri(),
-        oauth: false,
-        sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-        client,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "widgets".to_owned(),
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            client,
+        }),
+    );
     let sent = Box::pin(core.run(crate::api::messages::SendRawEventParams {
         persona: None,
         room_id: room_id.to_owned(),
@@ -128,22 +132,24 @@ async fn a_stable_only_server_offers_no_user_scheduling_because_it_cannot_list()
     let room_id = room_id!("!stable:example.org");
     server.sync_joined_room(&client, room_id).await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    assert!(!core.scheduling_supported().await.unwrap());
+    assert!(!session.scheduling_supported().await.unwrap());
     assert!(matches!(
-        core.schedule_message(
-            &room_id.to_owned(),
-            ruma::events::room::message::RoomMessageEventContent::text_plain("later"),
-            5000,
-            None,
-        )
-        .await,
+        session
+            .schedule_message(
+                &room_id.to_owned(),
+                ruma::events::room::message::RoomMessageEventContent::text_plain("later"),
+                5000,
+                None,
+            )
+            .await,
         Err(RpcError {
             code: RpcCode::DelayedEventsUnsupported,
             ..
         })
     ));
-    assert!(core.delayed_events_support().await.unwrap().any());
+    assert!(session.delayed_events_support().await.unwrap().any());
 }
 
 #[tokio::test]
@@ -161,8 +167,9 @@ async fn a_delayed_state_event_carries_the_delay() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let delay_id = core
+    let delay_id = session
         .widget_send_delayed_event(
             &room_id.to_owned(),
             "com.example.state",
@@ -188,8 +195,9 @@ async fn encrypted_delayed_events_are_rejected() {
         .mount()
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let refused = core
+    let refused = session
         .widget_send_delayed_event(
             &room_id.to_owned(),
             "org.matrix.msc4143.rtc.member",
@@ -207,7 +215,7 @@ async fn encrypted_delayed_events_are_rejected() {
         })
     ));
 
-    let refused = core
+    let refused = session
         .widget_send_delayed_event(
             &room_id.to_owned(),
             "com.example.secret",
@@ -224,7 +232,7 @@ async fn encrypted_delayed_events_are_rejected() {
             ..
         })
     ));
-    let refused = core
+    let refused = session
         .widget_send_delayed_event(
             &room_id.to_owned(),
             "com.example.secret",
@@ -263,8 +271,9 @@ async fn a_sticky_event_carries_its_duration() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let sent = core
+    let sent = session
         .widget_send_sticky_event(&room_id.to_owned(), "com.example.sticky", json!({}), 30_000)
         .await
         .unwrap();
@@ -286,12 +295,14 @@ async fn restarting_a_delayed_event_posts_the_restart_action() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    core.restart_delayed_event(crate::api::widgets::RestartDelayedEventParams {
-        delay_id: "d3".to_owned(),
-    })
-    .await
-    .unwrap();
+    session
+        .restart_delayed_event(crate::api::widgets::RestartDelayedEventParams {
+            delay_id: "d3".to_owned(),
+        })
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -316,8 +327,9 @@ async fn relations_come_back_with_their_room_id_and_the_event_type_filter() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let relations = core
+    let relations = session
         .room_event_relations(
             &room_id.to_owned(),
             &"$parent".try_into().unwrap(),
@@ -351,8 +363,9 @@ async fn turn_credentials_report_their_lifetime_in_milliseconds() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let server = core.turn_server().await.unwrap();
+    let server = session.turn_server().await.unwrap();
 
     assert_eq!(server.username, "u");
     assert_eq!(server.uris, ["turn:example.org"]);
@@ -369,8 +382,9 @@ async fn a_homeserver_without_turn_has_no_servers() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let server = core.turn_server().await.unwrap();
+    let server = session.turn_server().await.unwrap();
 
     assert_eq!(server.uris, Vec::<String>::new());
 }
@@ -387,9 +401,10 @@ async fn rtc_transports_are_relayed_as_the_homeserver_describes_them() {
             .mount(server.server())
             .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
     assert_eq!(
-        core.rtc_transports().await.unwrap(),
+        session.rtc_transports().await.unwrap(),
         json!({"rtc_transports": [{"type": "livekit", "livekit_service_url": "https://sfu.example.org"}]})
     );
 }
@@ -417,15 +432,18 @@ async fn the_livekit_requests_carry_the_widget_body_verbatim() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
     assert_eq!(
-        core.rtc_livekit(RtcLivekitEndpoint::GetToken, &request)
+        session
+            .rtc_livekit(RtcLivekitEndpoint::GetToken, &request)
             .await
             .unwrap(),
         json!({"jwt": "token"})
     );
     assert_eq!(
-        core.rtc_livekit(RtcLivekitEndpoint::DelegateDelayedLeave, &json!({}))
+        session
+            .rtc_livekit(RtcLivekitEndpoint::DelegateDelayedLeave, &json!({}))
             .await
             .unwrap(),
         json!({})
@@ -445,8 +463,9 @@ async fn a_missing_livekit_endpoint_reads_as_unsupported() {
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let result = core
+    let result = session
         .rtc_livekit(RtcLivekitEndpoint::GetToken, &json!({}))
         .await;
 
@@ -475,22 +494,25 @@ async fn a_clear_to_device_message_goes_out_in_one_request_and_internal_types_ar
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    core.widget_send_to_device(
-        "com.example.ping",
-        false,
-        json!({"@a:example.org": {"*": {"n": 1}}}),
-    )
-    .await
-    .unwrap();
+    session
+        .widget_send_to_device(
+            "com.example.ping",
+            false,
+            json!({"@a:example.org": {"*": {"n": 1}}}),
+        )
+        .await
+        .unwrap();
 
-    core.widget_send_to_device(
-        "m.room_key_request",
-        false,
-        json!({"@a:example.org": {"*": {}}}),
-    )
-    .await
-    .unwrap();
+    session
+        .widget_send_to_device(
+            "m.room_key_request",
+            false,
+            json!({"@a:example.org": {"*": {}}}),
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -498,14 +520,16 @@ async fn an_encrypted_to_device_message_to_an_unknown_device_sends_nothing() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    core.widget_send_to_device(
-        "com.example.ping",
-        true,
-        json!({"@a:example.org": {"DEVICE": {"n": 1}}}),
-    )
-    .await
-    .unwrap();
+    session
+        .widget_send_to_device(
+            "com.example.ping",
+            true,
+            json!({"@a:example.org": {"DEVICE": {"n": 1}}}),
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -540,8 +564,9 @@ async fn sticky_reads_come_from_the_sdk_sticky_map() {
         .await
         .unwrap();
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let events = core.room_sticky_events(&room_id.to_owned()).await.unwrap();
+    let events = session.room_sticky_events(&room_id.to_owned()).unwrap();
 
     assert_eq!(events.len(), 1);
     assert_eq!(events[0]["event_id"], "$sticky");
@@ -553,7 +578,9 @@ async fn the_feed_forwards_synced_events_only_while_it_is_on() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let (core, mut events) = Core::new("widgets", Box::new(MemorySessionStore::default()));
-    core.watch_widget_feed(&client, 1);
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_widget_feed(1);
     let room_id = room_id!("!feed:example.org");
     let event = |id: &str| {
         ruma::serde::Raw::new(&json!({
@@ -599,7 +626,9 @@ async fn a_widget_state_change_tells_the_room_to_reload_its_widgets() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let (core, mut events) = Core::new("widgets", Box::new(MemorySessionStore::default()));
-    core.watch_room_widgets(&client, 1);
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_room_widgets(1);
     let room_id = room_id!("!widgetstate:example.org");
 
     server
@@ -674,8 +703,9 @@ async fn the_integration_manager_page_carries_a_scalar_token_from_the_openid_exc
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let url = core
+    let url = session
         .integration_manager_url(&room_id!("!room:example.org").to_owned())
         .await
         .unwrap();
@@ -763,8 +793,10 @@ async fn accepting_integration_manager_terms_signs_with_the_scalar_token_and_rem
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    core.accept_integration_manager_terms(vec!["https://im/tos".to_owned()])
+    session
+        .accept_integration_manager_terms(vec!["https://im/tos".to_owned()])
         .await
         .unwrap();
 }
@@ -851,11 +883,12 @@ async fn terms_the_account_lists_are_signed_with_a_manager_that_never_saw_them()
         .mount(server.server())
         .await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let pending = core.integration_manager_terms().await.unwrap();
+    let pending = session.integration_manager_terms().await.unwrap();
 
     assert_eq!(pending, Vec::new());
-    let url = core
+    let url = session
         .integration_manager_url(&room_id!("!room:example.org").to_owned())
         .await
         .unwrap();
@@ -899,8 +932,9 @@ async fn known_rooms_are_the_joined_ones() {
     let room_id = room_id!("!known:example.org");
     server.sync_joined_room(&client, room_id).await;
     let core = core_with(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    assert_eq!(core.known_room_ids().await.unwrap(), [room_id.to_owned()]);
+    assert_eq!(session.known_room_ids(), [room_id.to_owned()]);
 }
 
 #[test]

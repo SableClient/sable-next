@@ -1,7 +1,6 @@
 use sable_model::text::visible_name;
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use matrix_sdk::ruma::api::client::state::get_state_events;
 use matrix_sdk::ruma::events::{AnyStateEvent, AnySyncStateEvent};
@@ -11,6 +10,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::Core;
+use crate::SignedIn;
 use crate::protocol::CoreEvent;
 
 pub(crate) const COMMAND_DESCRIPTION_EVENT: &str = "org.matrix.msc4391.command_description";
@@ -93,6 +93,33 @@ pub(crate) fn descriptions(state: &[Raw<AnyStateEvent>]) -> Vec<BotCommand> {
     parse_descriptions(&described)
 }
 
+impl SignedIn {
+    pub(crate) fn watch_bot_commands(&self, generation: u64) {
+        let client = self.client();
+        let handle = client.add_event_handler({
+            let core = self.clone();
+            move |raw: Raw<AnySyncStateEvent>, room: matrix_sdk::Room| {
+                let core = core.clone();
+                async move {
+                    let kind = raw.get_field::<String>("type").ok().flatten();
+                    if matches!(
+                        kind.as_deref(),
+                        Some(COMMAND_DESCRIPTION_EVENT | MEMBER_EVENT)
+                    ) {
+                        core.core().emit_if_current(
+                            generation,
+                            CoreEvent::BotCommandsChanged {
+                                room_id: room.room_id().to_owned(),
+                            },
+                        );
+                    }
+                }
+            }
+        });
+        self.track_session_handler(client, handle);
+    }
+}
+
 impl Core {
     pub(crate) async fn bot_commands_for(
         &self,
@@ -105,34 +132,6 @@ impl Core {
             ))
             .await?;
         Ok(descriptions(&response.room_state))
-    }
-
-    pub(crate) fn watch_bot_commands(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
-        let handle = client.add_event_handler({
-            let core = self.clone();
-            move |raw: Raw<AnySyncStateEvent>, room: matrix_sdk::Room| {
-                let core = core.clone();
-                async move {
-                    let kind = raw.get_field::<String>("type").ok().flatten();
-                    if matches!(
-                        kind.as_deref(),
-                        Some(COMMAND_DESCRIPTION_EVENT | MEMBER_EVENT)
-                    ) {
-                        core.emit_if_current(
-                            generation,
-                            CoreEvent::BotCommandsChanged {
-                                room_id: room.room_id().to_owned(),
-                            },
-                        );
-                    }
-                }
-            }
-        });
-        self.track_session_handler(client, handle);
     }
 }
 
@@ -172,6 +171,8 @@ mod tests {
         let client = server.client_builder().build().await;
         server.sync_joined_room(&client, room_id).await;
         let (core, _events) = Core::new("bot-commands", Box::new(MemorySessionStore::default()));
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
         Mock::given(method("GET"))
             .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!([
@@ -199,7 +200,8 @@ mod tests {
             .mount(server.server())
             .await;
 
-        let found = core
+        let found = session
+            .core()
             .bot_commands_for(&client, &client.get_room(room_id).unwrap())
             .await
             .unwrap();
@@ -217,7 +219,9 @@ mod tests {
         let client = server.client_builder().build().await;
         server.sync_joined_room(&client, room_id).await;
         let (core, mut events) = Core::new("bot-commands", Box::new(MemorySessionStore::default()));
-        core.watch_bot_commands(&client, 1);
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.watch_bot_commands(1);
 
         server
             .sync_room(

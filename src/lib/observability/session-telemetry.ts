@@ -34,7 +34,7 @@ export function reportSessionFailure(
     'session.operation': operation,
     'session.reason':
       operation === 'session_ended'
-        ? reason === 'soft_logout' || reason === 'token_rejected'
+        ? reason === 'soft_logout' || reason === 'token_rejected' || reason === 'lifecycle_failed'
           ? reason
           : 'unknown'
         : operation === 'restore_slow' || operation === 'switch_slow'

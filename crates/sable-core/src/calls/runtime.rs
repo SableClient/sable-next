@@ -2,12 +2,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::tasks::JoinHandleExt as _;
 use base64::{
     Engine as _,
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD},
 };
 use matrix_sdk::event_handler::EventHandlerDropGuard;
-use matrix_sdk::executor::{JoinHandleExt as _, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::api::client::delayed_events::update_delayed_event::UpdateAction;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedServerName, OwnedUserId};
@@ -22,6 +23,7 @@ use super::discover::{Discovered, ModeInfo, discover};
 use super::keys::{self, KeyDistributor, Rolled};
 use super::membership::{self, CallMember, StickyMemberships};
 use super::{HANGUP_DELAY, USE_KEY_DELAY, sfu, sticky};
+use crate::SignedIn;
 use crate::api::calls::JoinOk;
 use crate::protocol::{
     CallBackendView, CallIntent, CallMemberView, CallMode, CallSessionId, CoreEvent, RpcCode,
@@ -294,7 +296,7 @@ async fn publish_membership(
     }
 }
 
-async fn retract(core: &Core, room: &Room, own: &CallMember, delay: Option<String>) {
+async fn retract(core: &SignedIn, room: &Room, own: &CallMember, delay: Option<String>) {
     core.withdraw_call_invite(room, own, false).await;
     if let Some(delay) = delay
         && core.fire_hangup(delay).await.is_ok()
@@ -351,19 +353,20 @@ async fn send_delayed_leave(
 }
 
 async fn publish(
-    core: &Arc<Core>,
+    signed_in: &SignedIn,
     room: &Room,
     own: &CallMember,
     service: &str,
     encrypted: bool,
     intent: Option<CallIntent>,
 ) -> Result<Published, RpcError> {
+    let core = signed_in.core();
     let state_key = state_key(room, own);
     let delay = if own.mode == CallMode::Matrix2 {
         if !super::ensure_open_slot(room, encrypted, own.wire).await {
             return Err(core.failed("join_call", "no compatible open RTC slot"));
         }
-        let support = core.delayed_events_support().await.unwrap_or_default();
+        let support = signed_in.delayed_events_support().await.unwrap_or_default();
         if support.any() {
             match send_delayed_leave(room, support, own).await {
                 Ok(id) => Some(id),
@@ -376,15 +379,16 @@ async fn publish(
             None
         }
     } else {
-        core.schedule_hangup(&room.room_id().to_owned(), &state_key)
+        signed_in
+            .schedule_hangup(&room.room_id().to_owned(), &state_key)
             .await
     };
-    let postpone = delay.clone().map(|id| core.spawn_postpone_loop(id));
+    let postpone = delay.clone().map(|id| signed_in.spawn_postpone_loop(id));
     let membership_event = match publish_membership(room, own, intent).await {
         Ok(event) => event,
         Err(error) => {
             drop(postpone);
-            retract(core, room, own, delay).await;
+            retract(signed_in, room, own, delay).await;
             return Err(core.rpc_error("join_call", &error));
         }
     };
@@ -399,12 +403,12 @@ async fn publish(
         Ok(provision) if provision.identity == own.identity => provision,
         Ok(_) => {
             drop(postpone);
-            retract(core, room, own, delay).await;
+            retract(signed_in, room, own, delay).await;
             return Err(core.failed("join_call", "SFU publisher identity mismatch"));
         }
         Err(error) => {
             drop(postpone);
-            retract(core, room, own, delay).await;
+            retract(signed_in, room, own, delay).await;
             return Err(core.provision_error(service, &error));
         }
     };
@@ -417,7 +421,7 @@ async fn publish(
 }
 
 async fn publish_elsewhere(
-    core: &Core,
+    core: &SignedIn,
     room: &Room,
     own: &CallMember,
     configured: Option<String>,
@@ -472,14 +476,14 @@ async fn publish_elsewhere(
 }
 
 async fn publish_where_allowed(
-    core: &Arc<Core>,
+    core: &SignedIn,
     room: &Room,
-    state: &Mutex<State>,
+    state: &parking_lot::Mutex<State>,
     encrypted: bool,
     configured: Option<String>,
 ) -> Result<(CallMember, Published), RpcError> {
     let (mut own, intent) = {
-        let state = state.lock().await;
+        let state = state.lock();
         (state.own.clone(), state.intent)
     };
     let service = own.foci.first().cloned().ok_or(RpcCode::NoCallFocus)?;
@@ -495,7 +499,7 @@ async fn publish_where_allowed(
         tracing::warn!("no focus lets this account publish, joining listen-only");
     }
     let distributor = {
-        let mut state = state.lock().await;
+        let mut state = state.lock();
         state.own = own.clone();
         state.distributor.clone()
     };
@@ -506,11 +510,11 @@ async fn publish_where_allowed(
 }
 
 fn join_handlers(
-    core: &Arc<Core>,
+    core: &SignedIn,
     generation: u64,
     session: CallSessionId,
     room: &Room,
-    state: &Arc<Mutex<State>>,
+    state: &Arc<parking_lot::Mutex<State>>,
     encrypt_media: bool,
 ) -> (Arc<Notify>, Vec<EventHandlerDropGuard>) {
     let client = room.client();
@@ -525,7 +529,7 @@ fn join_handlers(
     ));
     if encrypt_media {
         handlers.extend(watch_keys(
-            core,
+            core.core(),
             &client,
             generation,
             session,
@@ -537,17 +541,17 @@ fn join_handlers(
 }
 
 async fn confirm_join(
-    core: &Arc<Core>,
+    core: &SignedIn,
     generation: u64,
     session: CallSessionId,
     room: &Room,
-    state: &Mutex<State>,
+    state: &parking_lot::Mutex<State>,
     provision: &sfu::Provisioned,
     membership_event: &ruma::OwnedEventId,
 ) -> Option<(String, Vec<CallBackendView>)> {
-    let own = state.lock().await.own.clone();
+    let own = state.lock().own.clone();
     let publisher_id = publisher_backend_id(&room.room_id().to_owned(), &own);
-    state.lock().await.backends.insert(
+    state.lock().backends.insert(
         publisher_id.clone(),
         CallBackendView {
             id: publisher_id.clone(),
@@ -560,7 +564,7 @@ async fn confirm_join(
         return None;
     }
     let (backends, was_running) = {
-        let state = state.lock().await;
+        let state = state.lock();
         (
             state.backends.values().cloned().collect(),
             state
@@ -580,14 +584,21 @@ fn same_service(left: &str, right: &str) -> bool {
 }
 
 async fn discover_state(
-    core: &Arc<Core>,
+    core: &SignedIn,
     room: &Room,
     session: CallSessionId,
     configured: Option<String>,
     requested: Option<CallMode>,
     intent: Option<CallIntent>,
     encrypt_media: bool,
-) -> Result<(Arc<Mutex<State>>, Option<sticky::StickySync>, ModeInfo), RpcError> {
+) -> Result<
+    (
+        Arc<parking_lot::Mutex<State>>,
+        Option<sticky::StickySync>,
+        ModeInfo,
+    ),
+    RpcError,
+> {
     let Discovered {
         own,
         members,
@@ -596,7 +607,7 @@ async fn discover_state(
         slot_closed,
         mode_info,
     } = discover(core, room, session, configured, requested).await?;
-    let state = Arc::new(Mutex::new(State::new(
+    let state = Arc::new(parking_lot::Mutex::new(State::new(
         own,
         members,
         sticky,
@@ -609,18 +620,19 @@ async fn discover_state(
 }
 
 pub(super) async fn join(
-    core: &Arc<Core>,
+    signed_in: &SignedIn,
     room_id: OwnedRoomId,
     configured: Option<String>,
     requested: Option<CallMode>,
     intent: Option<CallIntent>,
 ) -> Result<JoinOk, RpcError> {
-    let generation = core.lifecycle.current();
-    let room = core.room(&room_id).await?;
+    let core = signed_in.core();
+    let generation = signed_in.generation();
+    let room = signed_in.room(&room_id)?;
     let encrypt_media = core.room_is_encrypted(&room).await?;
     let session = CallSessionId(core.allocate_subscription().0);
     let (state, sticky_sync, mode_info) = discover_state(
-        core,
+        signed_in,
         &room,
         session,
         configured.clone(),
@@ -629,7 +641,8 @@ pub(super) async fn join(
         encrypt_media,
     )
     .await?;
-    let (wake, handlers) = join_handlers(core, generation, session, &room, &state, encrypt_media);
+    let (wake, handlers) =
+        join_handlers(signed_in, generation, session, &room, &state, encrypt_media);
     let (
         own,
         Published {
@@ -638,18 +651,17 @@ pub(super) async fn join(
             delay,
             postpone,
         },
-    ) = publish_where_allowed(core, &room, &state, encrypt_media, configured).await?;
+    ) = publish_where_allowed(signed_in, &room, &state, encrypt_media, configured).await?;
     if own.mode == CallMode::Matrix2 {
-        state.lock().await.slot_closed = false;
+        state.lock().slot_closed = false;
     }
-    let mode = own.mode;
-    let state_key = state_key(&room, &own);
+    let (mode, state_key) = (own.mode, state_key(&room, &own));
     if !core.is_current(generation) {
-        abort_join(core, &room, &own, delay, postpone).await;
+        abort_join(signed_in, &room, &own, delay, postpone).await;
         return Err(RpcCode::NotLoggedIn.into());
     }
     let Some((publisher_id, backends)) = confirm_join(
-        core,
+        signed_in,
         generation,
         session,
         &room,
@@ -659,26 +671,26 @@ pub(super) async fn join(
     )
     .await
     else {
-        abort_join(core, &room, &own, delay, postpone).await;
+        abort_join(signed_in, &room, &own, delay, postpone).await;
         return Err(core.failed("join_call", "call membership was not confirmed"));
     };
-    let mut calls = core.call_sessions.lock().await;
-    if !core.is_current(generation) {
+    let mut calls = signed_in.state().calls.lock().await;
+    // The teardown hangs up only the calls it drained before this one.
+    if !core.is_current(generation) || signed_in.has_ended() {
         drop(calls);
-        abort_join(core, &room, &own, delay, postpone).await;
+        abort_join(signed_in, &room, &own, delay, postpone).await;
         return Err(RpcCode::NotLoggedIn.into());
     }
-    let shared = state.clone();
     let delay = super::DelayState::shared(delay);
     drop(postpone);
-    let postpone = Some(core.spawn_managed_postpone_loop(delay.clone(), wake.clone()));
+    let postpone = Some(signed_in.spawn_managed_postpone_loop(delay.clone(), wake.clone()));
     let updates = updates(
         UpdateContext {
-            core: core.clone(),
+            core: signed_in.clone(),
             generation,
             session,
             room,
-            state,
+            state: state.clone(),
             wake,
             delay: delay.clone(),
             encrypted: encrypt_media,
@@ -694,13 +706,13 @@ pub(super) async fn join(
             postpone,
             _handlers: handlers,
             updates: Some(updates),
-            state: shared,
+            state,
             sticky_member: own.member_id.filter(|_| mode == CallMode::Matrix2),
         },
     );
     drop(calls);
-    core.apply_app_activity(core.activity.app_active()).await;
-    core.refresh_presence().await;
+    signed_in.reapply_app_activity().await;
+    signed_in.refresh_presence().await;
     if !core.is_current(generation) {
         return Err(RpcCode::NotLoggedIn.into());
     }
@@ -716,7 +728,7 @@ pub(super) async fn join(
 }
 
 async fn abort_join(
-    core: &Core,
+    core: &SignedIn,
     room: &Room,
     own: &CallMember,
     delay: Option<String>,
@@ -780,11 +792,11 @@ enum Refreshed {
 
 async fn current_members(
     room: &Room,
-    shared: &Mutex<State>,
+    shared: &parking_lot::Mutex<State>,
 ) -> Result<(Vec<CallMember>, CallMember), Refreshed> {
     let mut members = membership::active_members(room).await;
     let own = {
-        let mut state = shared.lock().await;
+        let mut state = shared.lock();
         let mut sticky = state.sticky.members(crate::now_ms());
         sticky.retain(|member| member.wire == state.own.wire);
         if state.own.mode == CallMode::Matrix2 && state.own.wire == membership::RtcWire::Stable {
@@ -871,14 +883,15 @@ fn wanted_backends(
 }
 
 async fn refresh(
-    core: &Arc<Core>,
+    signed_in: &SignedIn,
     generation: u64,
     session: CallSessionId,
     room: &Room,
-    shared: &Mutex<State>,
+    shared: &parking_lot::Mutex<State>,
 ) -> Refreshed {
+    let core = signed_in.core();
     recheck_slot(room, shared).await;
-    if shared.lock().await.slot_closed_midcall {
+    if shared.lock().slot_closed_midcall {
         return Refreshed::Ended;
     }
     let (members, own) = match current_members(room, shared).await {
@@ -900,7 +913,7 @@ async fn refresh(
     };
     let wanted = wanted_backends(room, &verified, &own);
     let missing = {
-        let mut state = shared.lock().await;
+        let mut state = shared.lock();
         set_members(
             core,
             generation,
@@ -933,7 +946,7 @@ async fn refresh(
             .collect::<Vec<_>>()
     };
     provision_missing(core, generation, session, room, shared, &own, missing).await;
-    publish_update(core, generation, session, room, shared).await;
+    publish_update(signed_in, generation, session, room, shared).await;
     Refreshed::Current
 }
 
@@ -989,10 +1002,10 @@ fn set_members(
     }
 }
 
-async fn recheck_slot(room: &Room, shared: &Mutex<State>) {
+async fn recheck_slot(room: &Room, shared: &parking_lot::Mutex<State>) {
     let now = crate::now_ms();
     let (due, encrypted) = {
-        let state = shared.lock().await;
+        let state = shared.lock();
         (
             now.saturating_sub(state.slot_checked_ms) >= SLOT_CHECK_INTERVAL_MS
                 && (state.own.mode == CallMode::Matrix2
@@ -1003,9 +1016,9 @@ async fn recheck_slot(room: &Room, shared: &Mutex<State>) {
         )
     };
     if due {
-        let wire = shared.lock().await.own.wire;
+        let wire = shared.lock().own.wire;
         let closed = super::slot_closed(room, encrypted, wire).await;
-        let mut state = shared.lock().await;
+        let mut state = shared.lock();
         state.slot_closed_midcall |= closed && !state.slot_closed;
         state.slot_closed = closed;
         state.slot_checked_ms = now;
@@ -1017,7 +1030,7 @@ async fn provision_missing(
     generation: u64,
     session: CallSessionId,
     room: &Room,
-    shared: &Mutex<State>,
+    shared: &parking_lot::Mutex<State>,
     own: &CallMember,
     missing: Vec<(String, String, Option<OwnedServerName>)>,
 ) {
@@ -1051,7 +1064,7 @@ async fn provision_missing(
         };
         match provision {
             Ok(provision) if provision.identity == identity => {
-                shared.lock().await.add_backend(
+                shared.lock().add_backend(
                     &room.room_id().to_owned(),
                     &publisher_id,
                     CallBackendView {
@@ -1076,7 +1089,7 @@ async fn provision_missing(
 
 async fn follow_oldest_focus(
     room: &Room,
-    shared: &Mutex<State>,
+    shared: &parking_lot::Mutex<State>,
     own: CallMember,
     members: &[CallMember],
 ) -> CallMember {
@@ -1092,7 +1105,7 @@ async fn follow_oldest_focus(
     }
     let now = crate::now_ms();
     let intent = {
-        let mut state = shared.lock().await;
+        let mut state = shared.lock();
         if now.saturating_sub(state.publisher_attempt_ms) < PUBLISHER_RETRY_MS {
             return own;
         }
@@ -1119,7 +1132,7 @@ async fn follow_oldest_focus(
         return own;
     }
     let id = backend_id(&room.room_id().to_owned(), &target);
-    let mut state = shared.lock().await;
+    let mut state = shared.lock();
     state.own.foci.clone_from(&moved.foci);
     state.backends.insert(
         id.clone(),
@@ -1135,7 +1148,7 @@ async fn follow_oldest_focus(
 
 pub(super) async fn set_screen_sharing(
     room: &Room,
-    state: &Mutex<State>,
+    state: &parking_lot::Mutex<State>,
     delay: &Mutex<super::DelayState>,
     active: bool,
 ) -> Result<(), matrix_sdk::Error> {
@@ -1145,7 +1158,7 @@ pub(super) async fn set_screen_sharing(
         return Ok(());
     }
     let (own, intent) = {
-        let mut state = state.lock().await;
+        let mut state = state.lock();
         if state.own.screen_sharing == active {
             return Ok(());
         }
@@ -1153,20 +1166,20 @@ pub(super) async fn set_screen_sharing(
         (state.own.clone(), state.intent)
     };
     if let Err(error) = publish_membership(room, &own, intent).await {
-        state.lock().await.own.screen_sharing = !active;
+        state.lock().own.screen_sharing = !active;
         return Err(error);
     }
     Ok(())
 }
 
-async fn emit_roster(
+fn emit_roster(
     core: &Arc<Core>,
     generation: u64,
     session: CallSessionId,
     room: &Room,
-    shared: &Mutex<State>,
+    shared: &parking_lot::Mutex<State>,
 ) -> (Vec<CallMember>, Option<Arc<Mutex<KeyDistributor>>>, String) {
-    let mut state = shared.lock().await;
+    let mut state = shared.lock();
     let mut views = super::member_views(&state.members);
     for (view, member) in views.iter_mut().zip(&state.members) {
         view.backend_id = member_service(member, &state.members)
@@ -1230,19 +1243,20 @@ fn log_rolled(rolled: &Rolled, members: usize) {
 }
 
 async fn publish_update(
-    core: &Arc<Core>,
+    signed_in: &SignedIn,
     generation: u64,
     session: CallSessionId,
     room: &Room,
-    shared: &Mutex<State>,
+    shared: &parking_lot::Mutex<State>,
 ) {
+    let core = signed_in.core();
     let (verified, distributor, publisher_id) =
-        emit_roster(core, generation, session, room, shared).await;
+        emit_roster(core, generation, session, room, shared);
     let Some(distributor) = distributor else {
         return;
     };
     let rolled = distributor.lock().await.roll(room, &verified).await;
-    shared.lock().await.rotation_due_ms = match &rolled {
+    shared.lock().rotation_due_ms = match &rolled {
         Rolled::Deferred { wait_ms } => Some(crate::now_ms().saturating_add(*wait_ms)),
         _ => None,
     };
@@ -1263,8 +1277,8 @@ async fn publish_update(
         if first {
             core.emit_if_current(generation, event);
         } else {
-            let core = core.clone();
-            core.clone().track_session_task(
+            let core = Arc::clone(core);
+            signed_in.track_session_task(
                 spawn(async move {
                     matrix_sdk::sleep::sleep(USE_KEY_DELAY).await;
                     core.emit_if_current(generation, event);
@@ -1276,7 +1290,7 @@ async fn publish_update(
 }
 
 pub(super) fn terminate(
-    core: &Arc<Core>,
+    core: &SignedIn,
     generation: u64,
     session: CallSessionId,
     stage: crate::protocol::CallSignalingStage,
@@ -1287,7 +1301,7 @@ pub(super) fn terminate(
             if let Err(error) = core.leave_call(session).await {
                 tracing::warn!("could not leave the call after a signaling error: {error:?}");
             }
-            core.emit_if_current(
+            core.core().emit_if_current(
                 generation,
                 CoreEvent::CallSignalingError {
                     session,
@@ -1436,10 +1450,10 @@ struct KeySink {
     generation: u64,
     session: CallSessionId,
     room_id: OwnedRoomId,
-    state: Arc<Mutex<State>>,
+    state: Arc<parking_lot::Mutex<State>>,
 }
 
-async fn receive_call_key(
+fn receive_call_key(
     sink: KeySink,
     sender: OwnedUserId,
     content: keys::ToDeviceCallEncryptionKeysEventContent,
@@ -1516,7 +1530,7 @@ async fn receive_call_key(
         );
         return;
     }
-    let mut state = state.lock().await;
+    let mut state = state.lock();
     if state.own.wire != wire {
         return;
     }
@@ -1544,7 +1558,7 @@ fn watch_keys(
     generation: u64,
     session: CallSessionId,
     room_id: OwnedRoomId,
-    state: Arc<Mutex<State>>,
+    state: Arc<parking_lot::Mutex<State>>,
 ) -> Vec<EventHandlerDropGuard> {
     let sink = KeySink {
         core: core.clone(),
@@ -1557,25 +1571,31 @@ fn watch_keys(
     let legacy = client.add_event_handler(
         move |event: keys::ToDeviceCallEncryptionKeysEvent,
               encryption: Option<matrix_sdk::deserialized_responses::EncryptionInfo>| {
-            receive_call_key(
-                legacy_sink.clone(),
-                event.sender,
-                event.content,
-                encryption,
-                membership::RtcWire::Deployed,
-            )
+            let sink = legacy_sink.clone();
+            async move {
+                receive_call_key(
+                    sink,
+                    event.sender,
+                    event.content,
+                    encryption,
+                    membership::RtcWire::Deployed,
+                );
+            }
         },
     );
     let stable = client.add_event_handler(
         move |event: keys::StableEncryptionKeyEvent,
               encryption: Option<matrix_sdk::deserialized_responses::EncryptionInfo>| {
-            receive_call_key(
-                sink.clone(),
-                event.sender,
-                event.content.content,
-                encryption,
-                membership::RtcWire::Stable,
-            )
+            let sink = sink.clone();
+            async move {
+                receive_call_key(
+                    sink,
+                    event.sender,
+                    event.content.content,
+                    encryption,
+                    membership::RtcWire::Stable,
+                );
+            }
         },
     );
     vec![
@@ -1602,7 +1622,7 @@ fn watch_members(
 fn watch_redactions(
     client: &Client,
     room_id: &OwnedRoomId,
-    state: Arc<Mutex<State>>,
+    state: Arc<parking_lot::Mutex<State>>,
     wake: Arc<Notify>,
 ) -> EventHandlerDropGuard {
     let handle = client.add_room_event_handler(
@@ -1616,7 +1636,6 @@ fn watch_redactions(
                 {
                     state
                         .lock()
-                        .await
                         .sticky
                         .redact(event_id.as_str(), crate::now_ms());
                     wake.notify_one();
@@ -1628,7 +1647,7 @@ fn watch_redactions(
 }
 
 async fn refresh_encrypted_hangup(
-    core: Arc<Core>,
+    core: SignedIn,
     room: Room,
     own: CallMember,
     delay: Arc<Mutex<super::DelayState>>,
@@ -1662,7 +1681,7 @@ async fn refresh_encrypted_hangup(
 }
 
 async fn restore_hangup(
-    core: &Core,
+    core: &SignedIn,
     room: &Room,
     own: &CallMember,
     delay: &Mutex<super::DelayState>,
@@ -1690,7 +1709,7 @@ async fn restore_hangup(
 }
 
 async fn protect_membership_renewal(
-    core: &Core,
+    core: &SignedIn,
     delay: &Mutex<super::DelayState>,
 ) -> super::Postponed {
     let mut delay = delay.lock().await;
@@ -1713,11 +1732,11 @@ async fn protect_membership_renewal(
 }
 
 struct UpdateContext {
-    core: Arc<Core>,
+    core: SignedIn,
     generation: u64,
     session: CallSessionId,
     room: Room,
-    state: Arc<Mutex<State>>,
+    state: Arc<parking_lot::Mutex<State>>,
     wake: Arc<Notify>,
     delay: Arc<Mutex<super::DelayState>>,
     encrypted: bool,
@@ -1759,16 +1778,17 @@ impl UpdateContext {
             Some(Ok(events)) => {
                 let encrypted = self
                     .core
+                    .core()
                     .room_is_encrypted(&self.room)
                     .await
                     .unwrap_or(true);
-                let mut state = self.state.lock().await;
+                let mut state = self.state.lock();
                 for event in events {
                     event.apply(&mut state.sticky, encrypted, crate::now_ms());
                 }
             }
             Some(Err(_)) => {
-                self.core.emit_if_current(
+                self.core.core().emit_if_current(
                     self.generation,
                     CoreEvent::CallSignalingError {
                         session: self.session,
@@ -1785,20 +1805,22 @@ impl UpdateContext {
     async fn apply_live_events(&self) {
         let encrypted = self
             .core
+            .core()
             .room_is_encrypted(&self.room)
             .await
             .unwrap_or(true);
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock();
         for event in sticky::live_events(&self.room) {
             event.apply(&mut state.sticky, encrypted, crate::now_ms());
         }
     }
 
     async fn encryption_changed(&self) -> bool {
-        match self.core.room_is_encrypted(&self.room).await {
-            Ok(encrypted) => encrypted != self.state.lock().await.distributor.is_some(),
-            Err(_) => false,
-        }
+        self.core
+            .core()
+            .room_is_encrypted(&self.room)
+            .await
+            .is_ok_and(|encrypted| encrypted != self.state.lock().distributor.is_some())
     }
 
     fn terminate_membership(&self) {
@@ -1817,7 +1839,7 @@ impl UpdateContext {
         absent: bool,
     ) {
         let (own, intent, roster_changed) = {
-            let state = self.state.lock().await;
+            let state = self.state.lock();
             let roster: HashSet<_> = state
                 .members
                 .iter()
@@ -1882,7 +1904,7 @@ impl UpdateContext {
         };
         loop {
             let interval = {
-                let due = self.state.lock().await.rotation_due_ms;
+                let due = self.state.lock().rotation_due_ms;
                 due.map_or(UPDATE_INTERVAL, |due| {
                     UPDATE_INTERVAL.min(Duration::from_millis(
                         due.saturating_sub(crate::now_ms()).max(100),
@@ -1891,7 +1913,7 @@ impl UpdateContext {
             };
             self.wait_for_change(&mut sync, &mut watch, interval).await;
             self.apply_live_events().await;
-            if self.core.lifecycle.current() != self.generation {
+            if self.core.core().lifecycle.current() != self.generation {
                 return;
             }
             if self.encryption_changed().await {

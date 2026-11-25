@@ -153,7 +153,8 @@ async fn every_transition_reaches_the_member_list() {
         .await
         .unwrap();
     let (core, mut events) = Core::new("live", Box::new(MemorySessionStore::default()));
-    core.watch_profile_changes(&client, 1);
+    let session = core.signed_in().unwrap();
+    session.watch_profile_changes(1);
     let sync = SyncService::builder(client.clone())
         .with_offline_mode()
         .build()

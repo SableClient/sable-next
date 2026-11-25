@@ -7,10 +7,16 @@ use super::{in_room, reingest_whole_room};
 use crate::search::MessageIndex;
 use crate::search::crawl::{CrawlBatch, CrawlOutcome};
 
-async fn wait_for_hits(core: &crate::Core, room_id: &ruma::OwnedRoomId, query: &str, count: usize) {
+async fn wait_for_hits(
+    core: &std::sync::Arc<crate::Core>,
+    room_id: &ruma::OwnedRoomId,
+    query: &str,
+    count: usize,
+) {
+    let session = core.signed_in().unwrap();
     tokio::time::timeout(Duration::from_secs(5), async {
         while in_room(
-            &*core.search_index.lock().await,
+            &*session.state().search_index.lock().await,
             room_id,
             query,
             count + 1,
@@ -49,10 +55,12 @@ async fn test_search_watcher_releases_paginated_room_cache() {
         "search-retention",
         Box::new(crate::store::MemorySessionStore::default()),
     );
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     core.foreground_paginations
         .store(1, std::sync::atomic::Ordering::Relaxed);
     let directory = tempfile::tempdir().unwrap();
-    core.watch_search_index(&client, directory.path().to_str().unwrap());
+    session.watch_search_index(directory.path().to_str().unwrap());
     wait_for_hits(&core, &room_id, "latest", 1).await;
 
     let history = (0..300)
@@ -82,7 +90,7 @@ async fn test_search_watcher_releases_paginated_room_cache() {
     .expect("search must not pin the paginated SDK cache");
     assert_eq!(
         in_room(
-            &*core.search_index.lock().await,
+            &*session.state().search_index.lock().await,
             &room_id,
             "archaeology",
             400,
@@ -103,7 +111,7 @@ async fn test_search_watcher_releases_paginated_room_cache() {
         )
         .await;
     wait_for_hits(&core, &room_id, "subsequent", 1).await;
-    core.session_tasks.lock().clear();
+    session.state().session_tasks.lock().clear();
 }
 
 #[async_test]
@@ -220,10 +228,12 @@ async fn test_the_crawler_deepens_a_room_and_records_reaching_its_start() {
         "search-crawl",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.prime_persisted_rooms(&client).await;
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.prime_persisted_rooms().await;
     assert!(
         in_room(
-            &*core.search_index.lock().await,
+            &*session.state().search_index.lock().await,
             &room_id,
             "archaeology",
             10,
@@ -244,13 +254,10 @@ async fn test_the_crawler_deepens_a_room_and_records_reaching_its_start() {
         .mount()
         .await;
 
-    let reached_start = core
-        .crawl_once(&client, &room_id)
-        .await
-        .expect("crawl one batch");
+    let reached_start = session.crawl_once(&room_id).await.expect("crawl one batch");
 
     let hits = in_room(
-        &*core.search_index.lock().await,
+        &*session.state().search_index.lock().await,
         &room_id,
         "archaeology",
         10,
@@ -295,10 +302,12 @@ async fn test_a_restored_room_does_not_charge_the_crawl_budget_again() {
         "search-budget",
         Box::new(crate::store::MemorySessionStore::default()),
     );
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     let directory = tempfile::tempdir().unwrap();
     let store_id = directory.path().to_str().unwrap();
-    core.open_search_index(&client, store_id).await;
-    core.prime_persisted_rooms(&client).await;
+    session.open_search_index(store_id).await;
+    session.prime_persisted_rooms().await;
 
     let (cache, _drop_handles) = client
         .event_cache()
@@ -318,10 +327,13 @@ async fn test_a_restored_room_does_not_charge_the_crawl_budget_again() {
         "search-budget-restored",
         Box::new(crate::store::MemorySessionStore::default()),
     );
+    crate::test_support::sign_in(&restored, &server, client.clone()).await;
+    let restored_session = restored.signed_in().unwrap();
     drop(core);
-    restored.open_search_index(&client, store_id).await;
+    restored_session.open_search_index(store_id).await;
 
-    let fresh = restored
+    let session_state = restored_session.state();
+    let fresh = session_state
         .search_index
         .lock()
         .await
@@ -359,10 +371,12 @@ async fn test_a_failed_room_reports_partial_not_complete() {
         "search-coverage-partial",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.prime_persisted_rooms(&client).await;
-    core.search_crawl.lock().await.fail(room_id);
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.prime_persisted_rooms().await;
+    session.state().search_crawl.lock().fail(room_id);
 
-    let coverage = core.search_coverage(&client).await;
+    let coverage = session.search_coverage().await;
     assert_eq!(
         coverage.state,
         crate::protocol::SearchCoverageState::Partial,
@@ -414,12 +428,11 @@ async fn test_a_room_walked_to_its_start_reports_complete() {
         "search-coverage-complete",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.prime_persisted_rooms(&client).await;
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.prime_persisted_rooms().await;
 
-    let reached_start = core
-        .crawl_once(&client, &room_id)
-        .await
-        .expect("crawl one batch");
+    let reached_start = session.crawl_once(&room_id).await.expect("crawl one batch");
     assert!(matches!(
         reached_start,
         CrawlOutcome::Batch(CrawlBatch {
@@ -427,9 +440,9 @@ async fn test_a_room_walked_to_its_start_reports_complete() {
             ..
         })
     ));
-    core.search_crawl.lock().await.settle(room_id, true);
+    session.state().search_crawl.lock().settle(room_id, true);
 
-    let coverage = core.search_coverage(&client).await;
+    let coverage = session.search_coverage().await;
     assert_eq!(
         coverage.state,
         crate::protocol::SearchCoverageState::Complete
@@ -468,15 +481,21 @@ async fn test_a_spent_budget_reports_stopped_even_with_rooms_left() {
         "search-coverage-stopped",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.prime_persisted_rooms(&client).await;
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.prime_persisted_rooms().await;
     assert_eq!(
-        core.search_coverage(&client).await.state,
+        session.search_coverage().await.state,
         crate::protocol::SearchCoverageState::Indexing
     );
 
-    core.search_crawl.lock().await.exhaust_budget_for_test();
+    session
+        .state()
+        .search_crawl
+        .lock()
+        .exhaust_budget_for_test();
 
-    let coverage = core.search_coverage(&client).await;
+    let coverage = session.search_coverage().await;
     assert_eq!(
         coverage.state,
         crate::protocol::SearchCoverageState::Stopped,
@@ -533,10 +552,12 @@ async fn test_the_crawl_serves_every_room_before_deepening_one() {
         "search-crawl-fairness",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.prime_persisted_rooms(&client).await;
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.prime_persisted_rooms().await;
 
     assert_eq!(
-        core.next_room_to_crawl(&client).await.as_ref(),
+        session.next_room_to_crawl().await.as_ref(),
         Some(&busy),
         "the first turn goes to the room with the newest message"
     );
@@ -552,10 +573,10 @@ async fn test_the_crawl_serves_every_room_before_deepening_one() {
         ]))
         .mount()
         .await;
-    core.crawl_once(&client, &busy).await.expect("crawl busy");
+    session.crawl_once(&busy).await.expect("crawl busy");
 
     assert_eq!(
-        core.next_room_to_crawl(&client).await.as_ref(),
+        session.next_room_to_crawl().await.as_ref(),
         Some(&quiet),
         "the quiet room must get a turn before the busy one is deepened again"
     );

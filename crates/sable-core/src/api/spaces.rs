@@ -1,11 +1,10 @@
-use std::sync::Arc;
 
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use serde::{Deserialize, Serialize};
 
-use super::Handler;
+use super::SessionHandler;
 use crate::protocol::{RpcCode, RpcError, SidebarItemView, SpaceHierarchyRoomView, SpaceParentView};
-use crate::{Core, ResultExt, view};
+use crate::{ResultExt, view, SignedIn};
 
 domain! {
     add,
@@ -31,11 +30,11 @@ pub struct AddParams {
     pub suggested: Option<bool>,
 }
 
-impl Handler for AddParams {
+impl SessionHandler for AddParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.add_to_space(&self.space_id, &self.room_id, self.suggested)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.add_to_space(&self.space_id, &self.room_id, self.suggested)
             .await
     }
 }
@@ -53,11 +52,11 @@ pub struct SetChildOrderParams {
     pub via: Option<Vec<String>>,
 }
 
-impl Handler for SetChildOrderParams {
+impl SessionHandler for SetChildOrderParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_space_child_order(&self.space_id, &self.room_id, self.order, self.via)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_space_child_order(&self.space_id, &self.room_id, self.order, self.via)
             .await
     }
 }
@@ -74,11 +73,11 @@ pub struct SetChildSuggestedParams {
     pub via: Option<Vec<String>>,
 }
 
-impl Handler for SetChildSuggestedParams {
+impl SessionHandler for SetChildSuggestedParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_space_child_suggested(&self.space_id, &self.room_id, self.suggested, self.via)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_space_child_suggested(&self.space_id, &self.room_id, self.suggested, self.via)
             .await
     }
 }
@@ -100,11 +99,12 @@ pub struct HierarchyOk {
     pub next_batch: Option<String>,
 }
 
-impl Handler for HierarchyParams {
+impl SessionHandler for HierarchyParams {
     type Ok = HierarchyOk;
+    const ENDS_WITH_SESSION: bool = true;
 
-    async fn run(self, core: &Arc<Core>) -> Result<HierarchyOk, RpcError> {
-        core.space_hierarchy(&self.space_id, self.from).await
+    async fn run(self, session: &SignedIn) -> Result<HierarchyOk, RpcError> {
+        session.space_hierarchy(&self.space_id, self.from).await
     }
 }
 
@@ -117,14 +117,14 @@ pub struct RemoveParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for RemoveParams {
+impl SessionHandler for RemoveParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         // The spec delists by omitting `via`. The typed content has it
         // non-optional and would send `{"via": []}`, a valid array.
-        let space = core.room(&self.space_id).await?;
-        core.refuse_private_child(&space, &self.room_id).await?;
+        let space = session.room(&self.space_id)?;
+        session.refuse_private_child(&space, &self.room_id).await?;
         space
             .send_state_event_raw(
                 "m.space.child",
@@ -132,7 +132,7 @@ impl Handler for RemoveParams {
                 serde_json::Value::Object(serde_json::Map::new()),
             )
             .await
-            .or_failed(core, "remove_from_space")?;
+            .or_failed(session.core(), "remove_from_space")?;
         Ok(())
     }
 }
@@ -141,11 +141,11 @@ impl Handler for RemoveParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct SidebarParams {}
 
-impl Handler for SidebarParams {
+impl SessionHandler for SidebarParams {
     type Ok = Vec<SidebarItemView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<SidebarItemView>, RpcError> {
-        core.space_sidebar().await
+    async fn run(self, session: &SignedIn) -> Result<Vec<SidebarItemView>, RpcError> {
+        session.space_sidebar().await
     }
 }
 
@@ -155,17 +155,17 @@ pub struct SetSidebarParams {
     pub items: Vec<SidebarItemView>,
 }
 
-impl Handler for SetSidebarParams {
+impl SessionHandler for SetSidebarParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         if sable_model::sidebar::layout_space_ids(&self.items)
             .iter()
             .any(|room_id| RoomId::parse(room_id).is_err())
         {
             return Err(RpcCode::UnknownRoom.into());
         }
-        core.set_space_sidebar(&self.items).await
+        session.set_space_sidebar(&self.items).await
     }
 }
 
@@ -177,11 +177,11 @@ pub struct SetAvatarOverrideParams {
     pub url: Option<String>,
 }
 
-impl Handler for SetAvatarOverrideParams {
+impl SessionHandler for SetAvatarOverrideParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_avatar_override(&self.room_id, self.url.as_deref())
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_avatar_override(&self.room_id, self.url.as_deref())
             .await
     }
 }
@@ -193,13 +193,13 @@ pub struct RoomHasSpaceParentParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for RoomHasSpaceParentParams {
+impl SessionHandler for RoomHasSpaceParentParams {
     type Ok = bool;
 
-    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
-        let client = core.client().await?;
-        let room = core.room(&self.room_id).await?;
-        Ok(!view::restricted_parents(&client, &room).await.is_empty())
+    async fn run(self, session: &SignedIn) -> Result<bool, RpcError> {
+        let client = session.client();
+        let room = session.room(&self.room_id)?;
+        Ok(!view::restricted_parents(client, &room).await.is_empty())
     }
 }
 
@@ -210,12 +210,12 @@ pub struct UnjoinedSpaceParentsParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for UnjoinedSpaceParentsParams {
+impl SessionHandler for UnjoinedSpaceParentsParams {
     type Ok = Vec<SpaceParentView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<SpaceParentView>, RpcError> {
-        let client = core.client().await?;
-        let room = core.room(&self.room_id).await?;
-        Ok(crate::cosmetics::unjoined_space_parents(core, &client, &room).await)
+    async fn run(self, session: &SignedIn) -> Result<Vec<SpaceParentView>, RpcError> {
+        let client = session.client();
+        let room = session.room(&self.room_id)?;
+        Ok(crate::cosmetics::unjoined_space_parents(session.core(), client, &room).await)
     }
 }

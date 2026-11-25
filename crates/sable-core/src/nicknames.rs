@@ -1,12 +1,13 @@
 //! The names and avatars the user gave other people, laid over every view.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use crate::tasks::JoinHandleExt;
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::{OwnedUserId, UserId};
 
 use crate::Core;
+use crate::SignedIn;
 use sable_model::bot_commands::BotCommand;
 
 use crate::protocol::{
@@ -262,45 +263,44 @@ pub(crate) fn reads_from(event_type: &str) -> bool {
         || event_type == crate::sealed_account_data::ADK_SECRET
 }
 
-impl Core {
-    pub(crate) fn watch_nicknames(self: &Arc<Self>) {
+impl SignedIn {
+    pub(crate) fn watch_nicknames(&self) {
         let core = self.clone();
         self.track_session_task(
             spawn(async move {
                 loop {
                     core.reload_nicknames().await;
-                    core.nicknames_stale.notified().await;
+                    core.core().nicknames_stale.notified().await;
                 }
             })
             .abort_on_drop(),
         );
     }
 
+    pub(crate) async fn reload_nicknames(&self) {
+        let Ok(view) = self.profile_overrides_view().await else {
+            return;
+        };
+        let own_user_id = self.client().user_id().map(ToOwned::to_owned);
+        let next = Nicknames::from_overrides(view.overrides, own_user_id.as_deref());
+        let changed = self.core().nicknames.borrow().changed(&next);
+        if changed.is_empty() {
+            return;
+        }
+        self.core().nicknames.send_replace(next.clone());
+        self.overlay_timeline_nicknames(&next, &changed);
+        self.core()
+            .emit(CoreEvent::NicknamesChanged { user_ids: changed });
+    }
+}
+
+impl Core {
     pub(crate) fn nicknames(&self) -> Nicknames {
         self.nicknames.borrow().clone()
     }
 
     pub(crate) fn nickname_changes(&self) -> tokio::sync::watch::Receiver<Nicknames> {
         self.nicknames.subscribe()
-    }
-
-    pub(crate) async fn reload_nicknames(self: &Arc<Self>) {
-        let Ok(view) = self.profile_overrides_view().await else {
-            return;
-        };
-        let own_user_id = self
-            .client()
-            .await
-            .ok()
-            .and_then(|client| client.user_id().map(ToOwned::to_owned));
-        let next = Nicknames::from_overrides(view.overrides, own_user_id.as_deref());
-        let changed = self.nicknames.borrow().changed(&next);
-        if changed.is_empty() {
-            return;
-        }
-        self.nicknames.send_replace(next.clone());
-        self.overlay_timeline_nicknames(&next, &changed).await;
-        self.emit(CoreEvent::NicknamesChanged { user_ids: changed });
     }
 }
 

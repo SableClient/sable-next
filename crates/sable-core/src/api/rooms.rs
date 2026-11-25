@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+
 use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
 use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
 use matrix_sdk::ruma::api::client::discovery::get_capabilities;
@@ -23,7 +24,7 @@ use matrix_sdk::ruma::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::Handler;
+use super::{Handler, SessionHandler};
 use crate::calendar::CALENDAR_ROOM_TYPE;
 use crate::media::is_not_found;
 use crate::search::MAX_SEARCH_RESULTS;
@@ -32,7 +33,7 @@ use crate::room_settings::join_rule_content;
 use crate::room_settings::voice_power_level_override;
 use crate::protocol::{RpcError, CreateJoinRuleView, InviteHistoryView, ShareHistoryView, PresenceHintView, PresencePromptView, PublicRoomView, RoomAttachmentKind, RoomAttachmentView, RoomCosmeticsView, RoomOpenView, RoomPreviewView, RoomListItemView, RoomTag, RoomVersionView, RoomVersionsView};
 use crate::view::FORUM_ROOM_TYPE;
-use crate::{Core, ResultExt, power_levels, view};
+use crate::{Core, ResultExt, power_levels, view, SignedIn};
 
 const WIDGETS_EVENT_TYPE: &str = "im.vector.modular.widgets";
 const POLICY_ROOM_TYPE: &str = "m.policy";
@@ -136,27 +137,26 @@ pub struct OpenParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for OpenParams {
+impl SessionHandler for OpenParams {
     type Ok = RoomOpenView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomOpenView, RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<RoomOpenView, RpcError> {
         let room_id = self.room_id;
         let (access, power_level_tags, widgets, pinned_event_ids) = futures_util::join!(
-            core.room_access(&room_id),
-            core.room_state_event_content(
+            session.room_access(&room_id),
+            session.room_state_event_content(
                 room_id.clone(),
                 power_levels::TAGS_EVENT.to_owned(),
                 String::new(),
             ),
-            core.room_state_events(&room_id, WIDGETS_EVENT_TYPE),
-            core.pinned_events(&room_id),
+            session.room_state_events(&room_id, WIDGETS_EVENT_TYPE),
+            session.pinned_events(&room_id),
         );
         if pinned_event_ids.as_ref().is_ok_and(|ids| !ids.is_empty()) {
-            core.watch_pinned(&room_id).await;
+            session.watch_pinned(&room_id).await;
         }
-        let predecessor = core
+        let predecessor = session
             .room(&room_id)
-            .await
             .ok()
             .and_then(|room| view::predecessor(&room));
         let (permissions, power_levels) = access?;
@@ -191,13 +191,13 @@ pub struct ListItemParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for ListItemParams {
+impl SessionHandler for ListItemParams {
     type Ok = RoomListItemView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomListItemView, RpcError> {
-        let room = core.room(&self.room_id).await?;
-        let rules = core.push_rules().await?.snapshot().await;
-        Ok(view::listless_room_list_item(room, &rules, &core.nicknames()).await)
+    async fn run(self, session: &SignedIn) -> Result<RoomListItemView, RpcError> {
+        let room = session.room(&self.room_id)?;
+        let rules = session.push_rules().await?.snapshot();
+        Ok(view::listless_room_list_item(room, &rules, &session.core().nicknames()).await)
     }
 }
 
@@ -214,11 +214,11 @@ pub struct PreviewParams {
     pub via: Vec<String>,
 }
 
-impl Handler for PreviewParams {
+impl SessionHandler for PreviewParams {
     type Ok = RoomPreviewView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomPreviewView, RpcError> {
-        core.room_preview(&self.address, &self.via).await
+    async fn run(self, session: &SignedIn) -> Result<RoomPreviewView, RpcError> {
+        session.room_preview(&self.address, &self.via).await
     }
 }
 
@@ -231,13 +231,13 @@ pub struct JoinParams {
     pub via: Vec<String>,
 }
 
-impl Handler for JoinParams {
+impl SessionHandler for JoinParams {
     /// Resolved, since the caller may have joined by alias.
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        let room_id = core.join_room(&self.address, &self.via).await?;
-        core.follow_presence_upgrade(&room_id).await;
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        let room_id = session.join_room(&self.address, &self.via).await?;
+        session.follow_presence_upgrade(&room_id).await;
         Ok(room_id.to_string())
     }
 }
@@ -253,7 +253,10 @@ impl Handler for PresencePromptParams {
     type Ok = Option<PresencePromptView>;
 
     async fn run(self, core: &Arc<Core>) -> Result<Option<PresencePromptView>, RpcError> {
-        core.presence_prompt(&self.room_id).await
+        match core.signed_in() {
+            Ok(session) => session.presence_prompt(&self.room_id).await,
+            Err(_) => Ok(None),
+        }
     }
 }
 
@@ -264,11 +267,11 @@ pub struct AnswerPresencePromptParams {
     pub share: bool,
 }
 
-impl Handler for AnswerPresencePromptParams {
+impl SessionHandler for AnswerPresencePromptParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.answer_presence_prompt(self.prompt, self.share).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.answer_presence_prompt(self.prompt, self.share).await
     }
 }
 
@@ -283,11 +286,11 @@ pub struct KnockParams {
     pub reason: Option<String>,
 }
 
-impl Handler for KnockParams {
+impl SessionHandler for KnockParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.knock_room(&self.address, &self.via, self.reason)
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.knock_room(&self.address, &self.via, self.reason)
             .await
             .map(|room_id| room_id.to_string())
     }
@@ -303,11 +306,11 @@ pub struct ViaServersParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for ViaServersParams {
+impl SessionHandler for ViaServersParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        let room = session.room(&self.room_id)?;
         Ok(crate::routing::Route::of(&room)
             .await
             .map(|route| route.to_strings())
@@ -323,11 +326,11 @@ pub struct UpgradeServersParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for UpgradeServersParams {
+impl SessionHandler for UpgradeServersParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        let room = session.room(&self.room_id)?;
         Ok(crate::routing::upgrade_servers(&room)
             .await
             .iter()
@@ -343,18 +346,18 @@ pub struct LeaveParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for LeaveParams {
+impl SessionHandler for LeaveParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.room(&self.room_id)
-            .await?
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.room(&self.room_id)?
             .leave()
             .await
-            .or_failed(core, "leave_room")?;
+            .or_failed(session.core(), "leave_room")?;
 
         // Keeping it would hand a stale timeline back on rejoin.
-        core.timelines.lock().await.remove(&self.room_id);
+        let removed = session.state().timelines.lock().remove(&self.room_id);
+        drop(removed);
 
         Ok(())
     }
@@ -369,15 +372,15 @@ pub struct InviteParams {
     pub user_id: OwnedUserId,
 }
 
-impl Handler for InviteParams {
+impl SessionHandler for InviteParams {
     type Ok = InviteHistoryView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<InviteHistoryView, RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<InviteHistoryView, RpcError> {
+        let room = session.room(&self.room_id)?;
         // MSC4268 sends the keys ahead of the invite. `invite_user_by_id`
         // gives up on the invite when that fails, so both steps happen here.
         let history =
-            match super::encryption::share_history(core, &room, &self.user_id, true).await {
+            match super::encryption::share_history(session, &room, &self.user_id, true).await {
                 Ok(ShareHistoryView::Shared) => InviteHistoryView::Shared,
                 Ok(_) => InviteHistoryView::NotShared,
                 // `share_history` has reported the error.
@@ -387,7 +390,7 @@ impl Handler for InviteParams {
         room.client()
             .send(invite_user::v3::Request::new(self.room_id, recipient))
             .await
-            .or_failed(core, "invite_user")?;
+            .or_failed(session.core(), "invite_user")?;
         // The next send reloads the members, so the invitee gets its key.
         room.mark_members_missing();
 
@@ -500,11 +503,11 @@ fn configure_voice_room(
     Ok(())
 }
 
-impl Handler for CreateParams {
+impl SessionHandler for CreateParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        let client = core.client().await?;
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        let client = session.client();
         let mut request = create_room::v3::Request::new();
         request.name = self.name;
         if let Some(topic) = self.topic.as_deref() {
@@ -523,7 +526,7 @@ impl Handler for CreateParams {
         request.room_version = self.room_version
             .map(RoomVersionId::try_from)
             .transpose()
-            .or_failed(core, "create_room_room_version")?;
+            .or_failed(session.core(), "create_room_room_version")?;
         request.visibility = if self.public {
             Visibility::Public
         } else {
@@ -534,7 +537,7 @@ impl Handler for CreateParams {
         } else {
             RoomPreset::PrivateChat
         });
-        if let Some(hint) = core
+        if let Some(hint) = session
             .presence_hint_initial_state(if self.public {
                 PresenceHintView::Forbid
             } else {
@@ -559,7 +562,7 @@ impl Handler for CreateParams {
             );
             request.creation_content = Some(
                 Raw::new(&creation)
-                    .or_failed(core, "create_room_creation_content")?
+                    .or_failed(session.core(), "create_room_creation_content")?
                     .cast_unchecked(),
             );
         }
@@ -568,16 +571,16 @@ impl Handler for CreateParams {
             request.initial_state.push(rule.to_raw_any());
         }
 
-        if let Some(rules) = core.delegated_rules_state(self.parent_space.as_ref()).await {
+        if let Some(rules) = session.delegated_rules_state(self.parent_space.as_ref()).await {
             request.initial_state.push(rules);
         }
-        request.initial_state.extend(canonical_parent(&client, self.parent_space.as_ref()).await);
+        request.initial_state.extend(canonical_parent(client, self.parent_space.as_ref()).await);
 
         // Anyone can join and read a public room, so encryption only
         // breaks previews.
         let encrypted = self.encrypted && !self.public;
         if matches!(self.kind, RoomKind::Voice) {
-            configure_voice_room(&mut request, encrypted, core)?;
+            configure_voice_room(&mut request, encrypted, session.core())?;
         }
 
         if encrypted {
@@ -592,16 +595,16 @@ impl Handler for CreateParams {
         let room = client
             .create_room(request)
             .await
-            .or_failed(core, "create_room")?;
+            .or_failed(session.core(), "create_room")?;
 
         if matches!(self.kind, RoomKind::Calendar)
-            && let Err(error) = core.calendar_id(&room).await
+            && let Err(error) = session.calendar_id(&room).await
         {
             tracing::warn!(?error, "calendar setup failed");
         }
 
         if let Some(space_id) = self.parent_space {
-            core.add_to_space(&space_id, room.room_id(), None).await?;
+            session.add_to_space(&space_id, room.room_id(), None).await?;
         }
 
         Ok(room.room_id().to_string())
@@ -619,16 +622,16 @@ pub struct CreateDmParams {
     pub encrypt_new: bool,
 }
 
-impl Handler for CreateDmParams {
+impl SessionHandler for CreateDmParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
         let Self {
             user_id,
             encrypted,
             encrypt_new,
         } = self;
-        let client = core.client().await?;
+        let client = session.client();
         let existing = client.get_dm_rooms(&user_id).find(|room| {
             !room.is_tombstoned()
                 && encrypted.is_none_or(|wanted| room.encryption_state().is_encrypted() == wanted)
@@ -641,14 +644,14 @@ impl Handler for CreateDmParams {
                 && let Err(error) = client.account().fetch_user_profile_of(&user_id).await
                 && is_not_found(&error)
             {
-                return Err(core.rpc_error("create_dm_profile", &error));
+                return Err(session.core().rpc_error("create_dm_profile", &error));
             }
             let mut request = create_room::v3::Request::new();
             // The sender already creates the room, and may not be listed again.
             if !own {
                 request.creation_content = Some(
                     Raw::new(&serde_json::json!({ "additional_creators": [&user_id] }))
-                        .or_failed(core, "create_dm_creation_content")?
+                        .or_failed(session.core(), "create_dm_creation_content")?
                         .cast_unchecked(),
                 );
                 request.invite = vec![user_id.clone()];
@@ -663,7 +666,7 @@ impl Handler for CreateDmParams {
                     .to_raw_any(),
                 );
             }
-            if let Some(hint) = core
+            if let Some(hint) = session
                 .presence_hint_initial_state(PresenceHintView::Suggest)
                 .await
             {
@@ -672,14 +675,14 @@ impl Handler for CreateDmParams {
             let room = client
                 .create_room(request)
                 .await
-                .or_failed(core, "create_dm")?;
+                .or_failed(session.core(), "create_dm")?;
             // The SDK marks a direct room only from its invitees.
             if own {
                 client
                     .account()
                     .mark_as_dm(room.room_id(), &[user_id])
                     .await
-                    .or_failed(core, "create_dm_mark")?;
+                    .or_failed(session.core(), "create_dm_mark")?;
             }
             room
         };
@@ -692,16 +695,15 @@ impl Handler for CreateDmParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct VersionsParams {}
 
-impl Handler for VersionsParams {
+impl SessionHandler for VersionsParams {
     type Ok = RoomVersionsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomVersionsView, RpcError> {
-        let response = core
+    async fn run(self, session: &SignedIn) -> Result<RoomVersionsView, RpcError> {
+        let response = session
             .client()
-            .await?
             .send(get_capabilities::v3::Request::new())
             .await
-            .or_failed(core, "room_versions")?;
+            .or_failed(session.core(), "room_versions")?;
 
         let versions = response.capabilities.room_versions;
         let mut available: Vec<RoomVersionView> = versions
@@ -732,30 +734,30 @@ pub struct UpgradeParams {
     pub additional_creators: Vec<OwnedUserId>,
 }
 
-impl Handler for UpgradeParams {
+impl SessionHandler for UpgradeParams {
     /// The replacement room.
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
         let mut request = upgrade_room::v3::Request::new(
             self.room_id,
-            RoomVersionId::try_from(self.new_version).or_failed(core, "upgrade_room")?,
+            RoomVersionId::try_from(self.new_version).or_failed(session.core(), "upgrade_room")?,
         );
         request.additional_creators = self.additional_creators;
 
-        let client = core.client().await?;
+        let client = session.client();
         let old_room = request.room_id.clone();
         let response = client
             .send(request)
             .await
-            .or_failed(core, "upgrade_room")?;
-        core.copy_room_packs(&client, &old_room, &response.replacement_room)
+            .or_failed(session.core(), "upgrade_room")?;
+        session.core().copy_room_packs(client, &old_room, &response.replacement_room)
             .await;
-        core.carry_space_links(&client, &old_room, &response.replacement_room)
+        session.carry_space_links(&old_room, &response.replacement_room)
             .await;
-        core.copy_presence_hint(&old_room, &response.replacement_room)
+        session.copy_presence_hint(&old_room, &response.replacement_room)
             .await;
-        core.carry_presence_sharing(&old_room, &response.replacement_room)
+        session.carry_presence_sharing(&old_room, &response.replacement_room)
             .await;
 
         Ok(response.replacement_room.to_string())
@@ -782,11 +784,12 @@ pub struct PublicRoomsOk {
     pub total: Option<u64>,
 }
 
-impl Handler for PublicRoomsParams {
+impl SessionHandler for PublicRoomsParams {
     type Ok = PublicRoomsOk;
+    const ENDS_WITH_SESSION: bool = true;
 
-    async fn run(self, core: &Arc<Core>) -> Result<PublicRoomsOk, RpcError> {
-        core.public_rooms(self)
+    async fn run(self, session: &SignedIn) -> Result<PublicRoomsOk, RpcError> {
+        session.public_rooms(self)
             .await
     }
 }
@@ -798,17 +801,16 @@ pub struct DirectoryVisibilityParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for DirectoryVisibilityParams {
+impl SessionHandler for DirectoryVisibilityParams {
     /// Whether the room is published.
     type Ok = bool;
 
-    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
-        let response = core
+    async fn run(self, session: &SignedIn) -> Result<bool, RpcError> {
+        let response = session
             .client()
-            .await?
             .send(get_room_visibility::v3::Request::new(self.room_id))
             .await
-            .or_failed(core, "room_directory_visibility")?;
+            .or_failed(session.core(), "room_directory_visibility")?;
 
         Ok(response.visibility == Visibility::Public)
     }
@@ -822,24 +824,23 @@ pub struct SetDirectoryVisibilityParams {
     pub public: bool,
 }
 
-impl Handler for SetDirectoryVisibilityParams {
+impl SessionHandler for SetDirectoryVisibilityParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         let visibility = if self.public {
             Visibility::Public
         } else {
             Visibility::Private
         };
 
-        core.client()
-            .await?
+        session.client()
             .send(set_room_visibility::v3::Request::new(
                 self.room_id,
                 visibility,
             ))
             .await
-            .or_failed(core, "set_room_directory_visibility")?;
+            .or_failed(session.core(), "set_room_directory_visibility")?;
 
         Ok(())
     }
@@ -852,16 +853,15 @@ pub struct AliasesParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for AliasesParams {
+impl SessionHandler for AliasesParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        let response = core
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        let response = session
             .client()
-            .await?
             .send(aliases::v3::Request::new(self.room_id))
             .await
-            .or_failed(core, "room_aliases")?;
+            .or_failed(session.core(), "room_aliases")?;
 
         Ok(response
             .aliases
@@ -879,17 +879,16 @@ pub struct CreateAliasParams {
     pub alias: String,
 }
 
-impl Handler for CreateAliasParams {
+impl SessionHandler for CreateAliasParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let alias = RoomAliasId::parse(self.alias).or_failed(core, "create_room_alias")?;
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        let alias = RoomAliasId::parse(self.alias).or_failed(session.core(), "create_room_alias")?;
 
-        core.client()
-            .await?
+        session.client()
             .send(create_alias::v3::Request::new(alias, self.room_id))
             .await
-            .or_failed(core, "create_room_alias")?;
+            .or_failed(session.core(), "create_room_alias")?;
 
         Ok(())
     }
@@ -901,17 +900,16 @@ pub struct DeleteAliasParams {
     pub alias: String,
 }
 
-impl Handler for DeleteAliasParams {
+impl SessionHandler for DeleteAliasParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let alias = RoomAliasId::parse(self.alias).or_failed(core, "delete_room_alias")?;
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        let alias = RoomAliasId::parse(self.alias).or_failed(session.core(), "delete_room_alias")?;
 
-        core.client()
-            .await?
+        session.client()
             .send(delete_alias::v3::Request::new(alias))
             .await
-            .or_failed(core, "delete_room_alias")?;
+            .or_failed(session.core(), "delete_room_alias")?;
 
         Ok(())
     }
@@ -931,11 +929,11 @@ pub struct CanonicalAliasOk {
     pub alt_aliases: Vec<String>,
 }
 
-impl Handler for CanonicalAliasParams {
+impl SessionHandler for CanonicalAliasParams {
     type Ok = CanonicalAliasOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<CanonicalAliasOk, RpcError> {
-        let (alias, alt_aliases) = core.canonical_alias(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<CanonicalAliasOk, RpcError> {
+        let (alias, alt_aliases) = session.canonical_alias(&self.room_id).await?;
         Ok(CanonicalAliasOk { alias, alt_aliases })
     }
 }
@@ -950,11 +948,11 @@ pub struct SetCanonicalAliasParams {
     pub alt_aliases: Vec<String>,
 }
 
-impl Handler for SetCanonicalAliasParams {
+impl SessionHandler for SetCanonicalAliasParams {
     type Ok = CanonicalAliasOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<CanonicalAliasOk, RpcError> {
-        let (alias, alt_aliases) = core
+    async fn run(self, session: &SignedIn) -> Result<CanonicalAliasOk, RpcError> {
+        let (alias, alt_aliases) = session
             .set_canonical_alias(self.room_id, self.alias.as_deref(), &self.alt_aliases)
             .await?;
         Ok(CanonicalAliasOk { alias, alt_aliases })
@@ -965,13 +963,13 @@ impl Handler for SetCanonicalAliasParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ReplacedRoomsParams {}
 
-impl Handler for ReplacedRoomsParams {
+impl SessionHandler for ReplacedRoomsParams {
     type Ok = Vec<RoomListItemView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<RoomListItemView>, RpcError> {
-        let client = core.client().await?;
-        let rules = core.push_rules().await?.snapshot().await;
-        let nicknames = core.nicknames();
+    async fn run(self, session: &SignedIn) -> Result<Vec<RoomListItemView>, RpcError> {
+        let client = session.client();
+        let rules = session.push_rules().await?.snapshot();
+        let nicknames = session.core().nicknames();
         let mut rooms = Vec::new();
         for room in client.joined_rooms() {
             if room.is_tombstoned() {
@@ -993,11 +991,11 @@ pub struct SetTombstoneParams {
     pub body: String,
 }
 
-impl Handler for SetTombstoneParams {
+impl SessionHandler for SetTombstoneParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_tombstone(self.room_id, &self.replacement_room, &self.body)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_tombstone(self.room_id, &self.replacement_room, &self.body)
             .await
     }
 }
@@ -1010,11 +1008,11 @@ pub struct ReportParams {
     pub reason: String,
 }
 
-impl Handler for ReportParams {
+impl SessionHandler for ReportParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.report_room(self).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.report_room(self).await
     }
 }
 
@@ -1028,11 +1026,11 @@ pub struct SetTagParams {
     pub set: bool,
 }
 
-impl Handler for SetTagParams {
+impl SessionHandler for SetTagParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        let room = session.room(&self.room_id)?;
         let name = match self.tag {
             RoomTag::Favourite => TagName::Favorite,
         };
@@ -1040,11 +1038,11 @@ impl Handler for SetTagParams {
         if self.set {
             room.set_tag(name, TagInfo::new())
                 .await
-                .or_failed(core, "set_room_tag")?;
+                .or_failed(session.core(), "set_room_tag")?;
         } else {
             room.remove_tag(name)
                 .await
-                .or_failed(core, "remove_room_tag")?;
+                .or_failed(session.core(), "remove_room_tag")?;
         }
 
         Ok(())
@@ -1069,11 +1067,11 @@ pub struct AttachmentsOk {
     pub next_batch: Option<String>,
 }
 
-impl Handler for AttachmentsParams {
+impl SessionHandler for AttachmentsParams {
     type Ok = AttachmentsOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<AttachmentsOk, RpcError> {
-        let (items, next_batch) = core
+    async fn run(self, session: &SignedIn) -> Result<AttachmentsOk, RpcError> {
+        let (items, next_batch) = session
             .room_attachments(
                 &self.room_id,
                 self.kind,
@@ -1095,11 +1093,11 @@ pub struct CosmeticsParams {
     pub space_id: Option<OwnedRoomId>,
 }
 
-impl Handler for CosmeticsParams {
+impl SessionHandler for CosmeticsParams {
     type Ok = RoomCosmeticsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomCosmeticsView, RpcError> {
-        core.room_cosmetics(&self.room_id, self.space_id).await
+    async fn run(self, session: &SignedIn) -> Result<RoomCosmeticsView, RpcError> {
+        session.room_cosmetics(&self.room_id, self.space_id).await
     }
 }
 

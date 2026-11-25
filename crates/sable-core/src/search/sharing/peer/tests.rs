@@ -3,6 +3,8 @@ mod browser;
 
 use std::collections::VecDeque;
 
+use matrix_sdk::test_utils::mocks::MatrixMockServer;
+
 use super::super::{History, STANDARD_NO_PAD};
 use super::*;
 use crate::search::tests::document;
@@ -278,8 +280,12 @@ fn rtc_signals(
     signals
 }
 
+fn session_state(core: &Core) -> Arc<crate::SessionState> {
+    crate::test_support::current_state(core).unwrap()
+}
+
 fn sending_to(core: &Core) -> Option<(String, OwnedDeviceId)> {
-    match &core.search_sharing.state.lock().phase {
+    match &session_state(core).search_peers.state.lock().phase {
         Phase::Sending(session) => Some((session.id.clone(), session.device.clone())),
         _ => None,
     }
@@ -287,21 +293,19 @@ fn sending_to(core: &Core) -> Option<(String, OwnedDeviceId)> {
 
 #[tokio::test]
 async fn one_device_is_served_at_a_time() {
-    let (core, mut events) = Core::new(
-        "peer-serve",
-        Box::new(crate::store::MemorySessionStore::default()),
-    );
-    let client = Client::builder()
-        .homeserver_url("http://localhost")
-        .build()
-        .await
-        .unwrap();
+    let server = MatrixMockServer::new().await;
+    let (core, mut events) =
+        crate::test_support::signed_in_core(&server, server.client_builder().build().await).await;
+    let session = core.signed_in().unwrap();
     let generation = core.lifecycle.current();
-    core.serve_search_peer(&client, generation, "a1".into(), "A".into())
+    session
+        .serve_search_peer(generation, "a1".into(), "A".into())
         .await;
-    core.serve_search_peer(&client, generation, "a2".into(), "A".into())
+    session
+        .serve_search_peer(generation, "a2".into(), "A".into())
         .await;
-    core.serve_search_peer(&client, generation, "b1".into(), "B".into())
+    session
+        .serve_search_peer(generation, "b1".into(), "B".into())
         .await;
     assert_eq!(sending_to(&core), Some(("a2".into(), "A".into())));
     assert_eq!(
@@ -312,21 +316,22 @@ async fn one_device_is_served_at_a_time() {
             ("a2".into(), RtcSignal::Open),
         ]
     );
-    core.close_search_peer(&client, "a2").await;
-    core.serve_search_peer(&client, generation, "b2".into(), "B".into())
+    session.close_search_peer("a2").await;
+    session
+        .serve_search_peer(generation, "b2".into(), "B".into())
         .await;
     assert_eq!(sending_to(&core), Some(("b2".into(), "B".into())));
 }
 
 #[tokio::test]
 async fn sharing_changes_are_pushed_as_events() {
-    let (core, mut events) = Core::new(
-        "peer-events",
-        Box::new(crate::store::MemorySessionStore::default()),
-    );
-    core.search_sharing.enabled.store(true, Ordering::Relaxed);
-    core.update_sharing(|state| state.begin("query".into(), Instant::now()));
-    core.update_sharing(|state| state.available = true);
+    let server = MatrixMockServer::new().await;
+    let (core, mut events) =
+        crate::test_support::signed_in_core(&server, server.client_builder().build().await).await;
+    let session = core.signed_in().unwrap();
+    core.settings.search_sharing.store(true, Ordering::Relaxed);
+    session.update_sharing(|state| state.begin("query".into(), Instant::now()));
+    session.update_sharing(|state| state.available = true);
     let states: Vec<_> = std::iter::from_fn(|| events.try_recv().ok())
         .filter_map(|event| match event {
             CoreEvent::SearchSharing { sharing } => Some(sharing.state),
@@ -418,52 +423,58 @@ fn a_copy_is_due_until_one_succeeds_and_again_after_a_week() {
 
 #[tokio::test]
 async fn the_automatic_copy_runs_once_and_a_failed_start_does_not_count() {
+    use crate::api::Handler as _;
+    use crate::api::search::PeerStartParams;
+
+    let server = MatrixMockServer::new().await;
     let (core, _events) = Core::new(
         "peer-auto",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.search_sharing.enabled.store(true, Ordering::Relaxed);
+    core.settings.search_sharing.store(true, Ordering::Relaxed);
     core.app_in_foreground.store(true, Ordering::Relaxed);
     core.update_network_conditions(true, true).await;
-    core.start_search_peers().await.unwrap_err();
-    core.start_search_peers().await.unwrap_err();
-    core.search_sharing.state.lock().auto_tried = true;
-    core.start_search_peers().await.unwrap();
-    core.cancel_search_peers();
-    core.start_search_peers().await.unwrap_err();
+    PeerStartParams {}.run(&core).await.unwrap_err();
+    PeerStartParams {}.run(&core).await.unwrap_err();
+    crate::test_support::sign_in(&core, &server, server.client_builder().build().await).await;
+    session_state(&core).search_peers.state.lock().auto_tried = true;
+    PeerStartParams {}.run(&core).await.unwrap();
+    core.stop_search_peers();
+    assert!(!session_state(&core).search_peers.state.lock().auto_tried);
 }
 
 #[tokio::test]
 async fn metered_policy_interrupts_a_copy_and_reports_the_pause() {
-    let (core, mut events) = Core::new(
-        "peer-policy",
-        Box::new(crate::store::MemorySessionStore::default()),
-    );
-    let sharing = &core.search_sharing;
-    sharing.enabled.store(true, Ordering::Relaxed);
+    let server = MatrixMockServer::new().await;
+    let (core, mut events) =
+        crate::test_support::signed_in_core(&server, server.client_builder().build().await).await;
+    let session = core.signed_in().unwrap();
+    core.settings.search_sharing.store(true, Ordering::Relaxed);
+    let sharing = session_state(&core);
     core.update_network_conditions(true, true).await;
     {
-        let mut state = sharing.state.lock();
+        let mut state = sharing.search_peers.state.lock();
         *state = state_with(&[("DEVICE", 5, 0, false)]);
         state.next(None, "session".into(), Instant::now());
     }
-    core.open_rtc(
+    session.open_rtc(
         RtcPurpose::SearchSharing,
         "session".into(),
         "DEVICE".into(),
         false,
     );
     core.update_network_conditions(true, false).await;
-    assert!(sharing.state.lock().phase.session().is_none());
+    assert!(sharing.search_peers.state.lock().phase.session().is_none());
     assert_eq!(
         rtc_signals(&mut events),
         [("session".into(), RtcSignal::Close)]
     );
-    let view = core.search_sharing_view();
+    let view = session.search_sharing_view();
     assert_eq!(view.state, SearchPeerState::Idle);
     assert_eq!(view.pause, Some(SearchPeerPause::Metered));
     assert_eq!(view.outcome, Some(SearchPeerOutcome::Interrupted));
-    core.exchange_search_peer("session", None)
+    session
+        .exchange_search_peer("session", None)
         .await
         .unwrap_err();
 }
@@ -481,11 +492,10 @@ fn shown_pauses(
 
 #[tokio::test]
 async fn returning_conditions_tell_the_page_that_peers_may_resume() {
-    let (core, mut events) = Core::new(
-        "peer-resume",
-        Box::new(crate::store::MemorySessionStore::default()),
-    );
-    core.search_sharing.enabled.store(true, Ordering::Relaxed);
+    let server = MatrixMockServer::new().await;
+    let (core, mut events) =
+        crate::test_support::signed_in_core(&server, server.client_builder().build().await).await;
+    core.settings.search_sharing.store(true, Ordering::Relaxed);
 
     core.update_network_conditions(false, true).await;
     core.update_network_conditions(true, true).await;
@@ -500,41 +510,44 @@ async fn live_core(
     name: &str,
 ) -> (Arc<Core>, tokio::sync::mpsc::UnboundedReceiver<CoreEvent>) {
     let (core, events) = Core::new(name, Box::new(crate::store::MemorySessionStore::default()));
-    core.search_sharing.enabled.store(true, Ordering::Relaxed);
+    core.settings.search_sharing.store(true, Ordering::Relaxed);
     core.app_in_foreground.store(true, Ordering::Relaxed);
-    *core.session.write().await = Some(crate::session::Session {
-        account_id: name.into(),
-        client: client.clone(),
-        sync_service: Arc::new(
-            matrix_sdk_ui::sync_service::SyncService::builder(client.clone())
-                .build()
-                .await
-                .unwrap(),
-        ),
-        homeserver: client.homeserver().to_string(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(crate::session::Session {
+            account_id: name.into(),
+            client: client.clone(),
+            sync_service: Arc::new(
+                matrix_sdk_ui::sync_service::SyncService::builder(client.clone())
+                    .build()
+                    .await
+                    .unwrap(),
+            ),
+            homeserver: client.homeserver().to_string(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
     let generation = core.lifecycle.current();
-    core.watch_search_peers(client, generation);
-    core.watch_rtc(client, generation);
+    session.watch_search_peers(generation);
+    session.watch_rtc(generation);
     (core, events)
 }
 
 #[tokio::test]
 async fn a_peer_message_handled_while_a_session_ends_does_not_deadlock() {
-    let server = matrix_sdk::test_utils::mocks::MatrixMockServer::new().await;
+    let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let (core, _events) = live_core(&client, "peer-reentry").await;
-    let handling = core.session.read().await;
-    let ending = core.take_session();
-    tokio::pin!(ending);
-    assert!(futures_util::poll!(ending.as_mut()).is_pending());
-
-    tokio::time::timeout(Duration::from_secs(5), core.next_search_peer(&client, None))
-        .await
-        .expect("handling a peer message must not wait for the session it holds");
-    drop(handling);
-    assert!(ending.await.is_some());
+    let session = core.signed_in().unwrap();
+    let (ended, ()) = tokio::time::timeout(
+        Duration::from_secs(5),
+        futures_util::future::join(core.end_session(), session.next_search_peer(None)),
+    )
+    .await
+    .expect("a session ends while a peer message is handled");
+    assert!(ended.is_some());
 }
 
 async fn trust(client: &Client, other: &Client) {
@@ -560,13 +573,13 @@ fn reopen(source: &Core, target: &Core, id: &str, devices: [&Client; 2]) {
     let [source_device, target_device] =
         devices.map(|client| client.device_id().unwrap().to_owned());
     let now = Instant::now();
-    source.search_sharing.state.lock().phase = Phase::Sending(Session::new(
+    session_state(source).search_peers.state.lock().phase = Phase::Sending(Session::new(
         id.into(),
         target_device,
         Transfer::Sending(None),
         now,
     ));
-    target.search_sharing.state.lock().phase = Phase::Receiving(Session::new(
+    session_state(target).search_peers.state.lock().phase = Phase::Receiving(Session::new(
         id.into(),
         source_device,
         Transfer::Receiving(ReceiverState::new(0)),
@@ -574,9 +587,11 @@ fn reopen(source: &Core, target: &Core, id: &str, devices: [&Client; 2]) {
     ));
 }
 
-async fn exchange(source: &Core, target: &Core, id: &str) -> usize {
+async fn exchange(source: &Arc<Core>, target: &Arc<Core>, id: &str) -> usize {
+    let source_session = source.signed_in().unwrap();
+    let target_session = target.signed_in().unwrap();
     assert!(
-        target
+        target_session
             .exchange_search_peer(id, None)
             .await
             .unwrap()
@@ -584,7 +599,7 @@ async fn exchange(source: &Core, target: &Core, id: &str) -> usize {
     );
     let mut frames = VecDeque::from([(
         true,
-        source
+        source_session
             .exchange_search_peer(id, None)
             .await
             .unwrap()
@@ -599,7 +614,8 @@ async fn exchange(source: &Core, target: &Core, id: &str) -> usize {
             payloads += 1;
         }
         let receiver = if to_target { target } else { source };
-        if let Some(reply) = receiver
+        let receiver_session = receiver.signed_in().unwrap();
+        if let Some(reply) = receiver_session
             .exchange_search_peer(id, Some(frame))
             .await
             .unwrap()
@@ -631,10 +647,12 @@ async fn verified_devices_copy_history_and_changes() {
     trust(&source, &reader).await;
     trust(&reader, &source).await;
     let (writer, mut writer_events) = live_core(&source, "peer-source").await;
+    let writer_session = writer.signed_in().unwrap();
     let (target, _target_events) = live_core(&reader, "peer-reader").await;
+    let target_session = target.signed_in().unwrap();
     crawl_to_start(&writer, &source, &room).await;
-    writer.start_search_peers().await.unwrap();
-    target.find_search_peers().await.unwrap();
+    writer_session.start_search_peers().await.unwrap();
+    target_session.find_search_peers().await.unwrap();
     let id = tokio::time::timeout(Duration::from_secs(40), async {
         loop {
             for client in [&source, &reader] {
@@ -659,23 +677,33 @@ async fn verified_devices_copy_history_and_changes() {
     })
     .await
     .unwrap();
-    let view = target.search_sharing_view();
+    let view = target_session.search_sharing_view();
     assert_eq!(view.state, SearchPeerState::Connecting);
     assert_eq!(view.candidates.len(), 1);
     assert_eq!(needles(&target, &room).await, 0);
     assert!(exchange(&writer, &target, &id).await >= 2);
     assert_eq!(needles(&target, &room).await, 30);
-    assert!(target.search_crawl.lock().await.cover_of(&room).is_some());
-    let view = target.search_sharing_view();
+    assert!(
+        target_session
+            .state()
+            .search_crawl
+            .lock()
+            .cover_of(&room)
+            .is_some()
+    );
+    let view = target_session.search_sharing_view();
     assert_eq!(view.transferred_rooms, 1);
     assert_eq!(view.state, SearchPeerState::Idle);
     assert_eq!(view.outcome, Some(SearchPeerOutcome::Completed));
     assert_eq!(view.last_copy.map(|copy| copy.rooms), Some(1));
-    target.exchange_search_peer(&id, None).await.unwrap_err();
+    target_session
+        .exchange_search_peer(&id, None)
+        .await
+        .unwrap_err();
     reopen(&writer, &target, &id, [&source, &reader]);
     assert_eq!(exchange(&writer, &target, &id).await, 0);
 
-    let event_id = super::super::settled_history(&writer.search_store().await, &room)
+    let event_id = super::super::settled_history(&writer_session.search_store().await, &room)
         .await
         .unwrap()
         .documents
@@ -701,8 +729,14 @@ async fn verified_devices_copy_history_and_changes() {
     reopen(&writer, &target, &id, [&source, &reader]);
     assert!(exchange(&writer, &target, &id).await > 0);
     assert_eq!(
-        crate::search::tests::in_room(&*target.search_index.lock().await, &room, "revised", 10, 0)
-            .len(),
+        crate::search::tests::in_room(
+            &*target_session.state().search_index.lock().await,
+            &room,
+            "revised",
+            10,
+            0
+        )
+        .len(),
         1,
     );
 
@@ -714,7 +748,7 @@ async fn verified_devices_copy_history_and_changes() {
     assert_eq!(needles(&target, &room).await, 29);
     reopen(&writer, &target, &id, [&source, &reader]);
     assert_eq!(exchange(&writer, &target, &id).await, 0);
-    assert!(!target.known_parts(&room).is_empty());
+    assert!(!target_session.known_parts(&room).is_empty());
     reopen(&writer, &target, &id, [&source, &reader]);
     reader
         .encryption()
@@ -725,16 +759,19 @@ async fn verified_devices_copy_history_and_changes() {
         .set_local_trust(matrix_sdk_base::crypto::LocalTrust::BlackListed)
         .await
         .unwrap();
-    target.exchange_search_peer(&id, None).await.unwrap_err();
+    target_session
+        .exchange_search_peer(&id, None)
+        .await
+        .unwrap_err();
 
-    target.forget_search_sharing(&reader).await;
-    let view = target.search_sharing_view();
+    target_session.forget_search_sharing().await;
+    let view = target_session.search_sharing_view();
     assert_eq!(view.transferred_rooms, 0);
     assert!(view.last_copy.is_none());
     assert!(view.automatic);
-    target.search_sharing.state.lock().saved = None;
-    target.load_saved(&reader).await;
-    assert!(target.known_parts(&room).is_empty());
+    session_state(&target).search_peers.state.lock().saved = None;
+    target_session.load_saved().await;
+    assert!(target_session.known_parts(&room).is_empty());
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -774,6 +811,7 @@ async fn browsers_transfer_verified_search_history() {
     trust(&reader, &source).await;
     let (writer, writer_events) = live_core(&source, "browser-peer-source").await;
     let (target, target_events) = live_core(&reader, "browser-peer-reader").await;
+    let target_session = target.signed_in().unwrap();
     crawl_to_start(&writer, &source, &room).await;
     assert_eq!(needles(&target, &room).await, 0);
     browser::exchange(
@@ -783,7 +821,30 @@ async fn browsers_transfer_verified_search_history() {
     )
     .await;
     assert_eq!(needles(&target, &room).await, 60);
-    assert!(target.search_crawl.lock().await.cover_of(&room).is_some());
-    assert!(writer.search_sharing.state.lock().phase.session().is_none());
-    assert!(target.search_sharing.state.lock().phase.session().is_none());
+    assert!(
+        target_session
+            .state()
+            .search_crawl
+            .lock()
+            .cover_of(&room)
+            .is_some()
+    );
+    assert!(
+        session_state(&writer)
+            .search_peers
+            .state
+            .lock()
+            .phase
+            .session()
+            .is_none()
+    );
+    assert!(
+        session_state(&target)
+            .search_peers
+            .state
+            .lock()
+            .phase
+            .session()
+            .is_none()
+    );
 }

@@ -2,7 +2,7 @@ use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, TransactionId};
 use serde::Serialize;
 use url::Url;
 
-use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{RpcCode, RpcError};
 use crate::room_settings::EmptyContent;
 
@@ -53,7 +53,7 @@ enum WidgetOut<'a> {
     },
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn add_room_widget(
         &self,
         room_id: OwnedRoomId,
@@ -63,7 +63,6 @@ impl Core {
         let url = widget_url(url).ok_or(RpcCode::InvalidUrl)?;
         let user_id = self
             .client()
-            .await?
             .user_id()
             .ok_or(RpcCode::NotLoggedIn)?
             .to_owned();

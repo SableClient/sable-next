@@ -465,9 +465,17 @@ async fn test_redacting_the_latest_edit_of_a_message_outside_the_cache_asks_the_
         "search-refetch",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.crawl_once(&client, &room_id).await.expect("crawl");
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.crawl_once(&room_id).await.expect("crawl");
 
-    let hits = in_room(&*core.search_index.lock().await, &room_id, "draft", 10, 0);
+    let hits = in_room(
+        &*session.state().search_index.lock().await,
+        &room_id,
+        "draft",
+        10,
+        0,
+    );
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].body, "second draft");
 }
@@ -487,17 +495,21 @@ async fn core_with_room(
     server.sync_joined_room(&client, &room_id).await;
     let (core, _events) =
         crate::Core::new(name, Box::new(crate::store::MemorySessionStore::default()));
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
     (server, client, room_id, core)
 }
 
 async fn index_crawled(
-    core: &crate::Core,
+    core: &Arc<crate::Core>,
     client: &matrix_sdk::Client,
     room_id: &OwnedRoomId,
     events: Vec<Value>,
 ) {
+    let session = core.signed_in().unwrap();
     let (cache, _drop) = client.event_cache().unwrap().room(room_id).await.unwrap();
-    core.search_index
+    session
+        .state()
+        .search_index
         .lock()
         .await
         .ingest_with(
@@ -511,8 +523,10 @@ async fn index_crawled(
         .expect("the index takes the events");
 }
 
-fn hits(core: &crate::Core, room_id: &OwnedRoomId, query: &str) -> usize {
-    let index = core.search_index.try_lock().unwrap();
+fn hits(core: &Arc<crate::Core>, room_id: &OwnedRoomId, query: &str) -> usize {
+    let session = core.signed_in().unwrap();
+    let session_state = session.state();
+    let index = session_state.search_index.try_lock().unwrap();
     in_room(&index, room_id, query, 50, 0).len()
 }
 
@@ -524,6 +538,7 @@ async fn test_a_limited_sync_leaves_a_hole_the_crawler_fills_forward() {
     use matrix_sdk_test::JoinedRoomBuilder;
 
     let (server, client, room_id, core) = core_with_room("search-hole").await;
+    let session = core.signed_in().unwrap();
     let now = crate::search::now_ms();
     let old: Vec<Value> = (1..=10)
         .map(|n| message(&format!("$old{n}"), now + n, &format!("early{n} words")))
@@ -541,10 +556,17 @@ async fn test_a_limited_sync_leaves_a_hole_the_crawler_fills_forward() {
         )
         .await;
     let room = client.get_room(&room_id).unwrap();
-    core.index_room_search(&client, &room).await;
+    session.index_room_search(&room).await;
     assert_eq!(hits(&core, &room_id, "live50"), 1);
     assert_eq!(hits(&core, &room_id, "gapped"), 0);
-    assert!(core.search_crawl.lock().await.holes.contains_key(&room_id));
+    assert!(
+        session
+            .state()
+            .search_crawl
+            .lock()
+            .holes
+            .contains_key(&room_id)
+    );
 
     server
         .mock_room_event_context()
@@ -567,11 +589,18 @@ async fn test_a_limited_sync_leaves_a_hole_the_crawler_fills_forward() {
         .mount()
         .await;
 
-    core.crawl_once(&client, &room_id).await.expect("fill");
+    session.crawl_once(&room_id).await.expect("fill");
 
     assert_eq!(hits(&core, &room_id, "gapped"), 2);
     assert_eq!(hits(&core, &room_id, "live50"), 1);
-    assert!(!core.search_crawl.lock().await.holes.contains_key(&room_id));
+    assert!(
+        !session
+            .state()
+            .search_crawl
+            .lock()
+            .holes
+            .contains_key(&room_id)
+    );
 }
 
 fn event_builder(
@@ -690,6 +719,7 @@ async fn test_a_poll_edit_replaces_the_question_and_answers() {
 #[async_test]
 async fn test_ignoring_keeps_the_index_and_unignoring_rewalks_without_wiping_it() {
     let (_server, client, room_id, core) = core_with_room("search-ignore").await;
+    let session = core.signed_in().unwrap();
     let now = crate::search::now_ms();
     index_crawled(
         &core,
@@ -699,18 +729,20 @@ async fn test_ignoring_keeps_the_index_and_unignoring_rewalks_without_wiping_it(
     )
     .await;
     let troll = matrix_sdk::ruma::user_id!("@troll:localhost").to_owned();
-    core.search_crawl
+    session
+        .state()
+        .search_crawl
         .lock()
-        .await
         .advance(&room_id, Some("saved".to_owned()));
 
-    core.ignored_users_changed(std::slice::from_ref(&troll))
+    session
+        .ignored_users_changed(std::slice::from_ref(&troll))
         .await;
-    assert!(core.search_crawl.lock().await.has_token(&room_id));
+    assert!(session.state().search_crawl.lock().has_token(&room_id));
     assert_eq!(hits(&core, &room_id, "troll"), 1);
 
-    core.ignored_users_changed(&[]).await;
-    assert!(!core.search_crawl.lock().await.has_token(&room_id));
+    session.ignored_users_changed(&[]).await;
+    assert!(!session.state().search_crawl.lock().has_token(&room_id));
     assert_eq!(hits(&core, &room_id, "troll"), 1);
 }
 

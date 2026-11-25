@@ -150,12 +150,19 @@ async fn test_reindexing_a_classified_cache_does_not_reload_it_from_storage() {
         "search-classified",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    reingest_whole_room(
+        &*session.state().search_index.lock().await,
+        &cache,
+        &room_id,
+    )
+    .await;
     store.wait_for_write_to_start().await;
     store.fail_next_last_chunk_load();
 
-    core.prime_persisted_rooms(&client).await;
-    core.prime_persisted_rooms(&client).await;
+    session.prime_persisted_rooms().await;
+    session.prime_persisted_rooms().await;
 
     assert!(
         tokio::time::timeout(Duration::from_millis(200), store.wait_for_write_to_start())
@@ -166,7 +173,7 @@ async fn test_reindexing_a_classified_cache_does_not_reload_it_from_storage() {
     assert_eq!(cache.events().await.unwrap().len(), 1);
     assert_eq!(
         in_room(
-            &*core.search_index.lock().await,
+            &*session.state().search_index.lock().await,
             &room_id,
             "searchable",
             10,
@@ -202,9 +209,12 @@ async fn test_a_room_with_no_new_activity_is_indexed_from_its_persisted_cache() 
         "search-prime",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.prime_persisted_rooms(&client).await;
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.prime_persisted_rooms().await;
 
-    let index = core.search_index.lock().await;
+    let session_state = session.state();
+    let index = session_state.search_index.lock().await;
     assert_eq!(
         in_room(&index, &room_id, "archived", 10, 0).len(),
         1,
@@ -652,13 +662,14 @@ async fn test_ignored_senders_are_read_from_the_store() {
         .expect("saved account data");
 
     let core = logged_in(&server, &client, "search-ignored-store").await;
+    let session = core.signed_in().unwrap();
 
     assert_eq!(
         client.subscribe_to_ignore_user_list_changes().get(),
         Vec::<ruma::OwnedUserId>::new()
     );
     assert_eq!(
-        core.ignored_senders().await,
+        session.ignored_senders().await,
         vec![user_id!("@troll:localhost").to_owned()],
         "a restored session has an ignore list before any sync changes it"
     );
@@ -962,11 +973,11 @@ async fn test_a_live_pass_applies_an_edit_that_arrives_with_its_original() {
 async fn test_the_words_of_a_search_request_split_its_query() {
     use crate::api::Handler as _;
 
-    let (core, _events) = crate::Core::new(
-        "search-words",
-        Box::new(crate::store::MemorySessionStore::default()),
-    );
-    core.search_index.lock().await.upsert(
+    let server = MatrixMockServer::new().await;
+    let (core, _events) =
+        crate::test_support::signed_in_core(&server, server.client_builder().build().await).await;
+    let session = core.signed_in().unwrap();
+    session.state().search_index.lock().await.upsert(
         room_id!("!words:localhost"),
         document(
             "study",
@@ -988,8 +999,10 @@ async fn test_the_words_of_a_search_request_split_its_query() {
         .run(&core)
     };
 
-    let split = search(&["日本語", "勉強", "猫"]).await.expect("a search");
-    let whole = search(&[]).await.expect("a search");
+    let split = Box::pin(search(&["日本語", "勉強", "猫"]))
+        .await
+        .expect("a search");
+    let whole = Box::pin(search(&[])).await.expect("a search");
 
     assert_eq!(split.hits.len(), 1);
     assert_eq!(split.hits[0].event_id, event_id!("$study"));

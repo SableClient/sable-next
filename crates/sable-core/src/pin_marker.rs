@@ -6,8 +6,9 @@ use serde_json::Value;
 use serde_with::{DefaultOnError, serde_as};
 use sha2::{Digest, Sha256};
 
+use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{PinReadStateView, RpcError};
-use crate::{Core, ResultExt};
 
 /// Which pins this account has seen, per room. Not specced; v1 wrote it too.
 const PIN_MARKER_EVENT: &str = "moe.sable.app.pins_read_marker";
@@ -126,16 +127,17 @@ fn read_state(pinned: Vec<OwnedEventId>, marker: Option<&PinMarker>) -> PinReadS
     }
 }
 
-impl Core {
+impl SignedIn {
     async fn stored_pin_marker(
         &self,
         room_id: &OwnedRoomId,
     ) -> Result<Option<PinMarker>, RpcError> {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let content = self
+            .core()
             .with_open_stores(async || room.account_data(PIN_MARKER_EVENT.into()).await)
             .await
-            .or_failed(self, "pin_marker")?
+            .or_failed(self.core(), "pin_marker")?
             .and_then(|raw| raw.get_field::<Value>("content").ok().flatten());
         Ok(read_marker(content.as_ref()))
     }
@@ -146,13 +148,12 @@ impl Core {
         marker: &PinMarker,
     ) -> Result<(), RpcError> {
         let raw = ruma::serde::Raw::new(&marker_content(marker))
-            .or_failed(self, "pin_marker")?
+            .or_failed(self.core(), "pin_marker")?
             .cast_unchecked();
-        self.room(room_id)
-            .await?
+        self.room(room_id)?
             .set_account_data_raw(PIN_MARKER_EVENT.into(), raw)
             .await
-            .or_failed(self, "pin_marker")?;
+            .or_failed(self.core(), "pin_marker")?;
         Ok(())
     }
 

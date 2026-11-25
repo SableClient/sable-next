@@ -5,8 +5,8 @@ use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use serde::{Deserialize, Serialize};
 
-use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{RpcCode, RpcError, SidebarItemView};
 
 /// The sidebar written over whatever else the account data already carries.
@@ -171,22 +171,23 @@ fn stored_items(items: &[SidebarItemView]) -> Vec<StoredItem> {
         .collect()
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn space_sidebar(&self) -> Result<Vec<SidebarItemView>, RpcError> {
-        let client = self.client().await?;
-        self.with_open_stores(async || sidebar(&client).await)
+        let client = self.client();
+        self.core()
+            .with_open_stores(async || sidebar(client).await)
             .await
-            .or_failed(self, "space_sidebar")
+            .or_failed(self.core(), "space_sidebar")
     }
 
     pub(crate) async fn set_space_sidebar(
         &self,
         items: &[SidebarItemView],
     ) -> Result<(), RpcError> {
-        let _guard = self.account_data_lock.lock().await;
-        set_sidebar(&self.client().await?, items)
+        let _guard = self.state().account_data_writes.lock().await;
+        set_sidebar(self.client(), items)
             .await
-            .or_failed(self, "set_space_sidebar")
+            .or_failed(self.core(), "set_space_sidebar")
     }
 
     /// `None` writes `{}`, which MSC3015 reads as no override.
@@ -198,17 +199,17 @@ impl Core {
         if url.is_some_and(|url| !url.starts_with("mxc://")) {
             return Err(RpcCode::InvalidMedia.into());
         }
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let content = url.map_or_else(
             || serde_json::json!({}),
             |url| serde_json::json!({ "url": url }),
         );
         let raw = Raw::new(&content)
-            .or_failed(self, "set_avatar_override")?
+            .or_failed(self.core(), "set_avatar_override")?
             .cast_unchecked();
         room.set_account_data_raw(AVATAR_OVERRIDE_EVENT.into(), raw)
             .await
-            .or_failed(self, "set_avatar_override")?;
+            .or_failed(self.core(), "set_avatar_override")?;
         Ok(())
     }
 }

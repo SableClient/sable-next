@@ -9,8 +9,8 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, serde_as};
 
-use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::api::packs::ListOk;
 use crate::protocol::{ReactionGroup, ReactionShortcodeView, RpcCode, RpcError};
 use crate::widgets::RelationsFilter;
@@ -66,18 +66,17 @@ fn is_redacted<T>(event: &Raw<T>) -> bool {
         .is_some_and(|unsigned| unsigned.contains_key("redacted_because"))
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn ensure_reaction_target(
         &self,
         room_id: &OwnedRoomId,
         event_id: &OwnedEventId,
     ) -> Result<(), RpcError> {
         let event = self
-            .room(room_id)
-            .await?
+            .room(room_id)?
             .load_or_fetch_event(event_id, None)
             .await
-            .or_failed(self, "reaction_target")?;
+            .or_failed(self.core(), "reaction_target")?;
         if can_annotate(event.raw()) && !is_redacted(event.raw()) {
             Ok(())
         } else {
@@ -114,7 +113,9 @@ impl Core {
                 return Ok(events);
             };
             if !seen_pages.insert(next.clone()) {
-                return Err(self.failed(context, "reaction pagination did not advance"));
+                return Err(self
+                    .core()
+                    .failed(context, "reaction pagination did not advance"));
             }
             from = Some(next);
         }
@@ -159,7 +160,7 @@ impl Core {
         key: &str,
         extra: Option<Map<String, Value>>,
     ) -> Result<bool, RpcError> {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let mine = self
             .reaction_event_ids(room_id, event_id, key, room.own_user_id())
             .await?;
@@ -175,13 +176,13 @@ impl Core {
             );
             room.send_raw("m.reaction", Value::Object(content))
                 .await
-                .or_failed(self, "react")?;
+                .or_failed(self.core(), "react")?;
             return Ok(true);
         }
         for id in mine {
             room.redact(&id, None, None)
                 .await
-                .or_failed(self, "react")?;
+                .or_failed(self.core(), "react")?;
         }
         Ok(false)
     }
@@ -212,18 +213,18 @@ impl Core {
         room_id: &OwnedRoomId,
         event_id: &OwnedEventId,
     ) -> Result<Vec<ReactionShortcodeView>, RpcError> {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let client = room.client();
         let (cache, _handles) = client
             .event_cache()
             .ok_or(RpcCode::Unavailable)?
             .room(room_id)
             .await
-            .or_failed(self, "reaction_shortcodes")?;
+            .or_failed(self.core(), "reaction_shortcodes")?;
         let related = cache
             .find_event_with_relations(event_id, Some(vec![RelationType::Annotation]))
             .await
-            .or_failed(self, "reaction_shortcodes")?
+            .or_failed(self.core(), "reaction_shortcodes")?
             .filter(|(target, _)| can_annotate(target.raw()))
             .map(|(_, related)| related)
             .unwrap_or_default();

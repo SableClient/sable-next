@@ -114,7 +114,7 @@ fn text(row: &[Value], column: usize) -> Option<&str> {
 #[derive(Clone)]
 pub(crate) struct Store {
     exec: Arc<Exec>,
-    #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+    #[cfg(not(target_family = "wasm"))]
     file: Option<Arc<(Location, Option<crate::secrets::Key>)>>,
 }
 
@@ -122,7 +122,7 @@ impl Store {
     pub(super) fn from_exec(exec: Exec) -> Self {
         Self {
             exec: Arc::new(exec),
-            #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+            #[cfg(not(target_family = "wasm"))]
             file: None,
         }
     }
@@ -157,7 +157,6 @@ impl Store {
             }
         };
         let directory = std::path::Path::new(store_id).join(DIRECTORY);
-        #[cfg(any(target_os = "ios", test))]
         let file = Arc::new((Location::File(directory.join(DATABASE)), key.clone()));
         let opened = tokio::task::spawn_blocking(move || {
             std::fs::create_dir_all(&directory)?;
@@ -169,7 +168,6 @@ impl Store {
                 exec: Arc::new(Exec::Native(Arc::new(parking_lot::Mutex::new(Some(
                     connection,
                 ))))),
-                #[cfg(any(target_os = "ios", test))]
                 file: Some(file),
             },
             Ok(Err(error)) => {
@@ -181,7 +179,7 @@ impl Store {
     }
 
     /// iOS kills a suspended app that still holds a lock on a file in the App Group container.
-    #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+    #[cfg(not(target_family = "wasm"))]
     pub(crate) async fn close(&self) {
         let (Exec::Native(connection), Some(_)) = (&*self.exec, &self.file) else {
             return;
@@ -194,7 +192,7 @@ impl Store {
         }
     }
 
-    #[cfg(all(any(target_os = "ios", test), not(target_family = "wasm")))]
+    #[cfg(not(target_family = "wasm"))]
     pub(crate) async fn reopen(&self) {
         let (Exec::Native(connection), Some(file)) = (&*self.exec, &self.file) else {
             return;

@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 
@@ -336,6 +336,9 @@ test('own trailing reactions share a line with a wide receipt stack', async () =
 });
 
 test('a receipt sits on or below the last line without covering text', async () => {
+  onTestFinished(() => {
+    document.documentElement.style.removeProperty('--text-scale');
+  });
   await page.viewport(390, 780);
   for (const scale of ['1', '0.75']) {
     document.documentElement.style.setProperty('--text-scale', scale);
@@ -366,7 +369,6 @@ test('a receipt sits on or below the last line without covering text', async () 
       }
     }
   }
-  document.documentElement.style.removeProperty('--text-scale');
 }, 240_000);
 
 test('the text wraps the same for one reader as for many', async () => {

@@ -78,7 +78,7 @@ impl PendingRegistration {
     }
 }
 
-#[cfg(any(target_os = "ios", test))]
+#[cfg(not(target_family = "wasm"))]
 impl PendingRegistration {
     pub(super) fn client(&self) -> matrix_sdk::Client {
         self.client.clone()
@@ -203,8 +203,8 @@ fn can_complete_email_out_of_band(versions: &ruma::api::SupportedVersions) -> bo
 }
 
 impl Core {
-    async fn restore_pending_registration(&self, pending: PendingRegistration) {
-        let mut slot = self.pending_registration.lock().await;
+    fn restore_pending_registration(&self, pending: PendingRegistration) {
+        let mut slot = self.sign_in.pending_registration.lock();
         if self.next_registration_attempt.load(Ordering::Acquire) == pending.attempt_id {
             *slot = Some(pending);
         }
@@ -382,7 +382,7 @@ impl Core {
             .next_registration_attempt
             .fetch_add(1, Ordering::AcqRel)
             + 1;
-        self.pending_registration.lock().await.take();
+        self.sign_in.pending_registration.lock().take();
         let (account_id, store_id) = self.allocate_account().await?;
         let client = self
             .build_account_client(&store_id, &homeserver)
@@ -424,7 +424,7 @@ impl Core {
                     .iter()
                     .any(|flow| flow.iter().any(|stage| stage == "m.login.email.identity"));
                 let (id_server, id_access_token) = email_params(&info);
-                *self.pending_registration.lock().await = Some(PendingRegistration {
+                *self.sign_in.pending_registration.lock() = Some(PendingRegistration {
                     account_id,
                     store_id,
                     attempt_id,
@@ -566,15 +566,15 @@ impl Core {
     ) -> Result<RegistrationResultView, RpcError> {
         let mut acknowledge_fallback = acknowledge_fallback;
         let mut pending = self
+            .sign_in
             .pending_registration
             .lock()
-            .await
             .take()
             .ok_or(RpcCode::Unavailable)?;
 
         loop {
             let Some(stages) = pending.flows.first() else {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(self.failed("register", "missing selected UIAA flow"));
             };
             let Some(stage) = stages
@@ -587,7 +587,7 @@ impl Core {
                 })
                 .cloned()
             else {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(self.failed("register", "registration flow did not complete"));
             };
 
@@ -596,7 +596,7 @@ impl Core {
                 match self.registration_action(&mut pending, &stage, &mut acknowledge_fallback) {
                     Ok(action) => action,
                     Err(error) => {
-                        self.restore_pending_registration(pending).await;
+                        self.restore_pending_registration(pending);
                         return Err(error);
                     }
                 };
@@ -606,7 +606,7 @@ impl Core {
                     used_fallback_acknowledgement,
                 } => (auth, used_fallback_acknowledgement),
                 RegistrationAction::View(result) => {
-                    self.restore_pending_registration(pending).await;
+                    self.restore_pending_registration(pending);
                     return Ok(result);
                 }
             };
@@ -624,7 +624,7 @@ impl Core {
                     {
                         Ok(result) => Ok(result),
                         Err(error) => {
-                            self.restore_pending_registration(pending).await;
+                            self.restore_pending_registration(pending);
                             Err(error)
                         }
                     };
@@ -637,7 +637,7 @@ impl Core {
                     ) {
                         Ok(progressed) => progressed,
                         Err(error) => {
-                            self.restore_pending_registration(pending).await;
+                            self.restore_pending_registration(pending);
                             return Err(error);
                         }
                     };
@@ -646,14 +646,14 @@ impl Core {
                             let result = match self.registration_step(&pending) {
                                 Ok(result) => result,
                                 Err(error) => {
-                                    self.restore_pending_registration(pending).await;
+                                    self.restore_pending_registration(pending);
                                     return Err(error);
                                 }
                             };
-                            self.restore_pending_registration(pending).await;
+                            self.restore_pending_registration(pending);
                             return Ok(result);
                         }
-                        self.restore_pending_registration(pending).await;
+                        self.restore_pending_registration(pending);
                         return Err(RpcCode::RegistrationStageFailed {
                             stage: submitted_stage,
                         }
@@ -673,9 +673,9 @@ impl Core {
         RequestRegistrationEmailParams { email: address }: RequestRegistrationEmailParams,
     ) -> Result<RegistrationResultView, RpcError> {
         let mut pending = self
+            .sign_in
             .pending_registration
             .lock()
-            .await
             .take()
             .ok_or(RpcCode::Unavailable)?;
         let is_email_stage = pending
@@ -691,18 +691,18 @@ impl Core {
             })
             .is_some_and(|stage| stage == "m.login.email.identity");
         if !is_email_stage {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::Unavailable.into());
         }
 
         let address = address.trim().to_owned();
         if address.is_empty() || !address.contains('@') {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::InvalidEmail.into());
         }
 
         let Some(email) = pending.email.as_mut() else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(self.failed("register_email", "email UIAA state was not initialized"));
         };
         let client_secret = email
@@ -725,13 +725,13 @@ impl Core {
         let response = match pending.client.send(request).await {
             Ok(response) => response,
             Err(error) => {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(self.registration_error(&error.into()));
             }
         };
         {
             let Some(email) = pending.email.as_mut() else {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(self.failed("register_email", "email UIAA state was lost"));
             };
             email.address = Some(address);
@@ -744,7 +744,7 @@ impl Core {
                 .await
                 .is_ok_and(|versions| can_complete_email_out_of_band(&versions));
         let Some(email) = pending.email.as_mut() else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(self.failed("register_email", "email UIAA state was lost"));
         };
         email.submit_url = response.submit_url;
@@ -753,11 +753,11 @@ impl Core {
         let result = match self.registration_email_step(&pending) {
             Ok(result) => result,
             Err(error) => {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(error);
             }
         };
-        self.restore_pending_registration(pending).await;
+        self.restore_pending_registration(pending);
         Ok(result)
     }
 
@@ -766,36 +766,36 @@ impl Core {
         SubmitRegistrationEmailParams { token }: SubmitRegistrationEmailParams,
     ) -> Result<RegistrationResultView, RpcError> {
         let mut pending = self
+            .sign_in
             .pending_registration
             .lock()
-            .await
             .take()
             .ok_or(RpcCode::Unavailable)?;
         let (submit_url, sid, client_secret) = {
             let Some(email) = pending.email.as_ref() else {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(self.failed("register_email", "email UIAA state was not initialized"));
             };
             let Some(submit_url) = email.submit_url.clone() else {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(RpcCode::Unavailable.into());
             };
             let Some(sid) = email.sid.as_ref().map(ToString::to_string) else {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(RpcCode::Unavailable.into());
             };
             let Some(client_secret) = email.client_secret.as_ref().map(ToString::to_string) else {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(RpcCode::Unavailable.into());
             };
             (submit_url, sid, client_secret)
         };
         let Some(submit_url) = trusted_submit_url(&pending, &submit_url) else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::EmailVerificationFailed.into());
         };
         if token.is_empty() || token.chars().count() > 255 {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::EmailVerificationFailed.into());
         }
 
@@ -804,7 +804,7 @@ impl Core {
             client_secret,
             token,
         }) else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::EmailVerificationFailed.into());
         };
         let builder = crate::tls::apply(reqwest::Client::builder());
@@ -813,7 +813,7 @@ impl Core {
             .redirect(reqwest::redirect::Policy::none())
             .timeout(std::time::Duration::from_secs(15));
         let Ok(client) = builder.build() else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::EmailVerificationFailed.into());
         };
         let Ok(response) = client
@@ -823,25 +823,25 @@ impl Core {
             .send()
             .await
         else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::Unavailable.into());
         };
         let response_success = response.status().is_success();
         let Ok(body) = response.bytes().await else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::EmailVerificationFailed.into());
         };
         if !response_success {
             let error = map_email_submit_error(&body);
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(error);
         }
         let Ok(verification) = serde_json::from_slice::<EmailSubmitResponse>(&body) else {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::EmailVerificationFailed.into());
         };
         if !verification.success {
-            self.restore_pending_registration(pending).await;
+            self.restore_pending_registration(pending);
             return Err(RpcCode::EmailVerificationFailed.into());
         }
         if let Some(email) = pending.email.as_mut() {
@@ -850,11 +850,11 @@ impl Core {
         let result = match self.registration_email_step(&pending) {
             Ok(result) => result,
             Err(error) => {
-                self.restore_pending_registration(pending).await;
+                self.restore_pending_registration(pending);
                 return Err(error);
             }
         };
-        self.restore_pending_registration(pending).await;
+        self.restore_pending_registration(pending);
         Ok(result)
     }
 
@@ -865,7 +865,7 @@ impl Core {
         let client = session::discovery_client(&homeserver)
             .await
             .map_err(|error| self.discovery_error(error))?;
-        self.remember_homeserver(&homeserver, &client).await;
+        self.remember_homeserver(&homeserver, &client);
         self.require_sliding_sync(&client).await?;
 
         let error = client

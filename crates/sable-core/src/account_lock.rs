@@ -1,6 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use crate::tasks::JoinHandleExt;
+use matrix_sdk::executor::spawn;
 use matrix_sdk::{
     Client, SessionChange,
     config::RequestConfig,
@@ -10,68 +11,83 @@ use matrix_sdk::{
     },
 };
 
-use crate::{Core, protocol::CoreEvent};
+use crate::{SignedIn, protocol::CoreEvent};
 
-impl Core {
-    pub(crate) fn lock_account(self: &Arc<Self>, generation: u64) {
-        if !self.is_current(generation) || self.activity.lock_account() {
+impl SignedIn {
+    pub(crate) fn lock_account(&self, generation: u64) {
+        if !self.core().is_current(generation) || self.core().activity.lock_account(generation) {
             return;
         }
-        let core = self.clone();
+        let session = self.clone();
         self.track_session_task(
             spawn(async move {
-                let Some((client, sync, account_id)) = core.session.current(|session| {
-                    (
-                        session.client.clone(),
-                        session.sync_service.clone(),
-                        session.account_id.clone(),
-                    )
-                }) else {
-                    return;
-                };
-                if !core.is_current(generation) {
+                let client = session.client().clone();
+                let sync = session.sync_service();
+                let account_id = session.session().account_id.clone();
+                if !session.core().is_current(generation) {
                     return;
                 }
                 client.send_queue().set_enabled(false).await;
-                core.emit_if_current(
+                session.core().emit_if_current(
                     generation,
                     CoreEvent::AccountLockChanged {
                         account_id: account_id.clone(),
                         locked: true,
                     },
                 );
+                if session
+                    .core()
+                    .supervise("pause locked account", {
+                        let sync = sync.clone();
+                        move |core, _| {
+                            Box::pin(async move {
+                                if core.is_current(generation) {
+                                    crate::sync_support::stop(&sync).await;
+                                }
+                            })
+                        }
+                    })
+                    .await
+                    .is_err()
                 {
-                    let _transition = core.activity.transition().await;
-                    sync.stop().await;
+                    return;
                 }
                 let mut delay = Duration::from_secs(30);
                 loop {
                     matrix_sdk::sleep::sleep(delay).await;
-                    if !core.is_current(generation) {
+                    if !session.core().is_current(generation) {
                         return;
                     }
                     let outcome = probe(&client).await;
                     if matches!(outcome, Ok(false)) {
                         let mut data = UnknownTokenErrorData::new();
                         data.soft_logout = true;
-                        core.handle_session_change(&SessionChange::UnknownToken(data), generation);
+                        session
+                            .core()
+                            .handle_session_change(&SessionChange::UnknownToken(data), generation);
                         return;
                     }
                     if matches!(outcome, Ok(true)) {
-                        let _transition = core.lock_session_transition().await;
-                        if !core.is_current(generation) {
-                            return;
-                        }
-                        core.activity.unlock_account();
-                        client.send_queue().set_enabled(true).await;
-                        core.resume_sync(&sync).await;
-                        core.emit_if_current(
-                            generation,
-                            CoreEvent::AccountLockChanged {
-                                account_id,
-                                locked: false,
-                            },
-                        );
+                        let _ = session
+                            .core()
+                            .supervise("resume unlocked account", move |core, supervised| {
+                                Box::pin(async move {
+                                    if !core.is_current(generation) {
+                                        return;
+                                    }
+                                    core.activity.unlock_account();
+                                    client.send_queue().set_enabled(true).await;
+                                    core.activity.start_sync(&supervised, &sync).await;
+                                    core.emit_if_current(
+                                        generation,
+                                        CoreEvent::AccountLockChanged {
+                                            account_id,
+                                            locked: false,
+                                        },
+                                    );
+                                })
+                            })
+                            .await;
                         return;
                     }
                     delay = (delay * 2).min(Duration::from_secs(300));
@@ -86,14 +102,9 @@ impl Core {
             .abort_on_drop(),
         );
     }
-}
 
-impl Core {
-    pub(crate) async fn detect_account_lock(
-        self: &Arc<Self>,
-        client: &Client,
-        generation: u64,
-    ) -> bool {
+    pub(crate) async fn detect_account_lock(&self, generation: u64) -> bool {
+        let client = self.client();
         let locked = probe(client)
             .await
             .is_err_and(|error| error.client_api_error_kind() == Some(&ErrorKind::UserLocked));
@@ -150,20 +161,25 @@ mod tests {
             .unwrap();
         let stored = core.sessions.load().await.unwrap();
         let identity = client.encryption().ed25519_key().await;
-        *core.session.write().await = Some(crate::session::Session {
-            account_id: "a1".to_owned(),
-            homeserver: server.server().uri(),
-            oauth: false,
-            sync_service: std::sync::Arc::new(
-                matrix_sdk_ui::sync_service::SyncService::builder(client.clone())
-                    .build()
-                    .await
-                    .unwrap(),
-            ),
-            client: client.clone(),
-        });
+        crate::test_support::set_session(
+            &core,
+            Some(crate::session::Session {
+                account_id: "a1".to_owned(),
+                homeserver: server.server().uri(),
+                oauth: false,
+                state: std::sync::Arc::default(),
+                sync_service: std::sync::Arc::new(
+                    matrix_sdk_ui::sync_service::SyncService::builder(client.clone())
+                        .build()
+                        .await
+                        .unwrap(),
+                ),
+                client: client.clone(),
+            }),
+        );
+        let session = core.signed_in().unwrap();
         core.lifecycle.set_current(1);
-        assert!(core.detect_account_lock(&client, 1).await);
+        assert!(session.detect_account_lock(1).await);
         assert_eq!(client.session_tokens().unwrap(), tokens);
         assert!(core.activity.account_locked());
         assert!(matches!(
@@ -171,7 +187,7 @@ mod tests {
             Some(crate::protocol::CoreEvent::AccountLockChanged { locked: true, .. })
         ));
         changes.try_recv().unwrap_err();
-        assert!(core.detect_account_lock(&client, 1).await);
+        assert!(session.detect_account_lock(1).await);
         events.try_recv().unwrap_err();
         tokio::time::timeout(std::time::Duration::from_secs(2), async {
             while client.send_queue().is_enabled() {
@@ -180,7 +196,7 @@ mod tests {
         })
         .await
         .unwrap();
-        assert!(core.session.read().await.is_some());
+        assert!(core.session.snapshot().is_some());
         assert_eq!(core.sessions.load().await.unwrap(), stored);
         assert_eq!(client.encryption().ed25519_key().await, identity);
         assert!(core.accounts().await.unwrap().accounts[0].state.usable());

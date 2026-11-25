@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk::ruma::api::client::state::get_state_events;
@@ -8,9 +7,9 @@ use matrix_sdk::ruma::serde::Raw;
 use serde::{Deserialize, Serialize};
 use sable_model::bot_commands::BotCommand;
 
-use super::{Handler, Json};
+use super::{SessionHandler, Json};
 use crate::protocol::{AbbreviationView, RpcError, HistoryVisibilityView, PresenceHintView, JoinRuleView, RoomRulesSettingsView, RoomRulesView, RoomStateEventView};
-use crate::{Core, ResultExt, account_data};
+use crate::{ResultExt, account_data, SignedIn};
 use crate::media::mxc_uri;
 use crate::room_rules::RulesEdit;
 use crate::room_settings::AclEdit;
@@ -59,16 +58,15 @@ pub struct SetNameParams {
     pub name: Option<String>,
 }
 
-impl Handler for SetNameParams {
+impl SessionHandler for SetNameParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         // The spec clears a name with an empty one.
-        core.room(&self.room_id)
-            .await?
+        session.room(&self.room_id)?
             .set_name(self.name.unwrap_or_default())
             .await
-            .or_failed(core, "set_room_name")?;
+            .or_failed(session.core(), "set_room_name")?;
         Ok(())
     }
 }
@@ -88,15 +86,14 @@ pub(crate) fn topic_content(topic: &str) -> RoomTopicEventContent {
     }
 }
 
-impl Handler for SetTopicParams {
+impl SessionHandler for SetTopicParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.room(&self.room_id)
-            .await?
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.room(&self.room_id)?
             .send_state_event(topic_content(&self.topic))
             .await
-            .or_failed(core, "set_room_topic")?;
+            .or_failed(session.core(), "set_room_topic")?;
         Ok(())
     }
 }
@@ -110,23 +107,23 @@ pub struct SetAvatarParams {
     pub url: Option<String>,
 }
 
-impl Handler for SetAvatarParams {
+impl SessionHandler for SetAvatarParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        let room = session.room(&self.room_id)?;
 
         match self.url {
             Some(url) => {
                 room.set_avatar_url(&mxc_uri(&url)?, None)
                     .await
-                    .or_failed(core, "set_room_avatar")?;
+                    .or_failed(session.core(), "set_room_avatar")?;
             }
             // State cannot be deleted, so empty content is the removal.
             None => {
                 room.send_state_event(RoomAvatarEventContent::new())
                     .await
-                    .or_failed(core, "clear_room_avatar")?;
+                    .or_failed(session.core(), "clear_room_avatar")?;
             }
         }
 
@@ -142,11 +139,11 @@ pub struct SetJoinRuleParams {
     pub rule: JoinRuleView,
 }
 
-impl Handler for SetJoinRuleParams {
+impl SessionHandler for SetJoinRuleParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_room_join_rule(&self.room_id, self.rule).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_room_join_rule(&self.room_id, self.rule).await
     }
 }
 
@@ -157,11 +154,11 @@ pub struct HistoryVisibilityParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for HistoryVisibilityParams {
+impl SessionHandler for HistoryVisibilityParams {
     type Ok = HistoryVisibilityView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<HistoryVisibilityView, RpcError> {
-        core.history_visibility(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<HistoryVisibilityView, RpcError> {
+        session.history_visibility(&self.room_id).await
     }
 }
 
@@ -173,11 +170,11 @@ pub struct SetHistoryVisibilityParams {
     pub visibility: HistoryVisibilityView,
 }
 
-impl Handler for SetHistoryVisibilityParams {
+impl SessionHandler for SetHistoryVisibilityParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_history_visibility(self)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_history_visibility(self)
             .await
     }
 }
@@ -190,11 +187,11 @@ pub struct EnableEncryptionParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for EnableEncryptionParams {
+impl SessionHandler for EnableEncryptionParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.enable_encryption(self).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.enable_encryption(self).await
     }
 }
 
@@ -205,11 +202,11 @@ pub struct BannerParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for BannerParams {
+impl SessionHandler for BannerParams {
     type Ok = Option<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<String>, RpcError> {
-        core.room_banner(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<Option<String>, RpcError> {
+        session.room_banner(&self.room_id).await
     }
 }
 
@@ -222,11 +219,11 @@ pub struct SetBannerParams {
     pub url: Option<String>,
 }
 
-impl Handler for SetBannerParams {
+impl SessionHandler for SetBannerParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_room_banner(self.room_id, self.url.as_deref())
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_room_banner(self.room_id, self.url.as_deref())
             .await
     }
 }
@@ -247,11 +244,11 @@ pub struct MemberListThresholdOk(
     pub  Option<i64>,
 );
 
-impl Handler for MemberListThresholdParams {
+impl SessionHandler for MemberListThresholdParams {
     type Ok = MemberListThresholdOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<MemberListThresholdOk, RpcError> {
-        core.member_list_threshold(&self.room_id)
+    async fn run(self, session: &SignedIn) -> Result<MemberListThresholdOk, RpcError> {
+        session.member_list_threshold(&self.room_id)
             .await
             .map(MemberListThresholdOk)
     }
@@ -267,11 +264,11 @@ pub struct SetMemberListThresholdParams {
     pub always_listed_from: Option<i64>,
 }
 
-impl Handler for SetMemberListThresholdParams {
+impl SessionHandler for SetMemberListThresholdParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_member_list_threshold(self)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_member_list_threshold(self)
             .await
     }
 }
@@ -283,11 +280,11 @@ pub struct PresenceHintParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for PresenceHintParams {
+impl SessionHandler for PresenceHintParams {
     type Ok = PresenceHintView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<PresenceHintView, RpcError> {
-        core.presence_hint(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<PresenceHintView, RpcError> {
+        session.presence_hint(&self.room_id).await
     }
 }
 
@@ -299,11 +296,11 @@ pub struct SetPresenceHintParams {
     pub hint: PresenceHintView,
 }
 
-impl Handler for SetPresenceHintParams {
+impl SessionHandler for SetPresenceHintParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_presence_hint(self.room_id, self.hint).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_presence_hint(self.room_id, self.hint).await
     }
 }
 
@@ -319,17 +316,17 @@ pub struct UpdateServerAclParams {
     pub remove_deny: Vec<String>,
 }
 
-impl Handler for UpdateServerAclParams {
+impl SessionHandler for UpdateServerAclParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         let edit = AclEdit {
             allow: self.allow,
             deny: self.deny,
             remove_allow: self.remove_allow,
             remove_deny: self.remove_deny,
         };
-        core.update_server_acl(self.room_id, &edit).await
+        session.update_server_acl(self.room_id, &edit).await
     }
 }
 
@@ -340,11 +337,11 @@ pub struct AbbreviationsParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for AbbreviationsParams {
+impl SessionHandler for AbbreviationsParams {
     type Ok = Vec<AbbreviationView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<AbbreviationView>, RpcError> {
-        core.room_abbreviations(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<Vec<AbbreviationView>, RpcError> {
+        session.room_abbreviations(&self.room_id).await
     }
 }
 
@@ -356,11 +353,11 @@ pub struct SetAbbreviationsParams {
     pub entries: Vec<AbbreviationView>,
 }
 
-impl Handler for SetAbbreviationsParams {
+impl SessionHandler for SetAbbreviationsParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_room_abbreviations(self.room_id, &self.entries)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_room_abbreviations(self.room_id, &self.entries)
             .await
     }
 }
@@ -374,11 +371,11 @@ pub struct EventParams {
     pub state_key: String,
 }
 
-impl Handler for EventParams {
+impl SessionHandler for EventParams {
     type Ok = Option<Json>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<Json>, RpcError> {
-        core.room_state_event_content(self.room_id, self.event_type, self.state_key)
+    async fn run(self, session: &SignedIn) -> Result<Option<Json>, RpcError> {
+        session.room_state_event_content(self.room_id, self.event_type, self.state_key)
             .await
             .map(|content| content.map(Json))
     }
@@ -392,11 +389,11 @@ pub struct EventsParams {
     pub event_type: String,
 }
 
-impl Handler for EventsParams {
+impl SessionHandler for EventsParams {
     type Ok = Vec<RoomStateEventView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<RoomStateEventView>, RpcError> {
-        core.room_state_events(&self.room_id, &self.event_type)
+    async fn run(self, session: &SignedIn) -> Result<Vec<RoomStateEventView>, RpcError> {
+        session.room_state_events(&self.room_id, &self.event_type)
             .await
     }
 }
@@ -411,11 +408,11 @@ pub struct EventsRawParams {
     pub state_key: Option<String>,
 }
 
-impl Handler for EventsRawParams {
+impl SessionHandler for EventsRawParams {
     type Ok = Vec<Json>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<Json>, RpcError> {
-        core.room_state_events_raw(&self.room_id, &self.event_type, self.state_key.as_deref())
+    async fn run(self, session: &SignedIn) -> Result<Vec<Json>, RpcError> {
+        session.room_state_events_raw(&self.room_id, &self.event_type, self.state_key.as_deref())
             .await
             .map(|events| events.into_iter().map(Json).collect())
     }
@@ -428,15 +425,15 @@ pub struct FullStateParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for FullStateParams {
+impl SessionHandler for FullStateParams {
     type Ok = Vec<Json>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<Json>, RpcError> {
-        let client = core.client().await?;
+    async fn run(self, session: &SignedIn) -> Result<Vec<Json>, RpcError> {
+        let client = session.client();
         let response = client
             .send(get_state_events::v3::Request::new(self.room_id))
             .await
-            .or_failed(core, "room_full_state")?;
+            .or_failed(session.core(), "room_full_state")?;
         Ok(response
             .room_state
             .iter()
@@ -453,11 +450,11 @@ pub struct RulesParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for RulesParams {
+impl SessionHandler for RulesParams {
     type Ok = Option<RoomRulesView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<RoomRulesView>, RpcError> {
-        core.room_rules(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<Option<RoomRulesView>, RpcError> {
+        session.room_rules(&self.room_id).await
     }
 }
 
@@ -471,11 +468,11 @@ pub struct AcceptRulesParams {
     pub version: i64,
 }
 
-impl Handler for AcceptRulesParams {
+impl SessionHandler for AcceptRulesParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.accept_room_rules(self.room_id, self.version).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.accept_room_rules(self.room_id, self.version).await
     }
 }
 
@@ -486,11 +483,11 @@ pub struct OwnRulesParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for OwnRulesParams {
+impl SessionHandler for OwnRulesParams {
     type Ok = RoomRulesSettingsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomRulesSettingsView, RpcError> {
-        core.room_rules_settings(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<RoomRulesSettingsView, RpcError> {
+        session.room_rules_settings(&self.room_id).await
     }
 }
 
@@ -510,10 +507,10 @@ pub struct SetRulesParams {
     pub notify: bool,
 }
 
-impl Handler for SetRulesParams {
+impl SessionHandler for SetRulesParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         let edit = RulesEdit {
             body: self.body,
             formatted: self.formatted,
@@ -521,7 +518,7 @@ impl Handler for SetRulesParams {
             delegate_to: self.delegate_to,
             notify: self.notify,
         };
-        core.set_room_rules(self.room_id, &edit).await
+        session.set_room_rules(self.room_id, &edit).await
     }
 }
 
@@ -538,11 +535,11 @@ pub struct SendEventParams {
     pub content: serde_json::Value,
 }
 
-impl Handler for SendEventParams {
+impl SessionHandler for SendEventParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.send_state(self.room_id, &self.event_type, &self.state_key, &self.content)
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.send_state(self.room_id, &self.event_type, &self.state_key, &self.content)
             .await
             .map(|event_id| event_id.to_string())
     }
@@ -556,15 +553,15 @@ pub struct AccountDataParams {
     pub event_type: String,
 }
 
-impl Handler for AccountDataParams {
+impl SessionHandler for AccountDataParams {
     type Ok = Option<Json>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<Json>, RpcError> {
-        let room = core.room(&self.room_id).await?;
-        let event = core
-            .with_open_stores(async || room.account_data(self.event_type.into()).await)
+    async fn run(self, session: &SignedIn) -> Result<Option<Json>, RpcError> {
+        let room = session.room(&self.room_id)?;
+        let event = session
+            .core().with_open_stores(async || room.account_data(self.event_type.into()).await)
             .await
-            .or_failed(core, "room_account_data")?;
+            .or_failed(session.core(), "room_account_data")?;
 
         Ok(event
             .and_then(|raw| raw.get_field::<serde_json::Value>("content").ok().flatten())
@@ -579,18 +576,18 @@ pub struct AccountDataTypesParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for AccountDataTypesParams {
+impl SessionHandler for AccountDataTypesParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        let client = core.client().await?;
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        let client = session.client();
         let types = account_data::room_server_types(
-            &client,
+            client,
             &self.room_id,
-            core.sync_presence().await,
+            session.sync_presence().await,
         )
         .await
-        .or_failed(core, "room_account_data_types")?;
+        .or_failed(session.core(), "room_account_data_types")?;
         Ok(types.into_iter().collect())
     }
 }
@@ -605,18 +602,17 @@ pub struct SetAccountDataParams {
     pub content: serde_json::Value,
 }
 
-impl Handler for SetAccountDataParams {
+impl SessionHandler for SetAccountDataParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         let raw = Raw::new(&self.content)
-            .or_failed(core, "set_room_account_data")?
+            .or_failed(session.core(), "set_room_account_data")?
             .cast_unchecked();
-        core.room(&self.room_id)
-            .await?
+        session.room(&self.room_id)?
             .set_account_data_raw(self.event_type.into(), raw)
             .await
-            .or_failed(core, "set_room_account_data")?;
+            .or_failed(session.core(), "set_room_account_data")?;
         Ok(())
     }
 }
@@ -629,11 +625,11 @@ pub struct AccountDataRawParams {
     pub event_type: String,
 }
 
-impl Handler for AccountDataRawParams {
+impl SessionHandler for AccountDataRawParams {
     type Ok = Option<Json>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<Json>, RpcError> {
-        core.room_account_data_raw(&self.room_id, &self.event_type)
+    async fn run(self, session: &SignedIn) -> Result<Option<Json>, RpcError> {
+        session.room_account_data_raw(&self.room_id, &self.event_type)
             .await
             .map(|content| content.map(Json))
     }
@@ -649,11 +645,11 @@ pub struct AddWidgetParams {
     pub url: String,
 }
 
-impl Handler for AddWidgetParams {
+impl SessionHandler for AddWidgetParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.add_room_widget(self.room_id, &self.name, &self.url)
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.add_room_widget(self.room_id, &self.name, &self.url)
             .await
     }
 }
@@ -666,11 +662,11 @@ pub struct RemoveWidgetParams {
     pub widget_id: String,
 }
 
-impl Handler for RemoveWidgetParams {
+impl SessionHandler for RemoveWidgetParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.remove_room_widget(self.room_id, &self.widget_id)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.remove_room_widget(self.room_id, &self.widget_id)
             .await
     }
 }
@@ -682,17 +678,17 @@ pub struct BotCommandsParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for BotCommandsParams {
+impl SessionHandler for BotCommandsParams {
     type Ok = Vec<BotCommand>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<BotCommand>, RpcError> {
-        let client = core.client().await?;
-        let room = core.room(&self.room_id).await?;
-        let mut commands = core
-            .bot_commands_for(&client, &room)
+    async fn run(self, session: &SignedIn) -> Result<Vec<BotCommand>, RpcError> {
+        let client = session.client();
+        let room = session.room(&self.room_id)?;
+        let mut commands = session
+            .core().bot_commands_for(client, &room)
             .await
-            .or_failed(core, "bot_commands")?;
-        let nicknames = core.nicknames();
+            .or_failed(session.core(), "bot_commands")?;
+        let nicknames = session.core().nicknames();
         for command in &mut commands {
             nicknames.apply_bot(command);
         }

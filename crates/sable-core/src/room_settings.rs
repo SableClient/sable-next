@@ -1,7 +1,7 @@
 use sable_model::text::visible_name;
 
-use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::api::room_state::EnableEncryptionParams;
 use crate::api::room_state::SetHistoryVisibilityParams;
 use crate::api::room_state::SetMemberListThresholdParams;
@@ -279,7 +279,7 @@ pub(crate) fn abbreviations_content(entries: &[AbbreviationView]) -> Abbreviatio
     }
 }
 
-impl Core {
+impl SignedIn {
     async fn room_state(
         &self,
         room_id: &OwnedRoomId,
@@ -572,7 +572,7 @@ fn has_out_of_range_integer(value: &Value) -> bool {
     }
 }
 
-impl Core {
+impl SignedIn {
     /// Every global account data write goes through here so the pack cache
     /// never serves what we just replaced.
     pub(crate) async fn set_account_data(
@@ -583,7 +583,10 @@ impl Core {
         self.remember_account_data_type(event_type).await;
         self.put_global_account_data(event_type.into(), content, "set_account_data")
             .await?;
-        self.pack_cache.lock().await.forget_account_data(event_type);
+        self.state()
+            .pack_cache
+            .lock()
+            .forget_account_data(event_type);
         Ok(())
     }
 
@@ -596,19 +599,18 @@ impl Core {
         state_key: &str,
         content: &impl Serialize,
     ) -> Result<OwnedEventId, RpcError> {
-        let content = &serde_json::to_value(content).or_failed(self, "send_state")?;
+        let content = &serde_json::to_value(content).or_failed(self.core(), "send_state")?;
         if has_out_of_range_integer(content) {
             return Err(RpcCode::IntegerOutOfRange.into());
         }
         let response = self
-            .room(&room_id)
-            .await?
+            .room(&room_id)?
             .send_state_event_raw(event_type, state_key, content)
             .await
-            .or_failed(self, "send_state_event")?;
-        self.pack_cache
+            .or_failed(self.core(), "send_state_event")?;
+        self.state()
+            .pack_cache
             .lock()
-            .await
             .note_state(&room_id, event_type, state_key, content);
         self.forget_room_state(&room_id, event_type);
         self.probed_state().remember_written(
@@ -619,7 +621,7 @@ impl Core {
             crate::now_ms(),
         );
         if self.note_cosmetic_state(&room_id, event_type, state_key, content) {
-            self.emit(CoreEvent::RoomCosmeticsChanged {
+            self.core().emit(CoreEvent::RoomCosmeticsChanged {
                 room_id: room_id.clone(),
             });
         }
@@ -637,9 +639,13 @@ impl Core {
                 text("displayname").and_then(visible_name),
                 text("avatar_url").and_then(|url| crate::media::mxc_only(&url)),
             );
-            self.overlay_profile(&room_id, &user_id, display_name.clone(), avatar_url.clone())
-                .await;
-            self.emit(CoreEvent::ProfileChanged {
+            self.overlay_profile(
+                &room_id,
+                &user_id,
+                display_name.as_deref(),
+                avatar_url.as_deref(),
+            );
+            self.core().emit(CoreEvent::ProfileChanged {
                 room_id,
                 user_id,
                 display_name,
@@ -670,15 +676,16 @@ impl Core {
         ),
         RpcError,
     > {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let user_id = room
             .client()
             .user_id()
-            .ok_or_else(|| self.failed("room_permissions", "no session"))?
+            .ok_or_else(|| self.core().failed("room_permissions", "no session"))?
             .to_owned();
         // An invited room carries only stripped state, so the levels are
         // often absent. Spec defaults beat failing the whole command.
         let power_levels = self
+            .core()
             .with_open_stores(async || room.power_levels_or_default().await)
             .await;
 
@@ -697,12 +704,12 @@ impl Core {
         room_id: &OwnedRoomId,
         event_type: &str,
     ) -> Result<Vec<RoomStateEventView>, RpcError> {
-        let client = self.client().await?;
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let stored = self
+            .core()
             .with_open_stores(async || room.get_state_events(event_type.into()).await)
             .await
-            .or_failed(self, "room_state_events")?;
+            .or_failed(self.core(), "room_state_events")?;
 
         let events: Vec<RoomStateEventView> = stored
             .iter()
@@ -733,9 +740,9 @@ impl Core {
         }
 
         let snapshot = self
-            .room_state_snapshot(&client, room.room_id())
+            .room_state_snapshot(room.room_id())
             .await
-            .or_failed(self, "room_state_events")?;
+            .or_failed(self.core(), "room_state_events")?;
         let state = room_state_by_type(&snapshot);
         let events = state.get(event_type).cloned().unwrap_or_default();
         self.probed_state().remember_full(room_id, state);
@@ -767,9 +774,10 @@ impl Core {
         if let Some((content, at)) = written {
             return Ok(Some((content, Some(at))));
         }
-        let client = self.client().await?;
-        let room = self.room(&room_id).await?;
+        let client = self.client();
+        let room = self.room(&room_id)?;
         let event = self
+            .core()
             .with_open_stores(async || {
                 room.get_state_event(event_type.clone().into(), &state_key)
                     .await
@@ -810,7 +818,7 @@ impl Core {
             Ok(response) => state_event(response.event_or_content.get()),
             Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => None,
             Err(error) => {
-                return Err(self.rpc_error("room_state_event", &error));
+                return Err(self.core().rpc_error("room_state_event", &error));
             }
         };
         self.probed_state()

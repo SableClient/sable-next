@@ -261,10 +261,12 @@ async fn sharing_is_absent_without_server_support() {
     let client = server.client_builder().no_server_versions().build().await;
     advertise(&server, json!({})).await;
     let (core, _) = crate::test_support::signed_in_core(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    assert_eq!(core.presence_sharing().await.unwrap(), None);
+    assert_eq!(session.presence_sharing().await.unwrap(), None);
     assert!(matches!(
-        core.edit_presence_sharing(&PresenceSharingEdit::ShareLocally { enabled: true })
+        session
+            .edit_presence_sharing(&PresenceSharingEdit::ShareLocally { enabled: true })
             .await,
         Err(RpcError {
             code: RpcCode::Failed { .. },
@@ -304,8 +306,9 @@ async fn an_edit_writes_the_unstable_document() {
         .mount(server.server())
         .await;
     let (core, _) = crate::test_support::signed_in_core(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let view = core
+    let view = session
         .edit_presence_sharing(&PresenceSharingEdit::ShareLocally { enabled: true })
         .await
         .unwrap();
@@ -352,8 +355,10 @@ async fn the_stable_flag_writes_stable_and_reads_the_unstable_fallback() {
         .mount(server.server())
         .await;
     let (core, _) = crate::test_support::signed_in_core(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    core.edit_presence_sharing(&PresenceSharingEdit::ShareLocally { enabled: true })
+    session
+        .edit_presence_sharing(&PresenceSharingEdit::ShareLocally { enabled: true })
         .await
         .unwrap();
 
@@ -414,9 +419,10 @@ async fn a_suggesting_dm_prompts_about_its_other_member() {
         .mount(server.server())
         .await;
     let (core, _) = crate::test_support::signed_in_core(&server, client).await;
+    let session = core.signed_in().unwrap();
 
     assert_eq!(
-        core.presence_prompt(&room_id).await.unwrap(),
+        session.presence_prompt(&room_id).await.unwrap(),
         Some(PresencePromptView::User { user_id: partner })
     );
 }

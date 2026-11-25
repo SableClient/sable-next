@@ -1,3 +1,4 @@
+use crate::SignedIn;
 use crate::errors::CoreResultExt as _;
 use crate::errors::{CoreError, ReportExt};
 use matrix_sdk::{
@@ -17,23 +18,22 @@ use crate::protocol::{
     RpcError,
 };
 
-impl Core {
+impl SignedIn {
+    fn report_key_backup_download(&self, generation: u64, download: KeyBackupDownloadView) {
+        *self.state().key_backup_download.lock() = Some(download.clone());
+        self.core()
+            .emit_if_current(generation, CoreEvent::KeyBackupDownload { download });
+    }
+
     pub(crate) async fn key_backup_status(&self) -> Result<KeyBackupStatusView, RpcError> {
-        let (account_id, client) = self
-            .session
-            .current(|session| (session.account_id.clone(), session.client.clone()))
-            .ok_or(RpcCode::NotLoggedIn)?;
+        let client = self.client();
         let base = self.base_client().await?;
         let status = self
-            .backup_status(&base, &client)
+            .core()
+            .backup_status(&base, client)
             .await
-            .or_report(self, "key_backup_status")?;
-        let download = self
-            .key_backup_download
-            .lock()
-            .as_ref()
-            .filter(|download| download.account_id == account_id)
-            .cloned();
+            .or_report(self.core(), "key_backup_status")?;
+        let download = self.state().key_backup_download.lock().clone();
         Ok(KeyBackupStatusView {
             local_keys: status.local_keys,
             backed_up_keys: status.backed_up_keys,
@@ -48,14 +48,12 @@ impl Core {
         request_id: String,
     ) -> Result<KeyBackupDownloadView, RpcError> {
         let _permit = self
+            .state()
             .key_backup_downloads
             .try_acquire()
             .map_err(|_| RpcCode::Unavailable)?;
-        let (account_id, client) = self
-            .session
-            .current(|session| (session.account_id.clone(), session.client.clone()))
-            .ok_or(RpcCode::NotLoggedIn)?;
-        let generation = self.lifecycle.current();
+        let account_id = self.session().account_id.clone();
+        let generation = self.generation();
         let initial = KeyBackupDownloadView {
             account_id,
             request_id,
@@ -68,7 +66,7 @@ impl Core {
         self.report_key_backup_download(generation, initial.clone());
         let base = self.base_client().await?;
         let result = self
-            .download_all_room_keys(&base, &client, |progress| {
+            .download_all_room_keys(&base, |progress| {
                 self.report_key_backup_download(
                     generation,
                     KeyBackupDownloadView {
@@ -82,52 +80,28 @@ impl Core {
                 );
             })
             .await;
-        let mut download = self.key_backup_download.lock().clone().unwrap_or(initial);
+        let mut download = self
+            .state()
+            .key_backup_download
+            .lock()
+            .clone()
+            .unwrap_or(initial);
         download.state = if result.is_ok() {
             KeyBackupDownloadState::Complete
         } else {
             KeyBackupDownloadState::Failed
         };
         self.report_key_backup_download(generation, download.clone());
-        result.or_report(self, "download_key_backup")?;
+        result.or_report(self.core(), "download_key_backup")?;
         Ok(download)
-    }
-
-    pub(crate) async fn backup_status(
-        &self,
-        base: &crate::session::SharedBaseClient,
-        client: &Client,
-    ) -> Result<BackupStatus, CoreError> {
-        let machine = base.olm_machine().await;
-        let machine = machine.as_ref().ok_or("no olm machine")?;
-        let counts = machine.backup_machine().room_key_counts().await.backend()?;
-        let keys = machine.store().load_backup_keys().await.backend()?;
-        let current = current_backup(client).await?;
-        let same_version = current
-            .as_ref()
-            .is_some_and(|info| keys.backup_version.as_ref() == Some(&info.version));
-        let can_restore = same_version
-            && current
-                .as_ref()
-                .is_some_and(|info| matches_backup(keys.decryption_key.as_ref(), info));
-        Ok(BackupStatus {
-            local_keys: counts.total as u64,
-            backed_up_keys: if same_version {
-                counts.backed_up as u64
-            } else {
-                0
-            },
-            cloud_keys: current.map(|info| info.count.into()),
-            can_restore,
-        })
     }
 
     pub(crate) async fn download_all_room_keys(
         &self,
         base: &crate::session::SharedBaseClient,
-        client: &Client,
         progress: impl Fn(BackupDownloadProgress),
     ) -> Result<BackupDownloadProgress, CoreError> {
+        let client = self.client();
         let machine = base.olm_machine().await;
         let machine = machine.as_ref().ok_or("no olm machine")?;
         let keys = machine.store().load_backup_keys().await.backend()?;
@@ -171,14 +145,6 @@ impl Core {
             progress(counts);
         }
         Ok(counts)
-    }
-
-    fn report_key_backup_download(&self, generation: u64, download: KeyBackupDownloadView) {
-        if !self.is_current(generation) {
-            return;
-        }
-        *self.key_backup_download.lock() = Some(download.clone());
-        self.emit_if_current(generation, CoreEvent::KeyBackupDownload { download });
     }
 }
 
@@ -289,9 +255,10 @@ pub(crate) enum ReadableBackup {
     Resumed,
 }
 
-impl Core {
+impl SignedIn {
     /// Whether the server holds a backup whose key this device lacks.
-    pub(crate) async fn server_backup_unreadable(&self, client: &Client) -> Result<bool, RpcError> {
+    pub(crate) async fn server_backup_unreadable(&self) -> Result<bool, RpcError> {
+        let client = self.client();
         let base = self.base_client().await?;
         let unreadable = async {
             let machine = base.olm_machine().await;
@@ -303,7 +270,7 @@ impl Core {
                 current.as_ref(),
             ))
         };
-        unreadable.await.or_report(self, "replace_backup")
+        unreadable.await.or_report(self.core(), "replace_backup")
     }
 
     /// Enables a server backup this device holds the key for, which recovery setup needs. A
@@ -311,9 +278,9 @@ impl Core {
     /// user agreed. A preference that cannot be read fails rather than guess.
     pub(crate) async fn resume_readable_backup(
         &self,
-        client: &Client,
         turn_on: bool,
     ) -> Result<ReadableBackup, RpcError> {
+        let client = self.client();
         let base = self.base_client().await?;
         let resumed = async {
             let machine = base.olm_machine().await;
@@ -341,10 +308,11 @@ impl Core {
                 .backend()?;
             Ok::<_, CoreError>(ReadableBackup::Resumed)
         };
-        resumed.await.or_report(self, "resume_backup")
+        resumed.await.or_report(self.core(), "resume_backup")
     }
 
-    pub(crate) async fn honor_backup_preference(&self, client: &Client) {
+    pub(crate) async fn honor_backup_preference(&self) {
+        let client = self.client();
         match backups_marked_disabled(client).await {
             Ok(true) => {}
             Ok(false) => return,
@@ -369,19 +337,21 @@ impl Core {
         }
     }
 
-    pub(crate) fn watch_backup_preference(self: &std::sync::Arc<Self>, client: &Client) {
+    pub(crate) fn watch_backup_preference(&self) {
+        use crate::tasks::JoinHandleExt;
         use futures_util::StreamExt;
-        use matrix_sdk::{encryption::backups::BackupState, executor::JoinHandleExt};
+        use matrix_sdk::encryption::backups::BackupState;
 
+        let client = self.client();
         let core = self.clone();
         let client = client.clone();
         let mut states = client.encryption().backups().state_stream();
         self.track_session_task(
             matrix_sdk::executor::spawn(async move {
-                core.honor_backup_preference(&client).await;
+                core.honor_backup_preference().await;
                 while let Some(state) = states.next().await {
                     if matches!(state, Ok(BackupState::Enabled)) {
-                        core.honor_backup_preference(&client).await;
+                        core.honor_backup_preference().await;
                     }
                 }
             })
@@ -435,6 +405,37 @@ async fn backups_marked_disabled(client: &Client) -> Result<bool, matrix_sdk::Er
         .await?
         .and_then(|raw| field(raw, "disabled"))
         .unwrap_or(false))
+}
+
+impl Core {
+    pub(crate) async fn backup_status(
+        &self,
+        base: &crate::session::SharedBaseClient,
+        client: &Client,
+    ) -> Result<BackupStatus, CoreError> {
+        let machine = base.olm_machine().await;
+        let machine = machine.as_ref().ok_or("no olm machine")?;
+        let counts = machine.backup_machine().room_key_counts().await.backend()?;
+        let keys = machine.store().load_backup_keys().await.backend()?;
+        let current = current_backup(client).await?;
+        let same_version = current
+            .as_ref()
+            .is_some_and(|info| keys.backup_version.as_ref() == Some(&info.version));
+        let can_restore = same_version
+            && current
+                .as_ref()
+                .is_some_and(|info| matches_backup(keys.decryption_key.as_ref(), info));
+        Ok(BackupStatus {
+            local_keys: counts.total as u64,
+            backed_up_keys: if same_version {
+                counts.backed_up as u64
+            } else {
+                0
+            },
+            cloud_keys: current.map(|info| info.count.into()),
+            can_restore,
+        })
+    }
 }
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+use crate::SignedIn;
 use crate::api::account::ChangePasswordParams;
 use crate::api::auth::RequestPasswordResetEmailParams;
 use crate::api::auth::ResetPasswordParams;
@@ -84,62 +85,6 @@ impl Core {
             _ => return self.rpc_error(context, error),
         };
         crate::errors::coded(context, rpc, error)
-    }
-
-    pub(crate) async fn password_change_enabled(&self) -> Result<bool, RpcError> {
-        let capabilities = self
-            .client()
-            .await?
-            .send(get_capabilities::v3::Request::new())
-            .await
-            .map_err(|error| self.rpc_error("password_change_enabled", &error))?
-            .capabilities;
-        Ok(capabilities.change_password.enabled)
-    }
-
-    pub(crate) async fn change_password(
-        &self,
-        ChangePasswordParams {
-            current_password,
-            new_password,
-            logout_devices,
-        }: ChangePasswordParams,
-    ) -> Result<(), RpcError> {
-        let client = self.client().await?;
-        if client.oauth().full_session().is_some() {
-            return Err(RpcCode::Unsupported.into());
-        }
-        let user_id = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
-
-        let info = match client
-            .send(change_password_request(&new_password, logout_devices, None))
-            .await
-        {
-            Ok(_) => return Ok(()),
-            Err(error) => match error.as_uiaa_response() {
-                Some(info) => info.clone(),
-                None => return Err(self.change_password_error("change_password", &error, false)),
-            },
-        };
-        if !info
-            .flows
-            .iter()
-            .any(|flow| flow.stages == [AuthType::Password])
-        {
-            return Err(RpcCode::Unsupported.into());
-        }
-        let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), current_password);
-        auth.session = info.session;
-
-        client
-            .send(change_password_request(
-                &new_password,
-                logout_devices,
-                Some(AuthData::Password(auth)),
-            ))
-            .await
-            .map(drop)
-            .map_err(|error| self.change_password_error("change_password_auth", &error, true))
     }
 
     fn change_password_error(
@@ -249,3 +194,69 @@ impl Core {
 #[cfg(test)]
 #[path = "password_reset_tests.rs"]
 mod tests;
+
+impl SignedIn {
+    pub(crate) async fn password_change_enabled(&self) -> Result<bool, RpcError> {
+        let capabilities = self
+            .client()
+            .send(get_capabilities::v3::Request::new())
+            .await
+            .map_err(|error| self.core().rpc_error("password_change_enabled", &error))?
+            .capabilities;
+        Ok(capabilities.change_password.enabled)
+    }
+
+    pub(crate) async fn change_password(
+        &self,
+        ChangePasswordParams {
+            current_password,
+            new_password,
+            logout_devices,
+        }: ChangePasswordParams,
+    ) -> Result<(), RpcError> {
+        let client = self.client();
+        if client.oauth().full_session().is_some() {
+            return Err(RpcCode::Unsupported.into());
+        }
+        let user_id = client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned();
+
+        let info = match client
+            .send(change_password_request(&new_password, logout_devices, None))
+            .await
+        {
+            Ok(_) => return Ok(()),
+            Err(error) => match error.as_uiaa_response() {
+                Some(info) => info.clone(),
+                None => {
+                    return Err(self.core().change_password_error(
+                        "change_password",
+                        &error,
+                        false,
+                    ));
+                }
+            },
+        };
+        if !info
+            .flows
+            .iter()
+            .any(|flow| flow.stages == [AuthType::Password])
+        {
+            return Err(RpcCode::Unsupported.into());
+        }
+        let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), current_password);
+        auth.session = info.session;
+
+        client
+            .send(change_password_request(
+                &new_password,
+                logout_devices,
+                Some(AuthData::Password(auth)),
+            ))
+            .await
+            .map(drop)
+            .map_err(|error| {
+                self.core()
+                    .change_password_error("change_password_auth", &error, true)
+            })
+    }
+}

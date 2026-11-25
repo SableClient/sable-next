@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 use matrix_sdk::RoomMemberships;
 
@@ -9,13 +8,13 @@ use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, RoomPowerLev
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
-use super::Handler;
+use super::SessionHandler;
 use crate::protocol::{
     FieldEdit, JoinRequestRoomView, MemberLookView, MemberView, MembershipView, PowerLevelLocation,
     PowerLevelTagView, PowerLevelTagsView, PronounView, RoomPermissionsView, RoomPowerLevelsView,
     RpcError,
 };
-use crate::{Core, ResultExt, view};
+use crate::{ResultExt, view, SignedIn};
 
 domain! {
     list,
@@ -56,17 +55,17 @@ pub struct MemberParams {
     pub user_id: OwnedUserId,
 }
 
-impl Handler for MemberParams {
+impl SessionHandler for MemberParams {
     /// `null` when the user has no member event in the room.
     type Ok = Option<MemberView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<MemberView>, RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<Option<MemberView>, RpcError> {
+        let room = session.room(&self.room_id)?;
         let member = room
             .get_member(&self.user_id)
             .await
-            .or_failed(core, "room_member")?;
-        Ok(member.map(|member| view::member_view(&member, &core.nicknames())))
+            .or_failed(session.core(), "room_member")?;
+        Ok(member.map(|member| view::member_view(&member, &session.core().nicknames())))
     }
 }
 
@@ -79,29 +78,29 @@ pub struct ListParams {
     pub memberships: Vec<MembershipView>,
 }
 
-impl Handler for ListParams {
+impl SessionHandler for ListParams {
     type Ok = Vec<MemberView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<MemberView>, RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<Vec<MemberView>, RpcError> {
         let room_id = self.room_id;
-        let room = core.room(&room_id).await?;
+        let room = session.room(&room_id)?;
         let filter = membership_filter(&self.memberships);
-        let members = if core.members_recently_loaded(&room_id) {
-            core.with_open_stores(async || room.members_no_sync(filter).await)
+        let members = if session.members_recently_loaded(&room_id) {
+            session.core().with_open_stores(async || room.members_no_sync(filter).await)
                 .await
         } else {
             room.members(filter).await
         }
-        .or_failed(core, "room_members")?;
+        .or_failed(session.core(), "room_members")?;
         if room.are_members_synced() {
-            core.note_members_loaded(&room_id);
+            session.note_members_loaded(&room_id);
         }
-        let power_levels = if core
-            .with_open_stores(async || room.power_levels().await)
+        let power_levels = if session
+            .core().with_open_stores(async || room.power_levels().await)
             .await
             .is_err()
         {
-            let content = core
+            let content = session
                 .room_state_event_content(room_id, "m.room.power_levels".to_owned(), String::new())
                 .await
                 .ok()
@@ -121,7 +120,7 @@ impl Handler for ListParams {
             None
         };
 
-        let nicknames = core.nicknames();
+        let nicknames = session.core().nicknames();
         Ok(members
             .iter()
             .map(|member| {
@@ -146,11 +145,11 @@ pub struct JoinRequestsOk {
     pub failed: bool,
 }
 
-impl Handler for JoinRequestsParams {
+impl SessionHandler for JoinRequestsParams {
     type Ok = JoinRequestsOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<JoinRequestsOk, RpcError> {
-        let client = core.client().await?;
+    async fn run(self, session: &SignedIn) -> Result<JoinRequestsOk, RpcError> {
+        let client = session.client();
         let mut rooms = Vec::new();
         let mut failed = false;
         for room in client.joined_rooms() {
@@ -162,16 +161,15 @@ impl Handler for JoinRequestsParams {
             }
             let room_id = room.room_id().to_owned();
             let result: Result<_, RpcError> = async {
-                let permissions = core.room_permissions(&room_id).await?;
+                let permissions = session.room_permissions(&room_id).await?;
                 if !permissions.can_invite && !permissions.can_kick {
                     return Ok(None);
                 }
-                let members = ListParams {
+                let knocking = ListParams {
                     room_id: room_id.clone(),
                     memberships: vec![MembershipView::Knock],
-                }
-                .run(core)
-                .await?;
+                };
+                let members = SessionHandler::run(knocking, session).await?;
                 Ok((!members.is_empty()).then_some(JoinRequestRoomView {
                     room_id,
                     members,
@@ -196,11 +194,11 @@ pub struct PermissionsParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for PermissionsParams {
+impl SessionHandler for PermissionsParams {
     type Ok = RoomPermissionsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomPermissionsView, RpcError> {
-        core.room_permissions(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<RoomPermissionsView, RpcError> {
+        session.room_permissions(&self.room_id).await
     }
 }
 
@@ -211,13 +209,13 @@ pub struct PowerLevelsParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for PowerLevelsParams {
+impl SessionHandler for PowerLevelsParams {
     type Ok = RoomPowerLevelsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomPowerLevelsView, RpcError> {
-        let room = core.room(&self.room_id).await?;
-        let power_levels = core
-            .with_open_stores(async || room.power_levels_or_default().await)
+    async fn run(self, session: &SignedIn) -> Result<RoomPowerLevelsView, RpcError> {
+        let room = session.room(&self.room_id)?;
+        let power_levels = session
+            .core().with_open_stores(async || room.power_levels_or_default().await)
             .await;
 
         Ok(view::room_power_levels(&power_levels))
@@ -237,11 +235,11 @@ pub struct SetPowerLevelParams {
     pub level: i64,
 }
 
-impl Handler for SetPowerLevelParams {
+impl SessionHandler for SetPowerLevelParams {
     type Ok = RoomPowerLevelsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RoomPowerLevelsView, RpcError> {
-        core.set_power_level(self.room_id, self.levels, &self.location, self.level)
+    async fn run(self, session: &SignedIn) -> Result<RoomPowerLevelsView, RpcError> {
+        session.set_power_level(self.room_id, self.levels, &self.location, self.level)
             .await
     }
 }
@@ -267,11 +265,11 @@ pub struct SyncPowerLevelsFromSpaceOk {
     pub tags: PowerLevelTagsView,
 }
 
-impl Handler for SyncPowerLevelsFromSpaceParams {
+impl SessionHandler for SyncPowerLevelsFromSpaceParams {
     type Ok = SyncPowerLevelsFromSpaceOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SyncPowerLevelsFromSpaceOk, RpcError> {
-        let (levels, tags) = core
+    async fn run(self, session: &SignedIn) -> Result<SyncPowerLevelsFromSpaceOk, RpcError> {
+        let (levels, tags) = session
             .sync_power_levels_from_space(self.room_id, self.space_id, self.levels)
             .await?;
         Ok(SyncPowerLevelsFromSpaceOk { levels, tags })
@@ -294,11 +292,11 @@ pub struct SyncChildPowerLevelsOk {
     pub skipped: u32,
 }
 
-impl Handler for SyncChildPowerLevelsParams {
+impl SessionHandler for SyncChildPowerLevelsParams {
     type Ok = SyncChildPowerLevelsOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SyncChildPowerLevelsOk, RpcError> {
-        let result = core
+    async fn run(self, session: &SignedIn) -> Result<SyncChildPowerLevelsOk, RpcError> {
+        let result = session
             .sync_child_power_levels(self.space_id, &self.child_ids)
             .await?;
         Ok(SyncChildPowerLevelsOk {
@@ -315,11 +313,11 @@ pub struct PowerLevelTagsParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for PowerLevelTagsParams {
+impl SessionHandler for PowerLevelTagsParams {
     type Ok = PowerLevelTagsOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<PowerLevelTagsOk, RpcError> {
-        core.power_level_tags(&self.room_id).await.map(tags_ok)
+    async fn run(self, session: &SignedIn) -> Result<PowerLevelTagsOk, RpcError> {
+        session.power_level_tags(&self.room_id).await.map(tags_ok)
     }
 }
 
@@ -335,11 +333,11 @@ pub struct SetPowerLevelTagParams {
     pub tag: Option<PowerLevelTagView>,
 }
 
-impl Handler for SetPowerLevelTagParams {
+impl SessionHandler for SetPowerLevelTagParams {
     type Ok = PowerLevelTagsOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<PowerLevelTagsOk, RpcError> {
-        core.set_power_level_tag(self.room_id, self.level, self.tag.as_ref())
+    async fn run(self, session: &SignedIn) -> Result<PowerLevelTagsOk, RpcError> {
+        session.set_power_level_tag(self.room_id, self.level, self.tag.as_ref())
             .await
             .map(tags_ok)
     }
@@ -356,15 +354,14 @@ pub struct SetUserPowerLevelParams {
     pub power_level: i32,
 }
 
-impl Handler for SetUserPowerLevelParams {
+impl SessionHandler for SetUserPowerLevelParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.room(&self.room_id)
-            .await?
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.room(&self.room_id)?
             .update_power_levels(vec![(&self.user_id, self.power_level.into())])
             .await
-            .or_failed(core, "set_user_power_level")?;
+            .or_failed(session.core(), "set_user_power_level")?;
 
         Ok(())
     }
@@ -384,19 +381,19 @@ pub struct KickParams {
     pub redact_events: bool,
 }
 
-impl Handler for KickParams {
+impl SessionHandler for KickParams {
     /// How many of their messages this client redacted itself.
     type Ok = u32;
 
-    async fn run(self, core: &Arc<Core>) -> Result<u32, RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<u32, RpcError> {
+        let room = session.room(&self.room_id)?;
         if !self.redact_events {
             room.kick_user(&self.user_id, self.reason.as_deref())
                 .await
-                .or_failed(core, "kick_user")?;
+                .or_failed(session.core(), "kick_user")?;
             return Ok(0);
         }
-        core.remove_redacting_events(&room, &self.user_id, self.reason.as_deref(), false)
+        session.remove_redacting_events(&room, &self.user_id, self.reason.as_deref(), false)
             .await
     }
 }
@@ -412,11 +409,11 @@ pub struct DenyKnockParams {
     pub user_id: OwnedUserId,
 }
 
-impl Handler for DenyKnockParams {
+impl SessionHandler for DenyKnockParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.send_state(
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.send_state(
             self.room_id,
             "m.room.member",
             self.user_id.as_str(),
@@ -442,19 +439,19 @@ pub struct BanParams {
     pub redact_events: bool,
 }
 
-impl Handler for BanParams {
+impl SessionHandler for BanParams {
     /// How many of their messages this client redacted itself.
     type Ok = u32;
 
-    async fn run(self, core: &Arc<Core>) -> Result<u32, RpcError> {
-        let room = core.room(&self.room_id).await?;
+    async fn run(self, session: &SignedIn) -> Result<u32, RpcError> {
+        let room = session.room(&self.room_id)?;
         if !self.redact_events {
             room.ban_user(&self.user_id, self.reason.as_deref())
                 .await
-                .or_failed(core, "ban_user")?;
+                .or_failed(session.core(), "ban_user")?;
             return Ok(0);
         }
-        core.remove_redacting_events(&room, &self.user_id, self.reason.as_deref(), true)
+        session.remove_redacting_events(&room, &self.user_id, self.reason.as_deref(), true)
             .await
     }
 }
@@ -470,15 +467,14 @@ pub struct UnbanParams {
     pub reason: Option<String>,
 }
 
-impl Handler for UnbanParams {
+impl SessionHandler for UnbanParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.room(&self.room_id)
-            .await?
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.room(&self.room_id)?
             .unban_user(&self.user_id, self.reason.as_deref())
             .await
-            .or_failed(core, "unban_user")?;
+            .or_failed(session.core(), "unban_user")?;
 
         Ok(())
     }
@@ -492,11 +488,11 @@ pub struct LookParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for LookParams {
+impl SessionHandler for LookParams {
     type Ok = MemberLookView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<MemberLookView, RpcError> {
-        core.member_look(self).await
+    async fn run(self, session: &SignedIn) -> Result<MemberLookView, RpcError> {
+        session.member_look(self).await
     }
 }
 
@@ -519,17 +515,17 @@ pub struct SetLookParams {
     pub color_on_dark: FieldEdit,
 }
 
-impl Handler for SetLookParams {
+impl SessionHandler for SetLookParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         let edit = crate::member_look::LookEdit {
             display_name: self.display_name,
             avatar_url: self.avatar_url,
             color_on_light: self.color_on_light,
             color_on_dark: self.color_on_dark,
         };
-        core.set_member_look(self.room_id, self.in_parent_space, edit)
+        session.set_member_look(self.room_id, self.in_parent_space, edit)
             .await
     }
 }
@@ -544,11 +540,11 @@ pub struct SetPronounsParams {
     pub pronouns: Vec<PronounView>,
 }
 
-impl Handler for SetPronounsParams {
+impl SessionHandler for SetPronounsParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_pronouns(self.room_id, self.in_parent_space, &self.pronouns)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_pronouns(self.room_id, self.in_parent_space, &self.pronouns)
             .await
     }
 }

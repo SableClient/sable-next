@@ -1,5 +1,4 @@
-use std::sync::Arc;
-
+use crate::tasks::JoinHandleExt;
 use aes::Aes256;
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::Engine as _;
@@ -11,7 +10,7 @@ use matrix_sdk::deserialized_responses::EncryptionInfo;
 use matrix_sdk::encryption::VerificationState;
 use matrix_sdk::encryption::identities::Device;
 use matrix_sdk::encryption::secret_storage::{SecretStorageError, SecretStore};
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::UserId;
 use matrix_sdk::ruma::events::StaticEventContent;
 use matrix_sdk::ruma::events::macros::EventContent;
@@ -22,6 +21,7 @@ use sha2::Sha256;
 
 use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{CoreEvent, RpcCode, RpcError, SealStateView, SealedAccountDataView};
 
 pub(crate) const ADK_SECRET: &str = "dev.zirco.msc4483.account_data.key";
@@ -282,7 +282,7 @@ pub(crate) async fn read_document(
     })
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn sealed_account_data(
         &self,
         event_type: &str,
@@ -290,13 +290,14 @@ impl Core {
         if !sealable(event_type) {
             return Err(RpcCode::Unsupported.into());
         }
-        let client = self.client().await?;
+        let client = self.client();
         let key = self
-            .with_open_stores(async || cached_key(&client).await)
+            .core()
+            .with_open_stores(async || cached_key(client).await)
             .await;
-        read_document(&client, event_type, true, key)
+        read_document(client, event_type, true, key)
             .await
-            .or_failed(self, "sealed_account_data")
+            .or_failed(self.core(), "sealed_account_data")
     }
 
     pub(crate) async fn set_sealed_account_data(
@@ -304,7 +305,7 @@ impl Core {
         event_type: &str,
         content: &serde_json::Value,
     ) -> Result<(), RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+        let _guard = self.state().account_data_writes.lock().await;
         self.set_sealed_account_data_locked(event_type, content)
             .await
     }
@@ -317,25 +318,23 @@ impl Core {
         if !sealable(event_type) {
             return Err(RpcCode::Unsupported.into());
         }
-        let client = self.client().await?;
+        let client = self.client();
         let content = match self
-            .with_open_stores(async || cached_key(&client).await)
+            .core()
+            .with_open_stores(async || cached_key(client).await)
             .await
         {
             Some(key) => key
                 .seal(event_type, content)
-                .or_failed(self, "set_sealed_account_data_seal")?,
+                .or_failed(self.core(), "set_sealed_account_data_seal")?,
             None => content.clone(),
         };
         self.put_global_account_data(event_type.into(), &content, "set_sealed_account_data")
             .await
     }
 
-    pub(crate) async fn adopt_account_data_key(
-        &self,
-        client: &matrix_sdk::Client,
-        recovery_key: &str,
-    ) {
+    pub(crate) async fn adopt_account_data_key(&self, recovery_key: &str) {
+        let client = self.client();
         let store = match client
             .encryption()
             .secret_storage()
@@ -348,28 +347,26 @@ impl Core {
                 return;
             }
         };
-        let adopted = adopt_key(self, client, &store).await;
-        self.start_dehydrated_device(client, store);
+        let adopted = adopt_key(self.core(), client, &store).await;
+        self.start_dehydrated_device(store);
         if let Err(error) = adopted {
             tracing::warn!("adopting the account data key failed: {error}");
             return;
         }
-        self.emit(CoreEvent::AccountDataChanged {
+        self.core().emit(CoreEvent::AccountDataChanged {
             event_type: ADK_SECRET.to_owned(),
         });
-        self.emit(CoreEvent::EncryptionStatus {
+        self.core().emit(CoreEvent::EncryptionStatus {
             status: self
+                .core()
                 .with_open_stores(async || crate::verification::encryption_status(client).await)
                 .await,
         });
     }
 
-    pub(crate) fn watch_account_data_key_sharing(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
-        let weak = Arc::downgrade(self);
+    pub(crate) fn watch_account_data_key_sharing(&self, generation: u64) {
+        let client = self.client();
+        let weak = self.downgrade();
         let handle = client.add_event_handler(
             move |event: ToDeviceAccountDataKeyRequestEvent,
                   encryption: Option<EncryptionInfo>,
@@ -419,13 +416,13 @@ impl Core {
                             return;
                         };
                         cache_key(&client, &key).await;
-                        core.emit_if_current(
+                        core.core().emit_if_current(
                             generation,
                             CoreEvent::AccountDataChanged {
                                 event_type: ADK_SECRET.to_owned(),
                             },
                         );
-                        core.emit_if_current(
+                        core.core().emit_if_current(
                             generation,
                             CoreEvent::EncryptionStatus {
                                 status: crate::verification::encryption_status(&client).await,

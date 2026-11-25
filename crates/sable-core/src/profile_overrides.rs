@@ -7,6 +7,7 @@ use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, serde_as};
 
 use crate::Core;
+use crate::SignedIn;
 use crate::cosmetics::MEMBER_COLOR_FIELD;
 use crate::protocol::{
     CoreEvent, FieldEdit, OverrideColorView, OverrideTextView, ProfileOverrideView,
@@ -274,38 +275,27 @@ async fn stored_overrides(
     })
 }
 
-impl Core {
+impl SignedIn {
     async fn stored_overrides(&self) -> Result<StoredOverrides, RpcError> {
         use crate::ResultExt;
-        let client = self.client().await?;
-        let key =
-            self.with_open_stores(async || crate::sealed_account_data::cached_key(&client).await);
-        stored_overrides(&client, true, key)
+        let client = self.client();
+        let key = self
+            .core()
+            .with_open_stores(async || crate::sealed_account_data::cached_key(client).await);
+        stored_overrides(client, true, key)
             .await
-            .or_failed(self, "profile_overrides")
-    }
-
-    fn overrides_view(stored: &StoredOverrides) -> ProfileOverridesView {
-        ProfileOverridesView {
-            overrides: if stored.protection == SealStateView::Locked {
-                Vec::new()
-            } else {
-                overrides(stored.content.as_ref())
-            },
-            protection: stored.protection,
-            can_seal: stored.can_seal,
-        }
+            .or_failed(self.core(), "profile_overrides")
     }
 
     pub(crate) async fn profile_overrides_view(&self) -> Result<ProfileOverridesView, RpcError> {
-        Ok(Self::overrides_view(&self.stored_overrides().await?))
+        Ok(Core::overrides_view(&self.stored_overrides().await?))
     }
 
     /// A plaintext unstable document read while the key is at hand is sealed.
     pub(crate) async fn profile_overrides(&self) -> Result<ProfileOverridesView, RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+        let _guard = self.state().account_data_writes.lock().await;
         let stored = self.stored_overrides().await?;
-        let view = Self::overrides_view(&stored);
+        let view = Core::overrides_view(&stored);
         if stored.sealed_type
             && stored.protection == SealStateView::Plain
             && stored.can_seal
@@ -325,7 +315,7 @@ impl Core {
         user_id: &OwnedUserId,
         edit: &OverrideEdit,
     ) -> Result<ProfileOverridesView, RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+        let _guard = self.state().account_data_writes.lock().await;
         let stored = self.stored_overrides().await?;
         if stored.protection == SealStateView::Locked {
             return Err(RpcCode::DocumentLocked.into());
@@ -340,13 +330,27 @@ impl Core {
                 .await?;
             PROFILE_OVERRIDES_EVENT
         };
-        self.emit(CoreEvent::AccountDataChanged {
+        self.core().emit(CoreEvent::AccountDataChanged {
             event_type: event_type.to_owned(),
         });
-        Ok(Self::overrides_view(&StoredOverrides {
+        Ok(Core::overrides_view(&StoredOverrides {
             content: Some(content),
             ..stored
         }))
+    }
+}
+
+impl Core {
+    fn overrides_view(stored: &StoredOverrides) -> ProfileOverridesView {
+        ProfileOverridesView {
+            overrides: if stored.protection == SealStateView::Locked {
+                Vec::new()
+            } else {
+                overrides(stored.content.as_ref())
+            },
+            protection: stored.protection,
+            can_seal: stored.can_seal,
+        }
     }
 }
 

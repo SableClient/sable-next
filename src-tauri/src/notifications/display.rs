@@ -146,7 +146,7 @@ fn avatar_source(view: &NotificationView) -> Option<&str> {
 /// Desktop notifiers only show a local image, so the thumbnail is kept in the cache folder.
 async fn avatar_file<R: Runtime>(
     app: &AppHandle<R>,
-    core: &sable_core::Core,
+    core: &std::sync::Arc<sable_core::Core>,
     view: &NotificationView,
 ) -> Option<tauri::Url> {
     use std::hash::{Hash as _, Hasher as _};
@@ -189,7 +189,7 @@ fn body(view: &NotificationView, content: bool) -> String {
 
 pub(super) async fn show_generic<R: Runtime>(
     app: &AppHandle<R>,
-    core: &sable_core::Core,
+    core: &std::sync::Arc<sable_core::Core>,
     view: &NotificationView,
 ) {
     let content = shows_content(

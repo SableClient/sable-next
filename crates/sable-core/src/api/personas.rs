@@ -4,7 +4,8 @@ use std::sync::Arc;
 use matrix_sdk::ruma::OwnedRoomId;
 use serde::Deserialize;
 
-use super::Handler;
+use super::{Handler, SessionHandler};
+use crate::SignedIn;
 use crate::Core;
 use crate::protocol::{RpcError, PersonaCatalogView, PersonaView};
 
@@ -25,11 +26,11 @@ domain! {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ListParams {}
 
-impl Handler for ListParams {
+impl SessionHandler for ListParams {
     type Ok = PersonaCatalogView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<PersonaCatalogView, RpcError> {
-        core.personas().await
+    async fn run(self, session: &SignedIn) -> Result<PersonaCatalogView, RpcError> {
+        session.personas().await
     }
 }
 
@@ -42,11 +43,11 @@ pub struct SaveParams {
     pub previous_id: Option<String>,
 }
 
-impl Handler for SaveParams {
+impl SessionHandler for SaveParams {
     type Ok = Vec<PersonaView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<PersonaView>, RpcError> {
-        core.save_persona(self).await
+    async fn run(self, session: &SignedIn) -> Result<Vec<PersonaView>, RpcError> {
+        session.save_persona(self).await
     }
 }
 
@@ -56,11 +57,11 @@ pub struct RemoveParams {
     pub id: String,
 }
 
-impl Handler for RemoveParams {
+impl SessionHandler for RemoveParams {
     type Ok = Vec<PersonaView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<PersonaView>, RpcError> {
-        core.remove_persona(&self.id).await
+    async fn run(self, session: &SignedIn) -> Result<Vec<PersonaView>, RpcError> {
+        session.remove_persona(&self.id).await
     }
 }
 
@@ -70,11 +71,11 @@ pub struct ReorderParams {
     pub ids: Vec<String>,
 }
 
-impl Handler for ReorderParams {
+impl SessionHandler for ReorderParams {
     type Ok = Vec<PersonaView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<PersonaView>, RpcError> {
-        core.reorder_personas(self).await
+    async fn run(self, session: &SignedIn) -> Result<Vec<PersonaView>, RpcError> {
+        session.reorder_personas(self).await
     }
 }
 
@@ -93,11 +94,11 @@ pub struct SetSelectionParams {
     pub valid_until: Option<u64>,
 }
 
-impl Handler for SetSelectionParams {
+impl SessionHandler for SetSelectionParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_persona_selection(self)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_persona_selection(self)
             .await
     }
 }
@@ -109,11 +110,11 @@ pub struct DisableRoomParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for DisableRoomParams {
+impl SessionHandler for DisableRoomParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.disable_room_personas(self).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.disable_room_personas(self).await
     }
 }
 
@@ -124,11 +125,11 @@ pub struct AccountRoomParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for AccountRoomParams {
+impl SessionHandler for AccountRoomParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.account_room_personas(self).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.account_room_personas(self).await
     }
 }
 
@@ -137,11 +138,11 @@ impl Handler for AccountRoomParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct BackupParams {}
 
-impl Handler for BackupParams {
+impl SessionHandler for BackupParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.persona_backup().await
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.persona_backup().await
     }
 }
 
@@ -167,10 +168,10 @@ pub struct RestoreBackupParams {
     pub backup: String,
 }
 
-impl Handler for RestoreBackupParams {
+impl SessionHandler for RestoreBackupParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.restore_persona_backup(&self.backup).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.restore_persona_backup(&self.backup).await
     }
 }

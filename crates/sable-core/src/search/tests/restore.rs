@@ -32,10 +32,8 @@ async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
         )
         .await;
 
-    let (core, _events) = crate::Core::new(
-        "search-resume",
-        Box::new(crate::store::MemorySessionStore::default()),
-    );
+    let (core, _events) = crate::test_support::signed_in_core(&server, client.clone()).await;
+    let session = core.signed_in().unwrap();
 
     server
         .mock_room_messages()
@@ -48,10 +46,7 @@ async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
         .mount()
         .await;
 
-    let reached_start = core
-        .crawl_once(&client, &room_id)
-        .await
-        .expect("crawl one batch");
+    let reached_start = session.crawl_once(&room_id).await.expect("crawl one batch");
     assert!(
         matches!(
             reached_start,
@@ -63,7 +58,7 @@ async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
         "a room with a next token is not exhausted"
     );
 
-    let checkpoints = core.search_crawl.lock().await.checkpoints();
+    let checkpoints = session.state().search_crawl.lock().checkpoints();
     assert_eq!(
         checkpoints
             .get(&room_id)
@@ -74,11 +69,13 @@ async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
     );
 
     // A fresh core, as after a reload: it must ask for the second page.
-    let (next, _next_events) = crate::Core::new(
-        "search-resume",
-        Box::new(crate::store::MemorySessionStore::default()),
-    );
-    next.search_crawl.lock().await.restore(checkpoints);
+    let (next, _next_events) = crate::test_support::signed_in_core(&server, client.clone()).await;
+    let next_session = next.signed_in().unwrap();
+    next_session
+        .state()
+        .search_crawl
+        .lock()
+        .restore(checkpoints);
 
     server
         .mock_room_messages()
@@ -90,8 +87,8 @@ async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
         .mount()
         .await;
 
-    let reached_start = next
-        .crawl_once(&client, &room_id)
+    let reached_start = next_session
+        .crawl_once(&room_id)
         .await
         .expect("crawl the resumed batch");
     assert!(
@@ -106,7 +103,14 @@ async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
         "no next token means the room is done"
     );
 
-    let hits = in_room(&*next.search_index.lock().await, &room_id, "second", 10, 0);
+    let session_state = next_session.state();
+    let hits = in_room(
+        &*session_state.search_index.lock().await,
+        &room_id,
+        "second",
+        10,
+        0,
+    );
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].event_id, event_id!("$two"));
 
@@ -194,9 +198,12 @@ async fn test_a_room_left_between_sessions_is_wiped_at_open() {
         "search-left-room",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    core.open_search_index(&client, &store_id(&directory)).await;
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.open_search_index(&store_id(&directory)).await;
 
-    let index = core.search_index.lock().await;
+    let session_state = session.state();
+    let index = session_state.search_index.lock().await;
     assert_eq!(index.rooms().await, [kept]);
     assert_eq!(index.documents().await, 1);
 }
@@ -228,13 +235,13 @@ async fn test_an_index_is_searchable_in_the_next_session() {
         "search-persist-first",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    first
-        .open_search_index(&client, &store_id(&directory))
-        .await;
-    first.prime_persisted_rooms(&client).await;
+    crate::test_support::sign_in(&first, &server, client.clone()).await;
+    let first_session = first.signed_in().unwrap();
+    first_session.open_search_index(&store_id(&directory)).await;
+    first_session.prime_persisted_rooms().await;
     assert_eq!(
         in_room(
-            &*first.search_index.lock().await,
+            &*first_session.state().search_index.lock().await,
             &room_id,
             "archaeology",
             10,
@@ -249,12 +256,14 @@ async fn test_an_index_is_searchable_in_the_next_session() {
         "search-persist-second",
         Box::new(crate::store::MemorySessionStore::default()),
     );
-    second
-        .open_search_index(&client, &store_id(&directory))
+    crate::test_support::sign_in(&second, &server, client.clone()).await;
+    let second_session = second.signed_in().unwrap();
+    second_session
+        .open_search_index(&store_id(&directory))
         .await;
 
     let hits = in_restored_room(
-        &*second.search_index.lock().await,
+        &*second_session.state().search_index.lock().await,
         &room_id,
         "archaeology",
         10,

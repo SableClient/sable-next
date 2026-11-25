@@ -38,6 +38,7 @@ pub struct Session {
     pub homeserver: String,
     /// Logging out through the wrong auth API fails.
     pub oauth: bool,
+    pub(crate) state: Arc<crate::SessionState>,
 }
 
 /// Whatever the client holds now, which after a refresh is newer than disk.

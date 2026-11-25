@@ -10,8 +10,8 @@ use matrix_sdk::ruma::{OwnedMxcUri, OwnedRoomId};
 use mime::Mime;
 use serde::Serialize;
 
-use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::delayed_events::{self, DelayedEvent, DelayedEventsSupport};
 use crate::protocol::{AttachmentInfoView, RpcCode, RpcError, ScheduledMessageView};
 use crate::view::SPOILER_PROPERTY;
@@ -101,11 +101,11 @@ fn attachment_content(
     }
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn delayed_events_support(&self) -> Result<DelayedEventsSupport, RpcError> {
-        delayed_events::support(&self.client().await?)
+        delayed_events::support(self.client())
             .await
-            .or_failed(self, "delayed_events_supported")
+            .or_failed(self.core(), "delayed_events_supported")
     }
 
     /// Scheduling is offered only where the queue can also be listed and cancelled.
@@ -120,12 +120,13 @@ impl Core {
         delay_ms: u64,
         persona: Option<&crate::protocol::PerMessageProfileView>,
     ) -> Result<String, RpcError> {
-        let mut content = serde_json::to_value(content).or_failed(self, "schedule_message")?;
+        let mut content =
+            serde_json::to_value(content).or_failed(self.core(), "schedule_message")?;
         if let Some(profile) = &persona {
             crate::personas::stamp_profile(&mut content, profile);
         }
         let content =
-            serde_json::value::to_raw_value(&content).or_failed(self, "schedule_message")?;
+            serde_json::value::to_raw_value(&content).or_failed(self.core(), "schedule_message")?;
         self.schedule_room_message(room_id, content, delay_ms).await
     }
 
@@ -139,8 +140,8 @@ impl Core {
         if !support.can_list() {
             return Err(RpcCode::DelayedEventsUnsupported.into());
         }
-        let room = self.room(room_id).await?;
-        if self.room_is_encrypted(&room).await? {
+        let room = self.room(room_id)?;
+        if self.core().room_is_encrypted(&room).await? {
             return Err(RpcCode::EncryptedScheduleUnsupported.into());
         }
 
@@ -152,9 +153,9 @@ impl Core {
             delay: Duration::from_millis(delay_ms),
             sticky_duration_ms: None,
         };
-        delayed_events::send(&self.client().await?, support, event)
+        delayed_events::send(self.client(), support, event)
             .await
-            .or_failed(self, "schedule_message")
+            .or_failed(self.core(), "schedule_message")
     }
 
     pub(crate) async fn schedule_attachment(
@@ -181,15 +182,15 @@ impl Core {
         let mut content = serde_json::to_value(attachment_content(
             filename, &mime, url, size, info, spoiler,
         ))
-        .or_failed(self, "schedule_attachment")?;
+        .or_failed(self.core(), "schedule_attachment")?;
         if let Some(profile) = &persona {
             crate::personas::stamp_profile(
                 &mut content,
                 &crate::personas::without_fallback(profile),
             );
         }
-        let content =
-            serde_json::value::to_raw_value(&content).or_failed(self, "schedule_attachment")?;
+        let content = serde_json::value::to_raw_value(&content)
+            .or_failed(self.core(), "schedule_attachment")?;
         self.schedule_room_message(&room_id, content, delay_ms)
             .await
     }
@@ -198,18 +199,18 @@ impl Core {
         &self,
         CancelScheduledParams { delay_id }: CancelScheduledParams,
     ) -> Result<(), RpcError> {
-        delayed_events::update(&self.client().await?, delay_id, UpdateAction::Cancel)
+        delayed_events::update(self.client(), delay_id, UpdateAction::Cancel)
             .await
-            .or_failed(self, "cancel_scheduled_message")
+            .or_failed(self.core(), "cancel_scheduled_message")
     }
 
     pub(crate) async fn send_scheduled_message_now(
         &self,
         SendScheduledParams { delay_id }: SendScheduledParams,
     ) -> Result<(), RpcError> {
-        delayed_events::update(&self.client().await?, delay_id, UpdateAction::Send)
+        delayed_events::update(self.client(), delay_id, UpdateAction::Send)
             .await
-            .or_failed(self, "send_scheduled_message")
+            .or_failed(self.core(), "send_scheduled_message")
     }
 
     pub(crate) async fn scheduled_messages(
@@ -219,11 +220,11 @@ impl Core {
         if !self.scheduling_supported().await? {
             return Ok(Vec::new());
         }
-        let client = self.client().await?;
+        let client = self.client();
         let response = client
             .send(get_all_delayed_events::msc4140::Request::new())
             .await
-            .or_failed(self, "scheduled_messages")?;
+            .or_failed(self.core(), "scheduled_messages")?;
 
         Ok(response
             .delayed_events

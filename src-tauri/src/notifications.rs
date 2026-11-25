@@ -38,7 +38,7 @@ pub(crate) fn room_notification_id(user_id: &str, room_id: &str) -> i32 {
 
 pub(crate) async fn show<R: Runtime>(
     app: &AppHandle<R>,
-    core: &sable_core::Core,
+    core: &std::sync::Arc<sable_core::Core>,
     view: &NotificationView,
 ) {
     if !core.notifications_enabled() || core.shows_banner(view) {
@@ -74,7 +74,7 @@ fn grant(
 
 pub(crate) async fn show_test<R: Runtime>(
     app: &AppHandle<R>,
-    core: &sable_core::Core,
+    core: &std::sync::Arc<sable_core::Core>,
     sequence: u32,
 ) {
     show(app, core, &test_view(sequence)).await;

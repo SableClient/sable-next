@@ -5,12 +5,12 @@ use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use serde::{Deserialize, Serialize};
 
-use super::Handler;
+use super::{Handler, SessionHandler};
 use crate::protocol::{
     HomeserverSoftwareView, OAuthMetadataView, OpenIdTokenView, RpcError, SessionInfo, SyncStatus,
     TermsPolicyView,
 };
-use crate::{Core, ResultExt};
+use crate::{Core, ResultExt, SignedIn};
 
 domain! {
     restore,
@@ -143,16 +143,16 @@ pub struct HomeserverInfoOk {
     pub server: Option<HomeserverSoftwareView>,
 }
 
-impl Handler for HomeserverInfoParams {
+impl SessionHandler for HomeserverInfoParams {
     type Ok = HomeserverInfoOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<HomeserverInfoOk, RpcError> {
-        let client = core.client().await?;
+    async fn run(self, session: &SignedIn) -> Result<HomeserverInfoOk, RpcError> {
+        let client = session.client();
         let server = match client.send(get_server_version::v1::Request::new()).await {
             Ok(response) => response.server.map(software_view),
             Err(error) => {
                 tracing::debug!(%error, "the homeserver did not report its version");
-                delegated_server_software(&client).await
+                delegated_server_software(client).await
             }
         };
 
@@ -239,17 +239,16 @@ pub struct RequestOpenIdTokenOk {
     pub expires_in: u32,
 }
 
-impl Handler for RequestOpenIdTokenParams {
+impl SessionHandler for RequestOpenIdTokenParams {
     type Ok = RequestOpenIdTokenOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<RequestOpenIdTokenOk, RpcError> {
-        let response = core
+    async fn run(self, session: &SignedIn) -> Result<RequestOpenIdTokenOk, RpcError> {
+        let response = session
             .client()
-            .await?
             .account()
             .request_openid_token()
             .await
-            .or_failed(core, "request_openid_token")?;
+            .or_failed(session.core(), "request_openid_token")?;
 
         Ok(RequestOpenIdTokenOk {
             access_token: response.access_token,
@@ -266,8 +265,11 @@ pub struct AccessTokenParams {}
 impl Handler for AccessTokenParams {
     type Ok = Option<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<String>, RpcError> {
-        Ok(core.client().await?.access_token())
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<Option<String>, RpcError>> {
+        std::future::ready(
+            core.signed_in()
+                .map(|session| session.client().access_token()),
+        )
     }
 }
 
@@ -275,11 +277,11 @@ impl Handler for AccessTokenParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct OpenIdTokenParams {}
 
-impl Handler for OpenIdTokenParams {
+impl SessionHandler for OpenIdTokenParams {
     type Ok = OpenIdTokenView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<OpenIdTokenView, RpcError> {
-        core.openid_token().await
+    async fn run(self, session: &SignedIn) -> Result<OpenIdTokenView, RpcError> {
+        session.openid_token().await
     }
 }
 
@@ -290,8 +292,11 @@ pub struct SyncStatusParams {}
 impl Handler for SyncStatusParams {
     type Ok = SyncStatus;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SyncStatus, RpcError> {
-        Ok(core.shown_sync_status(core.sync_service().await?.state().get()))
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<SyncStatus, RpcError>> {
+        std::future::ready(
+            core.signed_in()
+                .map(|session| core.shown_sync_status(session.sync_service().state().get())),
+        )
     }
 }
 
@@ -299,11 +304,13 @@ impl Handler for SyncStatusParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct RetrySyncParams {}
 
-impl Handler for RetrySyncParams {
+impl SessionHandler for RetrySyncParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.retry_sync(&*core.sync_service().await?).await;
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session
+            .until_ended(session.core().retry_sync(&session.sync_service()))
+            .await;
         Ok(())
     }
 }
@@ -312,13 +319,13 @@ impl Handler for RetrySyncParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct OauthMetadataParams {}
 
-impl Handler for OauthMetadataParams {
+impl SessionHandler for OauthMetadataParams {
     type Ok = Option<OAuthMetadataView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<OAuthMetadataView>, RpcError> {
-        let client = core.client().await?;
-        Ok(core
-            .oauth_metadata(&client, "oauth_metadata")
+    async fn run(self, session: &SignedIn) -> Result<Option<OAuthMetadataView>, RpcError> {
+        let client = session.client();
+        Ok(session
+            .core().oauth_metadata(client, "oauth_metadata")
             .await?
             .as_ref()
             .map(crate::oauth_metadata::view))
@@ -329,11 +336,11 @@ impl Handler for OauthMetadataParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ServerFeaturesParams {}
 
-impl Handler for ServerFeaturesParams {
+impl SessionHandler for ServerFeaturesParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        core.server_features().await
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        session.server_features().await
     }
 }
 
@@ -341,11 +348,11 @@ impl Handler for ServerFeaturesParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct DelayedEventsSupportedParams {}
 
-impl Handler for DelayedEventsSupportedParams {
+impl SessionHandler for DelayedEventsSupportedParams {
     type Ok = bool;
 
-    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
-        core.scheduling_supported().await
+    async fn run(self, session: &SignedIn) -> Result<bool, RpcError> {
+        session.scheduling_supported().await
     }
 }
 
@@ -353,11 +360,11 @@ impl Handler for DelayedEventsSupportedParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct QrGrantSupportedParams {}
 
-impl Handler for QrGrantSupportedParams {
+impl SessionHandler for QrGrantSupportedParams {
     type Ok = bool;
 
-    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
-        core.qr_grant_supported().await
+    async fn run(self, session: &SignedIn) -> Result<bool, RpcError> {
+        session.qr_grant_supported().await
     }
 }
 
@@ -380,29 +387,41 @@ impl Handler for SetSearchOptionsParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+        let session = core.signed_in().ok();
         let was_sharing = core
+            .settings
             .search_sharing
-            .enabled
             .swap(self.sharing, Ordering::Relaxed);
         if !self.sharing {
-            if was_sharing && let Ok(client) = core.client().await {
-                core.forget_search_sharing(&client).await;
+            if was_sharing && let Some(session) = &session {
+                session.forget_search_sharing().await;
             }
-            core.cancel_search_peers();
-            core.search_sharing.reset_session();
+            if let Some(session) = &session {
+                session.cancel_search_peers();
+                session.state().search_peers.reset();
+            }
         }
         core.search_network.set_unmetered_only(self.unmetered_only);
-        core.search_crawl.lock().await.tuning = self.tuning.clamped();
-        core.search_crawler_enabled
+        let tuning = self.tuning.clamped();
+        *core.settings.search_tuning.lock() = tuning;
+        if let Some(session) = &session {
+            session.state().search_crawl.lock().tuning = tuning;
+        }
+        core.settings.search_crawler_enabled
             .store(self.crawler, Ordering::Relaxed);
-        core.server_search_enabled
+        core.settings.server_search_enabled
             .store(self.server_search, Ordering::Relaxed);
-        core.search_index
-            .lock()
-            .await
-            .set_disk_budget_mb(self.disk_budget_mb);
-
-        core.refresh_search_peers().await;
+        if let Some(session) = &session {
+            session
+                .state()
+                .search_index
+                .lock()
+                .await
+                .set_disk_budget_mb(self.disk_budget_mb);
+        }
+        if let Some(session) = &session {
+            session.refresh_search_sharing().await;
+        }
 
         Ok(())
     }
@@ -452,7 +471,9 @@ impl Handler for SetReadRoomParams {
     type Ok = ();
 
     fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
-        core.set_read_room(self.room_id);
+        if let Ok(session) = core.signed_in() {
+            session.set_read_room(self.room_id);
+        }
         std::future::ready(Ok(()))
     }
 }
@@ -464,11 +485,11 @@ pub struct IntegrationManagerUrlParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for IntegrationManagerUrlParams {
+impl SessionHandler for IntegrationManagerUrlParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.integration_manager_url(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.integration_manager_url(&self.room_id).await
     }
 }
 
@@ -476,11 +497,11 @@ impl Handler for IntegrationManagerUrlParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct IntegrationManagerTermsParams {}
 
-impl Handler for IntegrationManagerTermsParams {
+impl SessionHandler for IntegrationManagerTermsParams {
     type Ok = Vec<TermsPolicyView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<TermsPolicyView>, RpcError> {
-        core.integration_manager_terms().await
+    async fn run(self, session: &SignedIn) -> Result<Vec<TermsPolicyView>, RpcError> {
+        session.integration_manager_terms().await
     }
 }
 
@@ -490,11 +511,11 @@ pub struct AcceptIntegrationManagerTermsParams {
     pub urls: Vec<String>,
 }
 
-impl Handler for AcceptIntegrationManagerTermsParams {
+impl SessionHandler for AcceptIntegrationManagerTermsParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.accept_integration_manager_terms(self.urls).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.accept_integration_manager_terms(self.urls).await
     }
 }
 
@@ -505,13 +526,14 @@ pub struct KnownRoomsParams {}
 impl Handler for KnownRoomsParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        Ok(core
-            .known_room_ids()
-            .await?
-            .iter()
-            .map(ToString::to_string)
-            .collect())
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<Vec<String>, RpcError>> {
+        std::future::ready(core.signed_in().map(|session| {
+            session
+                .known_room_ids()
+                .iter()
+                .map(ToString::to_string)
+                .collect()
+        }))
     }
 }
 

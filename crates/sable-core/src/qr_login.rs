@@ -4,13 +4,14 @@ use crate::api::auth::StartQrGrantParams;
 use crate::api::auth::StartQrLoginParams;
 use std::sync::Arc;
 
+use crate::tasks::JoinHandleExt;
 use futures_util::{FutureExt, Stream, StreamExt, pin_mut};
 use matrix_sdk::authentication::oauth::qrcode::{
     CheckCodeSender, ContinuationMessageSender, DeviceAuthorizationOAuthError, GeneratedQrProgress,
     GrantLoginProgress, LoginProgress, Msc4108IntentData, QRCodeGrantLoginError, QRCodeLoginError,
     QrCodeData, QrCodeIntent, QrCodeIntentData, QrProgress, SecureChannelError,
 };
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::api::FeatureFlag;
 use url::Url;
 
@@ -18,7 +19,7 @@ use crate::ResultExt;
 use crate::protocol::{CoreEvent, QrLoginFailureView, QrLoginProgressView, RpcCode, RpcError};
 use crate::session::{self, Credentials, PersistedSession};
 use crate::verification::level_h_code;
-use crate::{Core, Task};
+use crate::{Core, SignedIn, Task};
 
 #[derive(Default)]
 pub(crate) struct QrSlots {
@@ -302,7 +303,7 @@ impl Core {
         })
         .abort_on_drop();
 
-        *self.qr_flow.lock().await = Some(QrFlow { slots, _task: task });
+        *self.sign_in.qr_flow.lock() = Some(QrFlow { slots, _task: task });
         Ok(())
     }
 
@@ -337,8 +338,50 @@ impl Core {
         Ok(user_id)
     }
 
-    pub(crate) async fn start_qr_grant(
-        self: &Arc<Self>,
+    pub(crate) async fn qr_check_code(
+        &self,
+        QrCheckCodeParams { code }: QrCheckCodeParams,
+    ) -> Result<(), RpcError> {
+        let sender = self
+            .qr_slots()?
+            .take_check_code()
+            .ok_or(RpcCode::Unavailable)?;
+        sender.send(code).await.or_failed(self, "qr_check_code")
+    }
+
+    pub(crate) async fn qr_grant_continue(
+        &self,
+        QrGrantContinueParams { confirm }: QrGrantContinueParams,
+    ) -> Result<(), RpcError> {
+        let sender = self
+            .qr_slots()?
+            .take_continuation()
+            .ok_or(RpcCode::Unavailable)?;
+        let sent = if confirm {
+            sender.confirm().await
+        } else {
+            sender.cancel().await
+        };
+        sent.or_failed(self, "qr_grant_continue")
+    }
+
+    pub(crate) fn cancel_qr(&self) {
+        self.sign_in.qr_flow.lock().take();
+    }
+
+    fn qr_slots(&self) -> Result<Arc<QrSlots>, RpcError> {
+        self.sign_in
+            .qr_flow
+            .lock()
+            .as_ref()
+            .map(|flow| flow.slots.clone())
+            .ok_or_else(|| RpcCode::Unavailable.into())
+    }
+}
+
+impl SignedIn {
+    pub(crate) fn start_qr_grant(
+        &self,
         StartQrGrantParams {
             scanned: scanned_code,
         }: StartQrGrantParams,
@@ -350,12 +393,14 @@ impl Core {
         {
             return Err(RpcCode::Denied.into());
         }
-        let client = self.client().await?;
+        let client = self.client().clone();
 
         let slots = Arc::new(QrSlots::default());
-        let core = self.clone();
+        let session = self.clone();
+        let core = Arc::clone(self.core());
         let flow_slots = slots.clone();
-        let task = spawn(async move {
+        // Ends with its session, which it would otherwise keep open.
+        let grant = async move {
             let oauth = client.oauth();
             let result = if let Some(data) = &scanned_code {
                 let grant = oauth.grant_login_with_qr_code().scan(data);
@@ -389,62 +434,23 @@ impl Core {
                     }
                 },
             );
+        };
+        let task = spawn(async move {
+            session.until_ended(grant).await;
         })
         .abort_on_drop();
 
-        *self.qr_flow.lock().await = Some(QrFlow { slots, _task: task });
+        *self.core().sign_in.qr_flow.lock() = Some(QrFlow { slots, _task: task });
         Ok(())
     }
 
-    pub(crate) async fn qr_check_code(
-        &self,
-        QrCheckCodeParams { code }: QrCheckCodeParams,
-    ) -> Result<(), RpcError> {
-        let sender = self
-            .qr_slots()
-            .await?
-            .take_check_code()
-            .ok_or(RpcCode::Unavailable)?;
-        sender.send(code).await.or_failed(self, "qr_check_code")
-    }
-
-    pub(crate) async fn qr_grant_continue(
-        &self,
-        QrGrantContinueParams { confirm }: QrGrantContinueParams,
-    ) -> Result<(), RpcError> {
-        let sender = self
-            .qr_slots()
-            .await?
-            .take_continuation()
-            .ok_or(RpcCode::Unavailable)?;
-        let sent = if confirm {
-            sender.confirm().await
-        } else {
-            sender.cancel().await
-        };
-        sent.or_failed(self, "qr_grant_continue")
-    }
-
-    pub(crate) async fn cancel_qr(&self) {
-        self.qr_flow.lock().await.take();
-    }
-
     pub(crate) async fn qr_grant_supported(&self) -> Result<bool, RpcError> {
-        let client = self.client().await?;
+        let client = self.client();
         let features = client
             .unstable_features()
             .await
-            .or_failed(self, "qr_grant_supported")?;
+            .or_failed(self.core(), "qr_grant_supported")?;
         Ok(features.contains(&FeatureFlag::Msc4108) || msc_4388_supported(&client.oauth()).await)
-    }
-
-    async fn qr_slots(&self) -> Result<Arc<QrSlots>, RpcError> {
-        self.qr_flow
-            .lock()
-            .await
-            .as_ref()
-            .map(|flow| flow.slots.clone())
-            .ok_or_else(|| RpcCode::Unavailable.into())
     }
 }
 

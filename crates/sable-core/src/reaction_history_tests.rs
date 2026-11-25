@@ -248,6 +248,7 @@ async fn reaction_history_records_additions_once_and_survives_a_new_core() {
         .mount(server.server())
         .await;
     let core = signed_in_as(&server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     let react = || ReactParams {
         room_id: room_id.to_owned(),
         event_id: target.to_owned(),
@@ -259,12 +260,12 @@ async fn reaction_history_records_additions_once_and_survives_a_new_core() {
         persona: None,
     };
     core.run(react()).await.unwrap();
-    assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), ["🔥"]);
+    assert_eq!(session.frequent_reactions(None, &[]).await.unwrap(), ["🔥"]);
     assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
     core.run(react()).await.unwrap();
     assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
     assert_eq!(stored.lock()["recent_emoji"][1], other);
-    core.remember_reaction("hello").await.unwrap();
+    session.remember_reaction("hello").await.unwrap();
     assert_eq!(stored.lock()["recent_emoji"][0]["emoji"], "🔥");
     assert!(
         core.run(ReactParams {
@@ -277,8 +278,12 @@ async fn reaction_history_records_additions_once_and_survives_a_new_core() {
     assert_eq!(stored.lock()["recent_emoji"][0]["total"], 1);
 
     let restored = signed_in_as(&server, client.clone()).await;
+    let restored_session = restored.signed_in().unwrap();
     assert_eq!(
-        restored.frequent_reactions(None, &[]).await.unwrap(),
+        restored_session
+            .frequent_reactions(None, &[])
+            .await
+            .unwrap(),
         ["🔥"]
     );
 }
@@ -295,6 +300,7 @@ async fn reaction_history_keeps_offline_counts_and_merges_them_on_reconnect() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     let core = signed_in_as(&server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     let unavailable = Mock::given(method("GET"))
         .and(path_regex("/account_data/m.recent_emoji$"))
         .respond_with(
@@ -303,14 +309,14 @@ async fn reaction_history_keeps_offline_counts_and_merges_them_on_reconnect() {
         )
         .mount_as_scoped(server.server())
         .await;
-    core.remember_reaction("🔥").await.unwrap();
+    session.remember_reaction("🔥").await.unwrap();
     let seeds = ["mxc://example.org/wave".to_owned()];
     assert_eq!(
-        core.frequent_reactions(None, &seeds).await.unwrap(),
+        session.frequent_reactions(None, &seeds).await.unwrap(),
         ["🔥", "mxc://example.org/wave"]
     );
     assert_eq!(
-        core.frequent_reactions(None, &[]).await.unwrap(),
+        session.frequent_reactions(None, &[]).await.unwrap(),
         ["🔥", "mxc://example.org/wave"]
     );
     drop(unavailable);
@@ -331,7 +337,7 @@ async fn reaction_history_keeps_offline_counts_and_merges_them_on_reconnect() {
         .mount_as_scoped(server.server())
         .await;
     let shown = ["🐈", "🔥", "mxc://example.org/wave"];
-    assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), shown);
+    assert_eq!(session.frequent_reactions(None, &[]).await.unwrap(), shown);
     drop(refused);
 
     let expected = json!({"recent_emoji": [
@@ -345,7 +351,7 @@ async fn reaction_history_keeps_offline_counts_and_merges_them_on_reconnect() {
         .expect(1)
         .mount(server.server())
         .await;
-    assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), shown);
+    assert_eq!(session.frequent_reactions(None, &[]).await.unwrap(), shown);
     assert_eq!(uploads(&server).await.last(), Some(&expected));
     drop(get);
 
@@ -354,7 +360,7 @@ async fn reaction_history_keeps_offline_counts_and_merges_them_on_reconnect() {
         .respond_with(ResponseTemplate::new(200).set_body_json(expected))
         .mount(server.server())
         .await;
-    assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), shown);
+    assert_eq!(session.frequent_reactions(None, &[]).await.unwrap(), shown);
 }
 
 #[tokio::test]
@@ -376,6 +382,7 @@ async fn another_clients_history_survives_reading_and_picking() {
         .await
         .unwrap();
     let core = signed_in_as(&server, client.clone()).await;
+    let session = core.signed_in().unwrap();
     Mock::given(method("GET"))
         .and(path_regex("/account_data/m.recent_emoji$"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -390,7 +397,7 @@ async fn another_clients_history_survives_reading_and_picking() {
         .mount_as_scoped(server.server())
         .await;
     assert_eq!(
-        core.frequent_reactions(None, &[]).await.unwrap(),
+        session.frequent_reactions(None, &[]).await.unwrap(),
         ["🔥", "🐈"]
     );
     drop(untouched);
@@ -401,7 +408,7 @@ async fn another_clients_history_survives_reading_and_picking() {
         .expect(1)
         .mount(server.server())
         .await;
-    core.remember_reaction("🔥").await.unwrap();
+    session.remember_reaction("🔥").await.unwrap();
     assert_eq!(
         uploads(&server).await.last(),
         Some(&json!({
@@ -451,8 +458,9 @@ mod requests {
         json!({"recent_emoji": [{"emoji": "🔥", "total": total}]})
     }
 
-    async fn killed(core: &Core) {
-        let pick = core.remember_reaction("🔥");
+    async fn killed(core: &std::sync::Arc<Core>) {
+        let session = core.signed_in().unwrap();
+        let pick = session.remember_reaction("🔥");
         tokio::time::timeout(Duration::from_secs(1), pick)
             .await
             .unwrap_err();
@@ -462,6 +470,7 @@ mod requests {
     async fn a_pick_survives_the_app_dying_during_the_read() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let slow = ok(fire(1)).set_delay(Duration::from_secs(5));
         let reading = answer(&server, "GET", slow).await;
         killed(&core).await;
@@ -469,7 +478,7 @@ mod requests {
 
         let _read = answer(&server, "GET", ok(fire(1))).await;
         let _write = answer(&server, "PUT", ok(json!({}))).await;
-        core.frequent_reactions(None, &[]).await.unwrap();
+        session.frequent_reactions(None, &[]).await.unwrap();
         assert_eq!(uploads(&server).await, [fire(2)]);
     }
 
@@ -477,6 +486,7 @@ mod requests {
     async fn a_pick_survives_the_app_dying_during_the_upload() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let _read = answer(&server, "GET", ok(fire(1))).await;
         let slow = ok(json!({})).set_delay(Duration::from_secs(5));
         let writing = answer(&server, "PUT", slow).await;
@@ -484,7 +494,7 @@ mod requests {
         drop(writing);
 
         let _write = answer(&server, "PUT", ok(json!({}))).await;
-        core.frequent_reactions(None, &[]).await.unwrap();
+        session.frequent_reactions(None, &[]).await.unwrap();
         assert_eq!(uploads(&server).await, [fire(2), fire(2)]);
     }
 
@@ -492,6 +502,7 @@ mod requests {
     async fn an_upload_that_landed_before_the_app_died_is_not_counted_twice() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let before = answer(&server, "GET", ok(fire(1))).await;
         let slow = ok(json!({})).set_delay(Duration::from_secs(5));
         let writing = answer(&server, "PUT", slow).await;
@@ -501,8 +512,8 @@ mod requests {
         let sent = written(&server).await.pop().unwrap();
         let _landed = answer(&server, "GET", ok(sent)).await;
         let _write = answer(&server, "PUT", ok(json!({}))).await;
-        assert_eq!(core.frequent_reactions(None, &[]).await.unwrap(), ["🔥"]);
-        core.remember_reaction("🔥").await.unwrap();
+        assert_eq!(session.frequent_reactions(None, &[]).await.unwrap(), ["🔥"]);
+        session.remember_reaction("🔥").await.unwrap();
         assert_eq!(uploads(&server).await.last(), Some(&fire(3)));
     }
 
@@ -510,10 +521,15 @@ mod requests {
     async fn picks_waiting_on_a_slow_request_are_saved_already() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let slow = ok(fire(1)).set_delay(Duration::from_secs(5));
         let reading = answer(&server, "GET", slow).await;
-        let both =
-            async { tokio::join!(core.remember_reaction("🔥"), core.remember_reaction("🔥")) };
+        let both = async {
+            tokio::join!(
+                session.remember_reaction("🔥"),
+                session.remember_reaction("🔥")
+            )
+        };
         tokio::time::timeout(Duration::from_secs(1), both)
             .await
             .unwrap_err();
@@ -521,7 +537,7 @@ mod requests {
 
         let _read = answer(&server, "GET", ok(fire(1))).await;
         let _write = answer(&server, "PUT", ok(json!({}))).await;
-        core.frequent_reactions(None, &[]).await.unwrap();
+        session.frequent_reactions(None, &[]).await.unwrap();
         assert_eq!(uploads(&server).await, [fire(3)]);
     }
 
@@ -529,14 +545,15 @@ mod requests {
     async fn reading_does_not_restore_history_the_server_no_longer_has() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let present = answer(&server, "GET", ok(fire(4))).await;
-        core.frequent_reactions(None, &[]).await.unwrap();
+        session.frequent_reactions(None, &[]).await.unwrap();
         drop(present);
 
         let _absent = answer(&server, "GET", failed(404, "M_NOT_FOUND")).await;
         let _write = answer(&server, "PUT", ok(json!({}))).await;
         assert_eq!(
-            core.frequent_reactions(None, &[]).await.unwrap(),
+            session.frequent_reactions(None, &[]).await.unwrap(),
             Vec::<String>::new()
         );
         assert_eq!(uploads(&server).await, Vec::<Value>::new());
@@ -546,14 +563,18 @@ mod requests {
     async fn history_migrated_offline_uploads_on_reconnect() {
         let server = MatrixMockServer::new().await;
         let core = signed_in(&server).await;
+        let session = core.signed_in().unwrap();
         let offline = answer(&server, "GET", failed(403, "M_FORBIDDEN")).await;
         let legacy = Some(json!([["🔥", 4]]));
-        assert_eq!(core.frequent_reactions(legacy, &[]).await.unwrap(), ["🔥"]);
+        assert_eq!(
+            session.frequent_reactions(legacy, &[]).await.unwrap(),
+            ["🔥"]
+        );
         drop(offline);
 
         let _absent = answer(&server, "GET", failed(404, "M_NOT_FOUND")).await;
         let _write = answer(&server, "PUT", ok(json!({}))).await;
-        core.frequent_reactions(None, &[]).await.unwrap();
+        session.frequent_reactions(None, &[]).await.unwrap();
         assert_eq!(uploads(&server).await, [fire(4)]);
     }
 }

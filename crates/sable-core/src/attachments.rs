@@ -7,13 +7,13 @@ use matrix_sdk::ruma::{
     },
 };
 
-use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{
     RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView, RpcError,
 };
 use crate::view::{image_thumbnail, media_source, spoiler_reason, video_thumbnail};
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn room_attachments(
         &self,
         room_id: &OwnedRoomId,
@@ -21,7 +21,7 @@ impl Core {
         limit: usize,
         from: Option<&str>,
     ) -> Result<(Vec<RoomAttachmentView>, Option<String>), RpcError> {
-        self.room(room_id).await?;
+        self.room(room_id)?;
         let before = from.and_then(parse_cursor);
         let ignored = self.ignored_senders().await;
         let (items, next) = self

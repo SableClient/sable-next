@@ -42,15 +42,17 @@ impl MissingTokens {
 pub(crate) struct LoginTokens {
     directory: PathBuf,
     legacy_directory: PathBuf,
+    key_unmoved: bool,
 }
 
 impl LoginTokens {
     pub(crate) fn new(base_store: &Path) -> Self {
-        let logins = Self {
+        let mut logins = Self {
             directory: base_store.join("login-tokens"),
             legacy_directory: base_store.join("credentials"),
+            key_unmoved: false,
         };
-        logins.move_sealed_files();
+        logins.key_unmoved = !logins.move_sealed_files();
         logins
     }
 
@@ -67,9 +69,9 @@ impl LoginTokens {
     /// A file already in the new directory is newer and wins.
     ///
     /// A file sealed with another key than the current one is sealed again, or nothing opens it.
-    fn move_sealed_files(&self) {
+    fn move_sealed_files(&self) -> bool {
         let Ok(entries) = std::fs::read_dir(&self.legacy_directory) else {
-            return;
+            return true;
         };
         let files: Vec<_> = entries
             .flatten()
@@ -82,13 +84,13 @@ impl LoginTokens {
         let legacy_reference = self.legacy_directory.join(KEY);
         let legacy_key = legacy_reference.exists();
         if files.is_empty() && !legacy_key {
-            return;
+            return true;
         }
         let resealing = match self.adopt_legacy_key(&legacy_reference, legacy_key) {
             Ok(resealing) => resealing,
             Err(error) => {
                 tracing::warn!("could not move the key of the sealed token files: {error}");
-                return;
+                return false;
             }
         };
         let mut left = false;
@@ -119,6 +121,7 @@ impl LoginTokens {
         if resealing && self.reseal_moved(&legacy_reference) && !left {
             crate::secrets::forget(&legacy_reference);
         }
+        true
     }
 
     /// Sable 2.3.9 moved files before their key, so files already here may need the legacy key.
@@ -272,7 +275,7 @@ impl LoginTokens {
         let tokens: SessionTokens = match std::fs::read(&legacy) {
             Ok(bytes) => serde_json::from_slice(&bytes)?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(Err(MissingTokens::NoFile));
+                return self.read_sealed_again(account_id, device_id);
             }
             Err(error) => return Err(error.into()),
         };
@@ -286,6 +289,28 @@ impl LoginTokens {
             tracing::warn!("could not remove a plain token file: {error}");
         }
         Ok(Ok(tokens))
+    }
+
+    /// Another reader may have sealed the plain file between `read`'s two attempts. A sealed file
+    /// still waiting in the old directory for its key is unavailable, not missing.
+    fn read_sealed_again(
+        &self,
+        account_id: &str,
+        device_id: &str,
+    ) -> Result<Result<SessionTokens, MissingTokens>, StoreError> {
+        match std::fs::read(self.path(account_id, device_id, SEALED)) {
+            Ok(bytes) => return self.open(&bytes),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        let unmoved = self.legacy_directory.join(format!(
+            "{}.{SEALED}",
+            Self::file_stem(account_id, device_id)
+        ));
+        if self.key_unmoved && unmoved.exists() {
+            return Err(StoreError::Invalid("saved login tokens were not moved"));
+        }
+        Ok(Err(MissingTokens::NoFile))
     }
 
     pub(crate) fn read_or_migrate(
@@ -643,6 +668,7 @@ mod tests {
         LoginTokens {
             directory: base.join("login-tokens"),
             legacy_directory: legacy.clone(),
+            key_unmoved: false,
         }
         .save("a2", "D", &tokens("newer"))
         .unwrap();
@@ -665,6 +691,28 @@ mod tests {
             "newer"
         );
         assert_eq!(std::fs::read_dir(&legacy).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn a_sealed_file_whose_key_was_not_moved_is_unavailable_not_missing() {
+        let base = tempfile::tempdir().unwrap();
+        let logins = LoginTokens::new(base.path());
+        logins.save("a1", "D", &tokens("kept")).unwrap();
+        let sealed = logins.path("a1", "D", super::SEALED);
+        let legacy = base.path().join("credentials");
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::rename(&sealed, legacy.join(sealed.file_name().unwrap())).unwrap();
+        let waiting = |key_unmoved| LoginTokens {
+            directory: base.path().join("login-tokens"),
+            legacy_directory: legacy.clone(),
+            key_unmoved,
+        };
+
+        waiting(true).read("a1", "D").unwrap_err();
+        assert_eq!(
+            waiting(false).read("a1", "D").unwrap(),
+            Err(super::MissingTokens::NoFile)
+        );
     }
 
     #[test]

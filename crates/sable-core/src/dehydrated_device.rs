@@ -1,15 +1,15 @@
-use std::sync::Arc;
-
+use crate::tasks::JoinHandleExt;
 use matrix_sdk::encryption::secret_storage::SecretStore;
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::api::client::dehydrated_device::get_dehydrated_device;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::{AnyGlobalAccountDataEvent, AnyGlobalAccountDataEventContent};
 use matrix_sdk::ruma::serde::Raw;
 use serde::{Deserialize, Serialize};
 
+use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{DehydratedDeviceView, RpcError};
-use crate::{Core, ResultExt};
 
 /// Absent means enabled.
 pub(crate) const PREFERENCE_EVENT: &str = "moe.sable.dehydrated_device";
@@ -58,8 +58,9 @@ pub(crate) async fn on_account_data(
     }
 }
 
-impl Core {
-    pub(crate) fn resume_dehydrated_device(&self, client: &matrix_sdk::Client) {
+impl SignedIn {
+    pub(crate) fn resume_dehydrated_device(&self) {
+        let client = self.client();
         let client = client.clone();
         self.track_session_task(
             spawn(async move {
@@ -74,7 +75,8 @@ impl Core {
         );
     }
 
-    pub(crate) fn start_dehydrated_device(&self, client: &matrix_sdk::Client, store: SecretStore) {
+    pub(crate) fn start_dehydrated_device(&self, store: SecretStore) {
+        let client = self.client();
         let client = client.clone();
         self.track_session_task(
             spawn(async move {
@@ -96,7 +98,7 @@ impl Core {
     }
 
     pub(crate) async fn dehydrated_device(&self) -> Result<DehydratedDeviceView, RpcError> {
-        let client = self.client().await?;
+        let client = self.client();
         let present = match client
             .send(get_dehydrated_device::msc3814::Request::new())
             .await
@@ -105,12 +107,12 @@ impl Core {
             Err(error) => match error.client_api_error_kind() {
                 Some(ErrorKind::Unrecognized) => return Ok(DehydratedDeviceView::Unsupported),
                 Some(ErrorKind::NotFound) => false,
-                _ => return Err(error).or_failed(self, "dehydrated_device"),
+                _ => return Err(error).or_failed(self.core(), "dehydrated_device"),
             },
         };
-        if !enabled(&client)
+        if !enabled(client)
             .await
-            .or_failed(self, "dehydrated_device_preference")?
+            .or_failed(self.core(), "dehydrated_device_preference")?
         {
             return Ok(DehydratedDeviceView::Disabled);
         }
@@ -122,12 +124,12 @@ impl Core {
     }
 
     pub(crate) async fn set_dehydrated_device(
-        self: &Arc<Self>,
+        &self,
         enabled: bool,
     ) -> Result<DehydratedDeviceView, RpcError> {
-        let client = self.client().await?;
+        let client = self.client();
         {
-            let _guard = self.account_data_lock.lock().await;
+            let _guard = self.state().account_data_writes.lock().await;
             self.put_global_account_data(
                 PREFERENCE_EVENT.into(),
                 &Preference { enabled },
@@ -140,12 +142,12 @@ impl Core {
             devices
                 .resume()
                 .await
-                .or_failed(self, "resume_dehydrated_device")?;
+                .or_failed(self.core(), "resume_dehydrated_device")?;
         } else {
             devices
                 .delete()
                 .await
-                .or_failed(self, "delete_dehydrated_device")?;
+                .or_failed(self.core(), "delete_dehydrated_device")?;
         }
         self.dehydrated_device().await
     }

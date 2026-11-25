@@ -4,10 +4,11 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
+use crate::tasks::JoinHandleExt;
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RedecryptorReport;
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::events::room::member::{MembershipState, OriginalSyncRoomMemberEvent};
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
@@ -27,6 +28,7 @@ use matrix_sdk_base::sync::Notification;
 use matrix_sdk_ui::notification_client::{NotificationClient, NotificationProcessSetup};
 
 use crate::Core;
+use crate::SignedIn;
 use crate::notifications;
 use crate::search::ignored_user_ids;
 use crate::spaces::{self, SidebarSpacesEvent};
@@ -71,38 +73,20 @@ fn redecrypted_notification(
     })
 }
 
-impl Core {
-    /// A sync that is only waiting for a network would otherwise read as starting.
-    pub(crate) fn shown_sync_status(&self, state: SyncState) -> SyncStatus {
-        if matches!(state, SyncState::Idle)
-            && !self.sync_paused()
-            && !self.activity.network_available()
-        {
-            return SyncStatus::Offline;
-        }
-        sync_status(state)
-    }
-
-    fn emit_sync_status(&self, generation: u64, state: SyncState) {
-        self.emit_if_current(
-            generation,
-            CoreEvent::SyncStatus(self.shown_sync_status(state)),
-        );
-    }
-
+impl SignedIn {
     /// Restarts a stalled sync with backoff and reports each state change.
     pub(crate) fn watch_sync_state(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
+        &self,
         sync_service: &Arc<matrix_sdk_ui::sync_service::SyncService>,
         generation: u64,
     ) {
-        let core = self.clone();
+        let client = self.client();
+        let session = self.clone();
         let mut states = sync_service.state();
         let restarted = sync_service.clone();
         let support_client = client.clone();
         // `Subscriber::next` yields only on *change*, so emit the first by hand.
-        core.emit_sync_status(generation, states.get());
+        session.core().emit_sync_status(generation, states.get());
         self.track_session_task(
             spawn(async move {
                 let mut failures = 0u32;
@@ -113,7 +97,7 @@ impl Core {
                     // The SDK's offline mode already polls the server and resumes by itself; only
                     // an OS-reported outage, which blocks every restart, needs this probe.
                     let next = if matches!(states.get(), SyncState::Offline)
-                        && !core.activity.network_available()
+                        && !session.core().activity.network_available()
                     {
                         matrix_sdk::timeout::timeout(states.next(), OFFLINE_RECHECK).await
                     } else {
@@ -121,14 +105,14 @@ impl Core {
                     };
                     let Ok(next) = next else {
                         if server_reachable(&support_client).await {
-                            core.retry_sync(&restarted).await;
+                            session.core().retry_sync(&restarted).await;
                         }
                         continue;
                     };
                     let Some(state) = next else {
                         break;
                     };
-                    if core.sync_paused() {
+                    if session.core().sync_paused() {
                         continue;
                     }
                     let idle = matches!(state, SyncState::Idle);
@@ -142,14 +126,14 @@ impl Core {
                             .take()
                             .is_some_and(|since| since.elapsed() >= SYNC_BACKOFF_RESET)
                     };
-                    core.emit_sync_status(generation, state);
+                    session.core().emit_sync_status(generation, state);
                     if running {
-                        let core = core.clone();
+                        let session = session.clone();
                         let rules_cleaned = rules_cleaned.clone();
                         after_running = Some(
                             spawn(
                                 async move {
-                                    core.after_sync_running(generation, &rules_cleaned).await;
+                                    session.after_sync_running(generation, &rules_cleaned).await;
                                 }
                                 .instrument(tracing::info_span!(
                                     target: "sable_core::tasks",
@@ -160,25 +144,25 @@ impl Core {
                         );
                     }
 
-                    if !core.sync_allowed() {
+                    if !session.core().sync_allowed() {
                         continue;
                     }
                     if idle {
-                        core.resume_sync(&restarted).await;
+                        session.core().resume_sync(&restarted).await;
                     } else if failed {
                         after_running.take();
-                        if core.detect_account_lock(&support_client, generation).await {
+                        if session.detect_account_lock(generation).await {
                             continue;
                         }
                         if matches!(
-                            core.require_sliding_sync(&support_client).await,
+                            session.core().require_sliding_sync(&support_client).await,
                             Err(RpcError {
                                 code: RpcCode::SlidingSyncUnsupported,
                                 ..
                             })
                         ) {
                             restarted.stop().await;
-                            core.emit_if_current(
+                            session.core().emit_if_current(
                                 generation,
                                 CoreEvent::SyncStatus(SyncStatus::Error {
                                     message: "This homeserver does not support Sliding Sync."
@@ -192,7 +176,7 @@ impl Core {
                         }
                         retry_backoff(failures).await;
                         failures = failures.saturating_add(1);
-                        core.resume_sync(&restarted).await;
+                        session.core().resume_sync(&restarted).await;
                     }
                 }
             })
@@ -200,24 +184,22 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_account_data(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
+    pub(crate) fn watch_account_data(&self, generation: u64) {
+        let client = self.client();
         let handle = client.add_event_handler({
             let core = self.clone();
             move |event: AnyGlobalAccountDataEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
                 async move {
-                    if core.is_current(generation) {
+                    if core.core().is_current(generation) {
                         let event_type = event.event_type().to_string();
                         crate::dehydrated_device::on_account_data(&client, &event).await;
                         core.remember_account_data_type(event_type.clone()).await;
                         if crate::personas::is_persona_event(&event_type) {
-                            core.emit(CoreEvent::PersonasChanged);
+                            core.core().emit(CoreEvent::PersonasChanged);
                         }
-                        core.emit(CoreEvent::AccountDataChanged { event_type });
+                        core.core()
+                            .emit(CoreEvent::AccountDataChanged { event_type });
                     }
                 }
             }
@@ -225,10 +207,11 @@ impl Core {
         self.track_session_handler(client, handle);
     }
 
-    pub(crate) fn watch_send_queue(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_send_queue(&self) {
         use matrix_sdk::send_queue::RoomSendQueueUpdate;
         use tokio::sync::broadcast::error::RecvError;
 
+        let client = self.client();
         let queue = client.send_queue();
         let mut errors = queue.subscribe_errors();
         let mut updates = queue.subscribe();
@@ -265,8 +248,8 @@ impl Core {
                     failures = failures.saturating_add(1);
                     retry_backoff(failures).await;
                     // Unlocking re-enables the queue itself; a paused sync retries once it resumes.
-                    core.wait_until_sync_resumes().await;
-                    if !core.activity.account_locked() {
+                    core.core().wait_until_sync_resumes().await;
+                    if !core.core().activity.account_locked() {
                         queue.set_enabled(true).await;
                     }
                 }
@@ -275,28 +258,21 @@ impl Core {
         );
     }
 
-    pub(crate) async fn watch_notifications(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
+    pub(crate) async fn watch_notifications(&self, generation: u64) {
+        let client = self.client();
         let (sender, mut pending) = tokio::sync::mpsc::unbounded_channel();
-        let Some(account_id) = self.session.current(|session| session.account_id.clone()) else {
-            return;
-        };
-        let mut routes = self.notification_routes.lock().await;
-        let route = if let Some(route) = routes.get(&account_id) {
-            route.clone()
+        let account_id = &self.session().account_id;
+        // Runs in the session start's job, so no other registration races this one.
+        let route = if let Some(route) = self.core().clients.route(account_id) {
+            route
         } else {
             let route = register_notification_route(client).await;
-            routes.insert(account_id, route.clone());
-            route
+            self.core().clients.keep_route(account_id, route)
         };
         *route.lock() = Some(sender.clone());
         let redecrypted = sender.clone();
         let route_guard = NotificationWorkerRoute { route, sender };
-        drop(routes);
-        self.watch_redecrypted_notifications(client, redecrypted, generation);
+        self.watch_redecrypted_notifications(redecrypted, generation);
 
         let core = self.clone();
         let client = client.clone();
@@ -315,12 +291,8 @@ impl Core {
         );
     }
 
-    fn watch_redecrypted_notifications(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        notifications: NotificationSender,
-        generation: u64,
-    ) {
+    fn watch_redecrypted_notifications(&self, notifications: NotificationSender, generation: u64) {
+        let client = self.client();
         let Some(event_cache) = client.event_cache() else {
             return;
         };
@@ -374,7 +346,7 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_notification_settings(self: &Arc<Self>, generation: u64) {
+    pub(crate) fn watch_notification_settings(&self, generation: u64) {
         let core = self.clone();
         self.track_session_task(
             spawn(async move {
@@ -385,14 +357,16 @@ impl Core {
                 while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
                     changes.recv().await
                 {
-                    core.emit_if_current(generation, CoreEvent::NotificationSettingsChanged);
+                    core.core()
+                        .emit_if_current(generation, CoreEvent::NotificationSettingsChanged);
                 }
             })
             .abort_on_drop(),
         );
     }
 
-    pub(crate) fn watch_room_keys(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_room_keys(&self) {
+        let client = self.client();
         let core = self.clone();
         let client = client.clone();
         self.track_session_task(
@@ -441,7 +415,8 @@ impl Core {
     }
 
     /// Re-read the full status when verification, recovery, or backup changes.
-    pub(crate) fn watch_encryption(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+    pub(crate) fn watch_encryption(&self, generation: u64) {
+        let client = self.client();
         let mut verification = client.encryption().verification_state();
         let recovery = client.encryption().recovery().state_stream();
         let backups = client.encryption().backups().state_stream();
@@ -450,7 +425,7 @@ impl Core {
         let watched = client.clone();
         self.track_session_task(
             spawn(async move {
-                core.emit_if_current(
+                core.core().emit_if_current(
                     generation,
                     CoreEvent::EncryptionStatus {
                         status: crate::verification::encryption_status(&watched).await,
@@ -465,7 +440,7 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 while verification.next().await.is_some() {
-                    core.emit_if_current(
+                    core.core().emit_if_current(
                         generation,
                         CoreEvent::EncryptionStatus {
                             status: crate::verification::encryption_status(&watched).await,
@@ -482,7 +457,7 @@ impl Core {
             spawn(async move {
                 pin_mut!(recovery);
                 while recovery.next().await.is_some() {
-                    core.emit_if_current(
+                    core.core().emit_if_current(
                         generation,
                         CoreEvent::EncryptionStatus {
                             status: crate::verification::encryption_status(&watched).await,
@@ -499,7 +474,7 @@ impl Core {
             spawn(async move {
                 pin_mut!(backups);
                 while backups.next().await.is_some() {
-                    core.emit_if_current(
+                    core.core().emit_if_current(
                         generation,
                         CoreEvent::EncryptionStatus {
                             status: crate::verification::encryption_status(&watched).await,
@@ -511,7 +486,8 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_devices(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+    pub(crate) fn watch_devices(&self, generation: u64) {
+        let client = self.client();
         let core = self.clone();
         let watched = client.clone();
         self.track_session_task(
@@ -522,13 +498,13 @@ impl Core {
                     loop {
                         let devices = crate::verification::local_own_devices(&watched).await;
                         if known.as_ref().is_some_and(|known| *known != devices) {
-                            core.emit_if_current(
+                            core.core().emit_if_current(
                                 generation,
                                 CoreEvent::EncryptionStatus {
                                     status: crate::verification::encryption_status(&watched).await,
                                 },
                             );
-                            core.emit_if_current(
+                            core.core().emit_if_current(
                                 generation,
                                 CoreEvent::DevicesChanged {
                                     devices: devices.clone(),
@@ -546,16 +522,8 @@ impl Core {
         );
     }
 
-    pub(crate) async fn emit_devices(&self, generation: u64, client: &matrix_sdk::Client) {
-        self.emit_if_current(
-            generation,
-            CoreEvent::DevicesChanged {
-                devices: crate::verification::own_devices(client).await,
-            },
-        );
-    }
-
-    pub(crate) fn watch_joined_invites(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_joined_invites(&self) {
+        let client = self.client();
         self.track_session_task(
             spawn(crate::rooms::reconcile_joined_invites(client.clone())).abort_on_drop(),
         );
@@ -564,11 +532,8 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_profile_changes(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
+    pub(crate) fn watch_profile_changes(&self, generation: u64) {
+        let client = self.client();
         let handle = client.add_event_handler({
             let core = self.clone();
             move |event: OriginalSyncRoomMemberEvent, room: matrix_sdk::Room| {
@@ -583,7 +548,7 @@ impl Core {
                     {
                         return;
                     }
-                    core.emit_profile_changed(generation, &room, &event).await;
+                    core.emit_profile_changed(generation, &room, &event);
                 }
             }
         });
@@ -606,9 +571,9 @@ impl Core {
                         &event,
                         power_levels.as_ref(),
                         service,
-                        &core.nicknames(),
+                        &core.core().nicknames(),
                     );
-                    core.emit_if_current(
+                    core.core().emit_if_current(
                         generation,
                         CoreEvent::MembersChanged {
                             room_id: room.room_id().to_owned(),
@@ -635,7 +600,7 @@ impl Core {
                         return;
                     };
                     if event.prev_content().is_none() {
-                        core.emit_profile_changed(generation, &room, &event).await;
+                        core.emit_profile_changed(generation, &room, &event);
                     }
                     let power_levels = room.power_levels().await.ok();
                     let ban = power_levels.as_ref().and_then(|power_levels| {
@@ -647,15 +612,19 @@ impl Core {
                             event.origin_server_ts.0.into(),
                         )
                     });
-                    core.overlay_ban_redaction(room.room_id(), &event.state_key, ban, power_levels)
-                        .await;
+                    core.overlay_ban_redaction(
+                        room.room_id(),
+                        &event.state_key,
+                        ban.as_ref(),
+                        power_levels.as_ref(),
+                    );
                 }
             }
         });
         self.track_session_handler(client, handle);
     }
 
-    async fn emit_profile_changed(
+    fn emit_profile_changed(
         &self,
         generation: u64,
         room: &matrix_sdk::Room,
@@ -672,11 +641,10 @@ impl Core {
         self.overlay_profile(
             room.room_id(),
             &user_id,
-            display_name.clone(),
-            avatar_url.clone(),
-        )
-        .await;
-        self.emit_if_current(
+            display_name.as_deref(),
+            avatar_url.as_deref(),
+        );
+        self.core().emit_if_current(
             generation,
             CoreEvent::ProfileChanged {
                 room_id: room.room_id().to_owned(),
@@ -687,18 +655,15 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_space_sidebar(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
+    pub(crate) fn watch_space_sidebar(&self, generation: u64) {
+        let client = self.client();
         let handle = client.add_event_handler({
             let core = self.clone();
             move |event: SidebarSpacesEvent| {
                 let core = core.clone();
 
                 async move {
-                    core.emit_if_current(
+                    core.core().emit_if_current(
                         generation,
                         CoreEvent::SpaceSidebarChanged {
                             items: spaces::items(&event.content),
@@ -712,7 +677,8 @@ impl Core {
 
     /// The SDK drops a redaction's reason from an item it redacts live, so the reason is
     /// read off the redaction event and laid over the open timelines.
-    pub(crate) fn watch_redactions(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_redactions(&self) {
+        let client = self.client();
         let handle = client.add_event_handler({
             let core = self.clone();
             move |event: SyncRoomRedactionEvent, room: matrix_sdk::Room| {
@@ -730,8 +696,7 @@ impl Core {
                         return;
                     };
                     let rules = room.clone_info().room_version_rules_or_default();
-                    core.overlay_redaction(room.room_id(), event.redacts(&rules.redaction), reason)
-                        .await;
+                    core.overlay_redaction(room.room_id(), event.redacts(&rules.redaction), reason);
                 }
             }
         });
@@ -739,7 +704,8 @@ impl Core {
     }
 
     /// Ordinary sync events: one handler covers every room, including ones the UI has shut.
-    pub(crate) fn watch_ephemeral(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+    pub(crate) fn watch_ephemeral(&self, generation: u64) {
+        let client = self.client();
         let own_user_id = client.user_id().map(ToOwned::to_owned);
 
         let handle = client.add_event_handler({
@@ -758,7 +724,7 @@ impl Core {
                         .filter(|id| Some(id) != own_user_id.as_ref() && !ignored.contains(id))
                         .collect();
 
-                    core.emit_if_current(
+                    core.core().emit_if_current(
                         generation,
                         CoreEvent::Typing {
                             room_id: room.room_id().to_owned(),
@@ -828,7 +794,7 @@ async fn register_notification_route(client: &matrix_sdk::Client) -> Notificatio
 
 /// Turns live sync notifications into in-app alerts, once per event or invite.
 struct ForegroundNotifier {
-    core: Arc<Core>,
+    core: SignedIn,
     client: matrix_sdk::Client,
     notifications: NotificationClient,
     generation: u64,
@@ -837,8 +803,8 @@ struct ForegroundNotifier {
 }
 
 impl ForegroundNotifier {
-    async fn new(core: Arc<Core>, client: matrix_sdk::Client, generation: u64) -> Option<Self> {
-        let sync_service = core.sync_service().await.ok()?;
+    async fn new(core: SignedIn, client: matrix_sdk::Client, generation: u64) -> Option<Self> {
+        let sync_service = core.sync_service();
         let setup = NotificationProcessSetup::SingleProcess { sync_service };
         let notifications = NotificationClient::new(client.clone(), setup).await.ok()?;
         let alerted_invites = client
@@ -913,8 +879,12 @@ impl ForegroundNotifier {
             && !self.core.is_read_room(room.room_id())
             && !read
         {
-            self.core.nicknames().apply_notification(&mut notification);
             self.core
+                .core()
+                .nicknames()
+                .apply_notification(&mut notification);
+            self.core
+                .core()
                 .emit_if_current(self.generation, CoreEvent::Notification { notification });
         }
     }
@@ -955,6 +925,35 @@ fn first_alert(
 ) -> bool {
     alerted.retain(|_, sent| !notifications::is_backfill(now, *sent));
     alerted.insert(event_id.to_owned(), sent).is_none()
+}
+
+impl Core {
+    /// A sync that is only waiting for a network would otherwise read as starting.
+    pub(crate) fn shown_sync_status(&self, state: SyncState) -> SyncStatus {
+        if matches!(state, SyncState::Idle)
+            && !self.sync_paused()
+            && !self.activity.network_available()
+        {
+            return SyncStatus::Offline;
+        }
+        sync_status(state)
+    }
+
+    fn emit_sync_status(&self, generation: u64, state: SyncState) {
+        self.emit_if_current(
+            generation,
+            CoreEvent::SyncStatus(self.shown_sync_status(state)),
+        );
+    }
+
+    pub(crate) async fn emit_devices(&self, generation: u64, client: &matrix_sdk::Client) {
+        self.emit_if_current(
+            generation,
+            CoreEvent::DevicesChanged {
+                devices: crate::verification::own_devices(client).await,
+            },
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1084,7 +1083,9 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let client = server.client_builder().build().await;
         let (core, mut events) = Core::new("watchers", Box::new(MemorySessionStore::default()));
-        core.watch_profile_changes(&client, 1);
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.watch_profile_changes(1);
         let old = json!({ "membership": "join", "displayname": "Alice" });
         let new = json!({
             "membership": "join",
@@ -1124,7 +1125,9 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let client = server.client_builder().build().await;
         let (core, mut events) = Core::new("watchers", Box::new(MemorySessionStore::default()));
-        core.watch_profile_changes(&client, 1);
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.watch_profile_changes(1);
         let invited = json!({ "membership": "invite", "displayname": "Alice" });
         let joined = json!({ "membership": "join", "displayname": "Alice" });
         let left = json!({ "membership": "leave", "displayname": "Alice" });
@@ -1154,7 +1157,9 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let client = server.client_builder().build().await;
         let (core, mut events) = Core::new("watchers", Box::new(MemorySessionStore::default()));
-        core.watch_profile_changes(&client, 1);
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.watch_profile_changes(1);
         let state = |membership: &str| json!({ "membership": membership });
         let (invite, join, leave, ban) =
             (state("invite"), state("join"), state("leave"), state("ban"));
@@ -1203,7 +1208,9 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let client = server.client_builder().build().await;
         let (core, mut events) = Core::new("watchers", Box::new(MemorySessionStore::default()));
-        core.watch_profile_changes(&client, 1);
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.watch_profile_changes(1);
         let bob = json!({ "membership": "join", "displayname": "Bob" });
         let alicia = json!({ "membership": "join", "displayname": "Alicia" });
 
@@ -1233,7 +1240,9 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let client = server.client_builder().build().await;
         let (core, mut events) = Core::new("watchers", Box::new(MemorySessionStore::default()));
-        core.watch_ephemeral(&client, 1);
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        session.watch_ephemeral(1);
         let factory = EventFactory::new();
         let troll = user_id!("@troll:example.org");
         let bob = user_id!("@bob:example.org");

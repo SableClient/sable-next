@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 
-use super::Handler;
+use super::{Handler, SessionHandler};
 use crate::protocol::{DiagnosticPushView, RegisteredPusherView, RpcError, WebPushKeys};
-use crate::{Core, notifications, push_check, webpush};
+use crate::{Core, notifications, push_check, webpush, SignedIn};
 
 domain! {
     set_pusher,
@@ -53,13 +53,13 @@ pub struct SetPusherParams {
     pub pusher: PusherView,
 }
 
-impl Handler for SetPusherParams {
+impl SessionHandler for SetPusherParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        notifications::set_pusher(&core.client().await?, self.pusher)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        notifications::set_pusher(session.client(), self.pusher)
             .await
-            .or_report(core, "set_pusher")
+            .or_report(session.core(), "set_pusher")
     }
 }
 
@@ -70,13 +70,13 @@ pub struct RemovePusherParams {
     pub app_id: String,
 }
 
-impl Handler for RemovePusherParams {
+impl SessionHandler for RemovePusherParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        notifications::remove_pusher(&core.client().await?, self.pushkey, self.app_id)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        notifications::remove_pusher(session.client(), self.pushkey, self.app_id)
             .await
-            .or_report(core, "remove_pusher")
+            .or_report(session.core(), "remove_pusher")
     }
 }
 
@@ -85,14 +85,14 @@ impl Handler for RemovePusherParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct WebPusherSupportParams {}
 
-impl Handler for WebPusherSupportParams {
+impl SessionHandler for WebPusherSupportParams {
     /// `Some` carries the VAPID key subscriptions must be minted under.
     type Ok = Option<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<String>, RpcError> {
-        webpush::support(&core.client().await?)
+    async fn run(self, session: &SignedIn) -> Result<Option<String>, RpcError> {
+        webpush::support(session.client())
             .await
-            .or_report(core, "webpusher_support")
+            .or_report(session.core(), "webpusher_support")
     }
 }
 
@@ -102,13 +102,13 @@ pub struct SetWebPusherParams {
     pub pusher: WebPusherView,
 }
 
-impl Handler for SetWebPusherParams {
+impl SessionHandler for SetWebPusherParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        webpush::set_pusher(&core.client().await?, self.pusher)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        webpush::set_pusher(session.client(), self.pusher)
             .await
-            .or_report(core, "set_webpusher")
+            .or_report(session.core(), "set_webpusher")
     }
 }
 
@@ -116,13 +116,13 @@ impl Handler for SetWebPusherParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct WebPushersParams {}
 
-impl Handler for WebPushersParams {
+impl SessionHandler for WebPushersParams {
     type Ok = Vec<RegisteredPusherView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<RegisteredPusherView>, RpcError> {
-        webpush::pushers(&core.client().await?)
+    async fn run(self, session: &SignedIn) -> Result<Vec<RegisteredPusherView>, RpcError> {
+        webpush::pushers(session.client())
             .await
-            .or_report(core, "webpushers")
+            .or_report(session.core(), "webpushers")
     }
 }
 
@@ -147,13 +147,13 @@ pub struct SendDiagnosticParams {
     pub app_id: String,
 }
 
-impl Handler for SendDiagnosticParams {
+impl SessionHandler for SendDiagnosticParams {
     type Ok = DiagnosticPushView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<DiagnosticPushView, RpcError> {
-        push_check::send_diagnostic_push(&core.client().await?, &self.pushkey, &self.app_id)
+    async fn run(self, session: &SignedIn) -> Result<DiagnosticPushView, RpcError> {
+        push_check::send_diagnostic_push(session.client(), &self.pushkey, &self.app_id)
             .await
-            .or_report(core, "send_diagnostic_push")
+            .or_report(session.core(), "send_diagnostic_push")
     }
 }
 
@@ -164,12 +164,12 @@ pub struct AckWebPusherParams {
     pub ack_token: String,
 }
 
-impl Handler for AckWebPusherParams {
+impl SessionHandler for AckWebPusherParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        webpush::ack(&core.client().await?, self.app_id, self.ack_token)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        webpush::ack(session.client(), self.app_id, self.ack_token)
             .await
-            .or_report(core, "ack_webpusher")
+            .or_report(session.core(), "ack_webpusher")
     }
 }

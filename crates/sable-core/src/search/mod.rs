@@ -20,7 +20,7 @@ pub(crate) const MAX_SEARCH_RESULTS: usize = 200;
 pub(crate) use crawl::CrawlProgress;
 pub(crate) use filter::IndexFilter;
 pub(crate) use server::ServerSearch;
-pub(crate) use sharing::SearchSharing;
+pub(crate) use sharing::SearchPeers;
 
 use crate::now_ms;
 use std::time::Duration;
@@ -38,6 +38,8 @@ use self::document::{indexable_body, replacement_of};
 pub(crate) use self::index::{ContextLine, Hit, MessageIndex};
 #[cfg(not(target_family = "wasm"))]
 pub(crate) use self::store::DIRECTORY;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) use self::store::Store;
 pub(crate) use self::store::expands;
 #[cfg(target_family = "wasm")]
 pub use self::store_web::attach_search_port;
@@ -138,7 +140,7 @@ mod tests;
 /// Fills an account's database as an earlier session would have left it.
 #[cfg(all(test, not(target_family = "wasm")))]
 pub(crate) async fn seed_account_index(store_id: &str, room_id: &ruma::RoomId, count: usize) {
-    let index = MessageIndex::with_store(store::Store::open_account(store_id).await);
+    let index = MessageIndex::with_store(Store::open_account(store_id).await);
     for position in 0..count {
         index.upsert(
             room_id,

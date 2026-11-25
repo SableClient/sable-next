@@ -55,7 +55,8 @@ async fn test_an_unencrypted_room_is_searched_on_the_homeserver() {
         .await;
 
     let core = logged_in(&server, &client, "search-server-plain").await;
-    let hits = core
+    let session = core.signed_in().unwrap();
+    let hits = session
         .search_messages(
             "deploy",
             &scoped_to(&room_id),
@@ -119,11 +120,12 @@ async fn test_an_edited_server_hit_is_split_with_the_query_words() {
         .await;
 
     let core = logged_in(&server, &client, "search-server-words").await;
+    let session = core.signed_in().unwrap();
     let filter = crate::search::IndexFilter {
         words: vec!["日本語".to_owned(), "勉強".to_owned()],
         ..scoped_to(&room_id)
     };
-    let hits = core
+    let hits = session
         .search_messages(
             "日本語勉強",
             &filter,
@@ -177,15 +179,21 @@ async fn test_an_encrypted_room_is_never_searched_on_the_homeserver() {
         .await;
 
     let core = logged_in(&server, &client, "search-server-encrypted").await;
+    let session = core.signed_in().unwrap();
     let (cache, _drop_handles) = client
         .event_cache()
         .unwrap()
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(
+        &*session.state().search_index.lock().await,
+        &cache,
+        &room_id,
+    )
+    .await;
 
-    let hits = core
+    let hits = session
         .search_messages(
             "deploy",
             &scoped_to(&room_id),
@@ -236,15 +244,21 @@ async fn test_a_homeserver_that_cannot_search_falls_back_to_the_local_index() {
         .await;
 
     let core = logged_in(&server, &client, "search-server-missing").await;
+    let session = core.signed_in().unwrap();
     let (cache, _drop_handles) = client
         .event_cache()
         .unwrap()
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(
+        &*session.state().search_index.lock().await,
+        &cache,
+        &room_id,
+    )
+    .await;
 
-    let hits = core
+    let hits = session
         .search_messages(
             "deploy",
             &scoped_to(&room_id),
@@ -294,19 +308,25 @@ async fn test_a_dated_query_stays_local_even_for_an_unencrypted_room() {
         .await;
 
     let core = logged_in(&server, &client, "search-server-dated").await;
+    let session = core.signed_in().unwrap();
     let (cache, _drop_handles) = client
         .event_cache()
         .unwrap()
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(
+        &*session.state().search_index.lock().await,
+        &cache,
+        &room_id,
+    )
+    .await;
 
     let filter = crate::search::IndexFilter {
         after_ts: Some(1_000),
         ..scoped_to(&room_id)
     };
-    let hits = core
+    let hits = session
         .search_messages(
             "deploy",
             &filter,
@@ -356,19 +376,25 @@ async fn test_a_filter_only_query_stays_local_even_for_an_unencrypted_room() {
         .await;
 
     let core = logged_in(&server, &client, "search-server-filter-only").await;
+    let session = core.signed_in().unwrap();
     let (cache, _drop_handles) = client
         .event_cache()
         .unwrap()
         .room(&room_id)
         .await
         .expect("room event cache");
-    reingest_whole_room(&*core.search_index.lock().await, &cache, &room_id).await;
+    reingest_whole_room(
+        &*session.state().search_index.lock().await,
+        &cache,
+        &room_id,
+    )
+    .await;
 
     let filter = crate::search::IndexFilter {
         senders: vec![sender.to_owned()],
         ..scoped_to(&room_id)
     };
-    let hits = core
+    let hits = session
         .search_messages(
             "",
             &filter,

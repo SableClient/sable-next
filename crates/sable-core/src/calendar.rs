@@ -1,7 +1,6 @@
 //! Calendar rooms in Commet's format (`chat.commet.calendar`), plus RSVPs.
 
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
@@ -14,11 +13,12 @@ use serde_json::Value;
 use serde_json::value::to_raw_value;
 use serde_with::{DefaultOnError, VecSkipError, serde_as};
 
+use crate::ResultExt;
+use crate::SignedIn;
 use crate::protocol::{
     CalendarEntryView, CalendarRsvpView, CalendarView, CoreEvent, RpcError, RsvpStatusView,
 };
 use crate::room_settings::EmptyContent;
-use crate::{Core, ResultExt};
 
 pub(crate) const CALENDAR_ROOM_TYPE: &str = "chat.commet.calendar";
 pub(crate) const RSVP_EVENT: &str = "moe.sable.calendar.rsvp";
@@ -105,16 +105,16 @@ struct CalendarsOut {
     calendars: [OwnedEventId; 1],
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn calendar_entries(
         &self,
         room_id: &OwnedRoomId,
     ) -> Result<CalendarView, RpcError> {
-        let room = self.room(room_id).await?;
-        let cached = self
+        let session_state = self.state();
+        let room = self.room(room_id)?;
+        let cached = session_state
             .calendars
             .lock()
-            .await
             .get(room_id)
             .cloned()
             .unwrap_or_default();
@@ -128,7 +128,7 @@ impl Core {
             let messages = room
                 .messages(options)
                 .await
-                .or_failed(self, "calendar_entries")?;
+                .or_failed(self.core(), "calendar_entries")?;
             for event in &messages.chunk {
                 let Ok(event) = event.raw().deserialize_as::<Value>() else {
                     continue;
@@ -166,11 +166,15 @@ impl Core {
             .rsvps
             .retain(|(event_id, _)| !redacted.contains(event_id));
         let view = fresh.view();
-        self.calendars.lock().await.insert(room_id.clone(), fresh);
+        session_state
+            .calendars
+            .lock()
+            .insert(room_id.clone(), fresh);
         Ok(view)
     }
 
-    pub(crate) fn watch_calendars(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+    pub(crate) fn watch_calendars(&self, generation: u64) {
+        let client = self.client();
         let handle = client.add_event_handler({
             let core = self.clone();
             move |event: Raw<AnySyncTimelineEvent>, room: matrix_sdk::Room| {
@@ -184,7 +188,7 @@ impl Core {
                         kind.as_deref(),
                         Some(CALENDAR_EVENTS | RSVP_EVENT | REDACTION | ENCRYPTED)
                     ) {
-                        core.emit_if_current(
+                        core.core().emit_if_current(
                             generation,
                             CoreEvent::CalendarChanged {
                                 room_id: room.room_id().to_owned(),
@@ -203,7 +207,7 @@ impl Core {
         event: Value,
         replaces: Option<OwnedEventId>,
     ) -> Result<(), RpcError> {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         let calendar_id = self.calendar_id(&room).await?;
         let content = to_raw_value(&CalendarEventsOut {
             relates_to: CalendarRefOut::Reference {
@@ -212,14 +216,14 @@ impl Core {
             format: CalendarFormat::Rfc8984,
             events: [CalendarItemOut { event }],
         })
-        .or_failed(self, "save_calendar_event")?;
+        .or_failed(self.core(), "save_calendar_event")?;
         room.send_raw(CALENDAR_EVENTS, content)
             .await
-            .or_failed(self, "save_calendar_event")?;
+            .or_failed(self.core(), "save_calendar_event")?;
         if let Some(replaces) = replaces {
             room.redact(&replaces, None, None)
                 .await
-                .or_failed(self, "save_calendar_event")?;
+                .or_failed(self.core(), "save_calendar_event")?;
         }
         Ok(())
     }
@@ -230,12 +234,11 @@ impl Core {
         answer: &CalendarAnswer,
     ) -> Result<(), RpcError> {
         let content =
-            to_raw_value(&rsvp_content(answer)).or_failed(self, "answer_calendar_event")?;
-        self.room(room_id)
-            .await?
+            to_raw_value(&rsvp_content(answer)).or_failed(self.core(), "answer_calendar_event")?;
+        self.room(room_id)?
             .send_raw(RSVP_EVENT, content)
             .await
-            .or_failed(self, "answer_calendar_event")?;
+            .or_failed(self.core(), "answer_calendar_event")?;
         Ok(())
     }
 
@@ -253,18 +256,18 @@ impl Core {
         if let Some(calendar_id) = existing {
             return Ok(calendar_id);
         }
-        let empty = to_raw_value(&EmptyContent {}).or_failed(self, "calendar_id")?;
+        let empty = to_raw_value(&EmptyContent {}).or_failed(self.core(), "calendar_id")?;
         let created = room
             .send_raw(CALENDAR_CREATE, empty)
             .await
-            .or_failed(self, "calendar_id")?;
+            .or_failed(self.core(), "calendar_id")?;
         let calendars = to_raw_value(&CalendarsOut {
             calendars: [created.response.event_id.clone()],
         })
-        .or_failed(self, "calendar_id")?;
+        .or_failed(self.core(), "calendar_id")?;
         room.send_state_event_raw(CALENDARS, "", calendars)
             .await
-            .or_failed(self, "calendar_id")?;
+            .or_failed(self.core(), "calendar_id")?;
         self.forget_room_state(room.room_id(), CALENDARS);
         Ok(created.response.event_id.to_string())
     }

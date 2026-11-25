@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 
-use super::Handler;
+use super::{Handler, SessionHandler};
+use crate::SignedIn;
 use crate::Core;
 use crate::protocol::{RpcError, RtcSignal};
 
@@ -18,10 +19,10 @@ pub struct SignalParams {
     pub signal: RtcSignal,
 }
 
-impl Handler for SignalParams {
+impl SessionHandler for SignalParams {
     type Ok = ();
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.signal_rtc(&self.session_id, self.signal).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.signal_rtc(&self.session_id, self.signal).await
     }
 }
 
@@ -34,9 +35,11 @@ pub struct CloseParams {
 impl Handler for CloseParams {
     type Ok = ();
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.close_rtc(&self.session_id);
-        if let Ok(client) = core.client().await {
-            core.close_search_peer(&client, &self.session_id).await;
+        if let Ok(session) = core.signed_in() {
+            session.close_rtc(&self.session_id);
+            session
+                .close_search_peer(&self.session_id)
+                .await;
         }
         Ok(())
     }

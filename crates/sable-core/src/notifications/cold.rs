@@ -104,9 +104,6 @@ pub struct PushClient {
     _lease: Option<PushLease>,
 }
 
-/// Holds a store lease for as long as a push uses it. A client the core cached only for the push
-/// of an account that is not active is evicted before the lease is released, so its stores and
-/// their locks do not stay open for the next switch.
 pub(super) struct PushLease {
     lease: Option<crate::session::StoreLease>,
     evict: Option<(std::sync::Arc<crate::Core>, String)>,
@@ -123,17 +120,18 @@ impl PushLease {
 
 impl Drop for PushLease {
     fn drop(&mut self) {
-        let lease = self.lease.take();
+        drop(self.lease.take());
         let Some((core, account_id)) = self.evict.take() else {
             return;
         };
-        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
-            return;
-        };
-        drop(runtime.spawn(async move {
-            core.evict_idle_account_client(&account_id).await;
-            drop(lease);
-        }));
+        if core.clients.give_back(&account_id) {
+            // Ordered with switches, so a switch to this account keeps the client it finds.
+            core.supervise_later("return a push client", move |core, _| {
+                Box::pin(async move {
+                    core.evict_idle_account_client(&account_id);
+                })
+            });
+        }
     }
 }
 
@@ -201,12 +199,7 @@ pub async fn restore_push_client(
 ) -> Option<PushClient> {
     let host = push_host(store_dir, user_id, device_id, RoomLoadSettings::default()).await?;
     Some(match host {
-        PushHost::Live { client, .. } => PushClient {
-            client,
-            refreshes: false,
-            _lease: None,
-        },
-        PushHost::Shared { client, lease } => PushClient {
+        PushHost::Live { client, lease, .. } | PushHost::Shared { client, lease } => PushClient {
             client,
             refreshes: false,
             _lease: Some(lease),
@@ -268,6 +261,7 @@ pub(super) enum PushHost {
     Live {
         client: Client,
         sync_service: std::sync::Arc<matrix_sdk_ui::sync_service::SyncService>,
+        lease: PushLease,
     },
     Shared {
         client: Client,
@@ -309,7 +303,7 @@ impl PushHost {
     }
 }
 
-const RESTORE_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+const LEND_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 pub(super) const ACCOUNT_DATA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// A core in this process opens the client, so a store never has two there. Without one, the
@@ -325,38 +319,93 @@ pub(super) async fn push_host(
             .await
             .map(PushHost::Own);
     };
-    let _ = tokio::time::timeout(RESTORE_WAIT, core.lifecycle.restoring()).await;
-    if let Some(host) = live_push_host(&core, user_id, device_id).await {
+    let (user, device) = (user_id.to_owned(), device_id.to_owned());
+    let abandoned = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    // Queued behind a restore or switch in progress, so the push finds the session they start.
+    let lent = core.supervise("lend a client to a push", {
+        let abandoned = abandoned.clone();
+        move |core, supervised| {
+            Box::pin(async move {
+                if abandoned.load(std::sync::atomic::Ordering::SeqCst) {
+                    return None;
+                }
+                lend_push_host(&core, &supervised, &user, &device).await
+            })
+        }
+    });
+    let Ok(host) = matrix_sdk::timeout::timeout(Box::pin(lent), LEND_WAIT).await else {
+        // The push is over by the time a busy queue gets to it, so it opens nothing then.
+        abandoned.store(true, std::sync::atomic::Ordering::SeqCst);
+        return None;
+    };
+    let host = host.ok()??;
+    if let PushHost::Shared { client, .. } = &host {
+        // Bounded: the loan this push holds keeps lifecycle changes waiting.
+        matrix_sdk::timeout::timeout(
+            Box::pin(client.set_presence(ruma::presence::PresenceState::Offline, None, false)),
+            LEND_WAIT,
+        )
+        .await
+        .ok()?
+        .ok()?;
+    }
+    Some(host)
+}
+
+async fn lend_push_host(
+    core: &std::sync::Arc<crate::Core>,
+    supervised: &crate::supervisor::Supervised<'_>,
+    user_id: &str,
+    device_id: &str,
+) -> Option<PushHost> {
+    if let Some(host) = live_push_host(core, supervised, user_id, device_id) {
         return Some(host);
+    }
+    if !*core.activity.subscribe_stores().borrow() {
+        return None;
     }
     let accounts = core.accounts().await.ok()?;
     let account = push_account(&accounts, user_id, device_id)?;
-    let lease = crate::session::store_lease(&account.store_id).await;
-    if let Some(host) = live_push_host(&core, user_id, device_id).await {
-        return Some(host);
-    }
-    let client = core.saved_account_client(account, &lease).await.ok()?;
-    client
-        .set_presence(ruma::presence::PresenceState::Offline, None, false)
-        .await
-        .ok()?;
+    core.saved_account_client(supervised, account).await.ok()?;
+    let client = core.clients.lend(supervised, &account.account_id)?;
     let lease = PushLease {
-        lease: Some(lease),
+        lease: None,
         evict: Some((core.clone(), account.account_id.clone())),
     };
     Some(PushHost::Shared { client, lease })
 }
 
-async fn live_push_host(core: &crate::Core, user_id: &str, device_id: &str) -> Option<PushHost> {
-    core.session
-        .read()
-        .await
-        .as_ref()
-        .filter(|session| is_login(&session.client, user_id, device_id))
-        .map(|session| PushHost::Live {
-            client: session.client.clone(),
-            sync_service: session.sync_service.clone(),
+#[expect(
+    clippy::disallowed_methods,
+    reason = "lends the active session's client to a push"
+)]
+fn live_push_host(
+    core: &std::sync::Arc<crate::Core>,
+    supervised: &crate::supervisor::Supervised<'_>,
+    user_id: &str,
+    device_id: &str,
+) -> Option<PushHost> {
+    let (client, sync_service, account_id) = core
+        .session
+        .current(|session| {
+            is_login(&session.client, user_id, device_id).then(|| {
+                (
+                    session.client.clone(),
+                    session.sync_service.clone(),
+                    session.account_id.clone(),
+                )
+            })
         })
+        .flatten()?;
+    core.clients.count_loan(supervised, &account_id);
+    Some(PushHost::Live {
+        client,
+        sync_service,
+        lease: PushLease {
+            lease: None,
+            evict: Some((core.clone(), account_id)),
+        },
+    })
 }
 
 fn is_login(client: &Client, user_id: &str, device_id: &str) -> bool {

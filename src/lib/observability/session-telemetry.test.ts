@@ -49,6 +49,16 @@ test('does not include transport error text or arbitrary session-end reasons', (
   expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain('secret-token');
 });
 
+test('reports a session ended by a failed lifecycle step under its own reason', () => {
+  reportSessionFailure('session_ended', undefined, 'lifecycle_failed');
+  expect(sentry.captureMessage).toHaveBeenCalledWith(
+    'session.session_ended',
+    expect.objectContaining({
+      tags: expect.objectContaining({ 'session.reason': 'lifecycle_failed' }) as unknown,
+    })
+  );
+});
+
 test('does not capture when reporting is disabled', () => {
   sentry.isInitialized.mockReturnValue(false);
   reportSessionFailure('restore', new Error('failure'));

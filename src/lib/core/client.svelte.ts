@@ -871,31 +871,47 @@ export class CoreClient {
     const transport = this.ensureTransport();
     const accountId = this.session?.account_id ?? null;
     const userId = this.session?.user_id ?? null;
-    await this.#rpcOn(transport).session.logout();
+    let failure: Error | null = null;
+    try {
+      await this.#rpcOn(transport).session.logout();
+    } catch (error) {
+      // The core can fail after ending the session, leaving the account listed with its files.
+      const accounts = await this.#rpcOn(transport)
+        .session.listAccounts()
+        .catch(() => null);
+      const account = accounts?.find((account) => account.account_id === accountId);
+      if (!accounts || accountId === null || account?.needs_reauth === false) throw error;
+      failure = error instanceof Error ? error : new Error(String(error));
+    }
     this.generation += 1;
     this.replaceSession(null);
     this.verification = null;
     this.status = 'authenticating';
-    if (accountId !== null) {
-      discardAccountStore(transport, accountId);
-      removeAccountConfiguration(accountId);
-      clearRoomListSnapshot(accountId);
+    if (failure === null) {
+      if (accountId !== null) {
+        discardAccountStore(transport, accountId);
+        removeAccountConfiguration(accountId);
+        clearRoomListSnapshot(accountId);
+      }
+      if (userId !== null) clearRecentSearches(userId);
     }
-    if (userId !== null) clearRecentSearches(userId);
 
     try {
       await this.refreshAccounts();
-      if (await this.switchToFallback()) return;
-      this.status = 'signed-out';
+      if (!(await this.switchToFallback())) this.status = 'signed-out';
     } catch (error) {
       console.warn('[sable core] no saved account opened after signing out', error);
       this.status = 'signed-out';
     }
+    if (failure !== null) throw failure;
   }
 
-  private async switchToFallback(): Promise<boolean> {
+  private async switchToFallback(first?: string): Promise<boolean> {
     let failure: Error | null = null;
-    for (const account of this.accounts) {
+    const accounts = this.accounts
+      .slice()
+      .sort((a, b) => Number(b.account_id === first) - Number(a.account_id === first));
+    for (const account of accounts) {
       if (account.needs_reauth) continue;
       try {
         await this.switchAccount(account.account_id);
@@ -1376,13 +1392,16 @@ export class CoreClient {
       case 'failure':
         reportCoreFailure(event);
         return;
-      case 'session_ended':
+      case 'session_ended': {
         reportSessionFailure('session_ended', undefined, event.reason);
-        this.reauthenticationAccountId = this.session?.account_id ?? null;
+        const reopened = event.reason === 'lifecycle_failed' ? this.session?.account_id : undefined;
+        if (reopened === undefined)
+          this.reauthenticationAccountId = this.session?.account_id ?? null;
         this.replaceSession(null);
         this.status = 'authenticating';
-        void this.restoreFallbackAccount();
+        void this.restoreFallbackAccount(reopened);
         return;
+      }
       default:
         return;
     }
@@ -1405,12 +1424,12 @@ export class CoreClient {
     this.status = 'ready';
   }
 
-  private async restoreFallbackAccount(): Promise<void> {
+  private async restoreFallbackAccount(first?: string): Promise<void> {
     const generation = this.generation;
     try {
       await this.refreshAccounts();
       if (generation !== this.generation) return;
-      if (!(await this.switchToFallback())) this.status = 'signed-out';
+      if (!(await this.switchToFallback(first))) this.status = 'signed-out';
     } catch (error) {
       if (generation !== this.generation) return;
       reportSessionFailure('restore_fallback', error);

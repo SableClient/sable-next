@@ -190,17 +190,17 @@ impl Carried for Request<'_> {
     }
 }
 
-async fn carried_attachment(core: &Core, request: &impl Carried) -> Result<(), RpcError> {
+async fn carried_attachment(core: &Arc<Core>, request: &impl Carried) -> Result<(), RpcError> {
     core.send_attachment(request.metadata()?, request.bytes()?)
         .await
 }
 
-async fn carried_upload(core: &Core, request: &impl Carried) -> Result<String, RpcError> {
+async fn carried_upload(core: &Arc<Core>, request: &impl Carried) -> Result<String, RpcError> {
     let mime = request.header("mime").ok_or(RpcCode::InvalidMedia)?;
     core.upload_media(mime, request.bytes()?).await
 }
 
-async fn carried_gallery(core: &Core, request: &impl Carried) -> Result<(), RpcError> {
+async fn carried_gallery(core: &Arc<Core>, request: &impl Carried) -> Result<(), RpcError> {
     core.send_gallery(request.metadata()?, request.bytes()?)
         .await
 }
@@ -506,10 +506,15 @@ fn setup(app: &mut tauri::App<tauri::Wry>) -> Result<(), Box<dyn std::error::Err
         log::warn!("could not exclude the store from iCloud backup: {error}");
     }
     app.manage(notifications::PushStore(data_dir.clone()));
-    let (core, events) = Core::new(
-        data_dir.to_string_lossy().into_owned(),
-        session_store(&data_dir),
-    );
+    // Its lifecycle queue runs on the app's runtime, not on the short one a push brings up.
+    let runtime = tauri::async_runtime::handle();
+    let (core, events) = {
+        let _entered = runtime.inner().enter();
+        Core::new(
+            data_dir.to_string_lossy().into_owned(),
+            session_store(&data_dir),
+        )
+    };
     let event_sink = Arc::new(EventSink::default());
     #[cfg(target_os = "ios")]
     follow_ios_lifecycle(&core);

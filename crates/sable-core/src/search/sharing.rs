@@ -13,7 +13,7 @@ use super::store::Store;
 #[cfg(test)]
 mod live;
 mod peer;
-pub(crate) use peer::{DISCOVERY, SearchSharing};
+pub(crate) use peer::{DISCOVERY, SearchPeers};
 
 const MAX_SEGMENT_JSON: usize = 4 * 1024 * 1024;
 const CLASSIFIED_JSON: usize = 24;

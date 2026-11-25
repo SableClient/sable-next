@@ -327,10 +327,11 @@ async fn a_password_change_retries_with_the_current_password_and_the_session() {
         wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({})),
     )
     .await;
+    let session = core.signed_in().unwrap();
     challenge.mount(server.server()).await;
 
     assert!(matches!(
-        core.change_password(change_params()).await,
+        session.change_password(change_params()).await,
         Ok(())
     ));
     let requests = server.server().received_requests().await.unwrap();
@@ -363,9 +364,10 @@ async fn a_wrong_current_password_is_denied() {
         let (server, core, challenge) =
             change_password_core(serde_json::json!([{"stages": ["m.login.password"]}]), retry)
                 .await;
+        let session = core.signed_in().unwrap();
         challenge.mount(server.server()).await;
 
-        let error = core.change_password(change_params()).await.unwrap_err();
+        let error = session.change_password(change_params()).await.unwrap_err();
         assert!(matches!(error.code, RpcCode::Denied));
     }
 }
@@ -381,9 +383,10 @@ async fn a_weak_new_password_is_reported_as_weak() {
         })),
     )
     .await;
+    let session = core.signed_in().unwrap();
     challenge.mount(server.server()).await;
 
-    let error = core.change_password(change_params()).await.unwrap_err();
+    let error = session.change_password(change_params()).await.unwrap_err();
     assert!(matches!(error.code, RpcCode::WeakPassword));
 }
 
@@ -407,8 +410,9 @@ async fn a_server_that_forbids_changing_the_password_is_unsupported() {
         .mount(server.server())
         .await;
     let (core, _events) = crate::test_support::signed_in_core(&server, client).await;
+    let session = core.signed_in().unwrap();
 
-    let error = core.change_password(change_params()).await.unwrap_err();
+    let error = session.change_password(change_params()).await.unwrap_err();
     assert!(matches!(error.code, RpcCode::Unsupported));
 }
 
@@ -432,7 +436,8 @@ async fn the_change_password_capability_decides_whether_the_form_shows() {
             .mount(server.server())
             .await;
         let (core, _events) = crate::test_support::signed_in_core(&server, client).await;
+        let session = core.signed_in().unwrap();
 
-        assert_eq!(core.password_change_enabled().await.unwrap(), enabled);
+        assert_eq!(session.password_change_enabled().await.unwrap(), enabled);
     }
 }

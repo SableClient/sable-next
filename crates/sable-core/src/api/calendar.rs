@@ -1,10 +1,9 @@
-use std::sync::Arc;
 
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 use serde::Deserialize;
 
-use super::Handler;
-use crate::Core;
+use super::SessionHandler;
+use crate::SignedIn;
 use crate::calendar::CalendarAnswer;
 use crate::protocol::{CalendarView, RpcError, RsvpStatusView};
 
@@ -21,11 +20,11 @@ pub struct EntriesParams {
     pub room_id: OwnedRoomId,
 }
 
-impl Handler for EntriesParams {
+impl SessionHandler for EntriesParams {
     type Ok = CalendarView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<CalendarView, RpcError> {
-        core.calendar_entries(&self.room_id).await
+    async fn run(self, session: &SignedIn) -> Result<CalendarView, RpcError> {
+        session.calendar_entries(&self.room_id).await
     }
 }
 
@@ -41,11 +40,11 @@ pub struct SaveEventParams {
     pub replaces: Option<OwnedEventId>,
 }
 
-impl Handler for SaveEventParams {
+impl SessionHandler for SaveEventParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.save_calendar_event(&self.room_id, self.event, self.replaces)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.save_calendar_event(&self.room_id, self.event, self.replaces)
             .await
     }
 }
@@ -64,16 +63,16 @@ pub struct AnswerEventParams {
     pub status: RsvpStatusView,
 }
 
-impl Handler for AnswerEventParams {
+impl SessionHandler for AnswerEventParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         let answer = CalendarAnswer {
             calendar_event_id: self.calendar_event_id,
             uid: self.uid,
             recurrence_id: self.recurrence_id,
             status: self.status,
         };
-        core.answer_calendar_event(&self.room_id, &answer).await
+        session.answer_calendar_event(&self.room_id, &answer).await
     }
 }

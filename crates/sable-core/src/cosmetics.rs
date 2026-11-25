@@ -12,6 +12,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::Core;
+use crate::SignedIn;
 use crate::profiles::{profile_hex_color, pronoun_sets};
 use crate::protocol::{
     CoreEvent, PronounView, RoomCosmeticsView, RpcCode, RpcError, SenderCosmeticsView,
@@ -309,34 +310,34 @@ async fn stored_layer(room: &matrix_sdk::Room) -> Result<Layer, matrix_sdk::Erro
     })))
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn room_cosmetics(
         &self,
         room_id: &OwnedRoomId,
         space_id: Option<OwnedRoomId>,
     ) -> Result<RoomCosmeticsView, RpcError> {
-        let client = self.client().await?;
+        let client = self.client();
         let room = client.get_room(room_id).ok_or(RpcCode::UnknownRoom)?;
-        Ok(self.cosmetics_for(&client, &room, space_id).await)
+        Ok(self.cosmetics_for(&room, space_id).await)
     }
 
     pub(crate) async fn cosmetics_for(
         &self,
-        client: &matrix_sdk::Client,
         room: &matrix_sdk::Room,
         space_id: Option<OwnedRoomId>,
     ) -> RoomCosmeticsView {
+        let client = self.client();
         let space_id = match space_id {
             Some(space_id) if space_id != room.room_id() => Some(space_id),
             Some(_) => None,
-            None => first_space_parent(self, client, room).await,
+            None => first_space_parent(self.core(), client, room).await,
         };
         let space = space_id
             .as_ref()
             .and_then(|space_id| client.get_room(space_id));
-        let (own, inherited) = futures_util::join!(self.cosmetics_layer(client, room), async {
+        let (own, inherited) = futures_util::join!(self.cosmetics_layer(room), async {
             match &space {
-                Some(space) => Some(self.cosmetics_layer(client, space).await),
+                Some(space) => Some(self.cosmetics_layer(space).await),
                 None => None,
             }
         });
@@ -347,7 +348,7 @@ impl Core {
         }
     }
 
-    async fn cosmetics_layer(&self, client: &matrix_sdk::Client, room: &matrix_sdk::Room) -> Layer {
+    async fn cosmetics_layer(&self, room: &matrix_sdk::Room) -> Layer {
         let cached = self.cosmetics_cache().get(room.room_id());
         if let Some(layer) = cached {
             return layer;
@@ -360,7 +361,7 @@ impl Core {
             return layer;
         }
 
-        match self.room_state_snapshot(client, room.room_id()).await {
+        match self.room_state_snapshot(room.room_id()).await {
             Ok(snapshot) => {
                 let layer = Layer::from_events(
                     snapshot
@@ -373,21 +374,16 @@ impl Core {
             }
             Err(error) => {
                 tracing::warn!(room = %room.room_id(), %error, "room cosmetics read from the store after the state fetch failed");
-                self.with_open_stores(async || stored_layer(room).await)
+                self.core()
+                    .with_open_stores(async || stored_layer(room).await)
                     .await
                     .unwrap_or_default()
             }
         }
     }
 
-    fn cosmetics_fetch_lock(&self, room_id: &RoomId) -> Arc<tokio::sync::Mutex<()>> {
-        let mut locks = self.cosmetics_fetches.lock();
-        locks.retain(|_, lock| Arc::strong_count(lock) > 1);
-        locks.entry(room_id.to_owned()).or_default().clone()
-    }
-
-    fn cosmetics_cache(&self) -> parking_lot::MutexGuard<'_, CosmeticsCache> {
-        self.cosmetics.lock()
+    fn cosmetics_cache(&self) -> parking_lot::ArcMutexGuard<parking_lot::RawMutex, CosmeticsCache> {
+        self.state().cosmetics.lock_arc()
     }
 
     pub(crate) fn note_cosmetic_state(
@@ -404,13 +400,8 @@ impl Core {
         is_cosmetic(event_type) && cache.apply(room_id, event_type, state_key, content)
     }
 
-    async fn refresh_member(
-        &self,
-        client: &matrix_sdk::Client,
-        layers: Vec<OwnedRoomId>,
-        user_id: &UserId,
-        generation: u64,
-    ) {
+    async fn refresh_member(&self, layers: Vec<OwnedRoomId>, user_id: &UserId, generation: u64) {
+        let client = self.client();
         for room_id in layers {
             let request = get_state_event_for_key::v3::Request::new(
                 room_id.clone(),
@@ -428,12 +419,14 @@ impl Core {
                 }
             };
             if self.note_cosmetic_state(&room_id, MEMBER_EVENT, user_id.as_str(), &content) {
-                self.emit_if_current(generation, CoreEvent::RoomCosmeticsChanged { room_id });
+                self.core()
+                    .emit_if_current(generation, CoreEvent::RoomCosmeticsChanged { room_id });
             }
         }
     }
 
-    pub(crate) fn watch_cosmetics(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+    pub(crate) fn watch_cosmetics(&self, generation: u64) {
+        let client = self.client();
         let handle = client.add_event_handler({
             let core = self.clone();
             move |raw: Raw<AnySyncStateEvent>, room: matrix_sdk::Room| {
@@ -455,7 +448,7 @@ impl Core {
                         fields.state_key.as_deref().unwrap_or_default(),
                         &content,
                     ) {
-                        core.emit_if_current(
+                        core.core().emit_if_current(
                             generation,
                             CoreEvent::RoomCosmeticsChanged {
                                 room_id: room.room_id().to_owned(),
@@ -482,10 +475,8 @@ impl Core {
                         previous.as_ref(),
                     );
                     if !outdated.is_empty() {
-                        let client = room.client();
                         spawn(async move {
-                            core.refresh_member(&client, outdated, &user_id, generation)
-                                .await;
+                            core.refresh_member(outdated, &user_id, generation).await;
                         });
                     }
                 }
@@ -498,3 +489,11 @@ impl Core {
 #[cfg(test)]
 #[path = "cosmetics_tests.rs"]
 mod tests;
+
+impl SignedIn {
+    fn cosmetics_fetch_lock(&self, room_id: &RoomId) -> Arc<tokio::sync::Mutex<()>> {
+        let mut locks = self.state().cosmetics_fetches.lock();
+        locks.retain(|_, lock| Arc::strong_count(lock) > 1);
+        locks.entry(room_id.to_owned()).or_default().clone()
+    }
+}

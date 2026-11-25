@@ -3,7 +3,8 @@ use std::sync::atomic::Ordering;
 
 use serde::{Deserialize, Serialize};
 
-use super::Handler;
+use super::{Handler, SessionHandler};
+use crate::SignedIn;
 use crate::Core;
 use crate::protocol::{RpcError, LoginFlowsView, RegistrationFlowsView, RegistrationResultView};
 
@@ -180,8 +181,8 @@ impl Handler for CancelRegistrationParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.next_registration_attempt
             .fetch_add(1, Ordering::AcqRel);
-        core.pending_registration.lock().await.take();
-        core.pending_login.lock().await.take();
+        core.sign_in.pending_registration.lock().take();
+        core.sign_in.pending_login.lock().await.take();
         Ok(())
     }
 }
@@ -335,11 +336,11 @@ pub struct StartQrGrantParams {
     pub scanned: Option<String>,
 }
 
-impl Handler for StartQrGrantParams {
+impl SessionHandler for StartQrGrantParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.start_qr_grant(self).await
+    fn run(self, session: &SignedIn) -> impl Future<Output = Result<(), RpcError>> {
+        std::future::ready(session.start_qr_grant(self))
     }
 }
 
@@ -378,8 +379,8 @@ pub struct CancelQrParams {}
 impl Handler for CancelQrParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.cancel_qr().await;
-        Ok(())
+    fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
+        core.cancel_qr();
+        std::future::ready(Ok(()))
     }
 }

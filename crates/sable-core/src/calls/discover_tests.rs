@@ -2,10 +2,8 @@ use matrix_sdk::ruma::{owned_room_id, owned_user_id};
 use matrix_sdk::test_utils::mocks::MatrixMockServer;
 
 use super::{Discovered, discover, mode_reason, select_mode};
-use crate::Core;
 use crate::calls::runtime::tests::member;
 use crate::protocol::{CallMode, CallSessionId};
-use crate::store::MemorySessionStore;
 
 async fn discover_with_peers(
     mode: CallMode,
@@ -87,7 +85,7 @@ async fn discover_with_peers(
             .mount(server.server())
             .await;
     }
-    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let core = crate::test_support::session_for(&server, client.clone()).await;
     let discovered = discover(
         &core,
         &room,

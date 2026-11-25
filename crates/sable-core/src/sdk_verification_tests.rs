@@ -6,6 +6,7 @@ use matrix_sdk::test_utils::mocks::{MatrixMockServer, encryption::PendingToDevic
 use matrix_sdk_ui::sync_service::SyncService;
 use tokio::sync::mpsc;
 
+use crate::SignedIn;
 use crate::{
     Core,
     api::encryption::{
@@ -20,6 +21,7 @@ use crate::{
 struct Device {
     client: matrix_sdk::Client,
     core: Arc<Core>,
+    session: SignedIn,
     events: mpsc::UnboundedReceiver<CoreEvent>,
     states: Vec<(String, VerificationView)>,
     encryption: Option<EncryptionStatusView>,
@@ -88,19 +90,25 @@ async fn device(server: &MatrixMockServer, id: &str) -> Device {
         .await;
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let (core, events) = Core::new(id, Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: id.into(),
-        client: client.clone(),
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
-    core.watch_incoming_verifications(&client);
-    core.watch_encryption(&client, 1);
-    core.watch_devices(&client, 1);
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: id.into(),
+            client: client.clone(),
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
+    session.watch_incoming_verifications();
+    session.watch_encryption(1);
+    session.watch_devices(1);
     Device {
         client,
         core,
+        session,
         events,
         states: Vec::new(),
         encryption: None,
@@ -237,12 +245,12 @@ async fn an_unsigned_session_is_not_verified_after_done() {
     tokio::time::pause();
 
     assert!(
-        !new.core
+        !new.session
             .verified_after_done(&user_id, device_id!("BBBBBBBB"))
             .await
     );
     assert!(
-        new.core
+        new.session
             .verified_after_done(&owned_user_id!("@bob:example.org"), device_id!("BBBBBBBB"))
             .await
     );
@@ -265,7 +273,7 @@ async fn a_signed_session_is_not_done_until_the_device_it_verified_is_signed() {
             .is_cross_signed_by_owner()
     );
     assert!(
-        !old.core
+        !old.session
             .verified_after_done(&user_id, new.client.device_id().unwrap())
             .await
     );
@@ -498,7 +506,7 @@ async fn a_self_verification_completes_with_a_qr_code() {
         );
     }
 
-    let code = old.core.qr(&user_id, &flow_id).await.unwrap();
+    let code = old.session.qr(&user_id, &flow_id).await.unwrap();
     new.core
         .run(ScanVerificationQrParams {
             user_id: user_id.clone(),
@@ -740,7 +748,7 @@ async fn choosing_emoji_after_a_qr_scan_does_not_leave_either_side_waiting() {
         .unwrap();
     deliver(&server, &queue, &mut [&mut old, &mut new]).await;
 
-    let code = old.core.qr(&user_id, &flow_id).await.unwrap();
+    let code = old.session.qr(&user_id, &flow_id).await.unwrap();
     new.core
         .run(ScanVerificationQrParams {
             user_id: user_id.clone(),
@@ -803,9 +811,7 @@ async fn the_account_data_key_is_shared_only_with_a_verified_own_device() {
                     .unwrap();
             }
             let generation = device.core.lifecycle.current();
-            device
-                .core
-                .watch_account_data_key_sharing(&device.client, generation);
+            device.session.watch_account_data_key_sharing(generation);
         }
 
         request_account_data_key(&new.client).await;

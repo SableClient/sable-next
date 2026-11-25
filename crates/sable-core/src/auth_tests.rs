@@ -71,9 +71,9 @@ async fn hard_logout_login_uses_a_new_device_and_store() {
     assert_ne!(accounts.accounts[0].store_id, old_store);
     assert_eq!(accounts.accounts[0].session.credentials.device_id(), "NEW");
     assert_ne!(
-        core.client()
-            .await
+        core.signed_in()
             .unwrap()
+            .client()
             .encryption()
             .curve25519_key()
             .await
@@ -81,7 +81,7 @@ async fn hard_logout_login_uses_a_new_device_and_store() {
         old_key
     );
     assert_eq!(old.encryption().curve25519_key().await.unwrap(), old_key);
-    if let Some(session) = core.take_session().await {
+    if let Some(session) = core.end_session().await {
         session.sync_service.stop().await;
     }
 }
@@ -170,7 +170,7 @@ async fn signing_in_again_seals_tokens_another_key_sealed_with_the_current_one()
         logins.read("a1", "EXISTING").unwrap().unwrap().access_token,
         "new-token"
     );
-    if let Some(session) = core.take_session().await {
+    if let Some(session) = core.end_session().await {
         session.sync_service.stop().await;
     }
 }
@@ -238,7 +238,7 @@ async fn signing_in_again_replaces_the_saved_account_of_the_same_user() {
     assert_eq!(ids, ["a2", "a3"]);
     assert!(!std::path::Path::new(&stale_store).exists());
     assert!(std::path::Path::new(&bob_store).exists());
-    if let Some(session) = core.take_session().await {
+    if let Some(session) = core.end_session().await {
         session.sync_service.stop().await;
     }
 }
@@ -427,7 +427,7 @@ async fn oauth_reauthentication_url(registered: &str, requested: &str) -> (Strin
     let (_server, core, directory) = oauth_reauthentication_core(registered).await;
     let url = start_oauth_reauthentication(&core, requested).await;
     let invalidated = device_invalidated(&core).await;
-    *core.pending_login.lock().await = None;
+    *core.sign_in.pending_login.lock().await = None;
     drop(core);
     std::fs::remove_dir_all(directory).unwrap();
     (url, invalidated)
@@ -481,11 +481,11 @@ async fn a_refused_device_moves_the_next_reauthentication_to_a_new_device() {
     .await
     .unwrap_err();
     assert!(device_invalidated(&core).await);
-    assert!(core.pending_login.lock().await.is_none());
+    assert!(core.sign_in.pending_login.lock().await.is_none());
 
     let url = start_oauth_reauthentication(&core, REDIRECT).await;
     assert!(!url.contains("EXISTING"), "{url}");
-    *core.pending_login.lock().await = None;
+    *core.sign_in.pending_login.lock().await = None;
     drop(core);
     std::fs::remove_dir_all(directory).unwrap();
 }
@@ -693,7 +693,7 @@ async fn a_login_persists_the_endpoint_it_was_built_at_not_the_advertised_one() 
     .unwrap();
 
     let entered = Url::parse(&server.server().uri()).unwrap();
-    let live = core.session.read().await.as_ref().unwrap().client.clone();
+    let live = core.session.snapshot().as_ref().unwrap().client.clone();
     assert_eq!(live.homeserver().host_str(), Some("advertised.invalid"));
     let persisted = core.accounts().await.unwrap().accounts.remove(0).session;
     assert_eq!(persisted.resolved_homeserver, Some(entered.clone()));
@@ -701,7 +701,7 @@ async fn a_login_persists_the_endpoint_it_was_built_at_not_the_advertised_one() 
         .await
         .unwrap();
     assert_eq!(restored.homeserver(), entered);
-    if let Some(session) = core.take_session().await {
+    if let Some(session) = core.end_session().await {
         session.sync_service.stop().await;
     }
     drop((core, restored, live));

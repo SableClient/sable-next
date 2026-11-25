@@ -7,7 +7,7 @@ use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, OwnedUserId, UserId};
 use serde::{Deserialize, Serialize};
 
-use super::{Handler, Json};
+use super::{Handler, SessionHandler, Json};
 use crate::media::mxc_uri;
 use crate::profile_overrides::OverrideEdit;
 use crate::profiles::profile_view;
@@ -17,7 +17,7 @@ use crate::protocol::{
     PresenceSharingView, PresenceView, ProfileOverridesView, ProfileView, RpcCode, RpcError,
     SealedAccountDataView, ThreadSidebarView, UserDirectoryEntryView,
 };
-use crate::{Core, ResultExt};
+use crate::{Core, ResultExt, SignedIn};
 
 domain! {
     set_read_receipts,
@@ -77,11 +77,11 @@ pub struct DeactivateAccountParams {
     pub password: Option<String>,
 }
 
-impl Handler for DeactivateAccountParams {
+impl SessionHandler for DeactivateAccountParams {
     type Ok = Option<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<String>, RpcError> {
-        core.deactivate_account(self.password).await
+    async fn run(self, session: &SignedIn) -> Result<Option<String>, RpcError> {
+        session.deactivate_account(self.password).await
     }
 }
 
@@ -93,11 +93,11 @@ pub struct ChangePasswordParams {
     pub logout_devices: bool,
 }
 
-impl Handler for ChangePasswordParams {
+impl SessionHandler for ChangePasswordParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.change_password(self).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.change_password(self).await
     }
 }
 
@@ -105,11 +105,11 @@ impl Handler for ChangePasswordParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct PasswordChangeEnabledParams {}
 
-impl Handler for PasswordChangeEnabledParams {
+impl SessionHandler for PasswordChangeEnabledParams {
     type Ok = bool;
 
-    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
-        core.password_change_enabled().await
+    async fn run(self, session: &SignedIn) -> Result<bool, RpcError> {
+        session.password_change_enabled().await
     }
 }
 
@@ -145,19 +145,18 @@ pub struct UserProfileParams {
     pub user_id: OwnedUserId,
 }
 
-impl Handler for UserProfileParams {
+impl SessionHandler for UserProfileParams {
     type Ok = ProfileView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<ProfileView, RpcError> {
-        let response = core
+    async fn run(self, session: &SignedIn) -> Result<ProfileView, RpcError> {
+        let response = session
             .client()
-            .await?
             .account()
             .fetch_user_profile_of(&self.user_id)
             .await
-            .map_err(|error| core.profile_error(&error))?;
+            .map_err(|error| session.core().profile_error(&error))?;
         let mut profile = profile_view(self.user_id, &response);
-        core.nicknames().apply_profile(&mut profile);
+        session.core().nicknames().apply_profile(&mut profile);
         Ok(profile)
     }
 }
@@ -169,22 +168,21 @@ pub struct UserProfileSourceParams {
     pub user_id: OwnedUserId,
 }
 
-impl Handler for UserProfileSourceParams {
+impl SessionHandler for UserProfileSourceParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        let response = core
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        let response = session
             .client()
-            .await?
             .account()
             .fetch_user_profile_of(&self.user_id)
             .await
-            .map_err(|error| core.profile_error(&error))?;
+            .map_err(|error| session.core().profile_error(&error))?;
         let fields = response
             .iter()
             .map(|(field, value)| (field.as_str().to_owned(), value.clone()))
             .collect::<serde_json::Map<_, _>>();
-        serde_json::to_string_pretty(&fields).or_failed(core, "user_profile_source")
+        serde_json::to_string_pretty(&fields).or_failed(session.core(), "user_profile_source")
     }
 }
 
@@ -202,18 +200,18 @@ pub struct UserRelationsOk {
     pub ignored: bool,
 }
 
-impl Handler for UserRelationsParams {
+impl SessionHandler for UserRelationsParams {
     type Ok = UserRelationsOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<UserRelationsOk, RpcError> {
-        let client = core.client().await?;
-        let ignored = ignored_users(core)
+    async fn run(self, session: &SignedIn) -> Result<UserRelationsOk, RpcError> {
+        let client = session.client();
+        let ignored = ignored_users(session)
             .await?
             .iter()
             .any(|ignored| ignored == self.user_id.as_str());
-        let mutual_rooms = fetch_mutual_rooms(&client, &self.user_id)
+        let mutual_rooms = fetch_mutual_rooms(client, &self.user_id)
             .await
-            .or_failed(core, "user_relations")?;
+            .or_failed(session.core(), "user_relations")?;
 
         Ok(UserRelationsOk {
             mutual_rooms,
@@ -261,11 +259,11 @@ async fn fetch_mutual_rooms(
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct WellKnownParams {}
 
-impl Handler for WellKnownParams {
+impl SessionHandler for WellKnownParams {
     type Ok = Option<Json>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<Json>, RpcError> {
-        Ok(core.well_known().await?.map(Json))
+    async fn run(self, session: &SignedIn) -> Result<Option<Json>, RpcError> {
+        Ok(session.well_known().await?.map(Json))
     }
 }
 
@@ -273,11 +271,11 @@ impl Handler for WellKnownParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct DataTypesParams {}
 
-impl Handler for DataTypesParams {
+impl SessionHandler for DataTypesParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        core.account_data_types().await
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        session.account_data_types().await
     }
 }
 
@@ -287,13 +285,14 @@ pub struct DataParams {
     pub event_type: String,
 }
 
-impl Handler for DataParams {
+impl SessionHandler for DataParams {
     type Ok = Option<Json>;
+    const ENDS_WITH_SESSION: bool = true;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Option<Json>, RpcError> {
-        core.remember_account_data_type(self.event_type.as_str())
+    async fn run(self, session: &SignedIn) -> Result<Option<Json>, RpcError> {
+        session.remember_account_data_type(self.event_type.as_str())
             .await;
-        let content = core
+        let content = session
             .global_account_data(self.event_type.into(), "account_data")
             .await?
             .and_then(|raw| raw.deserialize_as::<serde_json::Value>().ok());
@@ -309,16 +308,16 @@ pub struct SetDataParams {
     pub content: serde_json::Value,
 }
 
-impl Handler for SetDataParams {
+impl SessionHandler for SetDataParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         // Server-managed since MSC4010.
         if matches!(self.event_type.as_str(), "m.push_rules" | "m.fully_read") {
             return Err(RpcCode::Unsupported.into());
         }
-        let _guard = core.account_data_lock.lock().await;
-        core.set_account_data(&self.event_type, &self.content).await
+        let _guard = session.state().account_data_writes.lock().await;
+        session.set_account_data(&self.event_type, &self.content).await
     }
 }
 
@@ -328,13 +327,13 @@ pub struct SealedDataParams {
     pub event_type: String,
 }
 
-impl Handler for SealedDataParams {
+impl SessionHandler for SealedDataParams {
     type Ok = SealedAccountDataView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SealedAccountDataView, RpcError> {
-        core.remember_account_data_type(self.event_type.as_str())
+    async fn run(self, session: &SignedIn) -> Result<SealedAccountDataView, RpcError> {
+        session.remember_account_data_type(self.event_type.as_str())
             .await;
-        core.sealed_account_data(&self.event_type).await
+        session.sealed_account_data(&self.event_type).await
     }
 }
 
@@ -346,13 +345,13 @@ pub struct SetSealedDataParams {
     pub content: serde_json::Value,
 }
 
-impl Handler for SetSealedDataParams {
+impl SessionHandler for SetSealedDataParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.remember_account_data_type(self.event_type.as_str())
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.remember_account_data_type(self.event_type.as_str())
             .await;
-        core.set_sealed_account_data(&self.event_type, &self.content)
+        session.set_sealed_account_data(&self.event_type, &self.content)
             .await
     }
 }
@@ -366,15 +365,15 @@ pub struct SetDisplayNameParams {
     pub propagate_to: ProfilePropagationView,
 }
 
-impl Handler for SetDisplayNameParams {
+impl SessionHandler for SetDisplayNameParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let client = core.client().await?;
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        let client = session.client();
         if client
             .unstable_features()
             .await
-            .or_failed(core, "set_display_name")?
+            .or_failed(session.core(), "set_display_name")?
             .contains(&ruma::api::FeatureFlag::from(
                 "computer.gingershaped.msc4466",
             ))
@@ -383,7 +382,7 @@ impl Handler for SetDisplayNameParams {
                 "displayname",
                 serde_json::Value::String(self.name.unwrap_or_default()),
             )
-            .or_failed(core, "set_display_name")?;
+            .or_failed(session.core(), "set_display_name")?;
             let mut request = set_profile_field::v3::Request::new(
                 client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned(),
                 value,
@@ -392,13 +391,13 @@ impl Handler for SetDisplayNameParams {
             client
                 .send(request)
                 .await
-                .or_failed(core, "set_display_name")?;
+                .or_failed(session.core(), "set_display_name")?;
         } else {
             client
                 .account()
                 .set_display_name(self.name.as_deref())
                 .await
-                .or_failed(core, "set_display_name")?;
+                .or_failed(session.core(), "set_display_name")?;
         }
 
         Ok(())
@@ -414,20 +413,20 @@ pub struct SetAvatarUrlParams {
     pub propagate_to: ProfilePropagationView,
 }
 
-impl Handler for SetAvatarUrlParams {
+impl SessionHandler for SetAvatarUrlParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
         let url = match self.url {
             Some(url) => Some(mxc_uri(&url)?),
             None => None,
         };
 
-        let client = core.client().await?;
+        let client = session.client();
         if client
             .unstable_features()
             .await
-            .or_failed(core, "set_avatar_url")?
+            .or_failed(session.core(), "set_avatar_url")?
             .contains(&ruma::api::FeatureFlag::from(
                 "computer.gingershaped.msc4466",
             ))
@@ -436,7 +435,7 @@ impl Handler for SetAvatarUrlParams {
                 "avatar_url",
                 serde_json::Value::String(url.map(|url| url.to_string()).unwrap_or_default()),
             )
-            .or_failed(core, "set_avatar_url")?;
+            .or_failed(session.core(), "set_avatar_url")?;
             let mut request = set_profile_field::v3::Request::new(
                 client.user_id().ok_or(RpcCode::NotLoggedIn)?.to_owned(),
                 value,
@@ -445,13 +444,13 @@ impl Handler for SetAvatarUrlParams {
             client
                 .send(request)
                 .await
-                .or_failed(core, "set_avatar_url")?;
+                .or_failed(session.core(), "set_avatar_url")?;
         } else {
             client
                 .account()
                 .set_avatar_url(url.as_deref())
                 .await
-                .or_failed(core, "set_avatar_url")?;
+                .or_failed(session.core(), "set_avatar_url")?;
         }
 
         Ok(())
@@ -475,25 +474,25 @@ pub struct SetProfileFieldParams {
     pub value: Option<serde_json::Value>,
 }
 
-impl Handler for SetProfileFieldParams {
+impl SessionHandler for SetProfileFieldParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        let account = core.client().await?.account();
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        let account = session.client().account();
         match self.value {
             Some(value) => {
                 let value = ProfileFieldValue::new(&self.field, value)
-                    .map_err(|error| core.failed_with("set_profile_field_invalid_value", &error))?;
+                    .map_err(|error| session.core().failed_with("set_profile_field_invalid_value", &error))?;
                 account
                     .set_profile_field(value)
                     .await
-                    .or_failed(core, "set_profile_field")?;
+                    .or_failed(session.core(), "set_profile_field")?;
             }
             None => {
                 account
                     .delete_profile_field(ProfileFieldName::from(self.field.as_str()))
                     .await
-                    .or_failed(core, "delete_profile_field")?;
+                    .or_failed(session.core(), "delete_profile_field")?;
             }
         }
 
@@ -505,18 +504,17 @@ impl Handler for SetProfileFieldParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ContactsParams {}
 
-impl Handler for ContactsParams {
+impl SessionHandler for ContactsParams {
     /// The account's email addresses.
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        Ok(core
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        Ok(session
             .client()
-            .await?
             .account()
             .get_3pids()
             .await
-            .or_failed(core, "account_contacts")?
+            .or_failed(session.core(), "account_contacts")?
             .threepids
             .into_iter()
             .filter(|identifier| identifier.medium.as_str() == "email")
@@ -529,11 +527,11 @@ impl Handler for ContactsParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct IgnoredUsersParams {}
 
-impl Handler for IgnoredUsersParams {
+impl SessionHandler for IgnoredUsersParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        ignored_users(core).await
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        ignored_users(session).await
     }
 }
 
@@ -541,11 +539,11 @@ impl Handler for IgnoredUsersParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct InviteTriageParams {}
 
-impl Handler for InviteTriageParams {
+impl SessionHandler for InviteTriageParams {
     type Ok = Vec<InviteTriageView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<InviteTriageView>, RpcError> {
-        Ok(crate::invites::triage(core, &core.client().await?).await)
+    async fn run(self, session: &SignedIn) -> Result<Vec<InviteTriageView>, RpcError> {
+        Ok(crate::invites::triage(session.core(), session.client()).await)
     }
 }
 
@@ -561,11 +559,11 @@ pub struct SetDirectParams {
     pub user_id: Option<OwnedUserId>,
 }
 
-impl Handler for SetDirectParams {
+impl SessionHandler for SetDirectParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.set_direct(&self.room_id, self.direct, self.user_id)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.set_direct(&self.room_id, self.direct, self.user_id)
             .await
     }
 }
@@ -578,11 +576,11 @@ pub struct IgnoreUserParams {
     pub user_id: OwnedUserId,
 }
 
-impl Handler for IgnoreUserParams {
+impl SessionHandler for IgnoreUserParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        edit_ignored_users(core, &self.user_id, true, "ignore_user").await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        edit_ignored_users(session, &self.user_id, true, "ignore_user").await
     }
 }
 
@@ -590,13 +588,13 @@ impl Handler for IgnoreUserParams {
 /// rewrites the account data in key order. Editing the raw content keeps the
 /// order the list was written in.
 async fn edit_ignored_users(
-    core: &Arc<Core>,
+    core: &SignedIn,
     user_id: &UserId,
     ignore: bool,
     label: &str,
 ) -> Result<(), RpcError> {
-    if ignore && core.client().await?.user_id() == Some(user_id) {
-        return Err(core.failed(label, "a user cannot ignore themselves"));
+    if ignore && core.client().user_id() == Some(user_id) {
+        return Err(core.core().failed(label, "a user cannot ignore themselves"));
     }
     core.update_account_data(&[IGNORED_USER_LIST], label, async |current| {
         Ok(with_ignored_user(current, user_id.as_str(), ignore))
@@ -606,7 +604,7 @@ async fn edit_ignored_users(
 }
 
 /// Read from the account data, since the SDK's observable only fills once a sync changes the list.
-async fn ignored_users(core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
+async fn ignored_users(core: &SignedIn) -> Result<Vec<String>, RpcError> {
     let content = core
         .global_account_data(IGNORED_USER_LIST.into(), "ignored_users")
         .await?
@@ -651,11 +649,11 @@ pub struct UnignoreUserParams {
     pub user_id: OwnedUserId,
 }
 
-impl Handler for UnignoreUserParams {
+impl SessionHandler for UnignoreUserParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        edit_ignored_users(core, &self.user_id, false, "unignore_user").await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        edit_ignored_users(session, &self.user_id, false, "unignore_user").await
     }
 }
 
@@ -667,11 +665,11 @@ pub struct ReportUserParams {
     pub reason: String,
 }
 
-impl Handler for ReportUserParams {
+impl SessionHandler for ReportUserParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.report_user(self).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.report_user(self).await
     }
 }
 
@@ -693,7 +691,9 @@ impl Handler for SetDeviceActivityParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        crate::notifications::set_device_activity(core, self.active).await;
+        if let Ok(session) = core.signed_in() {
+            crate::notifications::set_device_activity(&session, self.active).await;
+        }
         Ok(())
     }
 }
@@ -704,13 +704,14 @@ impl Handler for SetPresenceParams {
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
         core.set_desired_presence(self.presence);
 
-        let client = core.client().await?;
-        core.publish_presence(&client, self.status_message)
+        let session = core.signed_in()?;
+        let client = session.client();
+        session.publish_presence(self.status_message)
             .await
-            .or_failed(core, "set_presence")?;
+            .or_failed(session.core(), "set_presence")?;
 
         if let Some(user_id) = client.user_id() {
-            core.fetch_presence(vec![user_id.to_owned()]).await;
+            session.fetch_presence(vec![user_id.to_owned()]).await;
         }
         Ok(())
     }
@@ -726,7 +727,7 @@ impl Handler for SetReadReceiptsParams {
     type Ok = ();
 
     fn run(self, core: &Arc<Core>) -> impl Future<Output = Result<(), RpcError>> {
-        core.private_receipts.store(!self.public, Ordering::Relaxed);
+        core.settings.private_receipts.store(!self.public, Ordering::Relaxed);
         std::future::ready(Ok(()))
     }
 }
@@ -743,7 +744,9 @@ impl Handler for FetchPresenceParams {
     type Ok = ();
 
     async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.fetch_presence(self.user_ids).await;
+        if let Ok(session) = core.signed_in() {
+            session.fetch_presence(self.user_ids).await;
+        }
         Ok(())
     }
 }
@@ -764,12 +767,12 @@ pub struct SearchUserDirectoryOk {
     pub results: Vec<UserDirectoryEntryView>,
 }
 
-impl Handler for SearchUserDirectoryParams {
+impl SessionHandler for SearchUserDirectoryParams {
     type Ok = SearchUserDirectoryOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SearchUserDirectoryOk, RpcError> {
-        let (limited, mut results) = core.search_user_directory(&self.term, self.limit).await?;
-        let nicknames = core.nicknames();
+    async fn run(self, session: &SignedIn) -> Result<SearchUserDirectoryOk, RpcError> {
+        let (limited, mut results) = session.search_user_directory(&self.term, self.limit).await?;
+        let nicknames = session.core().nicknames();
         for entry in &mut results {
             nicknames.apply_directory_entry(entry);
         }
@@ -781,11 +784,11 @@ impl Handler for SearchUserDirectoryParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct DismissedInvitesParams {}
 
-impl Handler for DismissedInvitesParams {
+impl SessionHandler for DismissedInvitesParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
-        Ok(room_id_strings(core.dismissed_invites().await?))
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
+        Ok(room_id_strings(session.dismissed_invites().await?))
     }
 }
 
@@ -797,12 +800,12 @@ pub struct SetInviteDismissedParams {
     pub dismissed: bool,
 }
 
-impl Handler for SetInviteDismissedParams {
+impl SessionHandler for SetInviteDismissedParams {
     type Ok = Vec<String>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<String>, RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<Vec<String>, RpcError> {
         Ok(room_id_strings(
-            core.set_invite_dismissed(self.room_id, self.dismissed)
+            session.set_invite_dismissed(self.room_id, self.dismissed)
                 .await?,
         ))
     }
@@ -831,11 +834,11 @@ fn dm_space_links(
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct DmSpacesParams {}
 
-impl Handler for DmSpacesParams {
+impl SessionHandler for DmSpacesParams {
     type Ok = Vec<DmSpaceLink>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<DmSpaceLink>, RpcError> {
-        Ok(dm_space_links(core.dm_spaces().await?))
+    async fn run(self, session: &SignedIn) -> Result<Vec<DmSpaceLink>, RpcError> {
+        Ok(dm_space_links(session.dm_spaces().await?))
     }
 }
 
@@ -849,12 +852,12 @@ pub struct SetDmSpacesParams {
     pub space_ids: Vec<OwnedRoomId>,
 }
 
-impl Handler for SetDmSpacesParams {
+impl SessionHandler for SetDmSpacesParams {
     type Ok = Vec<DmSpaceLink>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<DmSpaceLink>, RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<Vec<DmSpaceLink>, RpcError> {
         Ok(dm_space_links(
-            core.set_dm_spaces(self.room_id, self.space_ids).await?,
+            session.set_dm_spaces(self.room_id, self.space_ids).await?,
         ))
     }
 }
@@ -893,11 +896,11 @@ fn space_notifications_view(
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct SpaceNotificationsParams {}
 
-impl Handler for SpaceNotificationsParams {
+impl SessionHandler for SpaceNotificationsParams {
     type Ok = SpaceNotificationsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SpaceNotificationsView, RpcError> {
-        Ok(space_notifications_view(core.space_notifications().await?))
+    async fn run(self, session: &SignedIn) -> Result<SpaceNotificationsView, RpcError> {
+        Ok(space_notifications_view(session.space_notifications().await?))
     }
 }
 
@@ -910,11 +913,11 @@ pub struct SetSpaceNotificationParams {
     pub mode: Option<NotificationModeView>,
 }
 
-impl Handler for SetSpaceNotificationParams {
+impl SessionHandler for SetSpaceNotificationParams {
     type Ok = SpaceNotificationsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SpaceNotificationsView, RpcError> {
-        let notifications = core
+    async fn run(self, session: &SignedIn) -> Result<SpaceNotificationsView, RpcError> {
+        let notifications = session
             .update_space_notifications(|notifications| match self.mode {
                 Some(mode) => {
                     notifications.modes.insert(self.space_id, mode);
@@ -936,11 +939,11 @@ pub struct SetSpaceNotificationExemptParams {
     pub exempt: bool,
 }
 
-impl Handler for SetSpaceNotificationExemptParams {
+impl SessionHandler for SetSpaceNotificationExemptParams {
     type Ok = SpaceNotificationsView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<SpaceNotificationsView, RpcError> {
-        let notifications = core
+    async fn run(self, session: &SignedIn) -> Result<SpaceNotificationsView, RpcError> {
+        let notifications = session
             .update_space_notifications(|notifications| {
                 if self.exempt {
                     notifications.exempt.insert(self.room_id);
@@ -961,11 +964,11 @@ fn room_id_strings(room_ids: Vec<OwnedRoomId>) -> Vec<String> {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct BookmarksParams {}
 
-impl Handler for BookmarksParams {
+impl SessionHandler for BookmarksParams {
     type Ok = Vec<BookmarkView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<BookmarkView>, RpcError> {
-        core.bookmarks().await
+    async fn run(self, session: &SignedIn) -> Result<Vec<BookmarkView>, RpcError> {
+        session.bookmarks().await
     }
 }
 
@@ -981,12 +984,12 @@ pub struct SetBookmarkParams {
     pub now_ms: u64,
 }
 
-impl Handler for SetBookmarkParams {
+impl SessionHandler for SetBookmarkParams {
     /// Whether the event is bookmarked now.
     type Ok = bool;
 
-    async fn run(self, core: &Arc<Core>) -> Result<bool, RpcError> {
-        core.set_bookmark(&self.room_id, &self.event_id, self.bookmarked, self.now_ms)
+    async fn run(self, session: &SignedIn) -> Result<bool, RpcError> {
+        session.set_bookmark(&self.room_id, &self.event_id, self.bookmarked, self.now_ms)
             .await
     }
 }
@@ -1000,11 +1003,11 @@ pub struct MediaPreviewConfigParams {
     pub room_id: Option<OwnedRoomId>,
 }
 
-impl Handler for MediaPreviewConfigParams {
+impl SessionHandler for MediaPreviewConfigParams {
     type Ok = MediaPreviewConfigView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<MediaPreviewConfigView, RpcError> {
-        core.media_preview_settings(self.room_id.as_ref()).await
+    async fn run(self, session: &SignedIn) -> Result<MediaPreviewConfigView, RpcError> {
+        session.media_preview_settings(self.room_id.as_ref()).await
     }
 }
 
@@ -1015,11 +1018,11 @@ pub struct SetMediaPreviewConfigParams {
     pub config: MediaPreviewConfigView,
 }
 
-impl Handler for SetMediaPreviewConfigParams {
+impl SessionHandler for SetMediaPreviewConfigParams {
     type Ok = MediaPreviewConfigView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<MediaPreviewConfigView, RpcError> {
-        core.set_media_preview_settings(self).await
+    async fn run(self, session: &SignedIn) -> Result<MediaPreviewConfigView, RpcError> {
+        session.set_media_preview_settings(self).await
     }
 }
 
@@ -1032,11 +1035,11 @@ pub struct SetRoomMediaPreviewsParams {
     pub media_previews: Option<MediaPreviewsView>,
 }
 
-impl Handler for SetRoomMediaPreviewsParams {
+impl SessionHandler for SetRoomMediaPreviewsParams {
     type Ok = MediaPreviewConfigView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<MediaPreviewConfigView, RpcError> {
-        core.set_room_media_previews(&self.room_id, self.media_previews)
+    async fn run(self, session: &SignedIn) -> Result<MediaPreviewConfigView, RpcError> {
+        session.set_room_media_previews(&self.room_id, self.media_previews)
             .await
     }
 }
@@ -1045,11 +1048,11 @@ impl Handler for SetRoomMediaPreviewsParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ProfileOverridesParams {}
 
-impl Handler for ProfileOverridesParams {
+impl SessionHandler for ProfileOverridesParams {
     type Ok = ProfileOverridesView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<ProfileOverridesView, RpcError> {
-        core.profile_overrides().await
+    async fn run(self, session: &SignedIn) -> Result<ProfileOverridesView, RpcError> {
+        session.profile_overrides().await
     }
 }
 
@@ -1063,16 +1066,16 @@ pub struct SetProfileOverrideParams {
     pub color: FieldEdit,
 }
 
-impl Handler for SetProfileOverrideParams {
+impl SessionHandler for SetProfileOverrideParams {
     type Ok = ProfileOverridesView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<ProfileOverridesView, RpcError> {
+    async fn run(self, session: &SignedIn) -> Result<ProfileOverridesView, RpcError> {
         let edit = OverrideEdit {
             display_name: self.display_name,
             avatar: self.avatar,
             color: self.color,
         };
-        core.set_profile_override(&self.user_id, &edit).await
+        session.set_profile_override(&self.user_id, &edit).await
     }
 }
 
@@ -1085,7 +1088,10 @@ impl Handler for PresenceSharingParams {
     type Ok = Option<PresenceSharingView>;
 
     async fn run(self, core: &Arc<Core>) -> Result<Option<PresenceSharingView>, RpcError> {
-        core.presence_sharing().await
+        match core.signed_in() {
+            Ok(session) => session.presence_sharing().await,
+            Err(_) => Ok(None),
+        }
     }
 }
 
@@ -1095,11 +1101,11 @@ pub struct EditPresenceSharingParams {
     pub edit: PresenceSharingEdit,
 }
 
-impl Handler for EditPresenceSharingParams {
+impl SessionHandler for EditPresenceSharingParams {
     type Ok = PresenceSharingView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<PresenceSharingView, RpcError> {
-        core.edit_presence_sharing(&self.edit).await
+    async fn run(self, session: &SignedIn) -> Result<PresenceSharingView, RpcError> {
+        session.edit_presence_sharing(&self.edit).await
     }
 }
 
@@ -1112,7 +1118,10 @@ impl Handler for PresenceOverrideParams {
     type Ok = Option<PresenceOverrideView>;
 
     async fn run(self, core: &Arc<Core>) -> Result<Option<PresenceOverrideView>, RpcError> {
-        core.presence_override().await
+        match core.signed_in() {
+            Ok(session) => session.presence_override().await,
+            Err(_) => Ok(None),
+        }
     }
 }
 
@@ -1123,11 +1132,11 @@ pub struct SetPresenceOverrideParams {
     pub presence_override: PresenceOverrideView,
 }
 
-impl Handler for SetPresenceOverrideParams {
+impl SessionHandler for SetPresenceOverrideParams {
     type Ok = PresenceOverrideView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<PresenceOverrideView, RpcError> {
-        core.set_presence_override(&self.presence_override).await
+    async fn run(self, session: &SignedIn) -> Result<PresenceOverrideView, RpcError> {
+        session.set_presence_override(&self.presence_override).await
     }
 }
 
@@ -1135,11 +1144,11 @@ impl Handler for SetPresenceOverrideParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ThreadSidebarParams {}
 
-impl Handler for ThreadSidebarParams {
+impl SessionHandler for ThreadSidebarParams {
     type Ok = ThreadSidebarView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<ThreadSidebarView, RpcError> {
-        core.thread_sidebar().await
+    async fn run(self, session: &SignedIn) -> Result<ThreadSidebarView, RpcError> {
+        session.thread_sidebar().await
     }
 }
 
@@ -1153,11 +1162,11 @@ pub struct SetThreadPinParams {
     pub pinned: bool,
 }
 
-impl Handler for SetThreadPinParams {
+impl SessionHandler for SetThreadPinParams {
     type Ok = ThreadSidebarView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<ThreadSidebarView, RpcError> {
-        core.set_thread_pin(self.room_id, self.event_id, self.pinned)
+    async fn run(self, session: &SignedIn) -> Result<ThreadSidebarView, RpcError> {
+        session.set_thread_pin(self.room_id, self.event_id, self.pinned)
             .await
     }
 }
@@ -1172,11 +1181,11 @@ pub struct SetThreadDismissedParams {
     pub dismissed: bool,
 }
 
-impl Handler for SetThreadDismissedParams {
+impl SessionHandler for SetThreadDismissedParams {
     type Ok = ThreadSidebarView;
 
-    async fn run(self, core: &Arc<Core>) -> Result<ThreadSidebarView, RpcError> {
-        core.set_thread_dismissed(self.room_id, self.event_id, self.dismissed)
+    async fn run(self, session: &SignedIn) -> Result<ThreadSidebarView, RpcError> {
+        session.set_thread_dismissed(self.room_id, self.event_id, self.dismissed)
             .await
     }
 }

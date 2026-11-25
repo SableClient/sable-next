@@ -20,7 +20,7 @@ use web_time::Instant;
 
 use super::super::{History, MAX_SEGMENT_JSON, SegmentPayload, settled_history, sha256};
 use super::{RESYNC_AFTER, age};
-use crate::Core;
+use crate::SignedIn;
 use crate::protocol::{RpcCode, RpcError, SearchPeerCopyView};
 use crate::search::now_ms;
 
@@ -231,7 +231,7 @@ impl PartsDownloadState {
     }
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn exchange_search_peer(
         &self,
         session_id: &str,
@@ -241,22 +241,6 @@ impl Core {
             tracing::debug!(session = session_id, %error, "search copy stopped");
             error.into_rpc()
         })
-    }
-
-    /// Held for a whole exchange so a logout cannot reset the index while a copy still writes
-    /// into it.
-    pub(super) async fn copying_session(
-        &self,
-    ) -> Result<
-        (
-            tokio::sync::RwLockReadGuard<'_, Option<crate::session::Session>>,
-            Client,
-        ),
-        RpcError,
-    > {
-        let session = self.session.read().await;
-        let client = session.as_ref().ok_or(RpcCode::NotLoggedIn)?.client.clone();
-        Ok((session, client))
     }
 
     /// Handle a message from the peer.
@@ -273,20 +257,19 @@ impl Core {
                 })
             })
             .transpose()?;
-        let (_copying, client) = self.copying_session().await.map_err(CopyError::Session)?;
         let transfer = self
-            .search_session(&client, session_id)
+            .search_session(session_id)
             .await
             .map_err(CopyError::Session)?;
 
         let mut transfer = transfer.lock().await;
 
-        self.load_saved(&client).await;
+        self.load_saved().await;
 
         let reply = match (&mut *transfer, message) {
             (Transfer::Sending(_), None) => {
                 // Send our room list to the receiver.
-                let rooms = self.search_index.lock().await.rooms().await;
+                let rooms = self.state().search_index.lock().await.rooms().await;
 
                 Some(Message::RoomList { rooms })
             }
@@ -295,11 +278,11 @@ impl Core {
                 return Ok(None);
             }
             (Transfer::Receiving(download), Some(message)) => {
-                self.handle_as_receiver(&client, session_id, download, message)
+                self.handle_as_receiver(session_id, download, message)
                     .await?
             }
             (Transfer::Sending(snapshot), Some(message)) => {
-                Some(self.handle_as_sender(&client, snapshot, message).await?)
+                Some(self.handle_as_sender(snapshot, message).await?)
             }
         };
 
@@ -307,7 +290,7 @@ impl Core {
         drop(transfer);
 
         if finished {
-            self.complete_search_copy(&client, session_id).await;
+            self.complete_search_copy(session_id).await;
         }
 
         reply
@@ -318,10 +301,10 @@ impl Core {
     /// Handle a message from the receiver (this device is the sender).
     async fn handle_as_sender(
         &self,
-        client: &Client,
         state: &mut Option<SenderState>,
         message: Message,
     ) -> Result<Message, CopyError> {
+        let client = self.client();
         // The sender's logic and state are a lot simpler than the receiver's:
         // we just send whatever they ask us for.
         match message {
@@ -359,7 +342,6 @@ impl Core {
     /// Handle a message from the sender (this device is the receiver).
     async fn handle_as_receiver(
         &self,
-        client: &Client,
         session_id: &str,
         ReceiverState { state, epoch }: &mut ReceiverState,
         message: Message,
@@ -382,7 +364,6 @@ impl Core {
             }
             (Message::ListParts(part_list), DownloadState::DownloadingRooms(download_state)) => {
                 self.advance_download_state(
-                    client,
                     *epoch,
                     download_state,
                     PartMessagePayload::ListParts(part_list),
@@ -391,7 +372,6 @@ impl Core {
             }
             (Message::PartData(part_data), DownloadState::DownloadingRooms(download_state)) => {
                 self.advance_download_state(
-                    client,
                     *epoch,
                     download_state,
                     PartMessagePayload::PartData(part_data),
@@ -420,7 +400,6 @@ impl Core {
 
     async fn advance_download_state(
         &self,
-        client: &Client,
         epoch: u64,
         state: &mut RoomDownloadState,
         message: PartMessagePayload,
@@ -458,7 +437,7 @@ impl Core {
                         room: room.clone(),
                         part,
                     })?;
-                self.import_peer_payload(client, &room, payload).await?;
+                self.import_peer_payload(&room, payload).await?;
                 (room, parts.missing.pop_front())
             }
             _ => {
@@ -469,7 +448,8 @@ impl Core {
         };
 
         // Update the timer for this room so the crawler will ignore it.
-        self.search_sharing
+        self.state()
+            .search_peers
             .state
             .lock()
             .restoring
@@ -498,107 +478,17 @@ impl Core {
             unreachable!();
         };
 
-        self.finish_receiving_room(client, parts, epoch).await?;
+        self.finish_receiving_room(parts, epoch).await?;
         state.finished_rooms += 1;
 
         Ok(next_room.map(|room| Message::RequestRoom { room }))
     }
 
-    pub(super) async fn mark_synced(&self, client: &Client, copy: Option<SearchPeerCopyView>) {
-        self.load_saved(client).await;
-        self.update_sharing(|state| {
-            let saved = state.saved.get_or_insert_with(Saved::default);
-            saved.synced_at = Some(now_ms());
-            if copy.is_some() {
-                saved.last_copy = copy;
-            }
-        });
-        if let Err(error) = self.save(client).await {
-            tracing::warn!(%error, "could not save the search copy result");
-        }
-    }
-
-    pub(crate) async fn forget_shared_room(&self, client: &Client, room: &RoomId) {
-        self.load_saved(client).await;
-        let removed = self
-            .search_sharing
-            .state
-            .lock()
-            .saved
-            .as_mut()
-            .is_some_and(|saved| saved.known.remove(room).is_some());
-        if removed && let Err(error) = self.save(client).await {
-            tracing::warn!(%error, "could not forget the received search parts");
-        }
-    }
-
-    pub(super) async fn clear_saved(&self, client: &Client) {
-        let _store = self.search_sharing.store.lock().await;
-        self.update_sharing(|state| {
-            state.epoch += 1;
-            state.saved = Some(Saved::default());
-        });
-        if let Err(error) = client.state_store().remove_custom_value(STORE_KEY).await {
-            tracing::warn!(%error, "could not clear the search sharing data");
-        }
-    }
-
-    pub(super) async fn load_saved(&self, client: &Client) {
-        if self.search_sharing.state.lock().saved.is_some() {
-            return;
-        }
-        let _store = self.search_sharing.store.lock().await;
-        if self.search_sharing.state.lock().saved.is_some() {
-            return;
-        }
-        let saved = client
-            .state_store()
-            .get_custom_value(STORE_KEY)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-            .unwrap_or_default();
-        self.update_sharing(|state| {
-            state.saved.get_or_insert(saved);
-        });
-    }
-
-    async fn save(&self, client: &Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let _store = self.search_sharing.store.lock().await;
-        let bytes = self
-            .search_sharing
-            .state
-            .lock()
-            .saved
-            .as_ref()
-            .map(serde_json::to_vec)
-            .transpose()?;
-        if let Some(bytes) = bytes {
-            client
-                .state_store()
-                .set_custom_value(STORE_KEY, bytes)
-                .await?;
-        }
-        Ok(())
-    }
-
-    pub(super) fn known_parts(&self, room: &OwnedRoomId) -> HashSet<String> {
-        self.search_sharing
-            .state
-            .lock()
-            .saved
-            .as_ref()
-            .and_then(|saved| saved.known.get(room))
-            .cloned()
-            .unwrap_or_default()
-    }
-
     async fn peer_snapshot(&self, room: OwnedRoomId) -> Option<SenderState> {
         self.save_changed_checkpoints().await;
         let history = settled_history(&self.search_store().await, &room).await?;
-        let (boundary, resume) = self.search_crawl.lock().await.share_boundary(&room);
-        let floor = self.search_index.lock().await.floor_of(&room).await;
+        let (boundary, resume) = self.state().search_crawl.lock().share_boundary(&room);
+        let floor = self.state().search_index.lock().await.floor_of(&room).await;
         let from = boundary
             .or_else(|| history.weights.first().map(|&(ts, _)| ts))
             .unwrap_or(0)
@@ -647,11 +537,11 @@ impl Core {
 
     async fn import_peer_payload(
         &self,
-        client: &Client,
         room: &OwnedRoomId,
         payload: SegmentPayload,
     ) -> Result<(), CopyError> {
-        if !self.peers_allowed() {
+        let client = self.client();
+        if !self.core().peers_allowed() {
             return Err(CopyError::Session(RpcCode::Unavailable.into()));
         }
 
@@ -664,7 +554,11 @@ impl Core {
             None => None,
         };
 
-        let index = self.search_index.lock().await;
+        let session_state = self.state();
+        let index = session_state.search_index.lock().await;
+        if self.has_ended() {
+            return Err(CopyError::Session(RpcCode::NotLoggedIn.into()));
+        }
         index
             .import_redactions(
                 room,
@@ -680,17 +574,22 @@ impl Core {
 
     async fn finish_receiving_room(
         &self,
-        client: &Client,
         parts: PartsDownloadState,
         epoch: u64,
     ) -> Result<(), CopyError> {
+        let client = self.client();
         let room = parts.room;
-        self.search_sharing.state.lock().restoring.remove(&room);
+        self.state()
+            .search_peers
+            .state
+            .lock()
+            .restoring
+            .remove(&room);
 
         // If we know we're joined to this room, mark it as covered so crawling skips it.
         if let Some(shared) = parts.cover.filter(|_| joined(client, &room)) {
             let mut cover = {
-                let crawl = self.search_crawl.lock().await;
+                let crawl = self.state().search_crawl.lock();
                 super::super::merged_cover(
                     crawl.cover_of(&room),
                     shared.from,
@@ -700,13 +599,19 @@ impl Core {
                     crawl.has_token(&room),
                 )
             };
-            let floor = self.search_index.lock().await.floor_of(&room).await;
+            let floor = self.state().search_index.lock().await.floor_of(&room).await;
             if floor > cover.from {
                 cover.from = floor;
                 cover.resume = None;
                 cover.stops = false;
             }
-            self.search_crawl.lock().await.cover(&room, cover);
+            {
+                let mut crawl = self.state().search_crawl.lock();
+                if self.has_ended() {
+                    return Err(CopyError::Session(RpcCode::NotLoggedIn.into()));
+                }
+                crawl.cover(&room, cover);
+            }
             self.save_changed_checkpoints().await;
         }
 
@@ -715,7 +620,7 @@ impl Core {
         }
 
         let kept = {
-            let mut state = self.search_sharing.state.lock();
+            let mut state = self.state().search_peers.state.lock();
             let current = state.epoch == epoch;
             if current {
                 state.saved.get_or_insert_with(Saved::default).known.insert(
@@ -726,9 +631,105 @@ impl Core {
             current
         };
         if kept {
-            self.save(client).await.map_err(|_| CopyError::Store)?;
+            self.save().await.map_err(|_| CopyError::Store)?;
         }
         Ok(())
+    }
+
+    pub(super) async fn clear_saved(&self) {
+        let client = self.client();
+        let _store = self.state().search_peers.store.lock().await;
+        self.update_sharing(|state| {
+            state.epoch += 1;
+            state.saved = Some(Saved::default());
+        });
+        if let Err(error) = client.state_store().remove_custom_value(STORE_KEY).await {
+            tracing::warn!(%error, "could not clear the search sharing data");
+        }
+    }
+
+    pub(crate) async fn forget_shared_room(&self, room: &RoomId) {
+        self.load_saved().await;
+        let removed = self
+            .state()
+            .search_peers
+            .state
+            .lock()
+            .saved
+            .as_mut()
+            .is_some_and(|saved| saved.known.remove(room).is_some());
+        if removed && let Err(error) = self.save().await {
+            tracing::warn!(%error, "could not forget the received search parts");
+        }
+    }
+
+    pub(super) fn known_parts(&self, room: &OwnedRoomId) -> HashSet<String> {
+        self.state()
+            .search_peers
+            .state
+            .lock()
+            .saved
+            .as_ref()
+            .and_then(|saved| saved.known.get(room))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub(super) async fn load_saved(&self) {
+        let client = self.client();
+        if self.state().search_peers.state.lock().saved.is_some() {
+            return;
+        }
+        let _store = self.state().search_peers.store.lock().await;
+        if self.state().search_peers.state.lock().saved.is_some() {
+            return;
+        }
+        let saved = client
+            .state_store()
+            .get_custom_value(STORE_KEY)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default();
+        self.update_sharing(|state| {
+            state.saved.get_or_insert(saved);
+        });
+    }
+
+    async fn save(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let client = self.client();
+        let _store = self.state().search_peers.store.lock().await;
+        let bytes = self
+            .state()
+            .search_peers
+            .state
+            .lock()
+            .saved
+            .as_ref()
+            .map(serde_json::to_vec)
+            .transpose()?;
+        if let Some(bytes) = bytes {
+            client
+                .state_store()
+                .set_custom_value(STORE_KEY, bytes)
+                .await?;
+        }
+        Ok(())
+    }
+
+    pub(super) async fn mark_synced(&self, copy: Option<SearchPeerCopyView>) {
+        self.load_saved().await;
+        self.update_sharing(|state| {
+            let saved = state.saved.get_or_insert_with(Saved::default);
+            saved.synced_at = Some(now_ms());
+            if copy.is_some() {
+                saved.last_copy = copy;
+            }
+        });
+        if let Err(error) = self.save().await {
+            tracing::warn!(%error, "could not save the search copy result");
+        }
     }
 }
 

@@ -22,13 +22,17 @@ async fn core_declines_legacy_notifications_but_rejects_invalid_and_own_events()
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let own_user_id = client.user_id().unwrap().to_owned();
     let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "test".to_owned(),
-        client,
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "test".to_owned(),
+            client,
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
 
     for (event_id, sender, notification_type) in [
         ("$legacy", "@caller:example.org", "notification"),
@@ -122,7 +126,20 @@ async fn deployed_non_sticky_invites_reach_the_call_handler_and_push_validation(
         )
         .await;
     let (core, mut events) = Core::new("fallback", Box::new(MemorySessionStore::default()));
-    core.watch_incoming_calls(&client, core.lifecycle.current());
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "fallback".to_owned(),
+            client: client.clone(),
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
+    session.watch_incoming_calls(core.lifecycle.current());
     let now = crate::now_ms();
     let event = json!({
         "type":"org.matrix.msc4075.rtc.notification", "event_id":"$fallback",
@@ -154,14 +171,6 @@ async fn deployed_non_sticky_invites_reach_the_call_handler_and_push_validation(
         .await
         .unwrap();
     assert!(validated.ring);
-    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-    *core.session.write().await = Some(Session {
-        account_id: "fallback".to_owned(),
-        client: client.clone(),
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
     Mock::given(method("PUT"))
         .and(path_regex(r"/send/org\.matrix\.msc4310\.rtc\.decline/"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id":"$declined"})))
@@ -185,7 +194,7 @@ async fn deployed_non_sticky_invites_reach_the_call_handler_and_push_validation(
             .query_pairs()
             .any(|(key, _)| key.contains("sticky"))
     );
-    core.session_tasks.lock().clear();
+    session.state().session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -216,7 +225,9 @@ async fn sticky_only_invites_are_cancelled_by_withdrawals_and_cross_device_actio
         )
         .await;
     let (core, mut events) = Core::new("invites", Box::new(MemorySessionStore::default()));
-    core.watch_incoming_calls(&client, core.lifecycle.current());
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_incoming_calls(core.lifecycle.current());
     let now = crate::now_ms();
     for (index, action) in ["withdraw", "join", "leave", "decline", "close"]
         .into_iter()
@@ -285,7 +296,7 @@ async fn sticky_only_invites_are_cancelled_by_withdrawals_and_cross_device_actio
             matches!(incoming_event(&mut events, &format!("{action}: ended")).await, CoreEvent::IncomingCallEnded { notification_event_id } if notification_event_id == id)
         );
     }
-    core.session_tasks.lock().clear();
+    session.state().session_tasks.lock().clear();
 }
 
 #[tokio::test]
@@ -348,19 +359,25 @@ async fn declining_a_draft_invite_sends_a_sticky_reference_without_a_local_echo(
         .mount(server.server())
         .await;
     let (core, _) = Core::new("decline", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "decline".to_owned(),
-        client: client.clone(),
-        sync_service: Arc::new(SyncService::builder(client).build().await.unwrap()),
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
-    core.decline_call(DeclineParams {
-        room_id: room_id.to_owned(),
-        notification_event_id: "$invite".to_owned(),
-    })
-    .await
-    .unwrap();
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "decline".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
+    let session = core.signed_in().unwrap();
+    session
+        .decline_call(DeclineParams {
+            room_id: room_id.to_owned(),
+            notification_event_id: "$invite".to_owned(),
+        })
+        .await
+        .unwrap();
     updates
         .try_recv()
         .expect_err("a decline must not enqueue a local echo");

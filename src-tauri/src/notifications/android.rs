@@ -198,10 +198,10 @@ pub(crate) async fn set_open_conversation<R: Runtime>(
 
 pub(crate) async fn forget_left_conversations<R: Runtime>(
     app: &AppHandle<R>,
-    core: &sable_core::Core,
+    core: &std::sync::Arc<sable_core::Core>,
 ) {
     use tauri_plugin_sable_push::SablePushExt;
-    let Ok((user_id, room_ids)) = core.left_rooms().await else {
+    let Ok((user_id, room_ids)) = core.left_rooms() else {
         return;
     };
     if room_ids.is_empty() {

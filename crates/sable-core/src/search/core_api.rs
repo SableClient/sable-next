@@ -1,12 +1,12 @@
 use crate::api::search::SearchOrder;
 use std::collections::HashSet;
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use crate::tasks::JoinHandleExt;
 use futures_util::{StreamExt, stream};
 use matrix_sdk::RoomState;
 use matrix_sdk::event_cache::RoomEventCacheUpdate;
-use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, OwnedUserId};
 use tracing::warn;
@@ -21,11 +21,11 @@ use super::{
     HYDRATE_CONCURRENCY, INGEST_WAIT, INGEST_WAIT_ATTEMPTS, IndexFilter, PINNED_FETCH_CONCURRENCY,
     ignored_user_ids, ingestable_events,
 };
-use crate::Core;
+use crate::SignedIn;
 use crate::attachments::attachment_contents;
 use crate::protocol::{RoomAttachmentKind, RoomAttachmentView};
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn search_messages(
         &self,
         query: &str,
@@ -35,11 +35,15 @@ impl Core {
         offset: usize,
         context: usize,
     ) -> Vec<Hit> {
-        let local_ready = self.search_index.lock().await.ready();
+        let local_ready = self.state().search_index.lock().await.ready();
         if order != SearchOrder::Oldest
-            && (!local_ready || self.server_search_enabled.load(Ordering::Relaxed))
-            && let Ok(client) = self.client().await
-            && let Some(room_id) = server::target(&client, query, filter).await
+            && (!local_ready
+                || self
+                    .core()
+                    .settings
+                    .server_search_enabled
+                    .load(Ordering::Relaxed))
+            && let Some(room_id) = server::target(self.client(), query, filter).await
         {
             let target = server::ServerQuery {
                 room_id: &room_id,
@@ -51,7 +55,7 @@ impl Core {
                 context,
             };
 
-            match self.search_server(&client, target).await {
+            match self.search_server(target).await {
                 Ok(hits) => return hits,
                 Err(error) => {
                     warn!(%room_id, "server-side search failed, falling back to the local index: {error}");
@@ -67,7 +71,8 @@ impl Core {
             HashSet::new()
         };
 
-        let index = self.search_index.lock().await;
+        let session_state = self.state();
+        let index = session_state.search_index.lock().await;
         let hits = index
             .search_pinned(query, &filter, pinned, order, limit, offset)
             .await;
@@ -75,9 +80,7 @@ impl Core {
     }
 
     async fn pinned_in_scope(&self, filter: &IndexFilter) -> HashSet<OwnedEventId> {
-        let Ok(client) = self.client().await else {
-            return HashSet::new();
-        };
+        let client = self.client();
 
         let in_scope: Vec<OwnedRoomId> = client
             .joined_rooms()
@@ -98,62 +101,62 @@ impl Core {
     }
 
     pub(crate) async fn ignored_senders(&self) -> Vec<OwnedUserId> {
-        let Ok(client) = self.client().await else {
-            return Vec::new();
-        };
+        let client = self.client();
 
-        self.with_open_stores(async || ignored_user_ids(&client).await)
+        self.core()
+            .with_open_stores(async || ignored_user_ids(client).await)
             .await
     }
 
     /// Replaces the index with the account's own database, and forgets the rooms left since.
-    pub(super) async fn open_search_index(&self, client: &matrix_sdk::Client, store_id: &str) {
+    pub(super) async fn open_search_index(&self, store_id: &str) {
+        let client = self.client();
+        let session_state = self.state();
         // Opened while the stores are open, so a suspension closes it with them.
         let store = self
+            .core()
             .with_open_stores(async || {
                 let store = Store::open_account(store_id).await;
-                self.search_index.lock().await.replace_store(store.clone());
-                store
+                let mut index = session_state.search_index.lock().await;
+                // The teardown closed the index under this lock, and nothing would close this one.
+                if self.has_ended() {
+                    #[cfg(not(target_family = "wasm"))]
+                    store.close().await;
+                    return None;
+                }
+                index.replace_store(store.clone());
+                Some(store)
             })
             .await;
+        let Some(store) = store else {
+            return;
+        };
         persist::purge_legacy(&store, client, store_id).await;
-        let index = self.search_index.lock().await;
+        let index = session_state.search_index.lock().await;
         for room_id in index.rooms().await {
             if client
                 .get_room(&room_id)
                 .is_some_and(|room| room.state() != RoomState::Joined)
             {
                 index.forget_room(&room_id).await;
-                self.search_crawl.lock().await.forget(&room_id);
+                self.state().search_crawl.lock().forget(&room_id);
             }
         }
     }
 
-    pub(crate) fn watch_search_persist(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_search_persist(&self) {
         let core = self.clone();
-        let client = client.clone();
 
         self.track_session_task(
             spawn(async move {
                 loop {
-                    let interval = core.search_crawl.lock().await.tuning.flush_interval();
+                    let interval = core.state().search_crawl.lock().tuning.flush_interval();
                     matrix_sdk::sleep::sleep(interval).await;
-                    core.enforce_disk_budget(&client).await;
+                    core.enforce_disk_budget().await;
                 }
             })
             .abort_on_drop(),
         );
-    }
-
-    pub(super) async fn enforce_disk_budget(&self, client: &matrix_sdk::Client) {
-        let evicted = self.search_index.lock().await.enforce_disk_budget().await;
-        for room_id in evicted {
-            self.forget_shared_room(client, &room_id).await;
-        }
-    }
-
-    pub(crate) async fn search_store(&self) -> Store {
-        self.search_index.lock().await.store().clone()
     }
 
     pub(crate) async fn attachment_page(
@@ -167,6 +170,7 @@ impl Core {
         let mut tried = HashSet::new();
         loop {
             let step = self
+                .state()
                 .search_index
                 .lock()
                 .await
@@ -183,12 +187,7 @@ impl Core {
     }
 
     async fn hydrate_media(&self, room_id: &OwnedRoomId, event_ids: &[OwnedEventId]) {
-        let Some(room) = self
-            .client()
-            .await
-            .ok()
-            .and_then(|client| client.get_room(room_id))
-        else {
+        let Some(room) = self.client().get_room(room_id) else {
             return;
         };
         let fetched: Vec<(OwnedEventId, AttachmentMedia)> = stream::iter(event_ids.iter().cloned())
@@ -211,7 +210,8 @@ impl Core {
             .collect()
             .await;
 
-        let index = self.search_index.lock().await;
+        let session_state = self.state();
+        let index = session_state.search_index.lock().await;
         for (event_id, media) in fetched {
             if media.is_empty() {
                 continue;
@@ -223,9 +223,11 @@ impl Core {
         }
     }
 
-    pub(crate) async fn prime_persisted_rooms(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) async fn prime_persisted_rooms(&self) {
+        let client = self.client();
         for room in client.joined_rooms() {
             if self
+                .state()
                 .search_index
                 .lock()
                 .await
@@ -234,11 +236,12 @@ impl Core {
             {
                 continue;
             }
-            self.index_room_search(client, &room).await;
+            self.index_room_search(&room).await;
         }
     }
 
-    pub(crate) fn watch_ignored_users(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    pub(crate) fn watch_ignored_users(&self) {
+        let client = self.client();
         let core = self.clone();
         let client = client.clone();
         let mut changes = client.subscribe_to_ignore_user_list_changes();
@@ -267,7 +270,7 @@ impl Core {
         let unignored =
             previous.is_some_and(|previous| previous.iter().any(|user| !ignored.contains(user)));
         if unignored {
-            self.search_crawl.lock().await.reset();
+            self.state().search_crawl.lock().reset();
             if !persist::forget_crawl(&store).await {
                 let _ = persist::forget_crawl(&store).await;
             }
@@ -275,11 +278,8 @@ impl Core {
         persist::save_ignored(&store, ignored).await;
     }
 
-    pub(crate) fn watch_search_index(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        store_id: &str,
-    ) {
+    pub(crate) fn watch_search_index(&self, store_id: &str) {
+        let client = self.client();
         let core = self.clone();
         let client = client.clone();
         let store_id = store_id.to_owned();
@@ -292,22 +292,22 @@ impl Core {
                 let mut updates = event_cache.subscribe_to_room_generic_updates();
 
                 #[cfg(not(target_family = "wasm"))]
-                persist::remove_dictionary(&core.store_id).await;
+                persist::remove_dictionary(&core.core().store_id).await;
                 // A tab still on an older version keeps the delete blocked until it closes.
                 #[cfg(target_family = "wasm")]
                 drop(spawn(persist::remove_dictionary()));
-                core.open_search_index(&client, &store_id).await;
-                core.prime_persisted_rooms(&client).await;
+                core.open_search_index(&store_id).await;
+                core.prime_persisted_rooms().await;
 
-                core.watch_search_crawl(&client);
-                core.watch_search_persist(&client);
+                core.watch_search_crawl();
+                core.watch_search_persist();
 
                 loop {
                     let room_id = match updates.recv().await {
                         Ok(update) => update.room_id,
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(missed)) => {
                             warn!(missed, "missed room updates, resweeping the search index");
-                            core.prime_persisted_rooms(&client).await;
+                            core.prime_persisted_rooms().await;
                             continue;
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
@@ -317,42 +317,22 @@ impl Core {
                         .get_room(&room_id)
                         .filter(|room| room.state() == RoomState::Joined)
                     else {
-                        core.search_index.lock().await.forget_room(&room_id).await;
-                        core.search_crawl.lock().await.forget(&room_id);
-                        core.forget_shared_room(&client, &room_id).await;
+                        core.state()
+                            .search_index
+                            .lock()
+                            .await
+                            .forget_room(&room_id)
+                            .await;
+                        core.state().search_crawl.lock().forget(&room_id);
+                        core.forget_shared_room(&room_id).await;
                         continue;
                     };
 
-                    core.index_room_search(&client, &room).await;
+                    core.index_room_search(&room).await;
                 }
             })
             .abort_on_drop(),
         );
-    }
-
-    /// Indexes again, from the homeserver, the messages that lost their
-    /// document with their latest edit, which it serves with the edit before.
-    pub(super) async fn refetch_unedited(
-        &self,
-        room: &matrix_sdk::Room,
-        cache: &matrix_sdk::event_cache::RoomEventCache,
-        rules: &RedactionRules,
-    ) {
-        let messages = self.search_index.lock().await.take_unedited(room.room_id());
-        for event_id in messages {
-            let Ok(event) = room.load_or_fetch_event(&event_id, None).await else {
-                continue;
-            };
-            let ingested = self
-                .search_index
-                .lock()
-                .await
-                .ingest_with(&room.room_id().to_owned(), vec![event], cache, rules, true)
-                .await;
-            if let Err(error) = ingested {
-                warn!(%event_id, "the search index could not take a message back: {error}");
-            }
-        }
     }
 
     #[tracing::instrument(
@@ -360,21 +340,18 @@ impl Core {
         target = "sable_core::tasks",
         name = "search.index_room_search"
     )]
-    pub(super) async fn index_room_search(
-        &self,
-        client: &matrix_sdk::Client,
-        room: &matrix_sdk::Room,
-    ) {
+    pub(super) async fn index_room_search(&self, room: &matrix_sdk::Room) {
+        let client = self.client();
         use tokio::sync::broadcast::error::TryRecvError;
 
         let room_id = room.room_id().to_owned();
         for _ in 0..INGEST_WAIT_ATTEMPTS {
-            if !self.search_crawl.lock().await.is_ingesting(&room_id) {
+            if !self.state().search_crawl.lock().is_ingesting(&room_id) {
                 break;
             }
             matrix_sdk::sleep::sleep(INGEST_WAIT).await;
         }
-        if self.search_crawl.lock().await.is_ingesting(&room_id) {
+        if self.state().search_crawl.lock().is_ingesting(&room_id) {
             return;
         }
         let Some(event_cache) = client.event_cache() else {
@@ -387,7 +364,8 @@ impl Core {
             return;
         };
         {
-            let index = self.search_index.lock().await;
+            let session_state = self.state();
+            let index = session_state.search_index.lock().await;
             // Dropping the last SDK subscriber reloads the cache from storage.
             if index.has_room(&room_id).await
                 && index.unclassified(&room_id, events).await.is_empty()
@@ -402,7 +380,8 @@ impl Core {
         let rules = room.clone_info().room_version_rules_or_default().redaction;
 
         loop {
-            let index = self.search_index.lock().await;
+            let session_state = self.state();
+            let index = session_state.search_index.lock().await;
             let total = events.len();
             let fresh = index.unclassified(&room_id, events).await;
             let bans = ban::bans_in(&fresh);
@@ -419,9 +398,9 @@ impl Core {
             index.ingest(&room_id, fresh, &cache, &rules).await;
             drop(index);
             if let Some((anchor, until)) = detached {
-                self.search_crawl
+                self.state()
+                    .search_crawl
                     .lock()
-                    .await
                     .open_hole(&room_id, anchor, until);
             }
             self.settle_bans(room, bans).await;
@@ -445,5 +424,59 @@ impl Core {
                 }
             };
         }
+    }
+
+    pub(crate) async fn search_store(&self) -> Store {
+        self.state().search_store().await
+    }
+
+    pub(super) async fn enforce_disk_budget(&self) {
+        let evicted = self
+            .state()
+            .search_index
+            .lock()
+            .await
+            .enforce_disk_budget()
+            .await;
+        for room_id in evicted {
+            self.forget_shared_room(&room_id).await;
+        }
+    }
+
+    /// Indexes again, from the homeserver, the messages that lost their
+    /// document with their latest edit, which it serves with the edit before.
+    pub(super) async fn refetch_unedited(
+        &self,
+        room: &matrix_sdk::Room,
+        cache: &matrix_sdk::event_cache::RoomEventCache,
+        rules: &RedactionRules,
+    ) {
+        let messages = self
+            .state()
+            .search_index
+            .lock()
+            .await
+            .take_unedited(room.room_id());
+        for event_id in messages {
+            let Ok(event) = room.load_or_fetch_event(&event_id, None).await else {
+                continue;
+            };
+            let ingested = self
+                .state()
+                .search_index
+                .lock()
+                .await
+                .ingest_with(&room.room_id().to_owned(), vec![event], cache, rules, true)
+                .await;
+            if let Err(error) = ingested {
+                warn!(%event_id, "the search index could not take a message back: {error}");
+            }
+        }
+    }
+}
+
+impl crate::SessionState {
+    pub(crate) async fn search_store(&self) -> Store {
+        self.search_index.lock().await.store().clone()
     }
 }

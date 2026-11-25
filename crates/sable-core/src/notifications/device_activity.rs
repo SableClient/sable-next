@@ -1,4 +1,5 @@
 use crate::ResultExt;
+use crate::SignedIn;
 
 pub(super) const DEVICE_ACTIVITY_EVENT: &str = "moe.sable.device_activity";
 const DEVICE_ACTIVITY_PRUNE_MS: u64 = 7 * 24 * 60 * 60_000;
@@ -28,11 +29,8 @@ fn update_device_activity(
     Some(content)
 }
 
-pub(crate) async fn set_device_activity(core: &crate::Core, active: bool) {
-    let Ok(client) = core.client().await else {
-        tracing::debug!("device activity not recorded: not logged in");
-        return;
-    };
+pub(crate) async fn set_device_activity(core: &SignedIn, active: bool) {
+    let client = core.client();
     let Some(device_id) = client.device_id() else {
         tracing::debug!("device activity not recorded: device ID unavailable");
         return;
@@ -45,12 +43,12 @@ pub(crate) async fn set_device_activity(core: &crate::Core, active: bool) {
                 let current = stored
                     .map(serde_json::from_value)
                     .transpose()
-                    .or_failed(core, "set_device_activity")?
+                    .or_failed(core.core(), "set_device_activity")?
                     .unwrap_or_default();
                 update_device_activity(current, device_id.as_str(), active, crate::now_ms())
                     .map(serde_json::to_value)
                     .transpose()
-                    .or_failed(core, "set_device_activity")
+                    .or_failed(core.core(), "set_device_activity")
             },
         )
         .await

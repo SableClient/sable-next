@@ -43,13 +43,17 @@ async fn setup(server: &MatrixMockServer, notified: u64) -> (Arc<Core>, Client, 
         )
         .await;
     let (core, _) = Core::new("inbox", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "inbox".to_owned(),
-        client: client.clone(),
-        sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "inbox".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
     (core, client, room)
 }
 
@@ -80,38 +84,32 @@ async fn an_unknown_encryption_state_hides_the_inbox_preview() {
 async fn recorded_notifications_reach_the_store_only_on_flush() {
     let server = MatrixMockServer::new().await;
     let (core, client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     for (event, ts) in [("first", 100), ("second", 200)] {
-        core.record_inbox(
-            &client,
-            vec![entry(event, ts)],
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .await
-        .unwrap();
+        session
+            .record_inbox(vec![entry(event, ts)], BTreeMap::new(), BTreeMap::new())
+            .await
+            .unwrap();
     }
     assert_eq!(super::load(&client).await.unwrap().entries, []);
 
-    core.flush_inbox(&client).await;
+    session.flush_inbox().await;
 
     let stored = super::load(&client).await.unwrap();
     assert_eq!(stored.entries.len(), 2);
-    *core.inbox.lock().await = super::InboxCache::default();
-    assert_eq!(core.stored_inbox(&client).await.unwrap().entries.len(), 2);
+    *session.state().inbox.cache.lock().await = super::InboxCache::default();
+    assert_eq!(session.stored_inbox().await.unwrap().entries.len(), 2);
 }
 
 #[tokio::test]
 async fn suspending_with_unsaved_notifications_saves_them_and_lets_sync_resume() {
     let server = MatrixMockServer::new().await;
     let (core, client, _room) = setup(&server, 1).await;
-    core.record_inbox(
-        &client,
-        vec![entry("first", 100)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(vec![entry("first", 100)], BTreeMap::new(), BTreeMap::new())
+        .await
+        .unwrap();
 
     let cycle = async {
         core.update_app_active(false).await;
@@ -127,14 +125,10 @@ async fn suspending_with_unsaved_notifications_saves_them_and_lets_sync_resume()
 #[tokio::test]
 async fn suspending_during_the_first_inbox_load_does_not_deadlock() {
     let server = MatrixMockServer::new().await;
-    let (core, client, _room) = setup(&server, 1).await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     let closing = core.activity.closing_stores().await;
-    let record = core.record_inbox(
-        &client,
-        vec![entry("first", 100)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    );
+    let record = session.record_inbox(vec![entry("first", 100)], BTreeMap::new(), BTreeMap::new());
     tokio::pin!(record);
     assert!(futures_util::poll!(record.as_mut()).is_pending());
 
@@ -152,17 +146,14 @@ async fn suspending_during_the_first_inbox_load_does_not_deadlock() {
 #[tokio::test]
 async fn the_inbox_can_be_limited_to_one_room() {
     let server = MatrixMockServer::new().await;
-    let (core, client, room) = setup(&server, 1).await;
-    core.record_inbox(
-        &client,
-        vec![entry("here", 200)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    let (core, _client, room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(vec![entry("here", 200)], BTreeMap::new(), BTreeMap::new())
+        .await
+        .unwrap();
 
-    let (here, _) = core
+    let (here, _) = session
         .inbox_notifications(
             InboxFilter::All,
             true,
@@ -176,7 +167,7 @@ async fn the_inbox_can_be_limited_to_one_room() {
         .await
         .unwrap();
     assert_eq!(here.len(), 1);
-    let (elsewhere, _) = core
+    let (elsewhere, _) = session
         .inbox_notifications(
             InboxFilter::All,
             true,
@@ -195,18 +186,19 @@ async fn the_inbox_can_be_limited_to_one_room() {
 #[tokio::test]
 async fn the_inbox_can_be_searched_by_sender() {
     let server = MatrixMockServer::new().await;
-    let (core, client, _) = setup(&server, 1).await;
-    core.record_inbox(
-        &client,
-        vec![entry("from-alice", 200)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    let (core, _client, _) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            vec![entry("from-alice", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
 
     for (query, found) in [("ALICE", 1), ("bob", 0), ("", 1)] {
-        let (items, _) = core
+        let (items, _) = session
             .inbox_notifications(
                 InboxFilter::All,
                 true,
@@ -227,14 +219,11 @@ async fn the_inbox_can_be_searched_by_sender() {
 async fn highlights_keep_inbox_notifications_unread() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 1).await;
-    core.record_inbox(
-        &client,
-        vec![entry("unread", 200)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(vec![entry("unread", 200)], BTreeMap::new(), BTreeMap::new())
+        .await
+        .unwrap();
     server
         .sync_room(
             &client,
@@ -243,7 +232,7 @@ async fn highlights_keep_inbox_notifications_unread() {
             ),
         )
         .await;
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -254,7 +243,8 @@ async fn highlights_keep_inbox_notifications_unread() {
 #[tokio::test]
 async fn a_stored_encrypted_preview_is_hidden_once_the_setting_is_off() {
     let server = MatrixMockServer::new().await;
-    let (core, client, _room) = setup(&server, 1).await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     let stored = Entry {
         body: Some("secret".to_owned()),
         emotes: vec![PreviewEmote {
@@ -264,24 +254,28 @@ async fn a_stored_encrypted_preview_is_hidden_once_the_setting_is_off() {
         encrypted: true,
         ..entry("secret", 200)
     };
-    core.record_inbox(&client, vec![stored], BTreeMap::new(), BTreeMap::new())
+    session
+        .record_inbox(vec![stored], BTreeMap::new(), BTreeMap::new())
         .await
         .unwrap();
-    core.notification_content
+    core.settings
+        .notification_content
         .store(true, std::sync::atomic::Ordering::Relaxed);
 
-    core.notification_encrypted_content
+    core.settings
+        .notification_encrypted_content
         .store(true, std::sync::atomic::Ordering::Relaxed);
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
         .await
         .unwrap();
     assert_eq!(items[0].body.as_deref(), Some("secret"));
     assert_eq!(items[0].emotes.len(), 1);
 
-    core.notification_encrypted_content
+    core.settings
+        .notification_encrypted_content
         .store(false, std::sync::atomic::Ordering::Relaxed);
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -293,14 +287,11 @@ async fn a_stored_encrypted_preview_is_hidden_once_the_setting_is_off() {
 async fn direct_filter_uses_current_room_status() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 1).await;
-    core.record_inbox(
-        &client,
-        vec![entry("unread", 200)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(vec![entry("unread", 200)], BTreeMap::new(), BTreeMap::new())
+        .await
+        .unwrap();
     let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
     server
         .mock_sync()
@@ -309,7 +300,7 @@ async fn direct_filter_uses_current_room_status() {
         })
         .await;
     assert!(room.is_direct().await.unwrap());
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::Direct, false, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -338,6 +329,7 @@ async fn a_direct_room_records_messages_the_push_rules_did_not_notify() {
 async fn a_thread_receipt_marks_its_replies_read_and_threads_filter_them() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 0).await;
+    let session = core.signed_in().unwrap();
     let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
     server
         .sync_room(
@@ -364,20 +356,20 @@ async fn a_thread_receipt_marks_its_replies_read_and_threads_filter_them() {
         thread_root: Some(event_id!("$root").to_owned()),
         ..entry(event, ts)
     };
-    core.record_inbox(
-        &client,
-        vec![
-            in_thread("seen", 200),
-            in_thread("new", 300),
-            entry("main", 100),
-        ],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    session
+        .record_inbox(
+            vec![
+                in_thread("seen", 200),
+                in_thread("new", 300),
+                entry("main", 100),
+            ],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
 
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::Threads, true, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -397,6 +389,7 @@ async fn a_thread_receipt_marks_its_replies_read_and_threads_filter_them() {
 async fn a_room_receipt_reads_thread_replies_in_a_room_without_notifications() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 0).await;
+    let session = core.signed_in().unwrap();
     let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
     server
         .sync_room(
@@ -423,16 +416,16 @@ async fn a_room_receipt_reads_thread_replies_in_a_room_without_notifications() {
         thread_root: Some(event_id!("$root").to_owned()),
         ..entry(event, ts)
     };
-    core.record_inbox(
-        &client,
-        vec![in_thread("seen", 200), in_thread("new", 300)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    session
+        .record_inbox(
+            vec![in_thread("seen", 200), in_thread("new", 300)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
 
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::All, true, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -447,6 +440,7 @@ async fn a_room_receipt_reads_thread_replies_in_a_room_without_notifications() {
 async fn a_mention_after_the_receipt_stays_unread_when_the_server_clears_its_counts() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 0).await;
+    let session = core.signed_in().unwrap();
     let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
     server
         .sync_room(
@@ -473,20 +467,20 @@ async fn a_mention_after_the_receipt_stays_unread_when_the_server_clears_its_cou
         highlight: true,
         ..entry(event, ts)
     };
-    core.record_inbox(
-        &client,
-        vec![
-            mention("seen", 100),
-            mention("ping", 200),
-            entry("after", 300),
-        ],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    session
+        .record_inbox(
+            vec![
+                mention("seen", 100),
+                mention("ping", 200),
+                entry("after", 300),
+            ],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
 
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(
             InboxFilter::Mentions,
             false,
@@ -520,6 +514,7 @@ fn an_entry_stored_before_threads_were_recorded_is_not_in_a_thread() {
 async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
     server
         .sync_room(
@@ -548,17 +543,13 @@ async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
         .expect(1)
         .mount(server.server())
         .await;
-    core.record_inbox(
-        &client,
-        vec![entry("unread", 200)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    session
+        .record_inbox(vec![entry("unread", 200)], BTreeMap::new(), BTreeMap::new())
+        .await
+        .unwrap();
 
     for _ in 0..2 {
-        let (items, _) = core
+        let (items, _) = session
             .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap();
@@ -586,7 +577,7 @@ async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
                 ),
         )
         .await;
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::All, true, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -598,6 +589,7 @@ async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
 async fn an_unfetchable_receipt_event_falls_back_to_the_receipt_time() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
     server
         .sync_room(
@@ -628,16 +620,16 @@ async fn an_unfetchable_receipt_event_falls_back_to_the_receipt_time() {
         )
         .mount(server.server())
         .await;
-    core.record_inbox(
-        &client,
-        vec![entry("old", 100), entry("new", 200)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    session
+        .record_inbox(
+            vec![entry("old", 100), entry("new", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
 
-    let (items, _) = core
+    let (items, _) = session
         .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -655,6 +647,7 @@ async fn an_unfetchable_receipt_event_falls_back_to_the_receipt_time() {
 async fn unread_backfill_resumes_after_five_empty_pages() {
     let server = MatrixMockServer::new().await;
     let (core, client, _) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     for page in 0..6 {
         let mock = Mock::given(method("GET")).and(path_regex("/messages$"));
         let mock = if page == 0 {
@@ -675,10 +668,19 @@ async fn unread_backfill_resumes_after_five_empty_pages() {
             }))).expect(1).mount(server.server()).await;
     }
 
-    assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (0, true));
-    assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
-    assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (0, false));
-    let (items, _) = core
+    assert_eq!(
+        session.backfill_inbox(false, None).await.unwrap(),
+        (0, true)
+    );
+    assert_eq!(
+        session.backfill_inbox(false, None).await.unwrap(),
+        (1, false)
+    );
+    assert_eq!(
+        session.backfill_inbox(false, None).await.unwrap(),
+        (0, false)
+    );
+    let (items, _) = session
         .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
         .await
         .unwrap();
@@ -690,6 +692,7 @@ async fn unread_backfill_resumes_after_five_empty_pages() {
 async fn backfill_fetch_errors_are_reported_and_can_be_retried() {
     let server = MatrixMockServer::new().await;
     let (core, client, _) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     let failure = Mock::given(method("GET"))
         .and(path_regex("/messages$"))
         .respond_with(
@@ -698,18 +701,22 @@ async fn backfill_fetch_errors_are_reported_and_can_be_retried() {
         )
         .mount_as_scoped(server.server())
         .await;
-    core.backfill_inbox(false, None).await.unwrap_err();
+    session.backfill_inbox(false, None).await.unwrap_err();
     drop(failure);
     Mock::given(method("GET")).and(path_regex("/messages$"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "chunk": [message("$retry", 100, client.user_id())], "state": []})))
             .mount(server.server()).await;
-    assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
+    assert_eq!(
+        session.backfill_inbox(false, None).await.unwrap(),
+        (1, false)
+    );
 }
 
 #[tokio::test]
 async fn unread_backfill_reaches_rooms_beyond_the_first_batch() {
     let server = MatrixMockServer::new().await;
     let (core, client, _) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     for index in 0..6 {
         let name = if index == 0 {
             "room".to_owned()
@@ -736,10 +743,17 @@ async fn unread_backfill_reaches_rooms_beyond_the_first_batch() {
                 .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "chunk": [message(&format!("${name}"), 100, client.user_id())], "state": []})))
                 .expect(1).mount(server.server()).await;
     }
-    assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (5, true));
-    assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
     assert_eq!(
-        core.inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
+        session.backfill_inbox(false, None).await.unwrap(),
+        (5, true)
+    );
+    assert_eq!(
+        session.backfill_inbox(false, None).await.unwrap(),
+        (1, false)
+    );
+    assert_eq!(
+        session
+            .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap()
             .0
@@ -752,6 +766,7 @@ async fn unread_backfill_reaches_rooms_beyond_the_first_batch() {
 async fn backfill_can_be_limited_to_one_room() {
     let server = MatrixMockServer::new().await;
     let (core, client, room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
     let other = matrix_sdk::ruma::room_id!("!other:example.org");
     let factory = EventFactory::new().room(other).sender(User::Alice);
     server
@@ -773,7 +788,8 @@ async fn backfill_can_be_limited_to_one_room() {
     }
 
     assert_eq!(
-        core.backfill_inbox(false, Some(room.room_id()))
+        session
+            .backfill_inbox(false, Some(room.room_id()))
             .await
             .unwrap(),
         (1, false)
@@ -784,14 +800,11 @@ async fn backfill_can_be_limited_to_one_room() {
 async fn a_cached_notification_does_not_stop_backfill_before_a_missing_one() {
     let server = MatrixMockServer::new().await;
     let (core, client, _) = setup(&server, 2).await;
-    core.record_inbox(
-        &client,
-        vec![entry("known", 200)],
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(vec![entry("known", 200)], BTreeMap::new(), BTreeMap::new())
+        .await
+        .unwrap();
     for (from, end, id, ts) in [
         (None, Some("older"), "$known", 200),
         (Some("older"), None, "$missing", 100),
@@ -805,9 +818,13 @@ async fn a_cached_notification_does_not_stop_backfill_before_a_missing_one() {
         mock.respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "end": end, "chunk": [message(id, ts, client.user_id())], "state": []})))
                 .expect(1).mount(server.server()).await;
     }
-    assert_eq!(core.backfill_inbox(false, None).await.unwrap(), (1, false));
     assert_eq!(
-        core.inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
+        session.backfill_inbox(false, None).await.unwrap(),
+        (1, false)
+    );
+    assert_eq!(
+        session
+            .inbox_notifications(InboxFilter::All, false, 30, None, InboxScope::default())
             .await
             .unwrap()
             .0
@@ -945,4 +962,24 @@ fn previews_are_truncated_on_characters() {
 
     assert_eq!(short.chars().count(), 121);
     assert!(short.ends_with('…'));
+}
+
+#[tokio::test]
+async fn logging_out_while_suspended_with_unsaved_notifications_finishes() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(vec![entry("first", 100)], BTreeMap::new(), BTreeMap::new())
+        .await
+        .unwrap();
+    *core.accounts.lock().await = Some(crate::session::AccountRegistry::empty());
+    core.activity.close_stores_when_suspended();
+    core.update_app_active(false).await;
+    session.state().inbox.cache.lock().await.revision += 1;
+
+    matrix_sdk::timeout::timeout(Box::pin(core.logout()), std::time::Duration::from_secs(15))
+        .await
+        .expect("a logout while the stores are closed must not wait for them")
+        .unwrap();
 }

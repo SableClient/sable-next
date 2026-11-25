@@ -106,13 +106,17 @@ async fn setup_room(
     };
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let (core, _events) = Core::new("invite-delivery", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "invite-delivery".to_owned(),
-        client,
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    crate::test_support::set_session(
+        &core,
+        Some(Session {
+            account_id: "invite-delivery".to_owned(),
+            client,
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+            state: Arc::default(),
+        }),
+    );
     (server, core, room, own)
 }
 
@@ -178,7 +182,9 @@ async fn draft_invitations_are_sent_sticky_in_both_wire_formats() {
     for wire in [RtcWire::Stable, RtcWire::Deployed] {
         for direct in [false, true] {
             let (server, core, room, own) = setup(wire, true, direct).await;
-            core.announce_call(&room, event_id!("$membership"), &own)
+            let session = core.signed_in().unwrap();
+            session
+                .announce_call(&room, event_id!("$membership"), &own)
                 .await;
             let requests = sends(&server).await;
             assert_eq!(requests.len(), 1);
@@ -216,8 +222,10 @@ async fn draft_invitations_are_sent_sticky_in_both_wire_formats() {
 #[tokio::test]
 async fn legacy_calls_keep_the_deployed_fallback_without_sticky_support() {
     let (server, core, room, mut own) = setup(RtcWire::Deployed, false, false).await;
+    let session = core.signed_in().unwrap();
     own.mode = CallMode::Legacy;
-    core.announce_call(&room, event_id!("$membership"), &own)
+    session
+        .announce_call(&room, event_id!("$membership"), &own)
         .await;
     let requests = sends(&server).await;
     assert_eq!(requests.len(), 1);
@@ -238,8 +246,10 @@ async fn legacy_calls_keep_the_deployed_fallback_without_sticky_support() {
 #[tokio::test]
 async fn compatibility_calls_announce_without_sticky_support() {
     let (server, core, room, mut own) = setup(RtcWire::Deployed, false, false).await;
+    let session = core.signed_in().unwrap();
     own.mode = CallMode::Compatibility;
-    core.announce_call(&room, event_id!("$membership"), &own)
+    session
+        .announce_call(&room, event_id!("$membership"), &own)
         .await;
     let requests = sends(&server).await;
     assert_eq!(requests.len(), 1);
@@ -251,6 +261,7 @@ async fn compatibility_calls_announce_without_sticky_support() {
 #[tokio::test]
 async fn room_invitations_need_permission_to_notify_the_room() {
     let (server, core, room, own) = setup(RtcWire::Stable, true, false).await;
+    let session = core.signed_in().unwrap();
     let client = room.client();
     let factory = EventFactory::new()
         .room(room.room_id())
@@ -267,7 +278,8 @@ async fn room_invitations_need_permission_to_notify_the_room() {
             );
         })
         .await;
-    core.announce_call(&room, event_id!("$membership"), &own)
+    session
+        .announce_call(&room, event_id!("$membership"), &own)
         .await;
     assert!(sends(&server).await.is_empty());
 }
@@ -275,7 +287,9 @@ async fn room_invitations_need_permission_to_notify_the_room() {
 #[tokio::test]
 async fn joining_a_voice_room_does_not_notify_the_room() {
     let (server, core, room, own) = setup_room(RtcWire::Stable, true, false, true).await;
-    core.announce_call(&room, event_id!("$membership"), &own)
+    let session = core.signed_in().unwrap();
+    session
+        .announce_call(&room, event_id!("$membership"), &own)
         .await;
     assert!(sends(&server).await.is_empty());
 }
@@ -284,7 +298,9 @@ async fn joining_a_voice_room_does_not_notify_the_room() {
 async fn draft_calls_do_not_send_non_sticky_invitations() {
     for wire in [RtcWire::Stable, RtcWire::Deployed] {
         let (server, core, room, own) = setup(wire, false, false).await;
-        core.announce_call(&room, event_id!("$membership"), &own)
+        let session = core.signed_in().unwrap();
+        session
+            .announce_call(&room, event_id!("$membership"), &own)
             .await;
         assert!(sends(&server).await.is_empty());
     }
@@ -294,6 +310,7 @@ async fn draft_calls_do_not_send_non_sticky_invitations() {
 async fn a_current_invitation_is_not_sent_again_to_the_same_recipients() {
     for wire in [RtcWire::Stable, RtcWire::Deployed] {
         let (server, core, room, own) = setup(wire, true, true).await;
+        let session = core.signed_in().unwrap();
         let event_type = super::notify::NOTIFICATION_EVENT_TYPE;
         let content = super::invites::content(
             wire.slot(),
@@ -307,7 +324,8 @@ async fn a_current_invitation_is_not_sent_again_to_the_same_recipients() {
             "content":content
         });
         sticky_update(&room, event).await;
-        core.announce_call(&room, event_id!("$membership"), &own)
+        session
+            .announce_call(&room, event_id!("$membership"), &own)
             .await;
         assert!(sends(&server).await.is_empty());
         sticky_update(
@@ -319,7 +337,8 @@ async fn a_current_invitation_is_not_sent_again_to_the_same_recipients() {
             }),
         )
         .await;
-        core.announce_call(&room, event_id!("$membership"), &own)
+        session
+            .announce_call(&room, event_id!("$membership"), &own)
             .await;
         assert_eq!(sends(&server).await.len(), 1);
     }
@@ -329,6 +348,7 @@ async fn a_current_invitation_is_not_sent_again_to_the_same_recipients() {
 async fn withdrawal_keeps_other_participants_invited_until_the_slot_closes() {
     for wire in [RtcWire::Stable, RtcWire::Deployed] {
         let (server, core, room, own) = setup(wire, true, false).await;
+        let session = core.signed_in().unwrap();
         let stable = wire == RtcWire::Stable;
         let mut content = json!({
             "slot_id":wire.slot(), "application":{"type":"m.call"},
@@ -346,9 +366,9 @@ async fn withdrawal_keeps_other_participants_invited_until_the_slot_closes() {
             "msc4354_sticky":{"duration_ms":300_000}, "content":content
         })).await;
         invite_sent(&room, &own, wire).await;
-        core.withdraw_call_invite(&room, &own, false).await;
+        session.withdraw_call_invite(&room, &own, false).await;
         assert!(sends(&server).await.is_empty());
-        core.withdraw_call_invite(&room, &own, true).await;
+        session.withdraw_call_invite(&room, &own, true).await;
         let requests = sends(&server).await;
         assert_eq!(requests.len(), 1);
         assert_sticky(&requests[0]);
@@ -361,8 +381,9 @@ async fn withdrawal_keeps_other_participants_invited_until_the_slot_closes() {
 async fn the_last_participant_withdraws_their_invitation_on_leave() {
     for wire in [RtcWire::Stable, RtcWire::Deployed] {
         let (server, core, room, own) = setup(wire, true, false).await;
+        let session = core.signed_in().unwrap();
         invite_sent(&room, &own, wire).await;
-        core.withdraw_call_invite(&room, &own, false).await;
+        session.withdraw_call_invite(&room, &own, false).await;
         let requests = sends(&server).await;
         assert_eq!(requests.len(), 1);
         assert_sticky(&requests[0]);
@@ -375,6 +396,7 @@ async fn the_last_participant_withdraws_their_invitation_on_leave() {
 async fn withdrawal_preserves_the_current_invitation_sticky_duration() {
     for wire in [RtcWire::Stable, RtcWire::Deployed] {
         let (server, core, room, own) = setup(wire, true, false).await;
+        let session = core.signed_in().unwrap();
         let content = super::invites::content(wire.slot(), false, &[], "$previous-member");
         sticky_update(
             &room,
@@ -385,7 +407,7 @@ async fn withdrawal_preserves_the_current_invitation_sticky_duration() {
             }),
         )
         .await;
-        core.withdraw_call_invite(&room, &own, false).await;
+        session.withdraw_call_invite(&room, &own, false).await;
         let requests = sends(&server).await;
         assert_eq!(requests.len(), 1);
         assert_eq!(
@@ -411,6 +433,7 @@ async fn withdrawal_preserves_the_current_invitation_sticky_duration() {
 #[tokio::test]
 async fn nothing_is_withdrawn_without_an_invitation() {
     let (server, core, room, own) = setup(RtcWire::Stable, true, false).await;
-    core.withdraw_call_invite(&room, &own, true).await;
+    let session = core.signed_in().unwrap();
+    session.withdraw_call_invite(&room, &own, true).await;
     assert!(sends(&server).await.is_empty());
 }

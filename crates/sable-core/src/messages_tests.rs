@@ -28,7 +28,6 @@ use matrix_sdk::{
     ruma::{event_id, room_id, user_id},
     test_utils::mocks::MatrixMockServer,
 };
-use matrix_sdk_ui::sync_service::SyncService;
 use serde_json::{Value, json};
 
 use wiremock::{
@@ -54,7 +53,7 @@ fn a_caption_edit_keeps_the_spoiler_and_its_reason() {
     assert!(super::spoiler_keys(&json!({"body": "x"})).is_empty());
 }
 
-use crate::{Core, session::Session, store::MemorySessionStore};
+use crate::Core;
 
 fn object(value: Value) -> serde_json::Map<String, Value> {
     let Value::Object(map) = value else {
@@ -467,15 +466,7 @@ fn a_pin_listed_twice_is_kept_once_in_order() {
 }
 
 async fn core(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
-    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
-    *core.session.write().await = Some(Session {
-        account_id: "test".to_owned(),
-        client,
-        sync_service,
-        homeserver: server.server().uri(),
-        oauth: false,
-    });
+    let (core, _events) = crate::test_support::signed_in_core(server, client).await;
     core
 }
 
@@ -726,12 +717,13 @@ async fn pin_and_unpin_load_existing_server_state() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let result = core
+    let session = core.signed_in().unwrap();
+    let result = session
         .set_pinned(&room_id.to_owned(), event_id!("$new").to_owned(), true)
         .await
         .unwrap();
     assert_eq!(result, vec![event_id!("$old"), event_id!("$new")]);
-    let result = core
+    let result = session
         .set_pinned(&room_id.to_owned(), event_id!("$new").to_owned(), false)
         .await
         .unwrap();
@@ -808,9 +800,11 @@ async fn forwarded_links_never_reveal_the_rooms_we_are_in() {
             .mount(server.server())
             .await;
         let core = core(&server, client).await;
+        let session = core.signed_in().unwrap();
 
         let (source, event) = (source.to_owned(), event_id!("$message").to_owned());
-        core.forward_message(&source, &event, &source, None, true)
+        session
+            .forward_message(&source, &event, &source, None, true)
             .await
             .unwrap();
 
@@ -866,7 +860,9 @@ async fn pinning_keeps_server_pins_the_local_cache_has_not_seen() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    core.set_pinned(&room_id.to_owned(), event_id!("$d").to_owned(), true)
+    let session = core.signed_in().unwrap();
+    session
+        .set_pinned(&room_id.to_owned(), event_id!("$d").to_owned(), true)
         .await
         .unwrap();
     assert_eq!(*sent.lock(), json!({"pinned": ["$a", "$b", "$c", "$d"]}));
@@ -912,7 +908,8 @@ async fn a_malformed_pin_does_not_hide_the_valid_ones() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let pins = core.pinned_events(&room_id.to_owned()).await.unwrap();
+    let session = core.signed_in().unwrap();
+    let pins = session.pinned_events(&room_id.to_owned()).await.unwrap();
     assert_eq!(
         pins,
         [event_id!("$a").to_owned(), event_id!("$b").to_owned()]
@@ -968,15 +965,17 @@ async fn forwarding_uses_latest_valid_edit_even_when_relations_are_unordered() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    core.forward_message(
-        &source.to_owned(),
-        &event_id!("$original").to_owned(),
-        &target.to_owned(),
-        None,
-        true,
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .forward_message(
+            &source.to_owned(),
+            &event_id!("$original").to_owned(),
+            &target.to_owned(),
+            None,
+            true,
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -1019,17 +1018,19 @@ async fn forwarding_uses_the_forwarders_selected_profile() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
+    let session = core.signed_in().unwrap();
     let persona =
         serde_json::from_value(json!({ "display_name": "Bob", "has_fallback": true })).unwrap();
-    core.forward_message(
-        &source.to_owned(),
-        &event_id!("$original").to_owned(),
-        &target.to_owned(),
-        Some(&persona),
-        true,
-    )
-    .await
-    .unwrap();
+    session
+        .forward_message(
+            &source.to_owned(),
+            &event_id!("$original").to_owned(),
+            &target.to_owned(),
+            Some(&persona),
+            true,
+        )
+        .await
+        .unwrap();
 
     let content = sent_message(&server).await;
     assert_eq!(
@@ -1089,15 +1090,17 @@ async fn forwarding_without_metadata_keeps_only_required_content() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    core.forward_message(
-        &source.to_owned(),
-        &event_id!("$original").to_owned(),
-        &target.to_owned(),
-        None,
-        false,
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .forward_message(
+            &source.to_owned(),
+            &event_id!("$original").to_owned(),
+            &target.to_owned(),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -1145,15 +1148,17 @@ async fn an_edit_of_a_forward_is_ignored_when_forwarding_it() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    core.forward_message(
-        &source.to_owned(),
-        &event_id!("$forward").to_owned(),
-        &target.to_owned(),
-        None,
-        false,
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .forward_message(
+            &source.to_owned(),
+            &event_id!("$forward").to_owned(),
+            &target.to_owned(),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -1194,7 +1199,8 @@ async fn edit_history_lists_the_original_then_valid_edits_by_time() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let versions = core
+    let session = core.signed_in().unwrap();
+    let versions = session
         .edit_history(&room.to_owned(), &event_id!("$original").to_owned())
         .await
         .unwrap();
@@ -1268,7 +1274,9 @@ async fn redacting_edits_redacts_each_valid_edit() {
             .await;
     }
     let core = core(&server, client).await;
-    core.redact_edits(&room.to_owned(), &event_id!("$original").to_owned(), None)
+    let session = core.signed_in().unwrap();
+    session
+        .redact_edits(&room.to_owned(), &event_id!("$original").to_owned(), None)
         .await
         .unwrap();
 }
@@ -1320,7 +1328,8 @@ async fn event_items_render_the_latest_valid_edit_and_skip_missing_events() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let items = core
+    let session = core.signed_in().unwrap();
+    let items = session
         .event_items(
             &room.to_owned(),
             &[
@@ -1396,8 +1405,9 @@ async fn event_items_and_thread_roots_share_missing_sender_state() {
 
     let server = MatrixMockServer::new().await;
     let core = preview_core(&server).await;
+    let session = core.signed_in().unwrap();
     let room = room_id!("!bookmarks:example.org");
-    let items = core
+    let items = session
         .event_items(&room.to_owned(), &[event_id!("$saved").to_owned()])
         .await
         .unwrap();
@@ -1432,7 +1442,7 @@ async fn thread_lists_keep_server_counts_when_local_history_is_empty() {
     let server = MatrixMockServer::new().await;
     let core = preview_core(&server).await;
     let room = room_id!("!bookmarks:example.org");
-    let client = core.client().await.unwrap();
+    let client = core.signed_in().unwrap().client().clone();
     let _cache = client
         .event_cache()
         .unwrap()
@@ -1504,12 +1514,16 @@ async fn event_items_fetch_missing_sender_state_in_a_left_room() {
 
     let server = MatrixMockServer::new().await;
     let core = preview_core(&server).await;
+    let session = core.signed_in().unwrap();
     let room = room_id!("!bookmarks:example.org");
     server
-        .sync_room(&core.client().await.unwrap(), LeftRoomBuilder::new(room))
+        .sync_room(
+            &core.signed_in().unwrap().client().clone(),
+            LeftRoomBuilder::new(room),
+        )
         .await;
 
-    let items = core
+    let items = session
         .event_items(&room.to_owned(), &[event_id!("$saved").to_owned()])
         .await
         .unwrap();
@@ -1569,15 +1583,17 @@ async fn forwarding_media_from_a_private_room_keeps_the_attachment() {
             .mount(server.server())
             .await;
     let core = core(&server, client).await;
-    core.forward_message(
-        &source.to_owned(),
-        &event_id!("$video").to_owned(),
-        &target.to_owned(),
-        None,
-        true,
-    )
-    .await
-    .unwrap();
+    let session = core.signed_in().unwrap();
+    session
+        .forward_message(
+            &source.to_owned(),
+            &event_id!("$video").to_owned(),
+            &target.to_owned(),
+            None,
+            true,
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -1588,6 +1604,7 @@ async fn a_queued_message_is_cancelled_through_its_send_queue_handle() {
     let room_id = room_id!("!pending:example.org");
     let room = server.sync_joined_room(&client, room_id).await;
     let core = core(&server, client).await;
+    let session = core.signed_in().unwrap();
     let params = serde_json::from_value::<crate::api::messages::SendParams>(json!({
         "room_id": room_id,
         "body": "queued",
@@ -1597,12 +1614,13 @@ async fn a_queued_message_is_cancelled_through_its_send_queue_handle() {
     let (echoes, _updates) = room.send_queue().subscribe().await.unwrap();
     let transaction_id = echoes[0].transaction_id.to_string();
 
-    let handle = core
+    let handle = session
         .local_echo(&room_id.to_owned(), &transaction_id)
         .await
         .unwrap();
     assert!(handle.abort().await.unwrap());
-    core.local_echo(&room_id.to_owned(), &transaction_id)
+    session
+        .local_echo(&room_id.to_owned(), &transaction_id)
         .await
         .unwrap_err();
 }
@@ -1682,7 +1700,8 @@ async fn editing_a_pending_reply_updates_the_queue_and_keeps_the_relation() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let timeline = core.timeline(&room_id.to_owned()).await.unwrap();
+    let session = core.signed_in().unwrap();
+    let timeline = session.timeline(&room_id.to_owned()).await.unwrap();
     let mut content = RoomMessageEventContent::text_plain("before");
     content.mentions = Some(super::outgoing_mentions(
         vec![user_id!("@bob:example.org").to_owned()],
@@ -1736,7 +1755,7 @@ async fn editing_a_pending_reply_updates_the_queue_and_keeps_the_relation() {
     })
     .await
     .unwrap();
-    let room = core.room(&room_id.to_owned()).await.unwrap();
+    let room = session.room(&room_id.to_owned()).unwrap();
     let (echoes, _updates) = room.send_queue().subscribe().await.unwrap();
     let matrix_sdk::send_queue::LocalEchoContent::Event {
         serialized_event, ..
@@ -1799,12 +1818,13 @@ async fn reading_a_thread_sends_only_a_receipt_scoped_to_its_root() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
+    let session = core.signed_in().unwrap();
     let subscription = core.allocate_subscription();
-    let timeline = core
+    let timeline = session
         .thread_timeline(&room_id.to_owned(), &root.to_owned())
         .await
         .unwrap();
-    core.subscriptions.lock().await.insert(
+    session.state().subscriptions.lock().insert(
         subscription,
         crate::Subscription {
             tasks: Vec::new(),
@@ -1814,7 +1834,8 @@ async fn reading_a_thread_sends_only_a_receipt_scoped_to_its_root() {
             kind: crate::SubscriptionKind::FocusedTimeline(room_id.to_owned()),
         },
     );
-    core.private_receipts
+    core.settings
+        .private_receipts
         .store(false, std::sync::atomic::Ordering::Relaxed);
     core.run(MarkReadParams {
         room_id: room_id.to_owned(),
@@ -1863,7 +1884,8 @@ async fn receipt_body(read: &str, viewed: Option<&str>) -> Value {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    core.private_receipts
+    core.settings
+        .private_receipts
         .store(false, std::sync::atomic::Ordering::Relaxed);
     core.run(MarkReadParams {
         room_id: room_id.to_owned(),
@@ -1933,12 +1955,13 @@ async fn a_thread_timeline_is_already_at_its_end_going_forward() {
         )
         .await;
     let core = core(&server, client).await;
+    let session = core.signed_in().unwrap();
     let subscription = core.allocate_subscription();
-    let timeline = core
+    let timeline = session
         .thread_timeline(&room_id.to_owned(), &root.to_owned())
         .await
         .unwrap();
-    core.subscriptions.lock().await.insert(
+    session.state().subscriptions.lock().insert(
         subscription,
         crate::Subscription {
             tasks: Vec::new(),

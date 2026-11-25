@@ -3,7 +3,7 @@ use sable_model::emote_picker::{
 };
 use serde_json::Value;
 
-use crate::Core;
+use crate::SignedIn;
 use crate::protocol::RpcError;
 use crate::usage_history::Kind;
 
@@ -42,7 +42,7 @@ fn frequent_keys(entries: &[Value], now: u64) -> Vec<String> {
     most_used(recent, FREQUENT_REACTIONS)
 }
 
-impl Core {
+impl SignedIn {
     pub(crate) async fn frequent_reactions(
         &self,
         legacy: Option<Value>,

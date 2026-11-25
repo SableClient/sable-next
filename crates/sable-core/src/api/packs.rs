@@ -1,10 +1,9 @@
-use std::sync::Arc;
 
 use matrix_sdk::ruma::OwnedRoomId;
 use serde::{Deserialize, Serialize};
 
-use super::Handler;
-use crate::Core;
+use super::SessionHandler;
+use crate::SignedIn;
 use crate::protocol::{RpcError, ImagePackView, PackAddressView, PackDraftView, PackImageDraftView};
 
 domain! {
@@ -49,11 +48,11 @@ pub struct ListOk {
     pub complete: bool,
 }
 
-impl Handler for ListParams {
+impl SessionHandler for ListParams {
     type Ok = ListOk;
 
-    async fn run(self, core: &Arc<Core>) -> Result<ListOk, RpcError> {
-        core.image_packs(self.room_id, self.cached_only).await
+    async fn run(self, session: &SignedIn) -> Result<ListOk, RpcError> {
+        session.image_packs(self.room_id, self.cached_only).await
     }
 }
 
@@ -61,11 +60,11 @@ impl Handler for ListParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct ListAllParams {}
 
-impl Handler for ListAllParams {
+impl SessionHandler for ListAllParams {
     type Ok = Vec<ImagePackView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<ImagePackView>, RpcError> {
-        core.all_image_packs().await
+    async fn run(self, session: &SignedIn) -> Result<Vec<ImagePackView>, RpcError> {
+        session.all_image_packs().await
     }
 }
 
@@ -76,11 +75,11 @@ pub struct SaveParams {
     pub draft: PackDraftView,
 }
 
-impl Handler for SaveParams {
+impl SessionHandler for SaveParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.save_image_pack(self.target, &self.draft).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.save_image_pack(self.target, &self.draft).await
     }
 }
 
@@ -93,11 +92,11 @@ pub struct CreateRoomPackParams {
     pub name: String,
 }
 
-impl Handler for CreateRoomPackParams {
+impl SessionHandler for CreateRoomPackParams {
     type Ok = String;
 
-    async fn run(self, core: &Arc<Core>) -> Result<String, RpcError> {
-        core.create_room_image_pack(self.room_id, &self.name)
+    async fn run(self, session: &SignedIn) -> Result<String, RpcError> {
+        session.create_room_image_pack(self.room_id, &self.name)
             .await
     }
 }
@@ -111,11 +110,11 @@ pub struct DeleteRoomPackParams {
     pub state_key: String,
 }
 
-impl Handler for DeleteRoomPackParams {
+impl SessionHandler for DeleteRoomPackParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.delete_room_image_pack(self.room_id, &self.state_key)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.delete_room_image_pack(self.room_id, &self.state_key)
             .await
     }
 }
@@ -128,11 +127,11 @@ pub struct ConvertLegacyParams {
     pub state_keys: Vec<String>,
 }
 
-impl Handler for ConvertLegacyParams {
+impl SessionHandler for ConvertLegacyParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.convert_legacy_image_packs(&self.room_id, &self.state_keys)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.convert_legacy_image_packs(&self.room_id, &self.state_keys)
             .await
     }
 }
@@ -145,11 +144,11 @@ pub struct RemoveLegacyParams {
     pub state_keys: Vec<String>,
 }
 
-impl Handler for RemoveLegacyParams {
+impl SessionHandler for RemoveLegacyParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.remove_legacy_image_packs(&self.room_id, &self.state_keys)
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.remove_legacy_image_packs(&self.room_id, &self.state_keys)
             .await
     }
 }
@@ -161,11 +160,11 @@ pub struct AddAccountImagesParams {
     pub images: Vec<PackImageDraftView>,
 }
 
-impl Handler for AddAccountImagesParams {
+impl SessionHandler for AddAccountImagesParams {
     type Ok = ();
 
-    async fn run(self, core: &Arc<Core>) -> Result<(), RpcError> {
-        core.add_account_pack_images(&self.images).await
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        session.add_account_pack_images(&self.images).await
     }
 }
 
@@ -173,11 +172,11 @@ impl Handler for AddAccountImagesParams {
 #[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
 pub struct SubscriptionsParams {}
 
-impl Handler for SubscriptionsParams {
+impl SessionHandler for SubscriptionsParams {
     type Ok = Vec<PackAddressView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<PackAddressView>, RpcError> {
-        core.pack_subscriptions().await
+    async fn run(self, session: &SignedIn) -> Result<Vec<PackAddressView>, RpcError> {
+        session.pack_subscriptions().await
     }
 }
 
@@ -188,11 +187,11 @@ pub struct SetSubscriptionsParams {
     pub removed: Vec<PackAddressView>,
 }
 
-impl Handler for SetSubscriptionsParams {
+impl SessionHandler for SetSubscriptionsParams {
     type Ok = Vec<PackAddressView>;
 
-    async fn run(self, core: &Arc<Core>) -> Result<Vec<PackAddressView>, RpcError> {
-        core.set_pack_subscriptions(&self.added, &self.removed)
+    async fn run(self, session: &SignedIn) -> Result<Vec<PackAddressView>, RpcError> {
+        session.set_pack_subscriptions(&self.added, &self.removed)
             .await
     }
 }

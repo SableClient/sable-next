@@ -3,3 +3,12 @@ allow-panic-in-tests = true
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-dbg-in-tests = true
+
+disallowed-methods = [
+  { path = "sable_core::lifecycle::SessionSlot::current", reason = "take the session once with `Core::signed_in`; only lifecycle code reads the slot" },
+  { path = "sable_core::lifecycle::SessionSlot::write", reason = "only lifecycle jobs publish or end a session" },
+]
+
+await-holding-invalid-types = [
+  { path = "lock_api::mutex::ArcMutexGuard", reason = "a `parking_lot` guard must not be held across `.await`" },
+]

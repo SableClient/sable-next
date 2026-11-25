@@ -10,7 +10,7 @@ use matrix_sdk::ruma::{OwnedEventId, OwnedUserId};
 use tracing::warn;
 
 use super::store::Removal;
-use crate::Core;
+use crate::SignedIn;
 use crate::timeline_overlay::BanRedaction;
 
 pub(super) struct Ban {
@@ -43,7 +43,7 @@ pub(super) fn bans_in(events: &[TimelineEvent]) -> Vec<Ban> {
         .collect()
 }
 
-impl Core {
+impl SignedIn {
     pub(super) async fn settle_bans(&self, room: &Room, bans: Vec<Ban>) {
         if bans.is_empty() {
             return;

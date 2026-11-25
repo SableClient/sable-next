@@ -5,18 +5,19 @@ use tempfile::NamedTempFile;
 
 use crate::Core;
 use crate::ResultExt;
+use crate::SignedIn;
 use crate::api::encryption::ImportRoomKeysOk;
 use crate::protocol::{RpcCode, RpcError};
 
-impl Core {
+impl SignedIn {
     #[cfg(not(target_family = "wasm"))]
     pub(crate) async fn export_room_keys(
         &self,
         passphrase: &str,
         room_id: Option<&RoomId>,
     ) -> Result<String, RpcError> {
-        let client = self.client().await?;
-        let file = self.room_key_file()?;
+        let client = self.client();
+        let file = self.core().room_key_file()?;
 
         client
             .encryption()
@@ -24,11 +25,11 @@ impl Core {
                 room_id.is_none_or(|room_id| session.room_id() == room_id)
             })
             .await
-            .or_failed(self, "export_room_keys")?;
+            .or_failed(self.core(), "export_room_keys")?;
 
         let export = tokio::fs::read_to_string(file.path())
             .await
-            .or_failed(self, "export_room_keys")?;
+            .or_failed(self.core(), "export_room_keys")?;
 
         tracing::info!("room keys exported");
         Ok(export)
@@ -40,18 +41,18 @@ impl Core {
         export: &str,
         passphrase: &str,
     ) -> Result<ImportRoomKeysOk, RpcError> {
-        let client = self.client().await?;
-        let file = self.room_key_file()?;
+        let client = self.client();
+        let file = self.core().room_key_file()?;
 
         tokio::fs::write(file.path(), export)
             .await
-            .or_failed(self, "import_room_keys")?;
+            .or_failed(self.core(), "import_room_keys")?;
 
         let result = client
             .encryption()
             .import_room_keys(file.path().to_owned(), passphrase)
             .await
-            .map_err(|error| self.room_key_import_error(error))?;
+            .map_err(|error| self.core().room_key_import_error(error))?;
 
         tracing::info!(
             imported = result.imported_count,
@@ -78,9 +79,9 @@ impl Core {
             .store()
             .export_room_keys(|session| room_id.is_none_or(|room_id| session.room_id() == room_id))
             .await
-            .or_failed(self, "export_room_keys")?;
+            .or_failed(self.core(), "export_room_keys")?;
         let export = matrix_sdk_base::crypto::encrypt_room_key_export(&keys, passphrase, 500_000)
-            .or_failed(self, "export_room_keys")?;
+            .or_failed(self.core(), "export_room_keys")?;
 
         tracing::info!("room keys exported");
         Ok(export)
@@ -97,12 +98,15 @@ impl Core {
         let machine = machine.as_ref().ok_or(RpcCode::NotLoggedIn)?;
 
         let keys = matrix_sdk_base::crypto::decrypt_room_key_export(export.as_bytes(), passphrase)
-            .map_err(|error| self.room_key_import_error(RoomKeyImportError::Export(error)))?;
+            .map_err(|error| {
+                self.core()
+                    .room_key_import_error(RoomKeyImportError::Export(error))
+            })?;
         let result = machine
             .store()
             .import_exported_room_keys(keys, |_, _| {})
             .await
-            .or_failed(self, "import_room_keys")?;
+            .or_failed(self.core(), "import_room_keys")?;
 
         tracing::info!(
             imported = result.imported_count,
@@ -116,17 +120,21 @@ impl Core {
     }
 
     pub(crate) async fn base_client(&self) -> Result<crate::session::SharedBaseClient, RpcError> {
-        let account_id = self
-            .session
-            .current(|session| session.account_id.clone())
-            .ok_or(RpcCode::NotLoggedIn)?;
         let store_id = self
-            .registered_store_id(&account_id)
+            .core()
+            .registered_store_id(&self.session().account_id)
             .await
             .ok_or(RpcCode::NotLoggedIn)?;
         crate::session::base_client(&store_id).ok_or_else(|| RpcCode::Unavailable.into())
     }
+}
 
+#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
+#[path = "room_keys_tests.rs"]
+mod tests;
+
+impl Core {
     #[cfg(not(target_family = "wasm"))]
     fn room_key_file(&self) -> Result<NamedTempFile, RpcError> {
         tempfile::Builder::new()
@@ -143,8 +151,3 @@ impl Core {
         }
     }
 }
-
-#[cfg(test)]
-#[cfg(not(target_family = "wasm"))]
-#[path = "room_keys_tests.rs"]
-mod tests;

@@ -10,7 +10,7 @@ use crate::protocol::{
     InviteAvatarsView, MediaPreviewConfigView, MediaPreviewsView, NotificationModeView, RpcError,
     ThreadRefView, ThreadSidebarView,
 };
-use crate::{Core, ResultExt};
+use crate::{Core, ResultExt, SignedIn};
 
 const MEDIA_PREVIEW_EVENT: &str = "m.media_preview_config";
 const UNSTABLE_MEDIA_PREVIEW_EVENT: &str = "io.element.msc4278.media_preview_config";
@@ -357,7 +357,7 @@ fn thread_sidebar_content(
     Value::Object(content)
 }
 
-impl Core {
+impl SignedIn {
     async fn account_document(&self, event_type: &str) -> Result<Option<Value>, RpcError> {
         Ok(self
             .global_account_data(event_type.into(), "account_document")
@@ -377,11 +377,12 @@ impl Core {
         room_id: &OwnedRoomId,
         event_type: &str,
     ) -> Result<Option<Value>, RpcError> {
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         Ok(self
+            .core()
             .with_open_stores(async || room.account_data(event_type.into()).await)
             .await
-            .or_failed(self, "room_account_data")?
+            .or_failed(self.core(), "room_account_data")?
             .and_then(|raw| raw.get_field::<Value>("content").ok().flatten()))
     }
 
@@ -408,7 +409,7 @@ impl Core {
         &self,
         SetMediaPreviewConfigParams { config: update }: SetMediaPreviewConfigParams,
     ) -> Result<MediaPreviewConfigView, RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+        let _guard = self.state().account_data_writes.lock().await;
         let mut content = Value::Null;
         self.update_account_data_locked(
             &[MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT],
@@ -429,7 +430,7 @@ impl Core {
         room_id: &OwnedRoomId,
         previews: Option<MediaPreviewsView>,
     ) -> Result<MediaPreviewConfigView, RpcError> {
-        let _guard = self.account_data_lock.lock().await;
+        let _guard = self.state().account_data_writes.lock().await;
         let stored = match self.room_document(room_id, MEDIA_PREVIEW_EVENT).await? {
             Some(stable) => Some(stable),
             None => {
@@ -438,14 +439,14 @@ impl Core {
             }
         };
         let content = room_media_previews_content(stored, previews);
-        let room = self.room(room_id).await?;
+        let room = self.room(room_id)?;
         for event in [MEDIA_PREVIEW_EVENT, UNSTABLE_MEDIA_PREVIEW_EVENT] {
             let raw = ruma::serde::Raw::new(&content)
-                .or_failed(self, "set_room_media_previews")?
+                .or_failed(self.core(), "set_room_media_previews")?
                 .cast_unchecked();
             room.set_account_data_raw(event.into(), raw)
                 .await
-                .or_failed(self, "set_room_media_previews")?;
+                .or_failed(self.core(), "set_room_media_previews")?;
         }
         Ok(media_preview_config(Some(&content)))
     }
@@ -456,16 +457,6 @@ impl Core {
         Ok(dm_spaces(
             self.account_document(DM_SPACES_EVENT).await?.as_ref(),
         ))
-    }
-
-    pub(crate) async fn synced_dm_spaces_of(
-        client: &matrix_sdk::Client,
-        room_id: &ruma::RoomId,
-    ) -> Vec<OwnedRoomId> {
-        synced_dm_spaces(client)
-            .await
-            .remove(room_id)
-            .unwrap_or_default()
     }
 
     pub(crate) async fn set_dm_spaces(
@@ -528,7 +519,7 @@ impl Core {
                     }
                     serde_json::to_value(DismissedInvitesOut { room_ids })
                         .map(Some)
-                        .or_failed(self, "set_invite_dismissed")
+                        .or_failed(self.core(), "set_invite_dismissed")
                 },
             )
             .await?;
@@ -576,6 +567,18 @@ impl Core {
             apply_thread_sidebar_flag(sidebar, room_id, event_id, false, dismissed);
         })
         .await
+    }
+}
+
+impl Core {
+    pub(crate) async fn synced_dm_spaces_of(
+        client: &matrix_sdk::Client,
+        room_id: &ruma::RoomId,
+    ) -> Vec<OwnedRoomId> {
+        synced_dm_spaces(client)
+            .await
+            .remove(room_id)
+            .unwrap_or_default()
     }
 }
 
