@@ -207,7 +207,7 @@ impl Core {
         let Some(fetch) = self.tunnel_fetch(service).await? else {
             return Ok(None);
         };
-        let Some(preview) =
+        let Ok(preview) =
             sable_link_preview::scrape(&fetch, &target, &ScrapeOptions::default()).await
         else {
             return Ok(None);
@@ -262,7 +262,7 @@ impl Core {
         let response = fetch
             .get(&url, "image/*,video/*;q=0.9,*/*;q=0.5")
             .await
-            .ok_or(RpcCode::Unavailable)?;
+            .map_err(|_| RpcCode::Unavailable)?;
         let body = response
             .body(limit.saturating_add(1))
             .await
