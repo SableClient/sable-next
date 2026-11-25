@@ -20,9 +20,9 @@ function trailingBlock(space: Element): Element | null {
   return null;
 }
 
-function spacerPlacement(node: HTMLElement): 'alone' | 'flip' | null {
+function lastLineRunsBackwards(node: HTMLElement): boolean {
   const space = node.querySelector('.receipt-space');
-  if (!space) return null;
+  if (!space) return false;
   const range = document.createRange();
   range.setStart(node, 0);
   range.setEndBefore(space);
@@ -30,21 +30,17 @@ function spacerPlacement(node: HTMLElement): 'alone' | 'flip' | null {
     trailingBlock(space)?.getBoundingClientRect() ??
     [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0).at(-1);
   const box = space.getBoundingClientRect();
-  if (last === undefined || box.width === 0) return null;
-  if (box.top >= last.bottom - 1) return 'alone';
+  if (last === undefined || box.width === 0 || box.top >= last.bottom - 1) return false;
   const endsLeft = box.right <= last.left + 1;
   const endsRight = box.left >= last.right - 1;
   const rtl = getComputedStyle(node).direction === 'rtl';
-  return (rtl ? endsRight : endsLeft) ? 'flip' : null;
+  return rtl ? endsRight : endsLeft;
 }
 
+// Flipping moves only the absolutely positioned badge, so it never resizes what it measures.
 export const receiptReserve: Attachment<HTMLElement> = (node) => {
   const measure = () => {
-    delete node.dataset.receiptNarrow;
-    delete node.dataset.receiptFlip;
-    const placement = spacerPlacement(node);
-    if (placement === 'alone') node.dataset.receiptNarrow = '';
-    if (placement === 'flip') node.dataset.receiptFlip = '';
+    node.toggleAttribute('data-receipt-flip', lastLineRunsBackwards(node));
   };
   const observer = new ResizeObserver(measure);
   observer.observe(node);
@@ -52,7 +48,6 @@ export const receiptReserve: Attachment<HTMLElement> = (node) => {
   if (space) observer.observe(space);
   return () => {
     observer.disconnect();
-    delete node.dataset.receiptNarrow;
-    delete node.dataset.receiptFlip;
+    node.removeAttribute('data-receipt-flip');
   };
 };

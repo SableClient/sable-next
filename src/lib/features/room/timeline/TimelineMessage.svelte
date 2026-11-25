@@ -991,17 +991,9 @@
     user-select: none;
   }
 
-  .has-receipts:global([data-receipt-narrow]) {
-    padding-inline-end: calc(var(--receipt-reserve) + var(--space-200));
-  }
-
   /* Move the badge, not the text: Firefox left-aligns an RTL line after a <br> on reflow. */
   .has-receipts:global([data-receipt-flip]) .receipt-slot {
     inset-inline: 0 auto;
-  }
-
-  .has-receipts:global([data-receipt-narrow]) .receipt-space {
-    display: none;
   }
 
   .message header {

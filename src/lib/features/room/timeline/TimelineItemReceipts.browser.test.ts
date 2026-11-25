@@ -146,15 +146,32 @@ function lineCount(itemId: string): number {
   return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
 }
 
-test('the compact layout keeps the badge beside the last line', async () => {
+function coversText(itemId: string): boolean {
+  const text = document.querySelector(`[data-item-id="${itemId}"] .formatted-body`);
+  const badge = document
+    .querySelector(`[data-item-id="${itemId}"] .read-receipt-stack`)
+    ?.getBoundingClientRect();
+  if (!text || !badge) throw new Error('missing body or badge');
+  const range = document.createRange();
+  range.selectNodeContents(text);
+  return [...range.getClientRects()].some(
+    (rect) =>
+      rect.width > 0 &&
+      rect.right > badge.left + 0.5 &&
+      rect.left < badge.right - 0.5 &&
+      rect.bottom > badge.top + 0.5 &&
+      rect.top < badge.bottom - 0.5
+  );
+}
+
+test('the compact layout keeps the badge in the corner clear of the text', async () => {
   await page.viewport(390, 780);
   await mountItem(item('receipted', WRAPPED, { read_by: TWO_READERS }), { layout: 'compact' });
 
   const receipted = measure('receipted');
   expect(Math.abs(receipted.badge.right - receipted.content.right)).toBeLessThanOrEqual(1);
-  expect(receipted.lastLine.right).toBeLessThanOrEqual(receipted.badge.left);
+  expect(coversText('receipted')).toBe(false);
   expect(Math.abs(receipted.badge.bottom - receipted.content.bottom)).toBeLessThanOrEqual(1);
-  expect(receipted.content.bottom - receipted.body.bottom).toBeLessThanOrEqual(2);
 });
 
 test('a receipt badge sits beside the last line and leaves the timestamp on the right', async () => {
@@ -206,7 +223,7 @@ test('an emote-only message keeps the badge on its bottom edge', async () => {
 });
 
 for (const code of ['let x = 1;\n', '    nested();\n']) {
-  test(`a collapsed code block keeps the badge beside it (${JSON.stringify(code)})`, async () => {
+  test(`a collapsed code block keeps the badge below it (${JSON.stringify(code)})`, async () => {
     await page.viewport(600, 780);
     const base = item('code', 'code');
     await mountItem({
@@ -222,8 +239,7 @@ for (const code of ['let x = 1;\n', '    nested();\n']) {
     const block = row?.querySelector('.code-block')?.getBoundingClientRect();
     const badge = row?.querySelector('.read-receipt-stack')?.getBoundingClientRect();
     if (!block || !badge) throw new Error('no code block or badge');
-    expect(badge.top).toBeLessThan(block.bottom);
-    expect(badge.left).toBeGreaterThanOrEqual(block.right);
+    expect(badge.top).toBeGreaterThanOrEqual(block.bottom - 0.5);
   });
 }
 
@@ -319,38 +335,39 @@ test('own trailing reactions share a line with a wide receipt stack', async () =
   });
 });
 
-test('a receipt never takes a line of its own or covers text when the last line is full', async () => {
-  await page.viewport(1280, 720);
-  for (const unit of ['word ', 'adsf']) {
-    for (let length = 60; length <= 140; length += 1) {
-      const body = unit.repeat(40).slice(0, length).trim();
-      const screen = await mountItem(item('general-18', body, { read_by: ['@bob:example.test'] }));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      const row = document.querySelector('[data-item-id="general-18"] .message');
-      const text = row?.querySelector('.formatted-body');
-      const badge = row?.querySelector('.read-receipt-stack');
-      if (!text || !badge) throw new Error('missing body or badge');
-      const range = document.createRange();
-      range.selectNodeContents(text);
-      const lines = [...range.getClientRects()].filter((rect) => rect.width > 0);
-      const badgeBox = badge.getBoundingClientRect();
-      const last = lines.at(-1);
-      const label = `${unit.trim()} x ${String(length)}`;
-      expect(last ? badgeBox.top - last.bottom : Number.POSITIVE_INFINITY, label).toBeLessThan(0);
-      expect(
-        lines.some(
-          (rect) =>
-            rect.right > badgeBox.left + 0.5 &&
-            rect.left < badgeBox.right - 0.5 &&
-            rect.bottom > badgeBox.top + 0.5 &&
-            rect.top < badgeBox.bottom - 0.5
-        ),
-        label
-      ).toBe(false);
-      await screen.unmount();
+test('a receipt sits on or below the last line without covering text', async () => {
+  await page.viewport(390, 780);
+  for (const scale of ['1', '0.75']) {
+    document.documentElement.style.setProperty('--text-scale', scale);
+    for (const unit of ['word ', 'adsf']) {
+      for (let length = 20; length <= 100; length += 1) {
+        const body = unit.repeat(40).slice(0, length).trim();
+        const screen = await mountItem(
+          item('general-18', body, { read_by: ['@bob:example.test'] })
+        );
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        const content = document.querySelector('[data-item-id="general-18"] .message-content');
+        const text = document.querySelector('[data-item-id="general-18"] .formatted-body');
+        const badge = document
+          .querySelector('[data-item-id="general-18"] .read-receipt-stack')
+          ?.getBoundingClientRect();
+        if (!content || !text || !badge) throw new Error('missing content, body or badge');
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        const lastLine = [...range.getClientRects()].filter((rect) => rect.width > 0).at(-1);
+        const label = `${unit.trim()} x ${String(length)} at ${scale}`;
+        expect(coversText('general-18'), label).toBe(false);
+        expect(badge.bottom, label).toBeGreaterThanOrEqual((lastLine?.bottom ?? 0) - 1);
+        expect(
+          Math.abs(badge.right - content.getBoundingClientRect().right),
+          label
+        ).toBeLessThanOrEqual(1);
+        await screen.unmount();
+      }
     }
   }
-}, 120_000);
+  document.documentElement.style.removeProperty('--text-scale');
+}, 240_000);
 
 test('the text wraps the same for one reader as for many', async () => {
   await page.viewport(1280, 720);
@@ -381,6 +398,9 @@ for (const layout of ['modern', 'compact', 'bubble'] as const) {
       ['ltr', 'سلام دنیا'],
       ['ltr', `سلام ${'دنیا و بیشتر '.repeat(10)}`],
       ['ltr', 'Sable یک کلاینت است'],
+      ['ltr', 'hello there<br>سلام دنیا'],
+      ['ltr', '<p>hello there</p><p>سلام دنیا</p>'],
+      ['rtl', 'سلام دنیا<br>hello there'],
       ['rtl', 'سلام دنیا'],
       ['rtl', 'hello world'],
       ['rtl', `hello ${'and more words '.repeat(10)}`],
