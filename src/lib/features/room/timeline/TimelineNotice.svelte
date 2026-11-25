@@ -111,9 +111,11 @@
         emoticon
       />
       {#snippet content()}
-        <EmoteCard label={customReactionLabel}>
-          <MediaImage source={customReaction} alt="" width={64} height={64} original />
-        </EmoteCard>
+        {#if customReaction}
+          <EmoteCard label={customReactionLabel}>
+            <MediaImage source={customReaction} alt="" width={64} height={64} original />
+          </EmoteCard>
+        {/if}
       {/snippet}
     </Tooltip>
   {/if}
