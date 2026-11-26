@@ -3206,6 +3206,9 @@ export type Rpc = {
 	room_id: string,
 	typing: boolean,
 }) => Promise<null>;
+    prepareToEncrypt: (params: {
+	room_id: string,
+}) => Promise<null>;
     mediaConfig: (params?: Record<string, never>) => Promise<{
 	upload_size: number,
 }>;
@@ -4154,6 +4157,7 @@ export type RpcMethods = {
   'messages.recent_stickers': Rpc['messages']['recentStickers'];
   'messages.remember_sticker': Rpc['messages']['rememberSticker'];
   'messages.set_typing': Rpc['messages']['setTyping'];
+  'messages.prepare_to_encrypt': Rpc['messages']['prepareToEncrypt'];
   'messages.media_config': Rpc['messages']['mediaConfig'];
   'notifications.settings': Rpc['notifications']['settings'];
   'notifications.default_modes': Rpc['notifications']['defaultModes'];
@@ -4523,6 +4527,7 @@ export function createRpc(call: RpcCall): Rpc {
       recentStickers: (params) => call('messages.recent_stickers', params) as ReturnType<Rpc['messages']['recentStickers']>,
       rememberSticker: (params) => call('messages.remember_sticker', params) as ReturnType<Rpc['messages']['rememberSticker']>,
       setTyping: (params) => call('messages.set_typing', params) as ReturnType<Rpc['messages']['setTyping']>,
+      prepareToEncrypt: (params) => call('messages.prepare_to_encrypt', params) as ReturnType<Rpc['messages']['prepareToEncrypt']>,
       mediaConfig: (params = {}) => call('messages.media_config', params) as ReturnType<Rpc['messages']['mediaConfig']>,
     },
     notifications: {

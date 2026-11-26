@@ -70,6 +70,7 @@ domain! {
     recent_stickers,
     remember_sticker,
     set_typing,
+    prepare_to_encrypt,
     media_config,
 }
 
@@ -1286,6 +1287,27 @@ impl SessionHandler for SetTypingParams {
         room.typing_notice(self.typing)
             .await
             .or_failed(session.core(), "set_typing")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PrepareToEncryptParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+}
+
+impl SessionHandler for PrepareToEncryptParams {
+    type Ok = ();
+
+    async fn run(self, session: &SignedIn) -> Result<(), RpcError> {
+        let room = session.room(&self.room_id)?;
+        if room.state() != matrix_sdk::RoomState::Joined {
+            return Ok(());
+        }
+        Box::pin(room.prepare_to_encrypt())
+            .await
+            .or_failed(session.core(), "prepare_to_encrypt")
     }
 }
 

@@ -95,6 +95,8 @@ function failed(action: string): (error: unknown) => void {
   };
 }
 
+const ENCRYPTION_PREPARATION_INTERVAL_MS = 60_000;
+
 export class Conversation {
   #context = $state<ComposerContext | null>(null);
   readonly restored: ComposerContext | null;
@@ -567,9 +569,24 @@ export class Conversation {
   };
 
   readonly setTyping = async (targetRoomId: string, typing: boolean): Promise<void> => {
-    if (!preferences.sendTypingNotifications || !targetRoomId.startsWith('!')) return;
+    if (!targetRoomId.startsWith('!')) return;
+    if (typing) this.#prepareToEncrypt(targetRoomId);
+    if (!preferences.sendTypingNotifications) return;
     await this.#core.rpc.messages.setTyping({ room_id: targetRoomId, typing });
   };
+
+  /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
+  readonly #preparedAt = new Map<string, number>();
+
+  #prepareToEncrypt(roomId: string): void {
+    const now = Date.now();
+    if (now - (this.#preparedAt.get(roomId) ?? -Infinity) < ENCRYPTION_PREPARATION_INTERVAL_MS)
+      return;
+    this.#preparedAt.set(roomId, now);
+    this.#core.rpc.messages.prepareToEncrypt({ room_id: roomId }).catch((error: unknown) => {
+      console.debug('[sable composer] preparing encryption failed', error);
+    });
+  }
 
   readonly retrySend = (transactionId: string): void => {
     void this.#core.rpc.messages

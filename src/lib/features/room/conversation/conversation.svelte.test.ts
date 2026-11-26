@@ -63,6 +63,7 @@ function setup(
   const toggleReaction = vi.fn(() => Promise.resolve());
   const urlPreview = vi.fn(() => Promise.resolve(null));
   const setTyping = vi.fn((..._args: unknown[]) => Promise.resolve());
+  const prepareToEncrypt = vi.fn((..._args: unknown[]) => Promise.resolve());
   const core = {
     session: { user_id: userId },
     media: {
@@ -82,6 +83,7 @@ function setup(
         react: toggleReaction,
         urlPreview,
         setTyping,
+        prepareToEncrypt,
       },
       account: {},
     },
@@ -118,6 +120,7 @@ function setup(
     toggleReaction,
     urlPreview,
     setTyping,
+    prepareToEncrypt,
     timeline,
     conversation: new Conversation({
       core,
@@ -182,6 +185,24 @@ test('typing is announced to a room id', async () => {
   const fixture = setup([], '@kris:example.org');
   await fixture.conversation.setTyping(ROOM, true);
   expect(fixture.setTyping).toHaveBeenCalledWith({ room_id: ROOM, typing: true });
+});
+
+test('typing prepares the room key once a minute per room', async () => {
+  vi.useFakeTimers();
+  try {
+    const fixture = setup([], '@kris:example.org');
+    await fixture.conversation.setTyping(ROOM, true);
+    await fixture.conversation.setTyping(ROOM, true);
+    await fixture.conversation.setTyping(ROOM, false);
+    expect(fixture.prepareToEncrypt).toHaveBeenCalledTimes(1);
+    expect(fixture.prepareToEncrypt).toHaveBeenCalledWith({ room_id: ROOM });
+
+    vi.advanceTimersByTime(60_000);
+    await fixture.conversation.setTyping(ROOM, true);
+    expect(fixture.prepareToEncrypt).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('quick reactions do nothing in an empty room', async () => {
