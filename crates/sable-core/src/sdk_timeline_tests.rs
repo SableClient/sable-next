@@ -450,6 +450,68 @@ async fn live_timeline_back_paginates_through_the_event_cache() {
 }
 
 #[tokio::test]
+async fn a_root_counts_replies_loaded_by_opening_its_thread() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!thread-count:example.org");
+    let thread_root = event_id!("$root");
+    let factory = EventFactory::new().room(room_id).sender(User::Bob);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("root").event_id(thread_root)),
+        )
+        .await;
+    server
+        .mock_room_relations()
+        .match_target_event(thread_root.to_owned())
+        .ok(
+            matrix_sdk::test_utils::mocks::RoomRelationsResponseTemplate::default().events(vec![
+                factory
+                    .text_msg("reply")
+                    .event_id(event_id!("$reply"))
+                    .in_thread(thread_root, thread_root),
+            ]),
+        )
+        .mount()
+        .await;
+
+    let thread = build_room_timeline(
+        &room,
+        &TimelineFocusView::Thread {
+            root_event_id: thread_root.to_owned(),
+        },
+        false,
+    )
+    .await
+    .unwrap();
+    thread.paginate_backwards(10).await.unwrap();
+    assert!(event_ids(thread.items().await).contains(&"$reply".to_owned()));
+
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
+    let items = timeline.items().await;
+    let item = items
+        .iter()
+        .find(|item| item.as_event().and_then(|event| event.event_id()) == Some(thread_root))
+        .expect("root item");
+    let view = crate::view::timeline_item(
+        item,
+        room.client().user_id(),
+        &crate::view::Highlights::default(),
+        &crate::view::LocalContent::default(),
+    );
+    assert_eq!(
+        view.thread_summary.map(|summary| summary.num_replies),
+        Some(1)
+    );
+}
+
+#[tokio::test]
 async fn hidden_events_admit_only_events_the_sdk_can_render_and_place() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
