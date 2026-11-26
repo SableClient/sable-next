@@ -219,9 +219,12 @@ export class AccountSync {
   /** One read at a time per document, so a burst of changes ends in a single re-read. */
   async #pull(document: SyncedDocument, generation: number): Promise<void> {
     if (this.#core === null || generation !== this.#generation) return;
-    if (document.enabled?.() === false) return;
-
     const state = this.#stateFor(document.eventType);
+    if (document.enabled?.() === false) {
+      state.pulled = false;
+      return;
+    }
+
     if (state.pulling) {
       state.queued = { document, generation };
       return;

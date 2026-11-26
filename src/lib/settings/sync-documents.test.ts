@@ -221,6 +221,14 @@ describe('the drafts document', () => {
     expect(readDraft('!room:example.org')?.doc).toEqual({ type: 'second' });
   });
 
+  it('keeps a draft typed here when another device replaces its uploaded copy', () => {
+    writeDraft('!room:example.org', { doc: { type: 'local' }, staged: [], nextStagedId: 0 });
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'local' } } });
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'remote' } } });
+
+    expect(readDraft('!room:example.org')?.doc).toEqual({ type: 'local' });
+  });
+
   it('drops an adopted draft once another device sends it', () => {
     draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'first' } } });
     draftsDocument.adopt({ v: 1, drafts: {} });

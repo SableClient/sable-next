@@ -42,6 +42,7 @@ interface ComposerRoom {
 interface DraftState {
   rooms: Map<string, ComposerRoom>;
   synced: Map<string, string>;
+  received: Map<string, string>;
   adopted: Map<string, number>;
   discarded: Map<string, string[]>;
   offered: Map<string, string[]>;
@@ -56,6 +57,7 @@ function stateFor(accountId: string): DraftState {
     state = {
       rooms: new Map(),
       synced: new Map(),
+      received: new Map(),
       adopted: new Map(),
       discarded: new Map(),
       offered: new Map(),
@@ -163,7 +165,7 @@ export function draftDocuments(accountId = ''): Record<string, unknown> {
 }
 
 export function adoptDraftDocuments(documents: Record<string, unknown>, accountId = ''): void {
-  const { rooms, synced, adopted, discarded } = stateFor(accountId);
+  const { rooms, synced, received, adopted, discarded } = stateFor(accountId);
   let changed = false;
   const dropped = [...synced.keys()].filter((roomId) => !(roomId in documents));
   for (const roomId of [...Object.keys(documents), ...dropped]) {
@@ -172,7 +174,7 @@ export function adoptDraftDocuments(documents: Record<string, unknown>, accountI
     const local = held === null ? null : docFingerprint(held);
     const doc = documents[roomId] ?? null;
     const next = doc === null ? null : docFingerprint(doc);
-    const untouched = local === null || local === synced.get(roomId);
+    const untouched = local === null || local === (next === null ? synced : received).get(roomId);
 
     if (next === null) synced.delete(roomId);
     else synced.set(roomId, next);
@@ -187,6 +189,7 @@ export function adoptDraftDocuments(documents: Record<string, unknown>, accountI
         staged: existing?.staged ?? [],
         nextStagedId: existing?.nextStagedId ?? 0,
       });
+    if (next !== null) received.set(roomId, next);
     adopted.set(roomId, (adopted.get(roomId) ?? 0) + 1);
     changed = true;
   }

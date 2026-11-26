@@ -481,6 +481,30 @@ describe('AccountSync', () => {
     expect(commands.setData).not.toHaveBeenCalled();
   });
 
+  it('reads changes made while disabled once enabled again', async () => {
+    const local = { value: 'old' };
+    let enabled = true;
+    const document = stubDocument(local, { enabled: () => enabled });
+    const remote: Record<string, unknown> = { [document.eventType]: { v: 1, value: 'old' } };
+    const { core, announce } = stubCore(remote);
+    const sync = new AccountSync();
+    sync.start(core, [document]);
+    await vi.runAllTimersAsync();
+
+    enabled = false;
+    sync.push(document);
+    remote[document.eventType] = { v: 1, value: 'other device' };
+    announce(document.eventType);
+    await vi.runAllTimersAsync();
+    expect(local.value).toBe('old');
+
+    enabled = true;
+    sync.push(document);
+    await vi.runAllTimersAsync();
+
+    expect(local.value).toBe('other device');
+  });
+
   it('reports a failed write and retries on the next change', async () => {
     const local = { value: 'local' };
     const document = stubDocument(local);
