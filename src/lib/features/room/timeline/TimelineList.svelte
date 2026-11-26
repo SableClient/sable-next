@@ -1749,6 +1749,7 @@
   }
 
   .unread-float {
+    background: var(--surface-container);
     inset-block-start: 0;
     inset-inline: 0 var(--timeline-scrollbar-size);
     position: absolute;
