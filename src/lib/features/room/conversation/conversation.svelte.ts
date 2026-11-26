@@ -176,13 +176,22 @@ export class Conversation {
     return this.#threadRoot;
   }
 
-  readonly loadLinkPreview = (url: string): Promise<UrlPreviewView | null> =>
-    resolveUrlPreview(
+  readonly loadLinkPreview = async (url: string): Promise<UrlPreviewView | null> => {
+    const preview = await resolveUrlPreview(
       this.#core.rpc.messages,
       url,
       previewSources(this.#encrypted()),
       usesTunnel(this.#encrypted(), this.#publicRoom())
     );
+    if (preview !== null) {
+      void this.#core.rpc.messages
+        .preparePreviewImages({ room_id: this.#roomId(), previews: [preview] })
+        .catch((error: unknown) => {
+          console.debug('[sable composer] preview images not prepared', error);
+        });
+    }
+    return preview;
+  };
 
   async #bundledLinkPreviews(
     html: string | null,

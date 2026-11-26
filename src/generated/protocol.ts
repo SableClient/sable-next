@@ -3166,6 +3166,10 @@ export type Rpc = {
 	service?: string | null,
 	tunnel?: boolean,
 }) => Promise<UrlPreviewView | null>;
+    preparePreviewImages: (params: {
+	room_id: string,
+	previews: UrlPreviewView[],
+}) => Promise<null>;
     eventReactions: (params: {
 	room_id: string,
 	event_id: string,
@@ -4148,6 +4152,7 @@ export type RpcMethods = {
   'messages.end_poll': Rpc['messages']['endPoll'];
   'messages.send_gesture': Rpc['messages']['sendGesture'];
   'messages.url_preview': Rpc['messages']['urlPreview'];
+  'messages.prepare_preview_images': Rpc['messages']['preparePreviewImages'];
   'messages.event_reactions': Rpc['messages']['eventReactions'];
   'messages.reaction_shortcodes': Rpc['messages']['reactionShortcodes'];
   'messages.reaction_event_ids': Rpc['messages']['reactionEventIds'];
@@ -4518,6 +4523,7 @@ export function createRpc(call: RpcCall): Rpc {
       endPoll: (params) => call('messages.end_poll', params) as ReturnType<Rpc['messages']['endPoll']>,
       sendGesture: (params) => call('messages.send_gesture', params) as ReturnType<Rpc['messages']['sendGesture']>,
       urlPreview: (params) => call('messages.url_preview', params) as ReturnType<Rpc['messages']['urlPreview']>,
+      preparePreviewImages: (params) => call('messages.prepare_preview_images', params) as ReturnType<Rpc['messages']['preparePreviewImages']>,
       eventReactions: (params) => call('messages.event_reactions', params) as ReturnType<Rpc['messages']['eventReactions']>,
       reactionShortcodes: (params) => call('messages.reaction_shortcodes', params) as ReturnType<Rpc['messages']['reactionShortcodes']>,
       reactionEventIds: (params) => call('messages.reaction_event_ids', params) as ReturnType<Rpc['messages']['reactionEventIds']>,

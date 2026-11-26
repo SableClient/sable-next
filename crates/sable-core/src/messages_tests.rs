@@ -1626,6 +1626,80 @@ async fn a_queued_message_is_cancelled_through_its_send_queue_handle() {
 }
 
 #[tokio::test]
+async fn a_preview_image_prepared_in_the_composer_is_not_uploaded_again_on_send() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!preview:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server
+        .mock_authenticated_media_config()
+        .ok_default()
+        .mount()
+        .await;
+    server.mock_room_state_encryption().plain().mount().await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/temporary",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_bytes(b"preview thumbnail".as_slice())
+                .set_delay(std::time::Duration::from_secs(1)),
+        )
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/media/v3/upload"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "content_uri": "mxc://example.org/persistent",
+        })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let preview = crate::link_previews::url_preview(
+        "https://example.org".to_owned(),
+        &json!({"og:title": "Example", "og:image": "mxc://example.org/temporary"}),
+    )
+    .unwrap();
+
+    core.run(
+        serde_json::from_value::<crate::api::messages::PreparePreviewImagesParams>(json!({
+            "room_id": room_id,
+            "previews": [preview],
+        }))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while server
+            .server()
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .all(|request| request.url.path() != "/_matrix/media/v3/upload")
+        {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    let send = serde_json::from_value::<crate::api::messages::SendParams>(json!({
+        "room_id": room_id,
+        "body": "https://example.org",
+        "link_previews": [preview],
+    }))
+    .unwrap();
+    tokio::time::timeout(std::time::Duration::from_millis(500), core.run(send))
+        .await
+        .expect("the send does not wait on the preview image again")
+        .unwrap();
+}
+
+#[tokio::test]
 async fn sending_previews_validates_the_whitelist_and_honors_optout() {
     for opt_out in [false, true] {
         let server = MatrixMockServer::new().await;

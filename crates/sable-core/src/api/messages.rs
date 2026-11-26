@@ -32,6 +32,7 @@ use crate::protocol::{
     ReactionShortcodeView, RpcCode, RpcError, ScheduledMessageView, SubscriptionId, UrlPreviewView,
 };
 use crate::{ResultExt, view, SignedIn};
+use crate::tasks::JoinHandleExt as _;
 
 domain! {
     send,
@@ -61,6 +62,7 @@ domain! {
     end_poll,
     send_gesture,
     url_preview,
+    prepare_preview_images,
     event_reactions,
     reaction_shortcodes,
     reaction_event_ids,
@@ -1062,6 +1064,32 @@ impl SessionHandler for SendGestureParams {
             self.persona.as_ref(),
         )
         .await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type), specta(inline))]
+pub struct PreparePreviewImagesParams {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub previews: Vec<UrlPreviewView>,
+}
+
+/// Uploads the images of previews shown in the composer, so sending one does not wait on them.
+impl SessionHandler for PreparePreviewImagesParams {
+    type Ok = ();
+
+    fn run(self, session: &SignedIn) -> impl Future<Output = Result<(), RpcError>> {
+        let prepared = session.clone();
+        session.track_session_task(
+            matrix_sdk::executor::spawn(async move {
+                prepared
+                    .prepare_preview_images(&self.room_id, &self.previews)
+                    .await;
+            })
+            .abort_on_drop(),
+        );
+        std::future::ready(Ok(()))
     }
 }
 

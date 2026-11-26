@@ -2,7 +2,8 @@
 
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { TimelineItemView, UrlPreviewView } from '#src/generated/protocol';
+import { previewWhitelistEntry } from '#lib/features/room/media/link-preview.js';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
@@ -61,7 +62,8 @@ function setup(
   const schedule = vi.fn(() => Promise.resolve('delay'));
   const sendGesture = vi.fn(() => Promise.resolve());
   const toggleReaction = vi.fn(() => Promise.resolve());
-  const urlPreview = vi.fn(() => Promise.resolve(null));
+  const urlPreview = vi.fn((): Promise<UrlPreviewView | null> => Promise.resolve(null));
+  const preparePreviewImages = vi.fn(() => Promise.resolve(null));
   const setTyping = vi.fn((..._args: unknown[]) => Promise.resolve());
   const prepareToEncrypt = vi.fn((..._args: unknown[]) => Promise.resolve());
   const core = {
@@ -82,6 +84,7 @@ function setup(
         sendGesture,
         react: toggleReaction,
         urlPreview,
+        preparePreviewImages,
         setTyping,
         prepareToEncrypt,
       },
@@ -119,6 +122,7 @@ function setup(
     sendGesture,
     toggleReaction,
     urlPreview,
+    preparePreviewImages,
     setTyping,
     prepareToEncrypt,
     timeline,
@@ -1207,6 +1211,17 @@ test('editing steps forward to the next own message and leaves after the last', 
 });
 
 const LINKS = '<p><a href="https://a.example/">a</a> <a href="https://b.example/">b</a></p>';
+
+test('a link preview shown in the composer has its images prepared for the send', async () => {
+  setPreference('encryptedUrlPreviews', true);
+  const fixture = setup([], '@kris:example.org');
+  const preview = previewWhitelistEntry('https://a.example/');
+  fixture.urlPreview.mockResolvedValueOnce(preview);
+
+  await fixture.conversation.loadLinkPreview('https://a.example/');
+
+  expect(fixture.preparePreviewImages).toHaveBeenCalledWith({ room_id: ROOM, previews: [preview] });
+});
 
 test('a dismissed link is not previewed and the dismissal is spent by the send', async () => {
   setPreference('encryptedUrlPreviews', true);

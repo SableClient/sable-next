@@ -289,6 +289,9 @@ pub(crate) struct SessionState {
     cosmetics_fetches: parking_lot::Mutex<HashMap<OwnedRoomId, Arc<Mutex<()>>>>,
     key_backup_downloads: tokio::sync::Semaphore,
     key_backup_download: parking_lot::Mutex<Option<protocol::KeyBackupDownloadView>>,
+    preview_images: parking_lot::Mutex<
+        hashlink::LruCache<link_previews::PreparedImageKey, link_previews::PreparedImage>,
+    >,
     operations: std::sync::atomic::AtomicUsize,
     operations_done: tokio::sync::Notify,
     tasks_stopped: AtomicBool,
@@ -337,6 +340,9 @@ impl Default for SessionState {
             cosmetics_fetches: parking_lot::Mutex::new(HashMap::new()),
             key_backup_downloads: tokio::sync::Semaphore::new(1),
             key_backup_download: parking_lot::Mutex::new(None),
+            preview_images: parking_lot::Mutex::new(hashlink::LruCache::new(
+                link_previews::MAX_PREPARED_IMAGES,
+            )),
             operations: std::sync::atomic::AtomicUsize::new(0),
             operations_done: tokio::sync::Notify::new(),
             tasks_stopped: AtomicBool::new(false),
