@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::Core;
-use crate::ResultExt;
 use crate::SignedIn;
 use crate::notifications;
 use crate::preview;
@@ -436,8 +435,9 @@ async fn notified(room: &Room) -> u64 {
         .max(room.unread_notification_counts().highlight_count)
         .max(room.num_unread_notifications())
         .max(room.num_unread_mentions());
-    if dm_notifies(room).await {
-        counted.max(room.num_unread_messages())
+    let messages = room.num_unread_messages();
+    if messages > counted && dm_notifies(room).await {
+        messages
     } else {
         counted
     }
@@ -856,9 +856,6 @@ impl SignedIn {
         room_id: Option<&RoomId>,
     ) -> Result<(u32, bool), RpcError> {
         let client = self.client();
-        crate::rooms::fill_own_members(client)
-            .await
-            .or_failed(self.core(), "inbox_memberships")?;
         let stored = self.stored_inbox().await?;
         let every_encrypted = self.every_encrypted_event_pushed().await;
         let candidates =
@@ -873,6 +870,11 @@ impl SignedIn {
         let mut failure = None;
 
         'rooms: for (room, mut scan) in candidates {
+            if let Err(error) = crate::rooms::fill_own_member(&room).await {
+                warn!(room_id = %room.room_id(), "inbox memberships failed: {error}");
+                failure = Some(self.core().failed_with("inbox_memberships", &error));
+                continue;
+            }
             loop {
                 if pages == MAX_PAGES {
                     has_more = true;
