@@ -80,6 +80,12 @@ test('backspacing at the start of a quote lifts the paragraph out', () => {
   expect(tx(model)).toBe('<p>|a</p>');
 });
 
+test('backspacing the empty line after a quote removes the line', () => {
+  const model = cm('<blockquote><p>a<br>b</p></blockquote><p>|</p>');
+  backspace(model);
+  expect(tx(model)).toBe('<blockquote><p>a<br>b|</p></blockquote>');
+});
+
 test('deleting all the text inside a mark removes the mark', () => {
   const model = cm('<p>abc<br><strong>{def<br>gh}|</strong>ijk</p>');
   backspace(model);

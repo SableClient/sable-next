@@ -212,6 +212,20 @@ const headingToParagraphBackward: Command = (state, dispatch) => {
   return true;
 };
 
+const deleteEmptyLineAfterQuote: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  if (!empty || $from.parent.type !== composerSchema.nodes.paragraph) return false;
+  if ($from.parent.content.size > 0) return false;
+  const before = $from.before();
+  if (state.doc.resolve(before).nodeBefore?.type !== composerSchema.nodes.blockquote) return false;
+
+  if (dispatch) {
+    const tr = state.tr.delete(before, $from.after());
+    dispatch(tr.setSelection(Selection.near(tr.doc.resolve(before), -1)).scrollIntoView());
+  }
+  return true;
+};
+
 const deleteEmptyCodeBlock: Command = (state, dispatch) => {
   const { $from } = state.selection;
   const block = $from.parent;
@@ -871,7 +885,8 @@ export class ComposerEditor {
           undoBlockRule,
           deleteInlineAtomBackward,
           joinListItemBackward,
-          headingToParagraphBackward
+          headingToParagraphBackward,
+          deleteEmptyLineAfterQuote
         ),
         ArrowUp: (state, dispatch, view) =>
           this.options.onNavigate('ArrowUp') ||
