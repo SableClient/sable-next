@@ -6,7 +6,7 @@ on:
 
 jobs:
   label-platforms:
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 5
     steps:
       - name: Check out repository

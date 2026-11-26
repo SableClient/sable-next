@@ -42,7 +42,7 @@ env:
 jobs:
   detect:
     name: Detect target
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 5
     outputs:
       production: ${{ steps.target.outputs.production }}
