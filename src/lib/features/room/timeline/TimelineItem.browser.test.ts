@@ -473,6 +473,22 @@ test('an edited message keeps its marker on the body line', async () => {
   expect(document.querySelectorAll('.edited, [class*="edited"]').length).toBeGreaterThan(0);
 });
 
+test.each([
+  ['subtext', '<sub data-md="-#">small print</sub>'],
+  ['a paragraph', '<p>first</p><p>second</p>'],
+])('the edited marker stays on the last line after %s', async (_, html) => {
+  await page.viewport(1280, 900);
+  const edited = message('marker-block', '@alice:example.test', 'Alice');
+  if (edited.content.kind !== 'message') throw new Error('expected a message');
+  edited.content = { ...edited.content, html, edited: true };
+  await mountItem(edited);
+
+  const last = document.querySelector('.formatted-body > :last-child');
+  const marker = document.querySelector('.edited');
+  if (!last || !marker) throw new Error('missing the body or the marker');
+  expect(marker.getBoundingClientRect().top).toBeLessThan(last.getBoundingClientRect().bottom);
+});
+
 test('a long handle in a narrow row gives way to the sender name', async () => {
   await page.viewport(1280, 900);
   document.body.style.width = '320px';

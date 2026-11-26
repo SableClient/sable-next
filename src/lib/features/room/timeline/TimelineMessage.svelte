@@ -1086,7 +1086,8 @@
     line-height: var(--line-height-body);
   }
 
-  .has-edited :global(.formatted-body) {
+  .has-edited :global(.formatted-body),
+  .has-edited :global(.formatted-body > :is(p, sub[data-md='-#']):last-child) {
     display: inline;
   }
 
