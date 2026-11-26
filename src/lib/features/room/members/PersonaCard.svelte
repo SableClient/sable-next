@@ -97,7 +97,7 @@
 >
   {#snippet pronouns()}
     {#if profile.pronouns.length > 0}
-      <PronounPill pronouns={profile.pronouns} class="persona-profile-pronoun-pill" />
+      <PronounPill pronouns={profile.pronouns} class="persona-profile-pronoun-pill" showAll />
     {/if}
     {#if ownerProfile?.supporter_awards}
       <UserSupporterBadge

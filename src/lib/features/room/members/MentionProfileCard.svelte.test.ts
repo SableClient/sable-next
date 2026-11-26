@@ -131,6 +131,31 @@ test('shows pronouns on the profile card but not in the member list', async () =
   }
 });
 
+test('lists every pronoun on the profile card past the pill limit', async () => {
+  const profile = {
+    ...emptyProfile,
+    display_name: 'Alice',
+    pronouns: [
+      { summary: 'she/her', language: null },
+      { summary: 'they/them', language: null },
+    ],
+  };
+  try {
+    preferences.pronounPillLimit = '1';
+    render(MentionProfileCard, {
+      userId: profile.user_id,
+      roomId: '!room:example.org',
+      member: null,
+      profile,
+    });
+    await tick();
+    const pills = document.querySelectorAll('.profile-pronoun-pill .pronoun-pill-row > *');
+    expect(Array.from(pills, (pill) => pill.textContent.trim())).toEqual(['she/her', 'they/them']);
+  } finally {
+    preferences.pronounPillLimit = '3';
+  }
+});
+
 async function press(element: Element | null | undefined): Promise<void> {
   if (!element) throw new Error('nothing to press');
   await user.click(element);

@@ -107,6 +107,14 @@ test('always adds a +N pill for pronouns beyond the configured limit', async () 
   expect(shown(container)).toEqual(['he/him', '+2']);
 });
 
+test('showAll lists every pronoun regardless of the limit and width', async () => {
+  preferences.pronounPillLimit = '1';
+  containerWidth = 100;
+  const { container } = render(PronounPill, { pronouns, showAll: true });
+  await tick();
+  expect(shown(container)).toEqual(['he/him', 'she/her', 'they/them']);
+});
+
 test('measuring copies are hidden from assistive tech and carry no text nodes', async () => {
   const { container } = await renderFitted(300);
   const sizer = container.querySelector('.pronoun-pill-sizer');

@@ -17,7 +17,7 @@
 </script>
 
 {#if pronouns.length > 0}
-  <PronounPill class="profile-pronoun-pill" {pronouns} />
+  <PronounPill class="profile-pronoun-pill" {pronouns} showAll />
 {/if}
 {#if profile?.supporter_awards}
   <UserSupporterBadge
