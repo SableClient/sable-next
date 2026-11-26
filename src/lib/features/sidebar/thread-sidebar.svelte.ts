@@ -5,6 +5,7 @@ import { AccountDataSync } from '#lib/core/account-data-sync.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { replyPreviewBody } from '#lib/features/room/messages/reply-preview.js';
 import { i18n } from '#lib/i18n.js';
+import { firstRoomSettled, isFirstRoomSettled } from '#lib/rooms/first-room-gate.js';
 import { loadThreadReplies, threadReplyRevision } from '#lib/rooms/thread-replies.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -318,6 +319,13 @@ export class ThreadSidebar {
   }
 
   private drain(): void {
+    if (!isFirstRoomSettled()) {
+      const generation = this.generation;
+      void firstRoomSettled.then(() => {
+        if (generation === this.generation) this.drain();
+      });
+      return;
+    }
     while (this.running < MAX_REQUESTS && this.queue.size > 0) {
       const roomId = [...this.queue].find((id) => !this.loading.has(id));
       if (roomId === undefined) return;

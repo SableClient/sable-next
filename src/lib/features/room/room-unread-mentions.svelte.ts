@@ -3,6 +3,7 @@ import { untrack } from 'svelte';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { InboxFeed } from '#lib/features/inbox/inbox-feed.svelte.js';
 import { timelineMentions } from '#lib/features/inbox/inbox.js';
+import { firstRoomSettled } from '#lib/rooms/first-room-gate.js';
 
 const UNREAD_MENTION_LIMIT = 1000;
 
@@ -25,12 +26,17 @@ export class RoomUnreadMentions {
     $effect(() => {
       const feed = this.#feed;
       this.#highlight = untrack(highlight);
-      void loadMentions(feed);
-      void feed.backfill(false).then(() => loadMentions(feed));
+      let disposed = false;
+      void firstRoomSettled.then(() => {
+        if (disposed) return;
+        void loadMentions(feed);
+        void feed.backfill(false).then(() => loadMentions(feed));
+      });
       const stop = core.subscribeEvents((event) => {
         if (event.type === 'inbox_changed') void loadMentions(feed);
       });
       return () => {
+        disposed = true;
         stop();
         feed.dispose();
       };

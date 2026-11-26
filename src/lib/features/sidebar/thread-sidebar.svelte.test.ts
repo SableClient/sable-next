@@ -5,10 +5,13 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { createCoreStub } from '#lib/core/__mocks__/context.js';
 import { timelineItem } from '../../../../tests/e2e/fixtures/timeline-items';
 
+import { settleFirstRoom } from '#lib/rooms/first-room-gate.js';
 import { THREAD_ACTIVITY_WINDOW } from '#lib/rooms/thread-roots.svelte.js';
 import { clearThreadRepliesCache } from '#lib/rooms/thread-replies.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { ThreadSidebar } from './thread-sidebar.svelte.js';
+
+settleFirstRoom();
 
 afterEach(() => {
   clearThreadRepliesCache();

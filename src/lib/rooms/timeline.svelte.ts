@@ -8,6 +8,7 @@ import type {
 } from '#src/generated/protocol';
 import { applyDiffs } from '#src/transport';
 import { TimeoutError, withTimeout } from '#lib/timeout.js';
+import { settleFirstRoom } from '#lib/rooms/first-room-gate.js';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
@@ -259,6 +260,7 @@ export class RoomTimeline {
     } finally {
       if (this.startPromise === promise) this.startPromise = null;
       if (session === this.session) this.loading = false;
+      settleFirstRoom();
     }
   }
 

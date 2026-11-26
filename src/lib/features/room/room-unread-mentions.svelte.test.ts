@@ -3,7 +3,10 @@
 import { flushSync } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import type { CoreEvent } from '#src/generated/protocol';
+import { settleFirstRoom } from '#lib/rooms/first-room-gate.js';
 import { RoomUnreadMentions } from './room-unread-mentions.svelte.js';
+
+settleFirstRoom();
 
 function setup() {
   let emit!: (event: CoreEvent) => void;
