@@ -71,3 +71,30 @@ test('cropping a staged image replaces it and keeps the viewer open', async () =
     .not.toBe(before);
   expect(document.activeElement?.closest('.staged-viewer')).not.toBeNull();
 });
+
+test('the staged viewer keeps each action label on one line at phone width', async () => {
+  await page.viewport(360, 780);
+  await render(ComposerAttachments, {
+    files: [{ id: 7, file: await png(800, 400), spoiler: false, metadata: 'location' }],
+    onRemove: vi.fn(),
+    onToggleSpoiler: vi.fn(),
+    onSetMetadata: vi.fn(),
+    onReplace: vi.fn(),
+  });
+
+  await page.getByRole('button', { name: 'Preview photo.png' }).click();
+  await expect.element(page.getByRole('button', { name: 'Crop photo.png' })).toBeVisible();
+  const labels = [...document.querySelectorAll('.staged-viewer-actions .btn')].map((button) => {
+    const text = [...button.childNodes].find(
+      (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() !== ''
+    );
+    if (!text) throw new Error('Action has no label');
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    return { label: text.textContent?.trim(), lines: range.getClientRects().length };
+  });
+  expect(labels).toEqual(
+    ['Spoiler', 'Crop', 'Options', 'Remove'].map((label) => ({ label, lines: 1 }))
+  );
+  await page.viewport(414, 896);
+});

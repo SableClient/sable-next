@@ -411,6 +411,15 @@
     flex: 0 1 12rem;
   }
 
+  @media (width < 32rem) {
+    .staged-viewer-actions :global(.btn) {
+      --button-gap: var(--space-050);
+      --button-padding-inline: var(--space-100);
+
+      flex-direction: column;
+    }
+  }
+
   .staged-viewer-actions :global(.staged-viewer-spoiler-on) {
     --button-container: var(--warn-container);
     --button-container-hover: var(--warn-container-hover);
