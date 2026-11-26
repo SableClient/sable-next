@@ -381,6 +381,27 @@ impl SignedIn {
         state_key: Option<&str>,
     ) -> Result<Vec<Value>, RpcError> {
         let room = self.room(room_id)?;
+        let wanted = |json: &Value| {
+            state_key
+                .is_none_or(|wanted| json.get("state_key").and_then(Value::as_str) == Some(wanted))
+        };
+        // Sliding sync only stores the state types in its `required_state`.
+        if room.state() == RoomState::Joined && event_type != "m.room.member" {
+            match self.room_state_snapshot(room_id).await {
+                Ok(snapshot) => {
+                    return Ok(snapshot
+                        .iter()
+                        .filter_map(|raw| serde_json::from_str::<Value>(raw.json().get()).ok())
+                        .filter(|json| json.get("type").and_then(Value::as_str) == Some(event_type))
+                        .filter(wanted)
+                        .map(|json| with_room_id(json, room_id))
+                        .collect());
+                }
+                Err(error) => {
+                    tracing::warn!(room = %room_id, %error, "room state read from the store after the state fetch failed");
+                }
+            }
+        }
         let events = self
             .core()
             .with_open_stores(async || room.get_state_events(event_type.into()).await)
@@ -396,11 +417,7 @@ impl SignedIn {
                 };
                 serde_json::from_str::<Value>(raw.get()).ok()
             })
-            .filter(|json| {
-                state_key.is_none_or(|wanted| {
-                    json.get("state_key").and_then(Value::as_str) == Some(wanted)
-                })
-            })
+            .filter(wanted)
             .map(|json| with_room_id(json, room_id))
             .collect())
     }

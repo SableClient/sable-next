@@ -38,7 +38,7 @@ use super::{
     store::MemorySessionStore,
 };
 use crate::api::packs::ConvertLegacyParams;
-use crate::api::room_state::{EventParams, SendEventParams};
+use crate::api::room_state::{EventParams, EventsRawParams, SendEventParams};
 use crate::api::timeline::{
     MarkReadParams, MarkUnreadParams, ReadMarkerParams, SetPinnedParams, SubscribeOk,
     SubscribeParams, UnsubscribeParams, WarmRoomsParams,
@@ -853,6 +853,55 @@ async fn custom_room_state_reads_from_the_server_when_not_in_the_store() {
         .map(|json| json.0);
 
     assert_eq!(content, Some(json!({"url": "mxc://example.org/banner"})));
+}
+
+#[tokio::test]
+async fn every_custom_state_event_reads_from_the_server_when_not_in_the_store() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!checklist:example.org");
+    let event_type = "net.headpats.checklist";
+
+    server.sync_joined_room(&client, room_id).await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+            {
+                "type": event_type, "state_key": "a", "content": { "done": true },
+                "sender": "@alice:example.org", "event_id": "$a",
+                "origin_server_ts": 1, "room_id": room_id
+            },
+            {
+                "type": event_type, "state_key": "b", "content": { "done": false },
+                "sender": "@alice:example.org", "event_id": "$b",
+                "origin_server_ts": 2, "room_id": room_id
+            },
+            {
+                "type": "m.room.topic", "state_key": "", "content": { "topic": "t" },
+                "sender": "@alice:example.org", "event_id": "$t",
+                "origin_server_ts": 3, "room_id": room_id
+            }
+        ])))
+        .mount(server.server())
+        .await;
+
+    let (core, _events) = crate::test_support::signed_in_core(&server, client).await;
+
+    let read = |state_key: Option<&str>| {
+        core.run(EventsRawParams {
+            room_id: room_id.to_owned(),
+            event_type: event_type.to_owned(),
+            state_key: state_key.map(str::to_owned),
+        })
+    };
+    let keys = |events: Vec<crate::api::Json>| -> Vec<String> {
+        events
+            .into_iter()
+            .map(|json| json.0["state_key"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(keys(read(None).await.unwrap()), ["a", "b"]);
+    assert_eq!(keys(read(Some("b")).await.unwrap()), ["b"]);
 }
 
 async fn core_for(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
