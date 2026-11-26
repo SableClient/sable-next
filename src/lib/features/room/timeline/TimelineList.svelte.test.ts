@@ -1882,6 +1882,34 @@ test('focusing the composer leaves a reader past the band where they are', async
   expect(followingLive()).toBe(false);
 });
 
+test('page up and page down in the composer page the timeline instead of the app', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { element, end } = await mountLive(roomTimeline);
+  const composer = document.querySelector<HTMLTextAreaElement>('.harness-composer textarea');
+  if (!composer) throw new Error('composer missing');
+  composer.focus();
+  const press = (key: string, init: KeyboardEventInit = {}): KeyboardEvent => {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+    composer.dispatchEvent(event);
+    element.dispatchEvent(new Event('scroll'));
+    return event;
+  };
+
+  expect(press('PageUp').defaultPrevented).toBe(true);
+  await flushed();
+  await runAnimationFrames();
+  const paged = element.scrollTop;
+  expect(paged).toBeLessThan(end);
+  expect(followingLive()).toBe(false);
+
+  expect(press('PageUp', { shiftKey: true }).defaultPrevented).toBe(false);
+  expect(element.scrollTop).toBe(paged);
+
+  expect(press('PageDown').defaultPrevented).toBe(true);
+  expect(element.scrollTop).toBe(end);
+});
+
 test('leaves a reader deep in history where they are when they send', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);

@@ -354,7 +354,12 @@
     currentUserId={core.session?.user_id ?? null}
   />
 
-  <div class="thread-composer" onfocusin={(event) => timelineList?.composerFocused(event)}>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="thread-composer"
+    onfocusin={(event) => timelineList?.composerFocused(event)}
+    onkeydown={(event) => timelineList?.composerKeydown(event)}
+  >
     <ConversationComposer
       bind:this={composer}
       {conversation}

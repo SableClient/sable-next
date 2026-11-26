@@ -36,6 +36,11 @@
 </script>
 
 <TimelineList bind:this={timelineList} {...list} bind:followingLive />
-<div class="harness-composer" onfocusin={(event) => timelineList?.composerFocused(event)}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="harness-composer"
+  onfocusin={(event) => timelineList?.composerFocused(event)}
+  onkeydown={(event) => timelineList?.composerKeydown(event)}
+>
   <textarea aria-label="composer"></textarea>
 </div>

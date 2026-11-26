@@ -982,9 +982,11 @@
       {/snippet}
     </TimelineList>
   {/key}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="composer-dock"
     onfocusin={(event) => timelineList?.composerFocused(event)}
+    onkeydown={(event) => timelineList?.composerKeydown(event)}
     {@attach publishComposerClearance}
   >
     <RoomComposerArea

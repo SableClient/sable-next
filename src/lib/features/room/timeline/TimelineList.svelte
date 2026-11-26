@@ -714,8 +714,17 @@
     if (!controller || !revealed || !isEditableTarget(event.target)) return;
     if (nearLatest && !windowState.pinned) void controller.jumpTo(null, 'start');
   }
+  export function composerKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'PageUp' && event.key !== 'PageDown') return;
+    if (event.defaultPrevented || isComposingKey(event) || !isEditableTarget(event.target)) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !viewport) return;
+    event.preventDefault();
+    const page = viewport.clientHeight * KEY_PAGE_FRACTION;
+    viewport.scrollBy({ top: event.key === 'PageUp' ? -page : page });
+  }
   const ARTICLE = 'article.message:not([aria-hidden="true"])';
   const KEY_PAGE_ITEMS = 8;
+  const KEY_PAGE_FRACTION = 0.875;
   const FOCUSABLE = 'button, a[href], input, textarea, select, [tabindex]';
   const feedItems = rovingFocus({
     orientation: 'vertical',
