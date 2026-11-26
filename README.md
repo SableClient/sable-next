@@ -235,9 +235,9 @@ Run `mise tasks` for the full list.
 
 ## Building without mise
 
-Put Node, pnpm, Rust (with the `wasm32-unknown-unknown` target) and
-`wasm-bindgen-cli` (the version in `Cargo.lock`) on your `PATH`, then run
-`pnpm install` and `pnpm build`.
+Put Node, pnpm, Rust (with the `wasm32-unknown-unknown` target),
+`wasm-bindgen-cli` (the version in `Cargo.lock`), and binaryen
+on your `PATH`, then run `pnpm install` and `pnpm build`.
 
 ## Self-hosting
 
