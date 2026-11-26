@@ -64,6 +64,7 @@
   import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
   import { readText } from '#lib/platform/local-json.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
+  import { scheduledQueue } from '#lib/composer/scheduled-queue.svelte.js';
   import { watchSearchPeers } from '#lib/search/search-peer.js';
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import {
@@ -896,9 +897,11 @@
     );
   });
 
+  let hasScheduled = $derived(scheduledQueue(core.session?.account_id ?? '').length > 0);
+
   $effect(() => {
     void core.accountRevision;
-    if (core.status !== 'ready') return;
+    if (core.status !== 'ready' || !hasScheduled) return;
     return watchScheduledQueue(core);
   });
 

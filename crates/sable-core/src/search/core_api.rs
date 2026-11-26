@@ -152,7 +152,10 @@ impl SignedIn {
                 loop {
                     let interval = core.state().search_crawl.lock().tuning.flush_interval();
                     matrix_sdk::sleep::sleep(interval).await;
-                    core.enforce_disk_budget().await;
+                    core.core().wait_until_active().await;
+                    core.core()
+                        .with_open_stores(async || core.enforce_disk_budget().await)
+                        .await;
                 }
             })
             .abort_on_drop(),

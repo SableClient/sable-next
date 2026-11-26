@@ -536,6 +536,16 @@ impl SignedIn {
 
     /// Waits out whatever keeps the crawler from its next room, and says whether it did.
     async fn held_back(&self) -> bool {
+        if !self.core().activity.app_active() {
+            self.save_changed_checkpoints().await;
+            self.state()
+                .search_crawl
+                .lock()
+                .enter(SearchCrawlPhase::Paused);
+            self.core().wait_until_active().await;
+            return true;
+        }
+
         if !self.state().search_index.lock().await.ready() {
             self.state()
                 .search_crawl
@@ -1559,6 +1569,32 @@ mod tests {
             coverage.state,
             crate::protocol::SearchCoverageState::Stopped
         );
+    }
+
+    #[async_test]
+    async fn test_a_disabled_crawler_sleeps_until_the_app_is_active() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let (core, _events) = crate::Core::new(
+            "inactive-disabled-search-crawler",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        crate::test_support::sign_in(&core, &server, client.clone()).await;
+        let session = core.signed_in().unwrap();
+        core.settings
+            .search_crawler_enabled
+            .store(false, Ordering::Relaxed);
+        core.set_app_active(false);
+        tokio::time::pause();
+
+        let held = session.held_back();
+        tokio::pin!(held);
+        tokio::time::timeout(Duration::from_secs(300), &mut held)
+            .await
+            .expect_err("an inactive app keeps the crawler parked");
+
+        core.set_app_active(true);
+        assert!(held.await);
     }
 
     #[async_test]

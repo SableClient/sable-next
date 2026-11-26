@@ -3,6 +3,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { formatTime } from '#lib/ui/date-time.js';
+  import { windowActivity } from '#lib/platform/window-activity.js';
   import { agenda, readEntries, type CalendarItem } from '#lib/calendar/calendar-events.js';
 
   interface Props {
@@ -28,14 +29,16 @@
 
   $effect(() => {
     void load();
-    const tick = setInterval(() => (now = Date.now()), 60_000);
-    const unsubscribe = core.subscribeEvents((event) => {
+    return core.subscribeEvents((event) => {
       if (event.type === 'calendar_changed' && event.room_id === roomId) void load();
     });
-    return () => {
-      clearInterval(tick);
-      unsubscribe();
-    };
+  });
+
+  $effect(() => {
+    if (!windowActivity.visible) return;
+    now = Date.now();
+    const tick = setInterval(() => (now = Date.now()), 60_000);
+    return () => clearInterval(tick);
   });
 
   let today = $derived(

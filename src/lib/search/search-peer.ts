@@ -264,12 +264,20 @@ function connectSearchPeers(
         discovering = false;
       });
   };
-  const timer = setInterval(discover, START_INTERVAL_MS);
-  discover();
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const schedule = (): void => {
+    clearInterval(timer);
+    if (document.visibilityState === 'hidden') return;
+    timer = setInterval(discover, START_INTERVAL_MS);
+    discover();
+  };
+  document.addEventListener('visibilitychange', schedule);
+  schedule();
 
   return () => {
     if (stopped) return;
     unsubscribe();
+    document.removeEventListener('visibilitychange', schedule);
     clearInterval(timer);
     session?.close();
     stopped = true;

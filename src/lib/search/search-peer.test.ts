@@ -93,6 +93,7 @@ afterEach(() => {
   stop = undefined;
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function start(): Channel {
@@ -251,6 +252,24 @@ test('the core is started at regular intervals', async () => {
   expect(core.rpc.search.peerStart).toHaveBeenCalledTimes(2);
   await vi.advanceTimersByTimeAsync(60_000);
   expect(core.rpc.search.peerStart).toHaveBeenCalledTimes(3);
+});
+
+test('a hidden page stops starting the core until it is shown again', async () => {
+  vi.useFakeTimers();
+  stop = watchSearchPeers(core, { stunServers: [] });
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(core.rpc.search.peerStart).toHaveBeenCalledOnce();
+
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  document.dispatchEvent(new Event('visibilitychange'));
+  await vi.advanceTimersByTimeAsync(180_000);
+  expect(core.rpc.search.peerStart).toHaveBeenCalledOnce();
+  expect(core.rpc.calls.turnServer).toHaveBeenCalledOnce();
+
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  document.dispatchEvent(new Event('visibilitychange'));
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(core.rpc.search.peerStart).toHaveBeenCalledTimes(2);
 });
 
 test('idle channels close after two minutes', async () => {
