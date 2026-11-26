@@ -429,6 +429,7 @@
       height: 100dvh;
       inset-inline-start: 0;
       padding-inline-start: var(--safe-left);
+      padding-bottom: var(--safe-area-inset-bottom);
       padding-top: var(--safe-top);
       position: fixed;
       top: 0;

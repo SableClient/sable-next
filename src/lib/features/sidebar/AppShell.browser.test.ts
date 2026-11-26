@@ -75,6 +75,20 @@ test('phone landscape keeps compact navigation and clears the safe areas', async
   await expectNoA11yViolations(screen.container, { disableRules: ICONS_HIDDEN_BY_LAYOUT });
 });
 
+test('tablet landscape keeps the sidebar tools above the bottom safe area', async () => {
+  await page.viewport(960, 600);
+  document.documentElement.style.setProperty('--safe-area-inset-bottom', '48px');
+  const screen = await render(Harness, { core: shellCore });
+
+  await expect.poll(() => matchesAppLayout()).toBe(true);
+  await expect.element(screen.getByRole('link', { name: 'Inbox' })).toBeVisible();
+  const tools = document.querySelectorAll('.desktop-tools :is(a, button)');
+  expect(tools.length).toBeGreaterThan(0);
+  for (const tool of tools) {
+    expect(tool.getBoundingClientRect().bottom).toBeLessThanOrEqual(552);
+  }
+});
+
 test('tablet shows fixed desktop navigation with room for the drawer', async () => {
   await page.viewport(768, 1024);
   const screen = await render(Harness, { core: shellCore });
