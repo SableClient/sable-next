@@ -11,7 +11,7 @@ import CallViewHarness from './CallViewHarness.test.svelte';
 
 afterEach(() => vi.restoreAllMocks());
 
-function activeCall(): CallSession {
+function activeCall(nativeVideo = true): CallSession {
   const overlay = { place: vi.fn(() => Promise.resolve()), clear: vi.fn(() => Promise.resolve()) };
   const track = { id: 'camera', muted: false, subscribed: true };
   return {
@@ -30,8 +30,8 @@ function activeCall(): CallSession {
     canScreenShare: true,
     canSwitchCamera: true,
     audioRoutes: { list: () => Promise.resolve([]), select: () => Promise.resolve() },
-    localVideo: overlay,
-    remoteVideo: overlay,
+    localVideo: nativeVideo ? overlay : undefined,
+    remoteVideo: nativeVideo ? overlay : undefined,
     rooms: [],
     members: [],
     transport: {
@@ -45,9 +45,9 @@ function activeCall(): CallSession {
   } as unknown as CallSession;
 }
 
-async function renderCall() {
+async function renderCall(session = activeCall()) {
   const { container } = await render(CallViewHarness, {
-    session: activeCall(),
+    session,
     members: [],
     onOpenSettings: vi.fn(),
   });
@@ -57,7 +57,7 @@ async function renderCall() {
 
 test('the wrapped controls dock floats inside the stage without reserving space below the video', async () => {
   await page.viewport(402, 874);
-  const container = await renderCall();
+  const container = await renderCall(activeCall(false));
   const stage = container.querySelector<HTMLElement>('.stage');
   const controls = container.querySelector<HTMLElement>('.dock .controls');
   const video = container.querySelector<HTMLElement>('.tile .video');
@@ -70,4 +70,17 @@ test('the wrapped controls dock floats inside the stage without reserving space 
   expect(controlsBox.right).toBeLessThanOrEqual(stageBox.right);
   expect(controlsBox.bottom).toBeLessThanOrEqual(stageBox.bottom);
   expect(video.getBoundingClientRect().bottom).toBeGreaterThan(controlsBox.top);
+});
+
+test('a native camera view on a phone stays clear of the controls dock', async () => {
+  await page.viewport(402, 874);
+  const container = await renderCall();
+  const controls = container.querySelector<HTMLElement>('.dock .controls');
+  const video = container.querySelector<HTMLElement>('.tile .video');
+  if (!controls || !video) throw new Error('call not rendered');
+
+  await expect.poll(() => video.getBoundingClientRect().height).toBeGreaterThan(0);
+  await expect
+    .poll(() => controls.getBoundingClientRect().top - video.getBoundingClientRect().bottom)
+    .toBeGreaterThanOrEqual(0);
 });

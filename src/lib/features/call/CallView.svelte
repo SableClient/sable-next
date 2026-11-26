@@ -138,6 +138,8 @@
   );
 
   let noticeHeight = $state(0);
+  let dockHeight = $state(0);
+  let nativeVideo = $derived(session.localVideo !== undefined || session.remoteVideo !== undefined);
   let mediaWidth = $state(0);
   let mediaHeight = $state(0);
   let aspect = $derived(mediaWidth > 0 && mediaWidth < NARROW_STAGE_PX ? 1 : 16 / 9);
@@ -325,7 +327,7 @@
   </header>
 
   {#if !failed}
-    <div class="dock chrome">
+    <div class="dock chrome" bind:clientHeight={dockHeight}>
       <CallControls
         microphoneEnabled={session.microphoneEnabled && !session.deafened}
         pushToTalk={session.inputMode === 'push-to-talk'}
@@ -415,10 +417,12 @@
           session.listenOnly ||
           backendUnreachable,
         locked: busy,
+        'native-video': nativeVideo,
       },
     ]}
     style:--tile-aspect={aspect}
     style:--notice-height="{noticeHeight}px"
+    style:--dock-height="{dockHeight}px"
   >
     {#if session.failure}
       {@const failure = session.failure}
@@ -710,8 +714,22 @@
     );
   }
 
+  .media.native-video {
+    padding-block-end: max(
+      var(--dock-height),
+      calc(
+        var(--control-height-500) + var(--space-150) * 2 + var(--border-width) * 2 +
+          var(--space-300) * 2
+      )
+    );
+  }
+
   .resting .media:not(.with-notice) {
     padding-block-start: var(--space-300);
+  }
+
+  .resting .media.native-video {
+    padding-block-end: var(--space-300);
   }
 
   .failed {
