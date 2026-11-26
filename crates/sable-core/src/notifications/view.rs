@@ -251,7 +251,7 @@ fn event_content(item: &NotificationItem) -> Option<serde_json::Value> {
 }
 
 /// A per-message profile's name and avatar win over the account's and a nickname, as in the
-/// timeline.
+/// timeline. A direct chat is presented as its sender, so it takes them too.
 fn apply_per_message_profile(view: &mut NotificationView, content: Option<&serde_json::Value>) {
     let Some(profile) = crate::view::per_message_profile(content) else {
         return;
@@ -260,10 +260,16 @@ fn apply_per_message_profile(view: &mut NotificationView, content: Option<&serde
         if profile.has_fallback {
             view.body = crate::matrix_html::strip_profile_fallback_body(&view.body, Some(&name));
         }
+        if view.is_direct {
+            view.room_name.clone_from(&name);
+        }
         view.sender_name = Some(name);
     }
     if let Some(avatar) = profile.avatar_url {
         view.sender_avatar_url = (!avatar.is_empty()).then_some(avatar);
+        if view.is_direct {
+            view.room_avatar_url.clone_from(&view.sender_avatar_url);
+        }
     }
 }
 

@@ -1513,3 +1513,123 @@ async fn a_message_notification_shows_its_per_message_profile_over_a_nickname() 
     assert_eq!(view.body, "hi");
     session.state().session_tasks.lock().clear();
 }
+
+#[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sequential flow kept in a single function"
+)]
+async fn an_encrypted_direct_message_notification_shows_its_per_message_profile() {
+    let server = MatrixMockServer::new().await;
+    server.mock_crypto_endpoints_preset().await;
+    let (alice, bob) = server.set_up_alice_and_bob_for_encryption().await;
+    let room_id = room_id!("!persona:example.org");
+    let alice_id = alice.user_id().unwrap();
+    let factory = EventFactory::new().room(room_id).sender(alice_id);
+    let room = |builder: &mut matrix_sdk_test::SyncResponseBuilder| {
+        builder.add_joined_room(
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.room_encryption())
+                .add_state_event(
+                    factory
+                        .member(alice_id)
+                        .display_name("Alice")
+                        .avatar_url(ruma::mxc_uri!("mxc://example.org/alice")),
+                )
+                .add_state_event(factory.member(bob.user_id().unwrap()))
+                .add_state_event(factory.power_levels())
+                .add_state_event(
+                    factory
+                        .room_avatar()
+                        .url(ruma::mxc_uri!("mxc://example.org/alice")),
+                )
+                .set_joined_members_count(2),
+        );
+    };
+    server.mock_sync().ok_and_run(&alice, room).await;
+    server
+        .mock_sync()
+        .ok_and_run(&bob, |builder| {
+            room(builder);
+            builder
+                .add_global_account_data(factory.direct().add_user(alice_id.to_owned(), room_id));
+        })
+        .await;
+    server
+        .mock_get_members()
+        .ok(vec![
+            factory.member(alice_id).into_raw(),
+            factory.member(bob.user_id().unwrap()).into_raw(),
+        ])
+        .mount()
+        .await;
+    let key_delivered = server
+        .mock_capture_put_to_device_then_sync_back(alice_id, &bob)
+        .await;
+    let (captured, send_mock) = server
+        .mock_room_send()
+        .ok_with_capture(ruma::event_id!("$persona"), alice_id);
+    send_mock.mock_once().mount().await;
+    alice
+        .get_room(room_id)
+        .unwrap()
+        .send_raw(
+            "m.room.message",
+            json!({
+                "msgtype": "m.text", "body": "Silver: hi",
+                "com.beeper.per_message_profile": {
+                    "id": "silver", "displayname": "Silver",
+                    "avatar_url": "mxc://example.org/silver", "has_fallback": true
+                }
+            }),
+        )
+        .await
+        .unwrap();
+    key_delivered.await;
+    let mut message: serde_json::Value = captured.await.unwrap().deserialize_as().unwrap();
+    message["origin_server_ts"] = json!(MilliSecondsSinceUnixEpoch::now());
+    message["room_id"] = json!(room_id);
+    assert_eq!(message["type"], "m.room.encrypted");
+
+    let (core, mut events) = watching(&server, &bob).await;
+    let session = core.signed_in().unwrap();
+    Mock::given(method("GET"))
+        .and(path_regex(r"/context/.*persona$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "event": message, "events_before": [], "events_after": [],
+            "state": [], "start": "s", "end": "e"
+        })))
+        .mount(server.server())
+        .await;
+    server
+        .mock_sync()
+        .ok_and_run(&bob, |builder| {
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 1, "highlight_count": 0}),
+                    )
+                    .add_timeline_event(
+                        ruma::serde::Raw::new(&message)
+                            .unwrap()
+                            .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
+                    ),
+            );
+        })
+        .await;
+
+    let view = next_notification(&mut events).await;
+    assert!(view.encrypted && view.is_direct);
+    assert_eq!(view.sender_name.as_deref(), Some("Silver"));
+    assert_eq!(
+        view.sender_avatar_url.as_deref(),
+        Some("mxc://example.org/silver")
+    );
+    assert_eq!(view.room_name, "Silver");
+    assert_eq!(
+        view.room_avatar_url.as_deref(),
+        Some("mxc://example.org/silver")
+    );
+    assert_eq!(view.body, "hi");
+    session.state().session_tasks.lock().clear();
+}
