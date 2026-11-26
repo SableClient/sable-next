@@ -591,7 +591,7 @@ export async function runSlash(body: string, context: SlashContext): Promise<Sla
     case 'none':
       return { kind: 'message', body, msgtype: 'text' };
     case 'literal':
-      return { kind: 'message', body: parsed.body, msgtype: 'text', formatted: null };
+      return { kind: 'message', body: parsed.body, msgtype: 'text', formatted: parsed.formatted };
     case 'unknown':
       throw new SlashError('composer.slashUnknown', { name: parsed.name });
     case 'usage':

@@ -188,6 +188,7 @@ pub enum SlashParse {
     None,
     Literal {
         body: String,
+        formatted: Option<String>,
     },
     Unknown {
         name: String,
@@ -854,6 +855,9 @@ pub fn parse_slash(
     if command.starts_with('/') {
         return SlashParse::Literal {
             body: command.to_owned(),
+            formatted: formatted
+                .and_then(|html| trim_start(html).strip_prefix("//"))
+                .map(|rest| format!("/{rest}")),
         };
     }
     let (name, args) = command.split_once(is_space).unwrap_or((command, ""));
@@ -929,7 +933,20 @@ mod tests {
         assert_eq!(
             parse("//me is literal"),
             SlashParse::Literal {
-                body: "/me is literal".to_owned()
+                body: "/me is literal".to_owned(),
+                formatted: None,
+            }
+        );
+        assert_eq!(
+            parse_slash(
+                "//foo [Spoiler]",
+                Some("//foo <span data-mx-spoiler=\"\">bar</span>"),
+                NOW,
+                None
+            ),
+            SlashParse::Literal {
+                body: "/foo [Spoiler]".to_owned(),
+                formatted: Some("/foo <span data-mx-spoiler=\"\">bar</span>".to_owned()),
             }
         );
         assert_eq!(

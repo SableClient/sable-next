@@ -154,6 +154,7 @@ test('a doubled slash escapes a message that starts with one', async () => {
   expect(parseSlash('//me is literal', null, 'matrix.to')).toEqual({
     kind: 'literal',
     body: '/me is literal',
+    formatted: null,
   });
 
   await expect(runSlash('//me is literal', context(fakeCommands()))).resolves.toEqual({
@@ -161,6 +162,20 @@ test('a doubled slash escapes a message that starts with one', async () => {
     body: '/me is literal',
     msgtype: 'text',
     formatted: null,
+  });
+});
+
+test('a doubled slash keeps the formatted body, less one slash', async () => {
+  const commands = {
+    ...context(fakeCommands()),
+    formatted: '//foo <span data-mx-spoiler>bar</span>',
+  };
+
+  await expect(runSlash('//foo ||bar||', commands)).resolves.toEqual({
+    kind: 'message',
+    body: '/foo ||bar||',
+    msgtype: 'text',
+    formatted: '/foo <span data-mx-spoiler>bar</span>',
   });
 });
 
