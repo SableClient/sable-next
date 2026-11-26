@@ -1,4 +1,6 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
+use std::ops::Range;
 
 use crate::tokenize;
 
@@ -37,6 +39,9 @@ pub fn match_expression(
     let alternatives: Vec<String> = groups
         .drain(..)
         .map(|group| {
+            if let Some(phrase) = unspaced_expression(&group) {
+                return format!("({phrase})");
+            }
             let terms: Vec<String> = group
                 .iter()
                 .map(|term| term_expression(term, expand, vocabulary))
@@ -57,6 +62,9 @@ pub fn exact_expression(query: &str, words: &[String]) -> Option<String> {
     let alternatives: Vec<String> = groups
         .iter()
         .map(|group| {
+            if let Some(phrase) = unspaced_expression(group) {
+                return format!("({phrase})");
+            }
             let terms: Vec<String> = group.iter().map(|term| quoted(term)).collect();
             format!("({})", terms.join(" AND "))
         })
@@ -69,14 +77,52 @@ fn groups(query: &str, words: &[String]) -> Vec<Vec<String>> {
         .into_iter()
         .map(|(_, group)| {
             let mut group: Vec<String> = group.into_iter().map(Into::into).collect();
-            group.sort_unstable();
-            group.dedup();
+            if !is_unspaced(&group) {
+                group.sort_unstable();
+                group.dedup();
+            }
             group
         })
         .collect();
     groups.sort_unstable();
     groups.dedup();
     groups
+}
+
+/// A word of a script written without spaces is indexed as overlapping pairs,
+/// one after the other, so its pairs must follow each other in that order. A
+/// single character is found at the start of any pair as well.
+fn unspaced_expression(group: &[String]) -> Option<String> {
+    if !is_unspaced(group) {
+        return None;
+    }
+    Some(match group {
+        [single] => format!("{}*", quoted(single)),
+        pairs => quoted(&pairs.join(" ")),
+    })
+}
+
+fn is_unspaced<T: AsRef<str>>(group: &[T]) -> bool {
+    group
+        .first()
+        .is_some_and(|term| tokenize::contains_unspaced(term.as_ref()))
+}
+
+/// Whether a document's `terms` hold `group` as the index would find it.
+fn holds<T: AsRef<str>>(group: &[T], terms: &[(Cow<'_, str>, Range<usize>)], expand: bool) -> bool {
+    if group.len() > 1 && is_unspaced(group) {
+        return terms.windows(group.len()).any(|window| {
+            window
+                .iter()
+                .zip(group)
+                .all(|((candidate, _), term)| candidate == term.as_ref())
+        });
+    }
+    group.iter().all(|term| {
+        terms
+            .iter()
+            .any(|(candidate, _)| finds(term.as_ref(), candidate, expand))
+    })
 }
 
 fn quoted(term: &str) -> String {
@@ -164,17 +210,7 @@ pub fn matched_words(
     let mut found = false;
     let mut matched = Vec::new();
     for (typed, group) in tokenize::tokenize_query(query, words) {
-        let stems: Vec<HashSet<&str>> = group
-            .iter()
-            .map(|term| {
-                terms
-                    .iter()
-                    .map(|(candidate, _)| candidate.as_ref())
-                    .filter(|candidate| finds(term, candidate, expand))
-                    .collect()
-            })
-            .collect();
-        if stems.iter().any(HashSet::is_empty) {
+        if !holds(&group, &terms, expand) {
             continue;
         }
         found = true;
@@ -182,7 +218,15 @@ pub fn matched_words(
             matched.push(typed.to_owned());
             continue;
         }
-        let stems: HashSet<&str> = stems.into_iter().flatten().collect();
+        let stems: HashSet<&str> = group
+            .iter()
+            .flat_map(|term| {
+                terms
+                    .iter()
+                    .map(|(candidate, _)| candidate.as_ref())
+                    .filter(|candidate| finds(term, candidate, expand))
+            })
+            .collect();
         matched.extend(
             terms
                 .iter()
@@ -202,18 +246,36 @@ pub fn matches_every_word(query: &str, words: &[String], body: &str, expand: boo
     let terms = tokenize::tokenize(body);
     tokenize::tokenize_query(query, words)
         .iter()
-        .all(|(_, group)| {
-            group.iter().all(|term| {
-                terms
-                    .iter()
-                    .any(|(candidate, _)| finds(term, candidate, expand))
-            })
-        })
+        .all(|(_, group)| holds(group, &terms, expand))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{allowed_typos, matched_words};
+    use super::{allowed_typos, exact_expression, match_expression, matched_words};
+
+    #[test]
+    fn test_a_word_of_several_pairs_is_a_phrase() {
+        let mut vocabulary = |_: &str, _: &str| Vec::new();
+        assert_eq!(
+            match_expression("東京都", &[], true, &mut vocabulary).as_deref(),
+            Some("(\"東京 京都\")")
+        );
+        assert_eq!(
+            exact_expression("東京都", &[]).as_deref(),
+            Some("(\"東京 京都\")")
+        );
+    }
+
+    #[test]
+    fn test_one_unspaced_character_counts_as_exact_anywhere_in_a_run() {
+        let mut vocabulary = |_: &str, _: &str| Vec::new();
+        let expected = Some("(\"猫\"*)");
+        assert_eq!(
+            match_expression("猫", &[], true, &mut vocabulary).as_deref(),
+            expected
+        );
+        assert_eq!(exact_expression("猫", &[]).as_deref(), expected);
+    }
 
     #[test]
     fn test_typo_budget_grows_with_length() {

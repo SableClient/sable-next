@@ -123,6 +123,8 @@ fn unspaced(text: &str, token: &Token<'_>) -> bool {
 /// Cuts a run into the longest words that start where the previous one ended.
 /// A single character the segmenter leaves over usually belongs to a word it
 /// does not know, Japanese above all, so it stays joined to its neighbours.
+/// A lone hiragana between two words written in kanji or katakana is a
+/// particle, which is dropped and cuts the run there: 日本語(で)検索.
 fn segmented<'text>(run: &'text str, words: &[String]) -> Vec<&'text str> {
     let mut pieces = Vec::new();
     let (mut start, mut end) = (0, 0);
@@ -136,6 +138,23 @@ fn segmented<'text>(run: &'text str, words: &[String]) -> Vec<&'text str> {
             return vec![run];
         };
         let single = word.chars().count() == 1;
+        let particle = single
+            && word.chars().all(is_hiragana)
+            && run
+                .get(start..end)
+                .and_then(|piece| piece.chars().next_back())
+                .is_some_and(starts_japanese_word)
+            && rest
+                .get(word.len()..)
+                .and_then(|after| after.chars().next())
+                .is_some_and(starts_japanese_word);
+        if particle {
+            pieces.extend(run.get(start..end));
+            end += word.len();
+            start = end;
+            joined = false;
+            continue;
+        }
         if end > start && !single && !joined {
             pieces.extend(run.get(start..end));
             start = end;
@@ -145,6 +164,15 @@ fn segmented<'text>(run: &'text str, words: &[String]) -> Vec<&'text str> {
     }
     pieces.extend(run.get(start..end));
     pieces
+}
+
+const fn is_hiragana(character: char) -> bool {
+    matches!(character, '\u{3041}'..='\u{309F}')
+}
+
+/// Katakana or a kanji.
+fn starts_japanese_word(character: char) -> bool {
+    Script::from(character) == Script::Cj && !is_hiragana(character)
 }
 
 /// Recomposed so a voiced kana stays one character apart from its unvoiced form.
@@ -361,6 +389,44 @@ mod tests {
             [vec!["ラー", "ーメ", "メン", "ン屋", "屋さ", "さん"]]
         );
         assert_eq!(query_terms("猫", &words(&["猫"])), [vec!["猫"]]);
+    }
+
+    #[test]
+    fn test_a_particle_does_not_weld_the_words_around_it() {
+        assert_eq!(
+            query_terms("日本語で検索", &words(&["日本語", "で", "検索"])),
+            [query_terms("日本語", &[]), query_terms("検索", &[])].concat()
+        );
+        assert_eq!(
+            query_terms("検索を使う", &words(&["検索", "を", "使う"])),
+            [query_terms("検索", &[]), query_terms("使う", &[])].concat()
+        );
+        assert_eq!(
+            query_terms("お名前", &words(&["お", "名前"])),
+            query_terms("お名前", &[])
+        );
+        let segmented = words(&["日本語", "で", "検索"]);
+        assert!(crate::matching::matches_every_word(
+            "日本語で検索",
+            &segmented,
+            "日本語の検索機能",
+            false
+        ));
+        assert!(
+            crate::matching::matched_words("日本語で検索", &segmented, "日本語の検索機能", false)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_a_word_matches_only_where_its_pairs_follow_each_other() {
+        let tokyo = words(&["東京", "都"]);
+        let finds_tokyo =
+            |document| crate::matching::matched_words("東京都", &tokyo, document, false).is_some();
+        assert!(finds_tokyo("東京都に住む"));
+        assert!(!finds_tokyo("京都から東京へ行く"));
+        assert!(finds("電話番号", "電話番号を教える"));
+        assert!(!finds("電話番号", "電話と話番号"));
     }
 
     #[test]

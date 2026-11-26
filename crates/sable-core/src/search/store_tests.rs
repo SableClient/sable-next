@@ -310,6 +310,46 @@ fn a_japanese_word_is_found_inside_a_longer_word() {
 }
 
 #[test]
+fn a_japanese_particle_does_not_weld_the_words_around_it() {
+    let index = index_of(&["日本語の検索機能", "英語を勉強する"]);
+    assert_eq!(
+        ranked_words(
+            &index,
+            "日本語で検索",
+            &["日本語", "で", "検索"],
+            SearchOrder::Rank
+        ),
+        [0]
+    );
+
+    let index = index_of(&["検索を使った", "索引です"]);
+    assert_eq!(
+        ranked_words(
+            &index,
+            "検索を使う",
+            &["検索", "を", "使う"],
+            SearchOrder::Rank
+        ),
+        [0]
+    );
+}
+
+#[test]
+fn a_japanese_word_needs_its_pairs_in_order_and_next_to_each_other() {
+    let index = index_of(&["東京都に住む", "京都から東京へ行く"]);
+    assert_eq!(
+        ranked_words(&index, "東京都", &["東京", "都"], SearchOrder::Rank),
+        [0]
+    );
+
+    let index = index_of(&["電話番号を教える", "電話と話番号"]);
+    assert_eq!(
+        ranked_words(&index, "電話番号", &["電話番号"], SearchOrder::Rank),
+        [0]
+    );
+}
+
+#[test]
 fn a_japanese_word_does_not_match_text_sharing_only_some_of_its_pairs() {
     let hiragana = index_of(&[
         "ありがとうございます",
