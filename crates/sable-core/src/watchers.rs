@@ -851,6 +851,7 @@ impl ForegroundNotifier {
                     room,
                     &event_id,
                     every_encrypted,
+                    &self.core.core().nicknames(),
                 )
                 .await;
                 (notification, Some(sent))
@@ -865,24 +866,24 @@ impl ForegroundNotifier {
                 {
                     return;
                 }
-                (
-                    notifications::invite_notification(room, &actions).await,
-                    None,
-                )
+                let mut notification = notifications::invite_notification(room, &actions).await;
+                if let Some(notification) = notification.as_mut() {
+                    self.core
+                        .core()
+                        .nicknames()
+                        .apply_notification(notification);
+                }
+                (notification, None)
             }
         };
         let read = match sent {
             Some(sent) => notifications::is_read(room, sent).await,
             None => false,
         };
-        if let Some(mut notification) = notification
+        if let Some(notification) = notification
             && !self.core.is_read_room(room.room_id())
             && !read
         {
-            self.core
-                .core()
-                .nicknames()
-                .apply_notification(&mut notification);
             self.core
                 .core()
                 .emit_if_current(self.generation, CoreEvent::Notification { notification });

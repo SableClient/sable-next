@@ -22,7 +22,9 @@ use wiremock::{
 
 use crate::{
     Core, notifications,
-    protocol::{CoreEvent, NotificationView},
+    protocol::{
+        CoreEvent, NotificationView, OverrideColorView, OverrideTextView, ProfileOverrideView,
+    },
     session::Session,
     store::MemorySessionStore,
 };
@@ -1432,5 +1434,82 @@ async fn a_knock_alerts_like_a_join() {
             Some(event_id)
         );
     }
+    session.state().session_tasks.lock().clear();
+}
+
+#[tokio::test]
+async fn a_message_notification_shows_its_per_message_profile_over_a_nickname() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!persona:example.org");
+    server.mock_room_state_encryption().plain().mount().await;
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.member(client.user_id().unwrap()))
+                .add_state_event(factory.power_levels()),
+        )
+        .await;
+    let (core, mut events) = watching(&server, &client).await;
+    let session = core.signed_in().unwrap();
+    core.nicknames
+        .send_replace(crate::nicknames::Nicknames::from_overrides(
+            vec![ProfileOverrideView {
+                user_id: User::Alice.into(),
+                display_name: OverrideTextView::Set {
+                    value: "Ally".to_owned(),
+                },
+                avatar: OverrideTextView::Set {
+                    value: "mxc://example.org/ally".to_owned(),
+                },
+                color: OverrideColorView::Unset,
+            }],
+            None,
+        ));
+    let message = json!({
+        "type": "m.room.message", "event_id": "$persona", "room_id": room_id,
+        "sender": User::Alice, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+        "content": {
+            "msgtype": "m.text", "body": "Silver: hi",
+            "com.beeper.per_message_profile": {
+                "id": "silver", "displayname": "Silver",
+                "avatar_url": "mxc://example.org/silver", "has_fallback": true
+            }
+        }
+    });
+    Mock::given(method("GET"))
+        .and(path_regex(r"/context/.*persona$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "event": message, "events_before": [], "events_after": [],
+            "state": [], "start": "s", "end": "e"
+        })))
+        .mount(server.server())
+        .await;
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 1, "highlight_count": 0}),
+                    )
+                    .add_timeline_event(
+                        ruma::serde::Raw::new(&message)
+                            .unwrap()
+                            .cast_unchecked::<ruma::events::AnySyncTimelineEvent>(),
+                    ),
+            );
+        })
+        .await;
+
+    let view = next_notification(&mut events).await;
+    assert_eq!(view.sender_name.as_deref(), Some("Silver"));
+    assert_eq!(
+        view.sender_avatar_url.as_deref(),
+        Some("mxc://example.org/silver")
+    );
+    assert_eq!(view.body, "hi");
     session.state().session_tasks.lock().clear();
 }

@@ -146,12 +146,14 @@ impl SessionHandler for NotificationParams {
             sync_service: session.sync_service(),
         };
 
-        let mut notification =
-            notifications::notification(client, setup, &self.room_id, &self.event_id).await;
-        if let Some(notification) = notification.as_mut() {
-            session.core().nicknames().apply_notification(notification);
-        }
-        Ok(notification)
+        Ok(notifications::notification(
+            client,
+            setup,
+            &self.room_id,
+            &self.event_id,
+            &session.core().nicknames(),
+        )
+        .await)
     }
 }
 

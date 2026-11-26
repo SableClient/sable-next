@@ -12,6 +12,7 @@ use matrix_sdk_ui::notification_client::{
 };
 use sable_model::text::visible_name;
 
+use crate::nicknames::Nicknames;
 use crate::preview;
 use crate::protocol::{NotificationView, PushEventView, PushFetchView};
 
@@ -193,15 +194,19 @@ pub async fn notification(
     setup: NotificationProcessSetup,
     room_id: &RoomId,
     event_id: &EventId,
+    nicknames: &Nicknames,
 ) -> Option<NotificationView> {
     let notifications = NotificationClient::new(client.clone(), setup).await.ok()?;
 
     match related_notification(&notifications, client, room_id, event_id).await {
         Ok(NotificationStatus::Event(item)) if item.actions.as_deref().is_some_and(notifies) => {
+            let content = event_content(&item);
             let mut view = view(client.user_id()?.to_owned(), room_id, event_id, *item);
             if let Some(room) = client.get_room(room_id) {
                 apply_direct(&room, &mut view).await;
             }
+            nicknames.apply_notification(&mut view);
+            apply_per_message_profile(&mut view, content.as_ref());
             Some(view)
         }
         _ => None,
@@ -213,6 +218,7 @@ pub(crate) async fn foreground_notification(
     room: &matrix_sdk::Room,
     event_id: &EventId,
     discard_undecryptable: bool,
+    nicknames: &Nicknames,
 ) -> Option<NotificationView> {
     match notifications
         .get_notification_with_context(room.room_id(), event_id)
@@ -221,6 +227,7 @@ pub(crate) async fn foreground_notification(
         Ok(NotificationStatus::Event(item))
             if !(discard_undecryptable && still_encrypted(&item.event)) =>
         {
+            let content = event_content(&item);
             let mut view = view(
                 room.own_user_id().to_owned(),
                 room.room_id(),
@@ -228,9 +235,35 @@ pub(crate) async fn foreground_notification(
                 *item,
             );
             apply_direct(room, &mut view).await;
+            nicknames.apply_notification(&mut view);
+            apply_per_message_profile(&mut view, content.as_ref());
             Some(view)
         }
         _ => None,
+    }
+}
+
+fn event_content(item: &NotificationItem) -> Option<serde_json::Value> {
+    match &item.raw_event {
+        RawNotificationEvent::Timeline(raw) => raw.get_field("content").ok().flatten(),
+        RawNotificationEvent::Invite(_) => None,
+    }
+}
+
+/// A per-message profile's name and avatar win over the account's and a nickname, as in the
+/// timeline.
+fn apply_per_message_profile(view: &mut NotificationView, content: Option<&serde_json::Value>) {
+    let Some(profile) = crate::view::per_message_profile(content) else {
+        return;
+    };
+    if let Some(name) = profile.display_name {
+        if profile.has_fallback {
+            view.body = crate::matrix_html::strip_profile_fallback_body(&view.body, Some(&name));
+        }
+        view.sender_name = Some(name);
+    }
+    if let Some(avatar) = profile.avatar_url {
+        view.sender_avatar_url = (!avatar.is_empty()).then_some(avatar);
     }
 }
 
