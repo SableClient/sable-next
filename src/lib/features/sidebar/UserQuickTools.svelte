@@ -50,7 +50,7 @@
 
   let hasAlerts = $derived(alertProviders.some((provider) => provider.priority !== null));
 
-  const messagesHref = $derived(resolve(preferences.showHome ? '/(app)/home' : '/(app)/rooms'));
+  const messagesHref = $derived(resolve(preferences.showHome ? '/(app)/home' : '/(app)/direct'));
   const mobileTools = $derived([
     { href: messagesHref, icon: ChatsIcon, label: 'nav.messages' },
     {
