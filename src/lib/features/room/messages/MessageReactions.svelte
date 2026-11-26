@@ -12,6 +12,7 @@
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
@@ -112,7 +113,8 @@
   });
 
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
-  let mediaHidden = $derived(roomMedia?.hidden ?? false);
+  let revealedImages = $state(false);
+  let mediaHidden = $derived((roomMedia?.hidden ?? false) && !revealedImages);
 </script>
 
 <div class="reactions" aria-label={i18n.t('timeline.reactions')}>
@@ -220,6 +222,16 @@
         : undefined}
     />
   {/each}
+  {#if mediaHidden && customKeys !== ''}
+    <Button
+      size="small"
+      onclick={() => {
+        revealedImages = true;
+      }}
+    >
+      {i18n.t('timeline.showImages')}
+    </Button>
+  {/if}
   {#if actionable && onReact}
     {@const react = onReact}
     <button

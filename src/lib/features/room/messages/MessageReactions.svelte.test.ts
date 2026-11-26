@@ -209,6 +209,44 @@ test('a custom emote reaction shows its shortcode where media previews are off (
   mediaPreviewSettings.global = {};
 });
 
+test('custom emote reactions held by media previews can be shown on request', async () => {
+  Object.assign(core.rpc.packs, { list: vi.fn(() => Promise.resolve({ packs, complete: true })) });
+  mediaPreviewSettings.global = { media_previews: 'off' };
+
+  render(MessageReactionsHarness, {
+    reactions: [{ key: 'mxc://example.org/neocat', senders: ['@alice:example.org'] }],
+    eventId: '$event',
+    currentUserId: null,
+    members: [],
+    roomId: '!emotes-shown:example.org',
+    actionable: false,
+    joinRule: 'invite',
+  });
+
+  await fireEvent.click(await screen.findByRole('button', { name: 'Show images' }));
+
+  expect(document.querySelector('.reaction-image')).not.toBeNull();
+  expect(screen.queryByRole('button', { name: 'Show images' })).toBeNull();
+  mediaPreviewSettings.global = {};
+});
+
+test('plain emoji reactions offer no image reveal where media previews are off', () => {
+  mediaPreviewSettings.global = { media_previews: 'off' };
+
+  render(MessageReactionsHarness, {
+    reactions: [{ key: '👍', senders: ['@alice:example.org'] }],
+    eventId: '$event',
+    currentUserId: null,
+    members: [],
+    roomId: '!emoji-only:example.org',
+    actionable: false,
+    joinRule: 'invite',
+  });
+
+  expect(screen.queryByRole('button', { name: 'Show images' })).toBeNull();
+  mediaPreviewSettings.global = {};
+});
+
 test('plain emoji reactions do not load the room packs', async () => {
   invalidatePacks(core.rpc);
   core.rpc.packs.list.mockClear();
