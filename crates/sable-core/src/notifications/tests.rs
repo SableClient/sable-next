@@ -2115,24 +2115,44 @@ async fn saved_refresh_token(store: &FileSessionStore, store_dir: &std::path::Pa
         .unwrap()
 }
 
-async fn mount_oauth_refresh(server: &MatrixMockServer, expected: u64, delay: std::time::Duration) {
+/// Notifies once the token request reaches the server.
+struct Refresh(
+    std::sync::Arc<tokio::sync::Notify>,
+    wiremock::ResponseTemplate,
+);
+
+impl wiremock::Respond for Refresh {
+    fn respond(&self, _: &wiremock::Request) -> wiremock::ResponseTemplate {
+        self.0.notify_one();
+        self.1.clone()
+    }
+}
+
+async fn mount_oauth_refresh(
+    server: &MatrixMockServer,
+    expected: u64,
+    delay: std::time::Duration,
+) -> std::sync::Arc<tokio::sync::Notify> {
     use wiremock::{
         Mock, ResponseTemplate,
         matchers::{method, path},
     };
 
     server.oauth().mock_server_metadata().ok().mount().await;
+    let requested = std::sync::Arc::new(tokio::sync::Notify::new());
     Mock::given(method("POST"))
         .and(path("/oauth2/token"))
-        .respond_with(
+        .respond_with(Refresh(
+            requested.clone(),
             ResponseTemplate::new(200)
                 .set_body_json(json!({"access_token": "new-access", "expires_in": 300,
                     "refresh_token": "new-refresh", "token_type": "Bearer"}))
                 .set_delay(delay),
-        )
+        ))
         .expect(expected)
         .mount(server.server())
         .await;
+    requested
 }
 
 async fn mount_whoami(server: &MatrixMockServer) {
@@ -2229,7 +2249,7 @@ async fn a_cold_push_cut_short_still_saves_the_rotated_tokens() {
     server.mock_versions().ok().mount().await;
     let (_data_dir, store_dir, store) =
         seeded_cold_store(&oauth_session(&server), "cold-push-cut-short").await;
-    mount_oauth_refresh(&server, 1, std::time::Duration::from_millis(1500)).await;
+    let requested = mount_oauth_refresh(&server, 1, std::time::Duration::from_millis(500)).await;
     mount_whoami(&server).await;
 
     let cold_dir = store_dir.clone();
@@ -2238,16 +2258,18 @@ async fn a_cold_push_cut_short_still_saves_the_rotated_tokens() {
             .enable_all()
             .build()
             .unwrap()
-            .block_on(super::settle_refreshes(tokio::time::timeout(
-                std::time::Duration::from_millis(500),
-                async {
-                    let client = restore_push_client(&cold_dir, &OAUTH_USER, &OAUTH_DEVICE)
-                        .await
-                        .unwrap();
-                    let _ = client.retry(|| client.whoami()).await;
-                },
-            )))
-            .unwrap_err();
+            .block_on(super::settle_refreshes(async {
+                // The push ends while its refresh is still on the wire.
+                tokio::select! {
+                    () = requested.notified() => {}
+                    () = async {
+                        let client = restore_push_client(&cold_dir, &OAUTH_USER, &OAUTH_DEVICE)
+                            .await
+                            .unwrap();
+                        let _ = client.retry(|| client.whoami()).await;
+                    } => panic!("the push finished before its refresh"),
+                }
+            }));
     })
     .await
     .unwrap();
