@@ -830,35 +830,41 @@ impl SessionHandler for UnreadDiagnosticsParams {
                 }
             }
         }
+        let mut thread_reads = Vec::with_capacity(threads.len());
+        for (root, receipts) in threads {
+            let mut read = read_diagnostics(&receipts);
+            if receipts.latest_active.is_none() {
+                read.unread = 0;
+                read.notifying = 0;
+                read.highlight = 0;
+            }
+            let mut receipt_timestamp = None;
+            if let Some((event, ts)) = stored.remove(&root)
+                && (read.receipt_event_id.is_none()
+                    || read.receipt_event_id.as_deref() == Some(event.as_str()))
+            {
+                read.receipt_event_id = Some(event.to_string());
+                receipt_timestamp = ts;
+            } else if let Some(active) = &receipts.latest_active {
+                receipt_timestamp = session
+                    .core()
+                    .with_open_stores(async || {
+                        receipt_event_timestamp(&room, &active.event_id, None).await
+                    })
+                    .await;
+            }
+            thread_reads.push(ThreadReadDiagnostics {
+                root_event_id: root.to_string(),
+                receipt_timestamp,
+                read,
+            });
+        }
         Ok(UnreadDiagnosticsView {
             main: read_diagnostics(&room.read_receipts()),
             server_notifications: count(server.notification_count),
             server_highlights: count(server.highlight_count),
             unthreaded_receipt_timestamp,
-            threads: threads
-                .into_iter()
-                .map(|(root, receipts)| {
-                    let mut read = read_diagnostics(&receipts);
-                    if receipts.latest_active.is_none() {
-                        read.unread = 0;
-                        read.notifying = 0;
-                        read.highlight = 0;
-                    }
-                    let mut receipt_timestamp = None;
-                    if let Some((event, ts)) = stored.remove(&root)
-                        && (read.receipt_event_id.is_none()
-                            || read.receipt_event_id.as_deref() == Some(event.as_str()))
-                    {
-                        read.receipt_event_id = Some(event.to_string());
-                        receipt_timestamp = ts;
-                    }
-                    ThreadReadDiagnostics {
-                        root_event_id: root.to_string(),
-                        receipt_timestamp,
-                        read,
-                    }
-                })
-                .collect(),
+            threads: thread_reads,
         })
     }
 }

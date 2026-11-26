@@ -2011,6 +2011,73 @@ async fn the_root_of_a_viewed_thread_is_read_in_it() {
 }
 
 #[tokio::test]
+async fn reacting_to_a_thread_reply_reads_the_thread_up_to_the_reaction() {
+    use crate::api::timeline::UnreadDiagnosticsParams;
+    use matrix_sdk::ruma::events::receipt::{ReceiptThread, ReceiptType};
+    use matrix_sdk_test::{JoinedRoomBuilder, User, event_factory::EventFactory};
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
+        .build()
+        .await;
+    let me = client.user_id().unwrap().to_owned();
+    let room_id = room_id!("!thread:example.org");
+    let root = event_id!("$root");
+    let factory = EventFactory::new().room(room_id).sender(User::Alice);
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("root").event_id(root).server_ts(1))
+                .add_timeline_event(
+                    factory
+                        .text_msg("reply")
+                        .event_id(event_id!("$reply"))
+                        .in_thread(root, root)
+                        .server_ts(2),
+                )
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$reply"),
+                            &me,
+                            ReceiptType::Read,
+                            ReceiptThread::Thread(root.to_owned()),
+                        )
+                        .into_event(),
+                ),
+        )
+        .await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .reaction(event_id!("$reply"), "x")
+                    .sender(&me)
+                    .event_id(event_id!("$reaction"))
+                    .server_ts(3),
+            ),
+        )
+        .await;
+    let core = core(&server, client).await;
+    let diagnostics = core
+        .run(UnreadDiagnosticsParams {
+            room_id: room_id.to_owned(),
+            thread_roots: vec![root.to_owned()],
+        })
+        .await
+        .unwrap();
+    let thread = &diagnostics.threads[0];
+    assert_eq!(thread.read.unread, 0);
+    assert_eq!(thread.read.receipt_event_id.as_deref(), Some("$reaction"));
+    assert_eq!(thread.receipt_timestamp, Some(3));
+}
+
+#[tokio::test]
 async fn a_thread_timeline_is_already_at_its_end_going_forward() {
     use crate::api::timeline::{PaginateOk, PaginateParams};
     use crate::protocol::PaginationDirection;
