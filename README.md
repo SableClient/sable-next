@@ -89,16 +89,15 @@ flatpak install sable-next-nightly moe.sable.next.electron.Nightly
 
 #### Arch Linux
 
-<a href="https://aur.archlinux.org/packages/sable-bin"><img alt="AUR" src="https://img.shields.io/badge/AUR-1793D1?style=for-the-badge&logo=archlinux&logoColor=white"></a>
+<a href="https://archlinux.org/packages/extra/x86_64/sable/"><img alt="Arch Linux extra" src="https://img.shields.io/badge/Arch_Linux-extra-1793D1?style=for-the-badge&logo=archlinux&logoColor=white"></a>
 
-Install and update using your preferred AUR helper:
+Install from the official repositories:
 
 ```bash
-yay -S sable-bin
-paru -S sable-bin
+sudo pacman -S sable
 ```
 
-Use `sable-nightly-bin` for nightly builds. See the
+For nightly builds, install `sable-nightly-bin` from the AUR with your preferred AUR helper. See the
 [AUR upgrade notes](packaging/aur/README.md) when upgrading older packages.
 
 #### Nix
