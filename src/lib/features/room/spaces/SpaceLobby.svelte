@@ -735,7 +735,7 @@
     {/if}
     <Avatar
       id={spaceId}
-      src={space?.avatar_url ?? null}
+      src={space?.display_avatar_url ?? null}
       openable={true}
       name={space?.name ?? ''}
       size="large"
