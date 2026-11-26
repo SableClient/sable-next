@@ -1093,6 +1093,7 @@ impl Core {
     ) -> matrix_sdk::Result<Vec<u8>> {
         let mut request = client
             .http_client()
+            .raw()
             .get(url.clone())
             .timeout(MEDIA_DOWNLOAD_TIMEOUT);
         if let Some(token) = token {

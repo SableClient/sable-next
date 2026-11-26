@@ -149,7 +149,7 @@ async fn sliding_sync_endpoint_exists(client: &Client) -> bool {
     else {
         return false;
     };
-    let request = client.http_client().post(url).body("{}").send();
+    let request = client.http_client().raw().post(url).body("{}").send();
     match matrix_sdk::timeout::timeout(request, Duration::from_secs(15)).await {
         Ok(Ok(response)) => !matches!(
             response.status(),

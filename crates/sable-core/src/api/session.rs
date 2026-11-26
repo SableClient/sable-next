@@ -187,6 +187,7 @@ async fn delegated_server_software(client: &matrix_sdk::Client) -> Option<Homese
     ) -> Option<T> {
         let response = client
             .http_client()
+            .raw()
             .get(url)
             .send()
             .await
@@ -325,7 +326,8 @@ impl SessionHandler for OauthMetadataParams {
     async fn run(self, session: &SignedIn) -> Result<Option<OAuthMetadataView>, RpcError> {
         let client = session.client();
         Ok(session
-            .core().oauth_metadata(client, "oauth_metadata")
+            .core()
+            .oauth_metadata(client, "oauth_metadata")
             .await?
             .as_ref()
             .map(crate::oauth_metadata::view))
@@ -407,9 +409,11 @@ impl Handler for SetSearchOptionsParams {
         if let Some(session) = &session {
             session.state().search_crawl.lock().tuning = tuning;
         }
-        core.settings.search_crawler_enabled
+        core.settings
+            .search_crawler_enabled
             .store(self.crawler, Ordering::Relaxed);
-        core.settings.server_search_enabled
+        core.settings
+            .server_search_enabled
             .store(self.server_search, Ordering::Relaxed);
         if let Some(session) = &session {
             session

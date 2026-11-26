@@ -16,8 +16,8 @@ rust-version = "1.97.1"
 publish = false
 
 [workspace.dependencies]
-matrix-sdk-common = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "12fdb99c2854803c3122cb735849ce712de08733" }
-matrix-sdk = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "12fdb99c2854803c3122cb735849ce712de08733", default-features = false, features = [
+matrix-sdk-common = { version = "0.20.0", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "680e45366b710d843f4d62c869716e6506ac4086" }
+matrix-sdk = { version = "0.20.0", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "680e45366b710d843f4d62c869716e6506ac4086", default-features = false, features = [
   "e2e-encryption",
   "unstable-msc4274",
   "unstable-msc4354",
@@ -26,16 +26,16 @@ matrix-sdk = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matr
   "experimental-send-custom-to-device",
   "federation-api",
 ] }
-matrix-sdk-ui = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "12fdb99c2854803c3122cb735849ce712de08733", features = [
+matrix-sdk-ui = { version = "0.20.0", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "680e45366b710d843f4d62c869716e6506ac4086", features = [
   "unstable-msc4274",
   "unstable-msc4354",
 ] }
-matrix-sdk-base = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "12fdb99c2854803c3122cb735849ce712de08733", default-features = false, features = [
+matrix-sdk-base = { version = "0.20.0", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "680e45366b710d843f4d62c869716e6506ac4086", default-features = false, features = [
   "e2e-encryption",
 ] }
-matrix-sdk-indexeddb = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "12fdb99c2854803c3122cb735849ce712de08733", default-features = false }
-matrix-sdk-test = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "12fdb99c2854803c3122cb735849ce712de08733" }
-matrix-sdk-test-utils = { version = "0.19.1", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "12fdb99c2854803c3122cb735849ce712de08733" }
+matrix-sdk-indexeddb = { version = "0.20.0", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "680e45366b710d843f4d62c869716e6506ac4086", default-features = false }
+matrix-sdk-test = { version = "0.20.0", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "680e45366b710d843f4d62c869716e6506ac4086" }
+matrix-sdk-test-utils = { version = "0.20.0", git = "https://git.sable.moe/SableClient/matrix-rust-sdk", rev = "680e45366b710d843f4d62c869716e6506ac4086" }
 ruma-html = { version = "0.10", git = "https://github.com/ruma/ruma", rev = "decdf3f6c5160e1db595d4edb4d65d5de935e13c" }
 ruma-common = { version = "0.21", git = "https://github.com/ruma/ruma", rev = "decdf3f6c5160e1db595d4edb4d65d5de935e13c", default-features = false }
 ruma = { version = "0.18", git = "https://github.com/ruma/ruma", rev = "decdf3f6c5160e1db595d4edb4d65d5de935e13c", features = [

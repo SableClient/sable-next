@@ -160,6 +160,7 @@ struct ManagerIn {
 async fn fetch_well_known(client: &matrix_sdk::Client, base: &url::Url) -> Option<Value> {
     let response = client
         .http_client()
+        .raw()
         .get(base.join("/.well-known/matrix/client").ok()?)
         .send()
         .await
@@ -846,6 +847,7 @@ impl SignedIn {
         let response = self
             .client()
             .http_client()
+            .raw()
             .get(terms_url(&manager.api_url))
             .send()
             .await
@@ -879,7 +881,7 @@ impl SignedIn {
             return false;
         };
         url.query_pairs_mut().append_pair("scalar_token", &token);
-        let Ok(response) = client.http_client().get(url).send().await else {
+        let Ok(response) = client.http_client().raw().get(url).send().await else {
             return false;
         };
         response.status() == reqwest::StatusCode::FORBIDDEN
@@ -902,6 +904,7 @@ impl SignedIn {
 
         self.client()
             .http_client()
+            .raw()
             .post(terms_url(&manager.api_url))
             .bearer_auth(token)
             .header("Content-Type", "application/json")
@@ -941,6 +944,7 @@ impl SignedIn {
         let response = self
             .client()
             .http_client()
+            .raw()
             .post(format!("{}/register", api_url.trim_end_matches('/')))
             .header("Content-Type", "application/json")
             .body(
