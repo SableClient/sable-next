@@ -1138,12 +1138,13 @@ jobs:
   distribute-aur:
     name: Publish to the AUR
     needs: [setup-release, github-bundles]
+    # Stable releases ship as `sable` in Arch Linux's extra repository.
+    if: ${{ needs.setup-release.outputs.nightly == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
-      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1163,15 +1164,9 @@ jobs:
             echo '::notice::AUR_KEY is not set; skipping the AUR publish.'
             exit 0
           fi
-          if [ "$IS_NIGHTLY" = 'true' ]; then
-            pkg=sable-nightly-bin
-            pkgver="${VERSION//-/.}"
-            relver="$VERSION"
-          else
-            pkg=sable-bin
-            pkgver="$VERSION"
-            relver=-
-          fi
+          pkg=sable-nightly-bin
+          pkgver="${VERSION//-/.}"
+          relver="$VERSION"
           sha="$(sha256sum "debs/sable-${VERSION}-amd64.deb" | awk '{print $1}')"
 
           mkdir -p ~/.ssh
