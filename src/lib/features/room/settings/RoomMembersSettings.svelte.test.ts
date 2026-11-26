@@ -6,6 +6,7 @@ import { expect, test, vi } from 'vitest';
 
 import { CoreError } from '#src/transport';
 import type {
+  CoreEvent,
   InviteHistoryView,
   MemberView,
   PowerLevelTagView,
@@ -134,6 +135,28 @@ test('offers approval and denial for join requests', async () => {
     room_id: '!room:example.org',
     memberships: ['knock'],
   });
+});
+
+test('shows a join request as soon as the room members change', async () => {
+  const requester: MemberView = { ...alice, membership: 'knock' };
+  let emit!: (event: CoreEvent) => void;
+  core.subscribeEvents.mockImplementationOnce((listener) => {
+    emit = listener;
+    return () => {};
+  });
+  core.rpc.members.list.mockResolvedValue([]);
+  render(RoomMembersSettings, { room, permissions: { ...permissions, can_invite: true } });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('radio', { name: 'Requests' }));
+  await screen.findByText('No pending join requests.');
+  const loads = core.rpc.members.list.mock.calls.length;
+
+  core.rpc.members.list.mockResolvedValue([requester]);
+  emit({ type: 'members_changed', room_id: '!other:example.org', member: requester });
+  expect(core.rpc.members.list).toHaveBeenCalledTimes(loads);
+  emit({ type: 'members_changed', room_id: room.room_id, member: requester });
+
+  expect(await screen.findByText('Alice')).toBeInTheDocument();
 });
 
 test.each(['Approve', 'Deny'])('answers a join request with %s', async (action) => {

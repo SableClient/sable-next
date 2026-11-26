@@ -133,6 +133,12 @@
     void load();
   });
 
+  $effect(() =>
+    core.subscribeEvents((event) => {
+      if (event.type === 'members_changed' && event.room_id === roomId) void load();
+    })
+  );
+
   $effect(() => {
     const target = roomId;
     if (!target) return;

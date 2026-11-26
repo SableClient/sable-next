@@ -3,6 +3,7 @@ import { defaultE2eePolicy } from '#lib/deployment/e2ee-policy.js';
 import { MemberPreviews } from '#lib/rooms/member-previews.svelte.js';
 import {
   createRpc,
+  type CoreEvent,
   type OAuthMetadataView,
   type RecentUse,
   type Rpc,
@@ -52,7 +53,7 @@ export function createCoreStub<T extends Record<string, unknown> & { rpc?: RpcOv
       Promise.reject(new Error('profile unavailable'))
     ),
     e2eePolicy: vi.fn(() => Promise.resolve(defaultE2eePolicy)),
-    subscribeEvents: vi.fn(() => () => {}),
+    subscribeEvents: vi.fn<(listener: (event: CoreEvent) => void) => () => void>(() => () => {}),
     onProfileChanged: vi.fn(() => () => {}),
     oauthMetadata: null as OAuthMetadataView | null,
     rpc: mockRpc(
