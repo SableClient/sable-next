@@ -724,10 +724,6 @@
     );
   }
 
-  .resting .media:not(.with-notice) {
-    padding-block-start: var(--space-300);
-  }
-
   .resting .media.native-video {
     padding-block-end: var(--space-300);
   }
