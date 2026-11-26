@@ -1620,6 +1620,7 @@ pub struct ForwardedView {
     pub timestamp: Option<u64>,
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub room_id: Option<OwnedRoomId>,
+    pub room_name: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub event_id: Option<OwnedEventId>,
     #[cfg_attr(feature = "typegen", specta(optional, type = Option<String>))]

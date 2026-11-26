@@ -417,6 +417,7 @@ export type FieldEdit = { kind: "keep" } | { kind: "clear" } | { kind: "set"; va
 export type ForwardedView = {
 	timestamp: number | null,
 	room_id: string | null,
+	room_name: string | null,
 	event_id: string | null,
 	sender: string | null,
 	content_valid: boolean | null,

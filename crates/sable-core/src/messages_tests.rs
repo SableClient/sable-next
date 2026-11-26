@@ -308,6 +308,8 @@ fn forwarding_a_forward_keeps_the_original_attribution() {
     let forwarded = json!({
         "sender": "@alice:x",
         "origin_server_ts": 1,
+        "room_name": "Origin",
+        "room_avatar_url": "mxc://x/origin",
         "content": {
             "msgtype": "m.text",
             "body": "original",
@@ -1098,6 +1100,76 @@ async fn forwarding_without_metadata_keeps_only_required_content() {
             &target.to_owned(),
             None,
             false,
+        )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn forwarding_from_a_public_room_names_the_room() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let source = room_id!("!source:example.org");
+    let target = room_id!("!target:example.org");
+    let factory = matrix_sdk_test::event_factory::EventFactory::new()
+        .room(source)
+        .sender(user_id!("@alice:example.org"));
+    server
+        .sync_room(
+            &client,
+            matrix_sdk_test::JoinedRoomBuilder::new(source)
+                .add_state_event(
+                    factory.room_join_rules(ruma::events::room::join_rules::JoinRule::Public),
+                )
+                .add_state_event(factory.room_name("Announcements"))
+                .add_state_event(
+                    factory
+                        .room_avatar()
+                        .url(ruma::mxc_uri!("mxc://example.org/a")),
+                ),
+        )
+        .await;
+    server.sync_joined_room(&client, target).await;
+    server.mock_room_state_encryption().plain().mount().await;
+    let original = json!({"type": "m.room.message", "event_id": "$original", "sender": "@alice:example.org", "origin_server_ts": 1,
+            "room_id": source, "content": {"msgtype": "m.text", "body": "original"}});
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{source}/event/$original"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(original))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/_matrix/client/v1/rooms/{source}/relations/$original/m.replace"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(wiremock::matchers::path_regex(format!(
+            "/_matrix/client/v3/rooms/{target}/send/m.room.message/.*"
+        )))
+        .and(|request: &wiremock::Request| {
+            let body: Value = request.body_json().unwrap();
+            let forwarded = &body["org.matrix.msc4553.forwarded"];
+            forwarded["room_name"] == "Announcements"
+                && forwarded["room_avatar_url"] == "mxc://example.org/a"
+        })
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$forward"})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let session = core.signed_in().unwrap();
+    session
+        .forward_message(
+            &source.to_owned(),
+            &event_id!("$original").to_owned(),
+            &target.to_owned(),
+            None,
+            true,
         )
         .await
         .unwrap();

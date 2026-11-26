@@ -78,6 +78,8 @@ struct ForwardIn {
     #[serde_as(deserialize_as = "DefaultOnError")]
     room_id: Option<String>,
     #[serde_as(deserialize_as = "DefaultOnError")]
+    room_name: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnError")]
     event_id: Option<String>,
     #[serde_as(deserialize_as = "DefaultOnError")]
     sender: Option<String>,
@@ -97,6 +99,7 @@ pub(super) fn forward_meta(content: &serde_json::Value) -> Option<ForwardedView>
         return Some(ForwardedView {
             timestamp: meta.timestamp,
             room_id: (!private).then(|| meta.room_id?.try_into().ok()).flatten(),
+            room_name: None,
             event_id: (!private).then(|| meta.event_id?.try_into().ok()).flatten(),
             sender: None,
             content_valid: None,
@@ -109,6 +112,7 @@ fn forward_view(meta: ForwardIn, content_valid: Option<bool>) -> ForwardedView {
     ForwardedView {
         timestamp: meta.origin_server_ts,
         room_id: meta.room_id.and_then(|room| room.try_into().ok()),
+        room_name: meta.room_name,
         event_id: meta.event_id.and_then(|event| event.try_into().ok()),
         sender: meta.sender.and_then(|sender| sender.try_into().ok()),
         content_valid,
@@ -194,7 +198,19 @@ mod tests {
             meta.event_id.as_deref().map(ruma::EventId::as_str),
             Some("$event")
         );
+        assert_eq!(meta.room_name, None);
         assert_eq!(meta.content_valid, Some(true));
+
+        let named = forward_meta(&json!({
+            "msgtype": "m.text",
+            "body": "fallback",
+            "org.matrix.msc4553.forwarded": {
+                "room_name": "Announcements",
+                "content": { "msgtype": "m.text", "body": "hi" }
+            }
+        }))
+        .unwrap();
+        assert_eq!(named.room_name.as_deref(), Some("Announcements"));
 
         let bare = forward_meta(&json!({
             "msgtype": "m.text",
@@ -257,5 +273,12 @@ mod tests {
         }))
         .expect("forwarded");
         assert_eq!(falls_through.timestamp, Some(9));
+
+        let unnamed = forward_meta(&json!({
+            "org.matrix.msc4553.forwarded": { "room_name": 5, "origin_server_ts": 2 }
+        }))
+        .expect("forwarded");
+        assert_eq!(unnamed.room_name, None);
+        assert_eq!(unnamed.timestamp, Some(2));
     }
 }

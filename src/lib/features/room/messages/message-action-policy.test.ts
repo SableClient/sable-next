@@ -81,7 +81,14 @@ test('local sends expose only actions that do not require a server event', () =>
 
 test('forwarded messages cannot be edited', () => {
   const actions = policy({
-    forwarded: { sender: null, content_valid: null, timestamp: 1, room_id: null, event_id: null },
+    forwarded: {
+      sender: null,
+      content_valid: null,
+      timestamp: 1,
+      room_id: null,
+      room_name: null,
+      event_id: null,
+    },
   });
 
   expect(actions.edit).toBe(false);
@@ -168,7 +175,14 @@ test('an attachment is not edited by someone else, nor once forwarded', () => {
   expect(
     policy({
       content,
-      forwarded: { sender: null, content_valid: null, timestamp: 1, room_id: null, event_id: null },
+      forwarded: {
+        sender: null,
+        content_valid: null,
+        timestamp: 1,
+        room_id: null,
+        room_name: null,
+        event_id: null,
+      },
     }).edit
   ).toBe(false);
 });

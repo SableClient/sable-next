@@ -989,6 +989,12 @@ impl SignedIn {
         if include_metadata && public {
             origin.insert("event_id".to_owned(), event_id.to_string().into());
             origin.insert("room_id".to_owned(), room_id.to_string().into());
+            if let Some(name) = source.cached_display_name() {
+                origin.insert("room_name".to_owned(), name.to_string().into());
+            }
+            if let Some(avatar) = source.avatar_url() {
+                origin.insert("room_avatar_url".to_owned(), avatar.to_string().into());
+            }
             origin.insert("sender".to_owned(), message.sender().to_string().into());
         }
         let attributed = prior_forward(&source_content)

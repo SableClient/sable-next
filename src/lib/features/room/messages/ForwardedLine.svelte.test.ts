@@ -33,6 +33,7 @@ test('a forward from a joined room links to the original', () => {
       content_valid: null,
       timestamp: null,
       room_id: '!origin:example.org',
+      room_name: null,
       event_id: '$event',
     },
     roomId: '!here:example.org',
@@ -44,6 +45,43 @@ test('a forward from a joined room links to the original', () => {
   );
 });
 
+test('a forward from an unjoined room uses the name it carries', () => {
+  render(ForwardedLine, {
+    forwarded: {
+      sender: null,
+      content_valid: null,
+      timestamp: null,
+      room_id: '!origin:example.org',
+      room_name: 'Announcements',
+      event_id: '$event',
+    },
+    roomId: '!here:example.org',
+  });
+
+  expect(screen.getByRole('link', { name: 'Forwarded from Announcements' })).toBeInTheDocument();
+});
+
+test('a joined room name wins over the name the forward carries', () => {
+  rooms.push({
+    room_id: '!origin:example.org',
+    name: 'Origin',
+    display_name: 'Origin',
+  } as RoomListItemView);
+  render(ForwardedLine, {
+    forwarded: {
+      sender: null,
+      content_valid: null,
+      timestamp: null,
+      room_id: '!origin:example.org',
+      room_name: 'Announcements',
+      event_id: '$event',
+    },
+    roomId: '!here:example.org',
+  });
+
+  expect(screen.getByRole('link', { name: 'Forwarded from Origin' })).toBeInTheDocument();
+});
+
 test('a forward from earlier in the room jumps in place', async () => {
   const user = userEvent.setup();
   const onJumpToEvent = vi.fn();
@@ -53,6 +91,7 @@ test('a forward from earlier in the room jumps in place', async () => {
       content_valid: null,
       timestamp: null,
       room_id: '!here:example.org',
+      room_name: null,
       event_id: '$event',
     },
     roomId: '!here:example.org',
@@ -70,6 +109,7 @@ test('a private forward names no origin', () => {
       content_valid: null,
       timestamp: null,
       room_id: null,
+      room_name: null,
       event_id: null,
     },
     roomId: '!here:example.org',
