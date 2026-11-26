@@ -604,6 +604,37 @@ test('media is held behind a prompt where the media preview setting says so (MSC
   mediaPreviewSettings.global = {};
 });
 
+test('an image caption stays visible while the image is held behind the prompt', () => {
+  mediaPreviewSettings.global = { media_previews: 'private' };
+  render(MessageBodyMediaHarness, {
+    props: { item: item(attachment('image')), joinRule: 'public' },
+  });
+
+  expect(screen.getByRole('button', { name: 'Show media' })).toBeInTheDocument();
+  expect(document.querySelector('.privacy-media')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '@ana' })).toBeInTheDocument();
+  mediaPreviewSettings.global = {};
+});
+
+test('a gallery caption stays visible while the gallery is held behind the prompt', () => {
+  mediaPreviewSettings.global = { media_previews: 'private' };
+  render(MessageBodyMediaHarness, {
+    props: {
+      item: item({
+        kind: 'gallery',
+        body: 'Ana',
+        html: '<a href="https://matrix.to/#/@ana:example.org">Ana</a>',
+        items: [],
+      }),
+      joinRule: 'public',
+    },
+  });
+
+  expect(screen.getByRole('button', { name: 'Show media' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '@ana' })).toBeInTheDocument();
+  mediaPreviewSettings.global = {};
+});
+
 test('media shows at once in a private room under the private setting', () => {
   mediaPreviewSettings.global = { media_previews: 'private' };
   render(MessageBodyMediaHarness, {

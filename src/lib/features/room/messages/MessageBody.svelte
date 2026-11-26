@@ -107,10 +107,12 @@
       spoiler === null ? 'timeline.hiddenMedia' : 'timeline.spoilerMedia'
     )}
   </Button>
-  {#if item.content.kind === 'video' && showCaption && item.content.html}
+  {#if (item.content.kind === 'video' || item.content.kind === 'image') && showCaption && item.content.html}
     <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
-  {:else if item.content.kind === 'video' && showCaption && item.content.caption}
+  {:else if (item.content.kind === 'video' || item.content.kind === 'image') && showCaption && item.content.caption}
     <p class="body" dir="auto">{item.content.caption}</p>
+  {:else if item.content.kind === 'gallery' && showCaption && item.content.body}
+    <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
   {/if}
 {:else if item.content.kind === 'redacted'}
   {@const reason = item.content.reason ?? redactionReason}
