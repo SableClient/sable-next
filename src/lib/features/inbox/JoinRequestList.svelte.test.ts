@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import type {
+  CoreEvent,
   InviteHistoryView,
   MemberView,
   RoomPermissionsView,
@@ -120,6 +121,27 @@ test('loads all requests with one RPC on mount and each room-list update', async
   });
   expect(core.rpc.members.permissions).not.toHaveBeenCalled();
   expect(core.rpc.members.list).not.toHaveBeenCalled();
+});
+
+test('loads again when someone asks to join a room', async () => {
+  let emit!: (event: CoreEvent) => void;
+  core.subscribeEvents.mockImplementationOnce((listener) => {
+    emit = listener;
+    return () => {};
+  });
+  render(JoinRequestList);
+  await screen.findByText('Alice');
+
+  emit({
+    type: 'members_changed',
+    room_id: room.room_id,
+    member: { ...alice, membership: 'join' },
+  });
+  emit({ type: 'members_changed', room_id: room.room_id, member: alice });
+
+  await vi.waitFor(() => {
+    expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(2);
+  });
 });
 
 test('sorts newest requests first and keeps room-list order for equal timestamps', async () => {

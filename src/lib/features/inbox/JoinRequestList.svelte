@@ -40,6 +40,12 @@
     };
   });
 
+  $effect(() =>
+    core.subscribeEvents((event) => {
+      if (event.type === 'members_changed' && event.member?.membership === 'knock') void load();
+    })
+  );
+
   async function load(): Promise<void> {
     const current = ++run;
     loading = true;
