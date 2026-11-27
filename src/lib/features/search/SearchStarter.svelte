@@ -90,7 +90,13 @@
 
   @media (pointer: coarse) {
     .starter-filter {
-      min-block-size: var(--target-hit);
+      position: relative;
+    }
+
+    .starter-filter::after {
+      content: '';
+      inset: calc((100% - var(--target-hit)) / 2) 0;
+      position: absolute;
     }
   }
 </style>
