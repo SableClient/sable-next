@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use futures_util::future::join_all;
 use matrix_sdk::deserialized_responses::TimelineEvent;
+use matrix_sdk::media::{MediaFormat, MediaRequestParameters};
 use matrix_sdk::room::edit::EditedContent;
 use matrix_sdk::room::{IncludeRelations, MessagesOptions, RelationsOptions};
 use matrix_sdk::ruma::api::Direction;
@@ -18,6 +19,7 @@ use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
 use matrix_sdk::ruma::events::room::pinned_events::RoomPinnedEventsEventContent;
+use matrix_sdk::ruma::events::room::{EncryptedFile, MediaSource};
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::{
     AnyMessageLikeEventContent, AnySyncTimelineEvent, Mentions, StateEventType,
@@ -972,11 +974,15 @@ impl SignedIn {
                     .ok()?;
                 latest_message(&edit)?.as_object().cloned()
             });
-        let source_content = match (edited, original) {
+        let mut source_content = match (edited, original) {
             (Some(edited), _) => edited,
             (None, serde_json::Value::Object(original)) => original,
             (None, _) => return Err(RpcCode::Unsupported.into()),
         };
+        let target = self.room(to_room_id)?;
+        publish_encrypted_media(&target, &mut source_content)
+            .await
+            .or_failed(self.core(), "forward_message")?;
 
         let public = matches!(source.join_rule(), Some(JoinRule::Public));
         let mut origin = serde_json::Map::new();
@@ -1028,7 +1034,7 @@ impl SignedIn {
             );
         }
 
-        self.room(to_room_id)?
+        target
             .send_raw(event_type, content)
             .await
             .or_failed(self.core(), "forward_message")?;
@@ -1292,6 +1298,89 @@ pub(crate) fn raw_content(event: &TimelineEvent) -> Option<serde_json::Value> {
         .get_field::<serde_json::Value>("content")
         .ok()
         .flatten()
+}
+
+/// An encrypted file carries its key in the event, so an unencrypted room gets a plain
+/// copy of the media instead of the key.
+async fn publish_encrypted_media(
+    target: &matrix_sdk::Room,
+    content: &mut serde_json::Map<String, serde_json::Value>,
+) -> matrix_sdk::Result<()> {
+    if target.latest_encryption_state().await?.is_encrypted() {
+        return Ok(());
+    }
+    let mut found = Vec::new();
+    each_object(content, &mut |object| {
+        for (sealed, _, info) in ENCRYPTED_MEDIA {
+            if let Some(file) = object.get(sealed).and_then(as_encrypted_file) {
+                let mime = object
+                    .get(info)
+                    .and_then(|info| info.get("mimetype")?.as_str());
+                found.push((file, mime.and_then(|mime| mime.parse().ok())));
+            }
+        }
+    });
+    let client = target.client();
+    let mut plain = HashMap::new();
+    for (file, mime) in found {
+        if plain.contains_key(&file.url) {
+            continue;
+        }
+        let request = MediaRequestParameters {
+            source: MediaSource::Encrypted(Box::new(file.clone())),
+            format: MediaFormat::File,
+        };
+        let bytes = client.media().get_media_content(&request, true).await?;
+        let mime = mime.unwrap_or(mime::APPLICATION_OCTET_STREAM);
+        let uploaded = client.media().upload(&mime, bytes, None).await?;
+        plain.insert(file.url, uploaded.content_uri);
+    }
+    // Any other encrypted file, such as a link preview image, is dropped with its key.
+    each_object(content, &mut |object| {
+        for (sealed, open, _) in ENCRYPTED_MEDIA {
+            let uri = object
+                .get(sealed)
+                .and_then(as_encrypted_file)
+                .and_then(|file| plain.get(&file.url));
+            if let Some(uri) = uri {
+                object.insert(open.to_owned(), uri.to_string().into());
+            }
+        }
+        object.retain(|_, child| as_encrypted_file(child).is_none());
+    });
+    Ok(())
+}
+
+/// The encrypted key, its plain counterpart and the sibling that holds its type.
+const ENCRYPTED_MEDIA: [(&str, &str, &str); 2] = [
+    ("file", "url", "info"),
+    ("thumbnail_file", "thumbnail_url", "thumbnail_info"),
+];
+
+fn as_encrypted_file(value: &serde_json::Value) -> Option<EncryptedFile> {
+    value.get("key")?;
+    serde_json::from_value(value.clone()).ok()
+}
+
+fn each_object(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    visit: &mut impl FnMut(&mut serde_json::Map<String, serde_json::Value>),
+) {
+    visit(object);
+    for child in object.values_mut() {
+        match child {
+            serde_json::Value::Object(child) => each_object(child, visit),
+            serde_json::Value::Array(items) => {
+                for item in items
+                    .iter_mut()
+                    .filter_map(serde_json::Value::as_object_mut)
+                {
+                    each_object(item, visit);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 fn is_valid_forward_content(content: &serde_json::Value, event_type: &str) -> bool {

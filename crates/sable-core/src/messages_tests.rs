@@ -1668,6 +1668,130 @@ async fn forwarding_media_from_a_private_room_keeps_the_attachment() {
         .unwrap();
 }
 
+async fn mock_unedited_event(
+    server: &MatrixMockServer,
+    room: &ruma::RoomId,
+    event: &str,
+    content: Value,
+) {
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{room}/event/{event}"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "type": "m.room.message", "event_id": event, "sender": "@alice:example.org",
+            "origin_server_ts": 1, "room_id": room, "content": content
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/_matrix/client/v1/rooms/{room}/relations/{event}/m.replace"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
+        .mount(server.server())
+        .await;
+}
+
+#[tokio::test]
+async fn forwarding_encrypted_media_to_an_unencrypted_room_sends_a_plain_copy() {
+    use std::io::Read;
+
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![ruma::api::MatrixVersion::V1_11])
+        .build()
+        .await;
+    let source = room_id!("!source:example.org");
+    let target = room_id!("!target:example.org");
+    server.sync_joined_room(&client, source).await;
+    server.sync_joined_room(&client, target).await;
+    server.mock_room_state_encryption().plain().mount().await;
+
+    let plaintext = b"a picture".to_vec();
+    let mut cursor = std::io::Cursor::new(plaintext.clone());
+    let mut encryptor = matrix_sdk_base::crypto::AttachmentEncryptor::new(&mut cursor);
+    let mut ciphertext = Vec::new();
+    encryptor.read_to_end(&mut ciphertext).unwrap();
+    let keys = encryptor.finish();
+    let file = |media: &str| {
+        ruma::events::room::EncryptedFile::new(
+            ruma::OwnedMxcUri::from(format!("mxc://example.org/{media}")),
+            keys.encryption_info.clone(),
+            keys.hashes.clone(),
+        )
+    };
+    for media in ["sealed", "sealedthumb"] {
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v1/media/download/example.org/{media}"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(ciphertext.clone()))
+            .mount(server.server())
+            .await;
+    }
+    let content = json!({
+        "msgtype": "m.image", "body": "cat.png", "file": file("sealed"),
+        "info": {
+            "mimetype": "image/png",
+            "thumbnail_file": file("sealedthumb"),
+            "thumbnail_info": {"mimetype": "image/png"}
+        }
+    });
+    mock_unedited_event(&server, source, "$image", content).await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/config"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"m.upload.size": 1_000_000})))
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/media/v3/upload"))
+        .and(wiremock::matchers::header("content-type", "image/png"))
+        .and(move |request: &wiremock::Request| request.body == plaintext)
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "content_uri": "mxc://example.org/plain",
+        })))
+        .expect(2)
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(wiremock::matchers::path_regex(format!(
+            "/_matrix/client/v3/rooms/{target}/send/m.room.message/.*"
+        )))
+        .and(wiremock::matchers::body_partial_json(json!({
+            "msgtype": "m.image",
+            "url": "mxc://example.org/plain",
+            "info": {"thumbnail_url": "mxc://example.org/plain"},
+            "org.matrix.msc4553.forwarded": {"content": {
+                "url": "mxc://example.org/plain",
+                "info": {"thumbnail_url": "mxc://example.org/plain"}
+            }}
+        })))
+        .and(|request: &wiremock::Request| {
+            let body = String::from_utf8_lossy(&request.body);
+            !["\"file\"", "thumbnail_file", "\"iv\"", "sealed"]
+                .iter()
+                .any(|leak| body.contains(leak))
+        })
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$forward"})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let session = core.signed_in().unwrap();
+    session
+        .forward_message(
+            &source.to_owned(),
+            &event_id!("$image").to_owned(),
+            &target.to_owned(),
+            None,
+            true,
+        )
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
 async fn a_queued_message_is_cancelled_through_its_send_queue_handle() {
     let server = MatrixMockServer::new().await;
