@@ -216,8 +216,8 @@ importers:
         specifier: ^0.8.0
         version: 0.8.0
       '@sableclient/twemoji-font':
-        specifier: ^1.0.4
-        version: 1.0.4
+        specifier: ^1.1.2
+        version: 1.1.2
       '@sapphi-red/web-noise-suppressor':
         specifier: 0.4.1
         version: 0.4.1(patch_hash=04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828)
@@ -2582,8 +2582,8 @@ packages:
   '@sableclient/tauri-plugin-livekit-mobile@0.8.0':
     resolution: {integrity: sha512-Vd/faMbKh/DkikDjcNN7jp6dMMGeDWlPxb/2Y1oN4ENM5N7jtVVQLZ9x2YN6CS0TzHHbkmU2mtdNciG+zt3U5A==}
 
-  '@sableclient/twemoji-font@1.0.4':
-    resolution: {integrity: sha512-LzvQB/VZtv5KEq1VYq2azr7v7cYT8oklOVRGkAN2RNwa3sF0XcnqM3lBHSYRFXQleGLSUgs3gA0slbwkD2+sJw==}
+  '@sableclient/twemoji-font@1.1.2':
+    resolution: {integrity: sha512-4W8djBqzHnhs+rE6BcF44ovzfXApgIU8jZeqNsCJVByqDcmh/9KGhB6gJ/Z8daAbzFZxxumXe4y8peIdqV+hJA==}
 
   '@sapphi-red/web-noise-suppressor@0.4.1':
     resolution: {integrity: sha512-hy2GnF079+zi4n9BZUf+GGIQ1IofApAk6rgGMyMQ3soHfz/GKu1pcCsmePyIHVvUuv1LrFudw9BmmBqoOKay5w==}
@@ -7954,7 +7954,7 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.12.5
 
-  '@sableclient/twemoji-font@1.0.4': {}
+  '@sableclient/twemoji-font@1.1.2': {}
 
   '@sapphi-red/web-noise-suppressor@0.4.1(patch_hash=04511f6908145288b825d9dbf66c17aaa96ae9c5594a38cf4133602fc8ad6828)': {}
 
