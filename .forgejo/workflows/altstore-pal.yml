@@ -14,7 +14,7 @@ jobs:
   publish:
     name: Publish AltStore PAL source
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -60,8 +60,24 @@ jobs:
         env:
           ADP_ID: ${{ steps.live.outputs.adpID }}
         run: |
-          curl -fsS "https://api.altstore.io/adps/$ADP_ID" -o adp-status.json
-          url="$(node -p 'require("./adp-status.json").downloadURL ?? ""')"
+          # AltStore only knows the packages Apple notified it about, and takes a few
+          # minutes to process one it is asked for.
+          url=''
+          for _ in $(seq 20); do
+            status="$(curl -sS -o adp-status.json -w '%{http_code}' "https://api.altstore.io/adps/$ADP_ID")"
+            if [ "$status" = 404 ]; then
+              curl -fsS -X POST -H 'Content-Type: application/json' \
+                -d "{\"adpID\":\"$ADP_ID\"}" https://api.altstore.io/adps
+              echo "Asked AltStore to process $ADP_ID."
+            elif [ "$status" != 200 ]; then
+              echo "AltStore answered $status for $ADP_ID: $(cat adp-status.json)"
+              exit 1
+            else
+              url="$(node -p 'require("./adp-status.json").downloadURL ?? ""')"
+              [ -z "$url" ] || break
+            fi
+            sleep 30
+          done
           if [ -z "$url" ]; then
             echo "AltStore is still processing $ADP_ID: $(cat adp-status.json)"
             echo 'ready=false' >> "$GITHUB_OUTPUT"
