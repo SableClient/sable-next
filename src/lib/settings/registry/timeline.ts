@@ -164,26 +164,6 @@ export const timelineCategory: SettingsCategory = {
       ],
     },
     {
-      key: 'doubleTapReact',
-      section: 'messages',
-      icon: HeartIcon,
-      name: 'settings.doubleTapReact',
-      type: 'boolean',
-      supported: supportsTouch,
-    },
-    {
-      key: 'messageSwipeAction',
-      section: 'messages',
-      icon: HandSwipeLeftIcon,
-      name: 'settings.messageSwipeAction',
-      type: 'select',
-      options: [
-        { value: 'reply', label: 'settings.messageSwipeActionReply' },
-        { value: 'members', label: 'settings.messageSwipeActionMembers' },
-      ],
-      supported: supportsTouch,
-    },
-    {
       key: 'showSingleReactionCount',
       section: 'messages',
       icon: SmileyIcon,
@@ -204,6 +184,26 @@ export const timelineCategory: SettingsCategory = {
       name: 'settings.hideMessageShields',
       description: 'settings.hideMessageShieldsHint',
       type: 'boolean',
+    },
+    {
+      key: 'messageSwipeAction',
+      section: 'messages',
+      icon: HandSwipeLeftIcon,
+      name: 'settings.messageSwipeAction',
+      type: 'select',
+      options: [
+        { value: 'reply', label: 'settings.messageSwipeActionReply' },
+        { value: 'members', label: 'settings.messageSwipeActionMembers' },
+      ],
+      supported: supportsTouch,
+    },
+    {
+      key: 'doubleTapReact',
+      section: 'messages',
+      icon: HeartIcon,
+      name: 'settings.doubleTapReact',
+      type: 'boolean',
+      supported: supportsTouch,
     },
     {
       key: 'hideMembershipEvents',
