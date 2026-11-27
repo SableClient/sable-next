@@ -112,6 +112,7 @@
       label: entry.stable ? entry.id : i18n.t('room.createVersionUnstable', { version: entry.id }),
     })),
   ]);
+  let suggestionList = $state<UserSuggestionList>();
   let suggestions = $derived(
     directory.results.filter(
       (entry) => entry.user_id !== inviteDraft.trim() && !invites.includes(entry.user_id)
@@ -180,7 +181,8 @@
   }
 
   function onInviteKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' || isComposingKey(event)) return;
+    if (isComposingKey(event) || suggestionList?.handleKey(event)) return;
+    if (event.key !== 'Enter') return;
     // Enter adds the invite; the form must not submit.
     event.preventDefault();
     addInvite();
@@ -530,6 +532,11 @@
     <div class="invite-row">
       <TextInput
         id="create-room-invite"
+        role="combobox"
+        aria-expanded={suggestions.length > 0}
+        aria-controls={suggestions.length > 0 ? 'create-room-invite-suggestions' : undefined}
+        aria-activedescendant={suggestionList?.activeOptionId()}
+        aria-autocomplete="list"
         bind:value={() => inviteDraft, setInviteDraft}
         autocomplete="off"
         placeholder={i18n.t('room.createInvitePlaceholder')}
@@ -545,7 +552,12 @@
       </Button>
     </div>
     {#if suggestions.length > 0}
-      <UserSuggestionList entries={suggestions} onSelect={addInvite} />
+      <UserSuggestionList
+        bind:this={suggestionList}
+        id="create-room-invite-suggestions"
+        entries={suggestions}
+        onSelect={addInvite}
+      />
     {/if}
     {#if inviteInvalid}
       <p class="error">{i18n.t('common.userIdFormatHint')}</p>

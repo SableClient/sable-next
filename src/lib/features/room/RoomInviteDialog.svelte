@@ -56,6 +56,7 @@
     return i18n.t(historyShared ? 'room.inviteHistoryShared' : 'room.inviteHistoryHidden');
   });
   let suggestions = $derived(directory.results.filter((entry) => entry.user_id !== draft.trim()));
+  let suggestionList = $state<UserSuggestionList>();
 
   $effect(() => {
     void roomId;
@@ -219,10 +220,16 @@
       <FormField fieldId="room-invite-user" label={i18n.t('common.invitePeople')}>
         <TextInput
           id="room-invite-user"
+          role="combobox"
+          aria-expanded={suggestions.length > 0}
+          aria-controls={suggestions.length > 0 ? 'room-invite-suggestions' : undefined}
+          aria-activedescendant={suggestionList?.activeOptionId()}
+          aria-autocomplete="list"
           bind:value={() => draft, setDraft}
           placeholder={i18n.t('room.createInvitePlaceholder')}
           onkeydown={(event: KeyboardEvent) => {
-            if (event.key !== 'Enter' || isComposingKey(event)) return;
+            if (isComposingKey(event) || suggestionList?.handleKey(event)) return;
+            if (event.key !== 'Enter') return;
             event.preventDefault();
             void invite();
           }}
@@ -231,6 +238,8 @@
 
       {#if suggestions.length > 0}
         <UserSuggestionList
+          bind:this={suggestionList}
+          id="room-invite-suggestions"
           entries={suggestions}
           onSelect={(userId) => {
             setDraft(userId);

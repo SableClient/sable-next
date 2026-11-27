@@ -4,6 +4,7 @@
 
   import '#lib/ui/primitives/menu.css';
   import { i18n } from '#lib/i18n.js';
+  import { keepInView } from '#lib/ui/keep-in-view.js';
   import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import { suppressBanners } from '#lib/ui/banner-suppression.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -23,10 +24,6 @@
   let { id, optionId, heading, suggestions, active, onSelect }: Props = $props();
 
   $effect(suppressBanners);
-
-  function keepActiveInView(node: HTMLElement): void {
-    node.querySelector(`[data-index="${String(active)}"]`)?.scrollIntoView({ block: 'nearest' });
-  }
 </script>
 
 <div
@@ -37,7 +34,7 @@
   {#if suggestions.length === 0}
     <p class="empty">{i18n.t('composer.noSuggestions')}</p>
   {/if}
-  <ul {id} role="listbox" aria-labelledby="{id}-heading" {@attach keepActiveInView}>
+  <ul {id} role="listbox" aria-labelledby="{id}-heading" {@attach keepInView(() => active)}>
     {#if suggestions.length > 0}
       {#each suggestions as suggestion, index (suggestion.id)}
         {@const isUnicodeEmoji = suggestion.id.startsWith('emoji:')}

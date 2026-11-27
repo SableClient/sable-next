@@ -1,25 +1,68 @@
 <script lang="ts">
   import type { UserDirectoryEntryView } from '#src/generated/protocol';
 
+  import { i18n } from '#lib/i18n.js';
+  import { keepInView } from '#lib/ui/keep-in-view.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import '#lib/ui/primitives/menu.css';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   interface Props {
+    /** The listbox id the field names in `aria-controls`. */
+    id: string;
     entries: UserDirectoryEntryView[];
+    disabled?: boolean;
     onSelect: (userId: string) => void;
   }
 
-  let { entries, onSelect }: Props = $props();
+  let { id, entries, disabled = false, onSelect }: Props = $props();
+
+  let activeId = $state<string | null>(null);
+  let active = $derived(entries.findIndex((entry) => entry.user_id === activeId));
+
+  /** The option the field names in `aria-activedescendant`. */
+  export function activeOptionId(): string | undefined {
+    return active === -1 ? undefined : `${id}-${String(active)}`;
+  }
+
+  /** Moves through the entries from the field that owns them; true when the key was used. */
+  export function handleKey(event: KeyboardEvent): boolean {
+    if (isComposingKey(event)) return false;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const from = active === -1 && event.key === 'ArrowUp' ? 0 : active;
+      const step = event.key === 'ArrowDown' ? 1 : entries.length - 1;
+      activeId = entries[(from + step) % entries.length]?.user_id ?? null;
+    } else if (event.key === 'Enter' && entries[active] && !disabled) {
+      onSelect(entries[active].user_id);
+    } else {
+      return false;
+    }
+    event.preventDefault();
+    return true;
+  }
 </script>
 
-<ul class="suggestions" {@attach scrollHint}>
-  {#each entries as entry (entry.user_id)}
+<ul
+  {id}
+  class="suggestions"
+  role="listbox"
+  aria-label={i18n.t('findOrJoin.people')}
+  {@attach keepInView(() => active)}
+  {@attach scrollHint}
+>
+  {#each entries as entry, index (entry.user_id)}
     {@const name = entry.display_name ?? entry.user_id}
-    <li>
+    <li role="presentation">
       <button
         type="button"
-        class="menu-item"
+        class="menu-item selection-highlight"
+        id="{id}-{index}"
+        role="option"
+        tabindex="-1"
+        data-index={index}
+        aria-selected={index === active}
+        {disabled}
         onclick={() => {
           onSelect(entry.user_id);
         }}

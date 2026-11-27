@@ -52,15 +52,15 @@ test('suggests people from the directory and fills the picked one into the field
   const user = userEvent.setup();
   render(RoomInviteDialog, { open: true, room, onOpenChange: () => {} });
 
-  await user.type(await screen.findByRole('textbox', { name: 'Invite people' }), 'bo');
+  await user.type(await screen.findByRole('combobox', { name: 'Invite people' }), 'bo');
 
-  const suggestion = await screen.findByRole('button', { name: /@bob:example\.org/ });
+  const suggestion = await screen.findByRole('option', { name: /@bob:example\.org/ });
   expect(searchUserDirectory).toHaveBeenCalledWith({ term: 'bo', limit: 10 });
 
   await user.click(suggestion);
   expect(core.rpc.rooms.invite).not.toHaveBeenCalled();
-  expect(screen.getByRole('textbox', { name: 'Invite people' })).toHaveValue('@bob:example.org');
-  expect(screen.queryByRole('button', { name: /@bob:example\.org/ })).toBeNull();
+  expect(screen.getByRole('combobox', { name: 'Invite people' })).toHaveValue('@bob:example.org');
+  expect(screen.queryByRole('option', { name: /@bob:example\.org/ })).toBeNull();
 
   await user.click(screen.getByRole('button', { name: 'Invite' }));
   await vi.waitFor(() => {
@@ -69,6 +69,37 @@ test('suggests people from the directory and fills the picked one into the field
       user_id: '@bob:example.org',
     });
   });
+});
+
+test('picks a suggestion with the arrow keys and Enter', async () => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  searchUserDirectory.mockResolvedValue({
+    limited: false,
+    results: ['alice', 'bob'].map((name) => ({
+      user_id: `@${name}:example.org`,
+      display_name: name,
+      avatar_url: null,
+      real_name: name,
+      real_avatar_url: null,
+    })),
+  });
+  core.rpc.rooms.invite.mockClear();
+  const user = userEvent.setup();
+  render(RoomInviteDialog, { open: true, room, onOpenChange: () => {} });
+
+  const field = await screen.findByRole('combobox', { name: 'Invite people' });
+  await user.type(field, 'o');
+  const bob = await screen.findByRole('option', { name: /@bob:example\.org/ });
+  await user.keyboard('{ArrowDown}{ArrowDown}');
+  expect(field).toHaveAttribute('aria-activedescendant', bob.id);
+  await user.keyboard('{Enter}');
+
+  expect(field).toHaveValue('@bob:example.org');
+  expect(core.rpc.rooms.invite).not.toHaveBeenCalled();
 });
 
 const historyVisibility = vi.fn<() => Promise<string>>();
@@ -85,7 +116,7 @@ test('says next to the invite button that history goes with the invite', async (
     await screen.findByText(/Inviting can also give their verified sessions the keys/)
   ).toBeTruthy();
 
-  await user.type(screen.getByRole('textbox', { name: 'Invite people' }), '@bob:example.org');
+  await user.type(screen.getByRole('combobox', { name: 'Invite people' }), '@bob:example.org');
   await user.click(screen.getByRole('button', { name: 'Invite' }));
   expect(
     await screen.findByText(/Invited @bob:example\.org\. Once they join, their verified sessions/)
@@ -99,7 +130,7 @@ test('says the invite went out when its history could not be shared', async () =
   render(RoomInviteDialog, { open: true, room: encrypted, onOpenChange: () => {} });
 
   await user.type(
-    await screen.findByRole('textbox', { name: 'Invite people' }),
+    await screen.findByRole('combobox', { name: 'Invite people' }),
     '@bob:example.org'
   );
   await user.click(screen.getByRole('button', { name: 'Invite' }));
@@ -153,7 +184,7 @@ test('warns before handing history to a stranger with no verified sessions', asy
   render(RoomInviteDialog, { open: true, room: encrypted, onOpenChange: () => {} });
 
   await user.type(
-    await screen.findByRole('textbox', { name: 'Invite people' }),
+    await screen.findByRole('combobox', { name: 'Invite people' }),
     '@eve:example.org'
   );
 

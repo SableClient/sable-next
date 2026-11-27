@@ -55,7 +55,7 @@ async function openWith(text: string): Promise<ReturnType<typeof userEvent.setup
   const user = userEvent.setup();
   render(FindOrJoinDialog);
   openFindOrJoin();
-  await user.type(await screen.findByRole('textbox'), text);
+  await user.type(await screen.findByRole('combobox'), text);
   return user;
 }
 
@@ -129,7 +129,7 @@ test('finds a person by name and opens a chat with them', async () => {
   core.rpc.rooms.createDm.mockResolvedValue('!dm:example.org');
 
   const user = await openWith('bob');
-  await user.click(await screen.findByRole('button', { name: /Bob/ }));
+  await user.click(await screen.findByRole('option', { name: /Bob/ }));
 
   await vi.waitFor(() => {
     expect(goto).toHaveBeenCalledWith('/direct/!dm%3Aexample.org');
@@ -137,6 +137,27 @@ test('finds a person by name and opens a chat with them', async () => {
   expect(core.rpc.rooms.createDm).toHaveBeenCalledWith(
     expect.objectContaining({ user_id: '@bob:example.org' })
   );
+});
+
+test('moves through the people with the arrow keys and opens the chosen one', async () => {
+  core.rpc.account.searchUserDirectory.mockResolvedValue({
+    limited: false,
+    results: [person('@alice:example.org', 'Alice'), person('@bob:example.org', 'Bob')],
+  });
+  core.rpc.rooms.createDm.mockResolvedValue('!dm:example.org');
+
+  const user = await openWith('b');
+  const bob = await screen.findByRole('option', { name: /Bob/ });
+  await user.keyboard('{ArrowDown}{ArrowDown}');
+  expect(bob).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByRole('combobox')).toHaveAttribute('aria-activedescendant', bob.id);
+  await user.keyboard('{ArrowDown}{ArrowUp}{Enter}');
+
+  await vi.waitFor(() => {
+    expect(core.rpc.rooms.createDm).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: '@bob:example.org' })
+    );
+  });
 });
 
 test('offers a full user id the directory does not list', async () => {

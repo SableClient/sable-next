@@ -22,23 +22,24 @@
   import ResponsiveDialog from '#lib/ui/primitives/ResponsiveDialog.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import '#lib/ui/primitives/menu.css';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
   import { isComposingKey } from '#lib/ui/shortcuts/binding.js';
 
   import { UserDirectoryLookup } from '../members/user-directory-lookup.svelte.js';
+  import UserSuggestionList from '../members/UserSuggestionList.svelte';
   import '#lib/ui/primitives/dialog-body.css';
 
   const core = useCoreClient();
   const roomList = useRoomList();
   const directory = new UserDirectoryLookup(core);
   const inputId = $props.id();
+  const listId = `${inputId}-people`;
 
   let value = $state('');
   let preview = $state<RoomPreviewView | null>(null);
   let previewing = $state(false);
   let busy = $state(false);
   let failed = $state<string | null>(null);
+  let suggestionList = $state<UserSuggestionList>();
 
   let room = $derived(parseJoinAddress(value) ?? null);
   let roomKey = $derived(room ? JSON.stringify([room.address, room.via]) : null);
@@ -56,6 +57,7 @@
     };
     return [typed, ...directory.results];
   });
+  let listed = $derived(!room && people.length > 0);
   let knock = $derived(preview?.join_rule === 'knock' || preview?.join_rule === 'knock_restricted');
   let joined = $derived(preview?.state === 'joined');
   let actionLabel = $derived(
@@ -152,7 +154,8 @@
   }
 
   function onKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' || isComposingKey(event)) return;
+    if (isComposingKey(event) || suggestionList?.handleKey(event)) return;
+    if (event.key !== 'Enter') return;
     event.preventDefault();
     if (room) void enterRoom();
     else if (people[0]) void message(people[0].user_id);
@@ -172,6 +175,11 @@
         id={inputId}
         bind:value
         onkeydown={onKeydown}
+        role="combobox"
+        aria-expanded={listed}
+        aria-controls={listed ? listId : undefined}
+        aria-activedescendant={suggestionList?.activeOptionId()}
+        aria-autocomplete="list"
         aria-label={i18n.t('nav.findOrJoin')}
         placeholder={i18n.t('findOrJoin.placeholder')}
         autocomplete="off"
@@ -202,27 +210,15 @@
           {/if}
         </div>
       {:else if people.length > 0}
-        <ul class="people" aria-label={i18n.t('findOrJoin.people')} {@attach scrollHint}>
-          {#each people as entry (entry.user_id)}
-            {@const name = entry.display_name ?? entry.user_id}
-            <li>
-              <button
-                type="button"
-                class="menu-item"
-                disabled={busy}
-                onclick={() => {
-                  void message(entry.user_id);
-                }}
-              >
-                <Avatar size="small" id={entry.user_id} src={entry.avatar_url} {name} />
-                <span class="identity">
-                  <span class="name">{name}</span>
-                  <span class="detail">{entry.user_id}</span>
-                </span>
-              </button>
-            </li>
-          {/each}
-        </ul>
+        <UserSuggestionList
+          bind:this={suggestionList}
+          id={listId}
+          entries={people}
+          disabled={busy}
+          onSelect={(userId) => {
+            void message(userId);
+          }}
+        />
       {:else if term !== '' && !directory.searching}
         <p class="note">{i18n.t('findOrJoin.noPeople')}</p>
       {:else if term === ''}
@@ -316,20 +312,6 @@
 
   .note {
     margin: 0;
-  }
-
-  .people {
-    display: grid;
-    list-style: none;
-    margin: 0;
-    max-height: 16rem;
-    overflow: auto;
-    padding: 0;
-  }
-
-  .people :global(.menu-item) {
-    --menu-item-height: var(--control-height-500);
-    --menu-item-gap: var(--space-200);
   }
 
   footer {

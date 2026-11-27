@@ -13,6 +13,7 @@
   import { fuzzyMatchParts } from './fuzzy.js';
   import { filterRoomsByQuery, parentSpaceNames, parseJumpQuery } from './room-jump.js';
   import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import { keepInView } from '#lib/ui/keep-in-view.js';
   import '#lib/ui/primitives/dialog-body.css';
 
   interface Props {
@@ -41,10 +42,6 @@
 
   function optionId(index: number): string {
     return `${uid}-option-${index}`;
-  }
-
-  function keepActiveInView(node: HTMLElement): void {
-    node.querySelector(`[data-index="${String(active)}"]`)?.scrollIntoView({ block: 'nearest' });
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -100,7 +97,7 @@
       id={listboxId}
       role="listbox"
       aria-label={i18n.t('shortcuts.paletteTitle')}
-      {@attach keepActiveInView}
+      {@attach keepInView(() => active)}
       {@attach scrollHint}
     >
       {#each results as room, index (room.room_id)}
