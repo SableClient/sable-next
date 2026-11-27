@@ -96,6 +96,7 @@ bin="${ANDROID_HOME:?ANDROID_HOME is not set}/ndk/$ANDROID_NDK_VERSION/toolchain
 rustup target add aarch64-linux-android
 CC_aarch64_linux_android="$bin/aarch64-linux-android24-clang" \
 AR_aarch64_linux_android="$bin/llvm-ar" \
+RANLIB_aarch64_linux_android="$bin/llvm-ranlib" \
 CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$bin/aarch64-linux-android24-clang" \
 cargo clippy --locked -p app --target aarch64-linux-android --all-targets -- -D warnings
 """
