@@ -114,7 +114,7 @@ Packages are published to the Forgejo repositories at `git.sable.moe`. Use `nigh
 
 ```bash
 sudo curl https://git.sable.moe/api/packages/SableClient/debian/repository.key -o /etc/apt/keyrings/forgejo-SableClient.asc
-echo "deb [signed-by=/etc/apt/keyrings/forgejo-SableClient.asc] https://git.sable.moe/api/packages/SableClient/debian stable main" | sudo tee /etc/apt/sources.list.d/sable.list
+echo "deb [arch=amd64,arm64 signed-by=/etc/apt/keyrings/forgejo-SableClient.asc] https://git.sable.moe/api/packages/SableClient/debian stable main" | sudo tee /etc/apt/sources.list.d/sable.list
 sudo apt update && sudo apt install sable
 ```
 
