@@ -5,15 +5,15 @@ import '../../../styles.css';
 
 import CodeTextArea from './CodeTextArea.svelte';
 
-const images = Object.fromEntries(
-  Array.from({ length: 40 }, (_, index) => [
-    `emote_${'x'.repeat(index % 17)}`,
-    { url: `mxc://example.org/${'a'.repeat(10 + ((index * 7) % 31))}`, body: 'b'.repeat(index) },
-  ])
+const content = JSON.stringify(
+  Object.fromEntries(
+    Array.from({ length: 40 }, (_, index) => [`key_${index}`, 'a'.repeat(index * 2)])
+  ),
+  null,
+  2
 );
-const content = JSON.stringify({ images }, null, 2);
 
-test('the highlighted layer wraps like the textarea so the last lines stay reachable', async () => {
+test('highlight layer wraps like the textarea', async () => {
   const screen = await render(CodeTextArea, { language: 'json', value: content });
   screen.container.style.width = '24rem';
   const area = screen.container.querySelector('textarea');
