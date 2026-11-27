@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Keep name colours readable in membership and state lines instead of fading them with the rest of the line
+Name colours in membership and state lines stay readable instead of fading with the rest of the line.

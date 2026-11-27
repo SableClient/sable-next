@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Clamp all expanded reply cards to 5 lines.
+Expanded reply cards are clamped to 5 lines.

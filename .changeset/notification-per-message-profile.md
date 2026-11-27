@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Notifications for a message sent with a per-message profile now show that profile's name and avatar.
+Notifications, including direct chat notifications and quick replies from an Android notification, show the name and avatar of the per-message profile a message was sent with.

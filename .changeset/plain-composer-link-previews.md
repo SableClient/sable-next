@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Show link previews for bare URLs when “Format text as you type” is off.
+Bare URLs get link previews when “Format text as you type” is off.

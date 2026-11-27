@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Swiping up on the phone emoji and sticker sheet now grows it in place instead of pushing it off the top of the screen.
+The phone emoji and sticker sheet grows in place when swiped up and no longer slides up when scrolling past the end of the grid.

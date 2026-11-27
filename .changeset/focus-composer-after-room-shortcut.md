@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Made message field focus after switching rooms with alt+up or down.
+The message field is focused after switching rooms with Alt+Up or Alt+Down.

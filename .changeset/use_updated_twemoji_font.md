@@ -2,4 +2,4 @@
 default: patch
 ---
 
-# Use updated Twemoji font
+Emoji use an updated Twemoji font.

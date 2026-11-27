@@ -2,4 +2,4 @@
 default: patch
 ---
 
-Offer matrix uri links for all copy link menus.
+Every copy link menu offers a matrix: URI link.

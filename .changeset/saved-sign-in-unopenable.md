@@ -2,4 +2,4 @@
 default: patch
 ---
 
-An account whose saved sign-in can't be opened asks to sign in again instead of failing on every start.
+An account whose saved sign-in can no longer be found or opened asks you to sign in again on the same device, instead of failing every time Sable opens.
