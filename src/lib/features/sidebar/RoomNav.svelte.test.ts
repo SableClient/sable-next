@@ -995,6 +995,25 @@ test('direct messages and unspaced rooms without an avatar show their initial', 
   expect(icon?.querySelector('svg')).toBeNull();
 });
 
+test('a group chat without an avatar shows its people in place of one', async () => {
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!group:example.org',
+      name: 'Trip',
+      is_direct: true,
+      group_members: [
+        { user_id: '@alice:example.org', name: 'Alice', avatar_url: null },
+        { user_id: '@bob:example.org', name: null, avatar_url: null },
+      ],
+    }),
+  ];
+
+  await mountNav();
+  const people = Array.from(document.querySelectorAll('.room-row .group-avatar .avatar-root'));
+  expect(people.map((person) => person.textContent.trim())).toEqual(['A', 'B']);
+  expect(document.querySelector('.room-row .room-avatar-icon')).toBeNull();
+});
+
 test('an active call in a text room shows its participants and count in the room row', async () => {
   roomsFixture.rooms = [
     makeRoom({

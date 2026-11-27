@@ -47,6 +47,7 @@ fn row(room_id: &str) -> Row {
         },
         counts: RoomUnreadView::default(),
         latest_event: None,
+        group_members: Vec::new(),
     }
 }
 

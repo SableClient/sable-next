@@ -436,6 +436,12 @@ export type GalleryItemView = { kind: "image"; filename: string; caption: string
 
 export type GestureView = "hug" | "cuddle" | "wave" | "poke" | "headpat";
 
+export type GroupMemberView = {
+	user_id: string,
+	name: string | null,
+	avatar_url: string | null,
+};
+
 export type HierarchyRoom = {
 	room: HierarchyRoomView,
 	suggested: boolean,
@@ -1450,6 +1456,8 @@ export type RoomListItemView = {
 	/**  The counts above under the room's mode. */
 	counts: RoomUnreadView,
 	latest_event: LatestEventView | null,
+	/**  The people a direct room of several shows in place of an avatar it does not have. */
+	group_members: GroupMemberView[],
 };
 
 export type RoomListOptionsView = {

@@ -1007,6 +1007,17 @@ pub struct RoomListItemView {
     /// The counts above under the room's mode.
     pub counts: RoomUnreadView,
     pub latest_event: Option<LatestEventView>,
+    /// The people a direct room of several shows in place of an avatar it does not have.
+    pub group_members: Vec<GroupMemberView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct GroupMemberView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub user_id: OwnedUserId,
+    pub name: Option<String>,
+    pub avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

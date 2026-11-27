@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasher;
 
 use matrix_sdk::EncryptionState;
+use matrix_sdk::RoomMemberships;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::latest_events::{LatestEventValue, LocalLatestEventValue, RemoteLatestEventValue};
 use matrix_sdk::room::{Room, RoomMember};
@@ -16,14 +17,14 @@ use matrix_sdk::ruma::events::{
     SyncMessageLikeEvent,
 };
 use matrix_sdk::ruma::push::Ruleset;
-use matrix_sdk::ruma::{EventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId};
+use matrix_sdk::ruma::{EventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId, UserId};
 use matrix_sdk_ui::{eyeball_im, room_list_service::RoomListItem};
 
 use crate::api::rooms::RoomKind;
 use crate::protocol::{
-    BridgeView, LatestEventKind, LatestEventView, MediaPreviewsView, NotificationModeView,
-    NotificationSettingsView, PredecessorRoomView, PreviewEmote, RoomJoinRuleView,
-    RoomListItemView, RoomTag, RoomUnreadView, SpaceChildEdge,
+    BridgeView, GroupMemberView, LatestEventKind, LatestEventView, MediaPreviewsView,
+    NotificationModeView, NotificationSettingsView, PredecessorRoomView, PreviewEmote,
+    RoomJoinRuleView, RoomListItemView, RoomTag, RoomUnreadView, SpaceChildEdge,
 };
 
 use super::diff::diff_values;
@@ -59,6 +60,7 @@ pub struct RoomInfo {
     /// Read once per row, as a bridge sets it when it creates the room.
     pub bridge: Option<BridgeView>,
     pub latest_sender: Option<LatestSender>,
+    pub group_members: Vec<GroupMemberView>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -151,6 +153,9 @@ pub fn room_list_item<S: BuildHasher>(
         latest_event,
         display_name: String::new(),
         display_avatar_url: None,
+        group_members: info
+            .map(|info| info.group_members.clone())
+            .unwrap_or_default(),
     };
     nicknames.apply_room(&mut view, info.is_some_and(|info| info.explicit_name));
     apply_avatar_override(&mut view, info);
@@ -635,6 +640,13 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         _ => room_avatar_url(room).await,
     };
 
+    let latest_sender = latest_sender(room).await;
+    let group_members = if is_direct && avatar_url.is_none() {
+        group_members(room, latest_sender.as_ref()).await
+    } else {
+        Vec::new()
+    };
+
     RoomInfo {
         room_kind,
         is_direct,
@@ -666,8 +678,63 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
                 .await
                 .unwrap_or_default(),
         },
-        latest_sender: latest_sender(room).await,
+        latest_sender,
+        group_members,
     }
+}
+
+const GROUP_MEMBERS: usize = 3;
+
+/// Heroes arrive with the sync, but a server leaves them out of a named room, so a room
+/// without them reads the members the store already holds. Nothing is fetched.
+async fn group_members(room: &Room, latest: Option<&LatestSender>) -> Vec<GroupMemberView> {
+    let service = room.service_members().unwrap_or_default();
+    let others = |user_id: &UserId| user_id != room.own_user_id() && !service.contains(user_id);
+    let mut people: Vec<_> = room
+        .heroes()
+        .await
+        .into_iter()
+        .filter(|hero| others(&hero.user_id))
+        .map(|hero| GroupMemberView {
+            user_id: hero.user_id,
+            name: hero.display_name,
+            avatar_url: hero.avatar_url.map(|url| url.to_string()),
+        })
+        .collect();
+    if people.len() < 2 {
+        people = room
+            .members_no_sync(RoomMemberships::JOIN)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|member| others(member.user_id()))
+            .map(|member| GroupMemberView {
+                user_id: member.user_id().to_owned(),
+                name: member.display_name().map(ToOwned::to_owned),
+                avatar_url: member.avatar_url().map(ToString::to_string),
+            })
+            .collect();
+    }
+    pick_group_members(people, latest.map(|latest| &*latest.user_id))
+}
+
+/// Up to three people, whoever spoke last first; one person alone is not a group.
+fn pick_group_members(
+    mut people: Vec<GroupMemberView>,
+    latest: Option<&UserId>,
+) -> Vec<GroupMemberView> {
+    if people.len() < 2 {
+        return Vec::new();
+    }
+    if let Some(position) = people
+        .iter()
+        .position(|person| Some(&*person.user_id) == latest)
+    {
+        let latest = people.remove(position);
+        people.insert(0, latest);
+    }
+    people.truncate(GROUP_MEMBERS);
+    people
 }
 
 /// The in-memory inputs of `room_avatar_url`, which reads the store.
@@ -808,6 +875,64 @@ fn topic_html(content: &PossiblyRedactedRoomTopicEventContent) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn person(name: &str) -> GroupMemberView {
+        GroupMemberView {
+            user_id: OwnedUserId::try_from(format!("@{name}:example.org")).unwrap(),
+            name: Some(name.to_owned()),
+            avatar_url: None,
+        }
+    }
+
+    #[test]
+    fn a_group_shows_three_people_with_the_latest_sender_first() {
+        let people = ["alice", "bob", "carol", "dave"].map(person).to_vec();
+        let latest = people[2].user_id.clone();
+        let names: Vec<_> = pick_group_members(people, Some(&latest))
+            .into_iter()
+            .filter_map(|member| member.name)
+            .collect();
+        assert_eq!(names, ["carol", "alice", "bob"]);
+    }
+
+    #[tokio::test]
+    async fn a_named_room_without_heroes_takes_its_people_from_the_stored_members() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_test::JoinedRoomBuilder;
+        use serde_json::json;
+
+        let member = |user: &str, name: &str| {
+            ruma::serde::Raw::new(&json!({
+                "type": "m.room.member", "state_key": user, "sender": user,
+                "event_id": format!("$member{name}"), "origin_server_ts": 1,
+                "content": {"membership": "join", "displayname": name},
+            }))
+            .unwrap()
+            .cast_unchecked()
+        };
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = matrix_sdk::ruma::room_id!("!trip:example.org");
+        let own = client.user_id().unwrap().to_string();
+        let room = JoinedRoomBuilder::new(room_id)
+            .add_state_event(member(&own, "Me"))
+            .add_state_event(member("@alice:example.org", "Alice"))
+            .add_state_event(member("@bob:example.org", "Bob"));
+        server.sync_room(&client, room).await;
+
+        let mut names: Vec<_> = group_members(&client.get_room(room_id).unwrap(), None)
+            .await
+            .into_iter()
+            .filter_map(|member| member.name)
+            .collect();
+        names.sort();
+        assert_eq!(names, ["Alice", "Bob"]);
+    }
+
+    #[test]
+    fn one_other_person_is_not_a_group() {
+        assert_eq!(pick_group_members(vec![person("alice")], None), []);
+    }
 
     use crate::protocol::{NotificationModeView, NotificationSettingsView};
 

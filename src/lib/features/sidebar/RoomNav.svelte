@@ -57,6 +57,7 @@
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
+  import GroupAvatar from './GroupAvatar.svelte';
   import BridgeBadge from './BridgeBadge.svelte';
   import CallParticipantList from './CallParticipantList.svelte';
   import CategoryCaret from './CategoryCaret.svelte';
@@ -684,6 +685,8 @@
                 >
                   {@render glyph()}
                 </Avatar>
+              {:else if room && room.group_members.length > 0}
+                <GroupAvatar members={room.group_members.slice(0, 2)} />
               {:else if room && (room.is_direct || unspacedSection)}
                 <Avatar class="room-avatar-icon" id={item.roomId} {name} size="small" />
               {:else}

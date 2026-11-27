@@ -44,6 +44,7 @@ const room: RoomListItemView = withCounts({
   avatar_url: null,
   is_direct: false,
   direct_targets: [],
+  group_members: [],
   join_rule: 'invite',
   tags: [],
   state: 'joined',

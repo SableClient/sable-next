@@ -16,6 +16,7 @@
     display_name: 'Sable Space',
     is_direct: false,
     direct_targets: [],
+    group_members: [],
     join_rule: 'unknown',
     tags: [],
     state: 'joined',

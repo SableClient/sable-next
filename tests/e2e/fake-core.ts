@@ -179,6 +179,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       avatar_url: null,
       is_direct: workerMode === 'direct',
       direct_targets: workerMode === 'direct' ? ['@alice:example.test'] : [],
+      group_members: [],
       join_rule: 'invite',
       tags: [],
       state: 'joined',

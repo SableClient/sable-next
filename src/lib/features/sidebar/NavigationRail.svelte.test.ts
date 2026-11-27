@@ -102,6 +102,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomListItemView 
     avatar_url: null,
     is_direct: false,
     direct_targets: [],
+    group_members: [],
     join_rule: 'invite',
     tags: [],
     state: 'joined',
@@ -209,6 +210,7 @@ test('shows unread direct rooms as individual avatars', async () => {
     avatar_url: null,
     is_direct: true,
     direct_targets: [],
+    group_members: [],
     join_rule: 'invite' as const,
     tags: [],
     state: 'joined' as const,
@@ -239,6 +241,20 @@ test('shows unread direct rooms as individual avatars', async () => {
     'unread-badge-count'
   );
   expect(directLink.querySelector('.unread-badge-dot')).not.toBeInTheDocument();
+
+  const group = {
+    ...directRoom,
+    room_id: '!trip:example.org',
+    name: 'Trip',
+    group_members: [
+      { user_id: '@bob:example.org', name: 'Bob', avatar_url: null },
+      { user_id: '@carol:example.org', name: 'Carol', avatar_url: null },
+    ],
+  };
+  renderRail({ spaces: [], directRooms: [group], mobile: true });
+  await tick();
+  const people = Array.from(tab('Trip').querySelectorAll('.group-avatar .avatar-root'));
+  expect(people.map((person) => person.textContent.trim())).toEqual(['B', 'C']);
 });
 
 test('badges a space with its mentions and dots one with only unread messages', async () => {

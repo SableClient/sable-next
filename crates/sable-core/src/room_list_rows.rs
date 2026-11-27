@@ -222,6 +222,7 @@ mod tests {
             avatar_url: None,
             display_name: room_id.to_string(),
             display_avatar_url: None,
+            group_members: Vec::new(),
             is_direct: false,
             direct_targets: Vec::new(),
             join_rule: RoomJoinRuleView::Invite,
@@ -288,6 +289,7 @@ mod tests {
             media_previews: None,
             bridge: None,
             latest_sender: None,
+            group_members: Vec::new(),
         };
         let mut cache = HashMap::from([(kept.to_owned(), info()), (gone.to_owned(), info())]);
         let mut rows = RoomListRows::default();
@@ -322,6 +324,7 @@ mod tests {
             media_previews: None,
             bridge: None,
             latest_sender: None,
+            group_members: Vec::new(),
         }
     }
 

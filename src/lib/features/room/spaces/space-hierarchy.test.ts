@@ -237,6 +237,7 @@ function summary(roomId: string, overrides: Partial<RoomListItemView> = {}): Roo
     avatar_url: null,
     is_direct: false,
     direct_targets: [],
+    group_members: [],
     join_rule: 'public',
     tags: [],
     state: 'joined',

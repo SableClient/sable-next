@@ -4,7 +4,7 @@
 
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
-  import type { BridgeView, RoomListItemView } from '#src/generated/protocol';
+  import type { BridgeView, GroupMemberView, RoomListItemView } from '#src/generated/protocol';
   import { resolve } from '$app/paths';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -53,6 +53,7 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import BridgeBadge from './BridgeBadge.svelte';
+  import GroupAvatar from './GroupAvatar.svelte';
   import RailCallMark from './RailCallMark.svelte';
   import RailCreateMenu from './RailCreateMenu.svelte';
   import RailDisplayMenu from './RailDisplayMenu.svelte';
@@ -74,6 +75,7 @@
     icon?: Component;
     initial?: string;
     avatar?: string | null;
+    group?: GroupMemberView[];
     navigateHref?: string;
     unread?: UnreadCount;
     dm?: boolean;
@@ -239,6 +241,7 @@
         roomId: room.room_id,
         initial: toInitials(name),
         avatar: room.avatar_url,
+        group: room.group_members,
         label: name,
         unread: unreadFor(room),
         dm: true,
@@ -583,6 +586,8 @@
 {#snippet itemBody(item: RailItem, active: boolean)}
   {#if item.icon}
     <span class="icon" aria-hidden="true"><item.icon weight={active ? 'fill' : 'regular'} /></span>
+  {:else if item.group && item.group.length > 0}
+    <GroupAvatar members={item.group} --group-avatar-size="var(--avatar-size-400)" />
   {:else}
     {@const avatar =
       item.space && item.roomId ? spacesById.get(item.roomId)?.display_avatar_url : item.avatar}
