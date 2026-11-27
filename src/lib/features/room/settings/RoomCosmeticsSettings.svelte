@@ -15,6 +15,13 @@
   import { nativeFilePicker } from '#lib/platform/native-file-picker.js';
   import ColorSetting from '#lib/ui/ColorSetting.svelte';
   import { i18n } from '#lib/i18n.js';
+  import ChatBackgroundPicker from '#lib/features/settings/ChatBackgroundPicker.svelte';
+  import {
+    loadRoomBackground,
+    roomBackground,
+    saveRoomBackground,
+    type ChatBackgroundChoice,
+  } from '#lib/rooms/chat-background.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -65,6 +72,21 @@
   let savedPronouns = $state('');
   let saving = $state<string | null>(null);
   let failed = $state(false);
+  let background = $derived(
+    (room && roomBackground(core, room.room_id)) ?? { image: '', color: '' }
+  );
+
+  $effect(() => {
+    if (room) void loadRoomBackground(core, room.room_id);
+  });
+
+  function saveBackground(choice: ChatBackgroundChoice): void {
+    if (!room) return;
+    saveRoomBackground(core, room.room_id, choice).catch((error: unknown) => {
+      console.warn('[sable room] chat background not saved', error);
+      failed = true;
+    });
+  }
   let applied = $state<{ done: number; failed: number; total: number } | null>(null);
   let run = 0;
 
@@ -417,6 +439,26 @@
       </SettingsRow>
     </ul>
   </SettingsSection>
+
+  {#if room && !isSpace}
+    <SettingsSection
+      headingId="room-settings-chat-background"
+      title={i18n.t('settings.chatBackground')}
+      description={i18n.t('room.chatBackgroundHint')}
+    >
+      <ChatBackgroundPicker
+        id="room-chat-background"
+        image={background.image}
+        color={background.color}
+        onImage={(image) => {
+          saveBackground({ ...background, image });
+        }}
+        onColor={(color) => {
+          saveBackground({ ...background, color });
+        }}
+      />
+    </SettingsSection>
+  {/if}
 
   {#if canManage}
     <SettingsSection

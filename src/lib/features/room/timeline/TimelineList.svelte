@@ -57,6 +57,7 @@
     MessageSelection,
     provideMessageSelection,
   } from '../messages/message-selection.svelte.js';
+  import ChatBackground from './ChatBackground.svelte';
   import { LoadRetry } from './load-retry';
   import TimelineItem from './TimelineItem.svelte';
   import TimelineMemberGroup from './TimelineMemberGroup.svelte';
@@ -1382,6 +1383,7 @@
   {/if}
 
   <div class="timeline-stage">
+    <ChatBackground {roomId} />
     {#if historyLoadingVisible}
       <div
         class="timeline-loading history-loading"
@@ -1619,6 +1621,7 @@
     display: flex;
     flex: 1;
     flex-direction: column;
+    isolation: isolate;
     min-height: 0;
     min-width: 0;
     position: relative;

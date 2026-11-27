@@ -206,6 +206,14 @@
           "type": "boolean",
           "default": true
         },
+        "chatBackgroundImage": {
+          "type": "string",
+          "default": ""
+        },
+        "chatBackgroundColor": {
+          "type": "string",
+          "default": ""
+        },
         "fontFamily": {
           "type": "string",
           "default": ""
@@ -1085,6 +1093,14 @@
           "title": "Use this server’s theme",
           "type": "boolean",
           "default": true
+        },
+        "chatBackgroundImage": {
+          "type": "string",
+          "default": ""
+        },
+        "chatBackgroundColor": {
+          "type": "string",
+          "default": ""
         },
         "fontFamily": {
           "type": "string",

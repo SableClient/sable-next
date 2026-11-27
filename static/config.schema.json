@@ -383,6 +383,14 @@
           "type": "string",
           "default": ""
         },
+        "chatBackgroundImage": {
+          "type": "string",
+          "default": ""
+        },
+        "chatBackgroundColor": {
+          "type": "string",
+          "default": ""
+        },
         "fontFamily": {
           "type": "string",
           "default": ""
@@ -1926,6 +1934,14 @@
           "default": 1
         },
         "quickCss": {
+          "type": "string",
+          "default": ""
+        },
+        "chatBackgroundImage": {
+          "type": "string",
+          "default": ""
+        },
+        "chatBackgroundColor": {
           "type": "string",
           "default": ""
         },

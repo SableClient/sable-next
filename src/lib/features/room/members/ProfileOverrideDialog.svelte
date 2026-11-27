@@ -16,6 +16,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { requestCrop } from '#lib/ui/image-crop/crop-request.svelte.js';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
+  import '#lib/ui/primitives/file-button.css';
 
   interface Props {
     open: boolean;
@@ -194,21 +195,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-300);
-  }
-
-  .file-button {
-    cursor: pointer;
-    position: relative;
-  }
-
-  .file-button input {
-    height: 1px;
-    opacity: 0;
-    position: absolute;
-    width: 1px;
-  }
-
-  .file-button:focus-within {
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 </style>

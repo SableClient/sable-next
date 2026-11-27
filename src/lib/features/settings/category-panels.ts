@@ -13,6 +13,7 @@ import CallServiceSettings from '#lib/features/call/CallServiceSettings.svelte';
 import ComposerButtons from '#lib/features/settings/ComposerButtons.svelte';
 import ComposerEnterSetting from '#lib/features/settings/ComposerEnterSetting.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
+import ChatBackgroundSettings from '#lib/features/settings/ChatBackgroundSettings.svelte';
 import FontSettings from '#lib/features/settings/FontSettings.svelte';
 import QuickCss from '#lib/features/settings/QuickCss.svelte';
 import LinkDeviceSetting from '#lib/features/settings/LinkDeviceSetting.svelte';
@@ -53,6 +54,7 @@ export interface CategoryPanel extends SettingsPanelDefinition {
 export const panelComponents: Partial<Record<string, Component>> = {
   'custom-themes': CustomThemes,
   'quick-css': QuickCss,
+  'chat-background': ChatBackgroundSettings,
   'app-icon': AppIconSettings,
   font: FontSettings,
   'composer-enter': ComposerEnterSetting,

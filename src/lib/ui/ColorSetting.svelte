@@ -138,8 +138,12 @@
       maxlength={7}
       onchange={commit}
     />
-    <Button variant="ghost" size="small" disabled={!value} onclick={onReset}
-      >{i18n.t('common.reset')}</Button
+    <Button
+      variant="ghost"
+      size="small"
+      disabled={!value}
+      aria-label={i18n.t('settings.colorResetLabel', { label })}
+      onclick={onReset}>{i18n.t('common.reset')}</Button
     >
   </div>
 </div>

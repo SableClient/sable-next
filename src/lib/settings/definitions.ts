@@ -278,6 +278,8 @@ const SETTINGS = {
   deploymentTheme: toggle(true, { account: true }),
   saturation: range(0, 2, 1, { device: true }),
   quickCss: text(''),
+  chatBackgroundImage: text('', { account: true }),
+  chatBackgroundColor: text('', { account: true }),
   fontFamily: text('', { account: true, device: true }),
   fontFamilyMono: text('', { account: true, device: true }),
   codeLigatures: toggle(true, { account: true }),

@@ -48,6 +48,13 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
       targets: targets([['quick-css', 'settings.quickCss', 'settings.quickCssHint']]),
     },
     {
+      id: 'chat-background',
+      section: 'themes',
+      targets: targets([
+        ['chat-background', 'settings.chatBackground', 'settings.chatBackgroundHint'],
+      ]),
+    },
+    {
       id: 'app-icon',
       section: 'themes',
       supported: isNativeMobile,

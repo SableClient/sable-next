@@ -16,6 +16,7 @@
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
+  import '#lib/ui/primitives/file-button.css';
 
   interface Props {
     userId: string;
@@ -281,26 +282,10 @@
     gap: var(--space-200);
   }
 
-  .file-button {
-    cursor: pointer;
-    position: relative;
-  }
-
-  .file-button input {
-    height: 1px;
-    opacity: 0;
-    position: absolute;
-    width: 1px;
-  }
-
   @media (pointer: coarse) {
     .file-button {
       min-height: 2.75rem;
     }
-  }
-
-  .file-button:focus-within {
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 
   :global(.avatar-root.avatar-preview) {

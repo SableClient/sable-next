@@ -260,6 +260,8 @@ accepts the same settings except those marked deployment only.
 ## Other
 
 - `quickCss`: Text. Default empty. Deployment only.
+- `chatBackgroundImage`: Text. Default empty.
+- `chatBackgroundColor`: Text. Default empty.
 - `fontFamily`: Text. Default empty.
 - `fontFamilyMono`: Text. Default empty.
 - `codeLigatures`: `true` or `false`. Default `true`.

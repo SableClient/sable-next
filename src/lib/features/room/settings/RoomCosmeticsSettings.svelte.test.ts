@@ -133,3 +133,28 @@ test('the room nickname and pronouns share the profile editor limits', async () 
     String(MAX_PRONOUN_INPUT)
   );
 });
+
+test('a picture chosen for the room is saved as its chat background', async () => {
+  const uploadMedia = vi.fn(() => Promise.resolve('mxc://example.org/wall'));
+  Object.assign(baseCore, { uploadMedia });
+  core.rpc.room_state.accountData.mockResolvedValue(null);
+  core.rpc.room_state.setAccountData.mockResolvedValue(null);
+  const user = userEvent.setup();
+  render(RoomCosmeticsSettings, { room, permissions: null, levels: null });
+
+  await user.upload(
+    await screen.findByLabelText('settings.chatBackgroundChoose'),
+    new File(['picture'], 'wall.png', { type: 'image/png' })
+  );
+
+  await vi.waitFor(() => {
+    expect(core.rpc.room_state.setAccountData).toHaveBeenCalledWith({
+      room_id: room.room_id,
+      event_type: 'moe.sable.chat_background',
+      content: { image: 'mxc://example.org/wall', color: '' },
+    });
+  });
+  expect(
+    await screen.findByRole('button', { name: 'settings.chatBackgroundRemove' })
+  ).toBeVisible();
+});
