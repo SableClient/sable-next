@@ -1,11 +1,8 @@
 import i18next from 'i18next';
 import BrowserIcon from 'phosphor-svelte/lib/BrowserIcon';
-import FilmStripIcon from 'phosphor-svelte/lib/FilmStripIcon';
 import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
-import PauseIcon from 'phosphor-svelte/lib/PauseIcon';
-import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 import TargetIcon from 'phosphor-svelte/lib/TargetIcon';
 import InstagramLogoIcon from 'phosphor-svelte/lib/InstagramLogoIcon';
 import TiktokLogoIcon from 'phosphor-svelte/lib/TiktokLogoIcon';
@@ -43,29 +40,6 @@ export const mediaCategory: SettingsCategory = {
           toasts.error(i18next.t('errors.actionFailed'));
         });
       },
-    },
-    {
-      key: 'autoplayGifs',
-      section: 'playback',
-      icon: FilmStripIcon,
-      name: 'settings.autoplayGifs',
-      description: 'settings.autoplayGifsHint',
-      terms: ['settings.terms.autoplayGifs'],
-      type: 'boolean',
-    },
-    {
-      key: 'autoplayStickers',
-      section: 'playback',
-      icon: StickerIcon,
-      name: 'settings.autoplayStickers',
-      type: 'boolean',
-    },
-    {
-      key: 'pauseAnimationsWhenInactive',
-      section: 'playback',
-      icon: PauseIcon,
-      name: 'settings.pauseAnimationsWhenInactive',
-      type: 'boolean',
     },
     {
       key: 'urlPreviews',

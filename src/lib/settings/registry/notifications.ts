@@ -25,6 +25,7 @@ export const notificationsCategory: SettingsCategory = {
   sections: [
     { id: 'alerts', name: 'settings.groups.systemNotifications' },
     { id: 'sounds', name: 'settings.groups.sounds' },
+    { id: 'volumes', name: 'sounds.volumeCategory' },
     { id: 'highlights', name: 'settings.groups.highlights' },
   ],
   items: [

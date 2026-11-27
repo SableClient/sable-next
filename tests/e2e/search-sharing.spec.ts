@@ -22,7 +22,7 @@ test('search sharing starts by default and can be turned off', async ({ page }) 
     calls.findIndex((call) => call.method === 'search.peer_start')
   );
 
-  await page.goto('/settings/timeline');
+  await page.goto('/settings/search');
   await expect(
     page.getByRole('switch', { name: 'Share the search index between devices', exact: true })
   ).toBeChecked();
@@ -53,7 +53,7 @@ test('unsupported browsers keep direct sharing unavailable without starting it',
   await page.addInitScript(() => {
     Object.defineProperty(window, 'RTCPeerConnection', { value: undefined });
   });
-  await page.goto('/settings/timeline');
+  await page.goto('/settings/search');
   await expect(
     page.getByText('This browser cannot connect directly to your other devices.')
   ).toBeVisible();

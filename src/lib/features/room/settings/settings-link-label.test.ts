@@ -15,7 +15,7 @@ describe('custom panel links', () => {
     ['notifications', 'notification-badge-badgeDefaultDirect', 'common.directMessages'],
     ['devices', 'key-backup-heading', 'settings.keyBackupTitle'],
     ['personas', 'settings-personas-backup', 'personas.backupTitle'],
-    ['sounds', 'sound-volume-camera_on', 'sounds.camera_on'],
+    ['notifications', 'sound-volume-camera_on', 'sounds.camera_on'],
   ])('labels %s / %s with its setting name', (section, focus, name) => {
     const category = settingsCategories.find((entry) => entry.id === section);
     assert(category);

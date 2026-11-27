@@ -60,10 +60,10 @@ describe('setting sections', () => {
     expect(new Set(anchors).size).toBe(anchors.length);
   });
 
-  it('fold time and date into the timeline', async () => {
+  it('fold time and date into language and region', async () => {
     const { findCategory, findSettingByFocusId } = await import('./registry');
     expect(findCategory('time')).toBeUndefined();
-    expect(findSettingByFocusId('hour24-clock')?.category.id).toBe('timeline');
+    expect(findSettingByFocusId('hour24-clock')?.category.id).toBe('language');
   });
 });
 

@@ -2,6 +2,7 @@ import {
   canonicalSection,
   findCategory,
   findSettingByFocusId,
+  findSettingsSection,
   STANDALONE_PAGE_NAMES,
 } from '#lib/settings/registry.js';
 
@@ -23,7 +24,8 @@ function knownSection(section: string): boolean {
 
 /** A focus id that moved to another category still resolves, as it does in v1. */
 function resolve(section: string, focus: string | undefined): SettingsLink | null {
-  const owner = focus === undefined ? undefined : findSettingByFocusId(focus);
+  const owner =
+    focus === undefined ? undefined : (findSettingByFocusId(focus) ?? findSettingsSection(focus));
   if (owner) return { section: owner.category.id, focus };
 
   const page = canonicalSection(section);

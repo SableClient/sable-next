@@ -10,41 +10,13 @@ values are ignored, and numbers outside their range are clamped.
 [`/.well-known/sable`](https://docs.sable.moe/installation/homeserver-configuration/)
 accepts the same settings except those marked deployment only.
 
-## Appearance
+## Language & region
 
 - `language` (Language): One of `system`, `ar`, `bg`, `ca`, `cs`, `de`, `en`, `es`, `fi`, `fr`, `hu`, `it`, `mi`, `nl`, `pl`, `pt`, `pt-BR`, `ro`, `ru`, `th`, `tok`, `tr`, `uk`, `zh-Hans`. Default `system`.
-- `theme` (Light or dark): One of `system`, `dark`, `light`. Default `system`.
-- `deploymentTheme` (Use this server’s theme): `true` or `false`. Default `true`.
-- `saturation` (Saturation): Number from 0 to 2. Default `1`. Deployment only.
-- `underlineLinks` (Always underline links): `true` or `false`. Default `true`.
-- `renderRoomColors` (Use room colours instead of profile colours): `true` or `false`. Default `true`.
-- `renderProfileColors` (Show profile name colours): `true` or `false`. Default `true`.
-- `reducedMotion` (Reduce motion): `true` or `false`. The default depends on the platform.
-- `pageZoom` (Interface scale): Number from 0.75 to 1.5. Default `1`.
-- `textScale` (Text size): Number from 0.75 to 1.5. Default `1`.
-- `highContrast` (Increase contrast): `true` or `false`. Default `false`.
-- `alwaysShowAltText` (Always show image descriptions): `true` or `false`. Default `false`.
-- `nameColorCorrection` (Improve name colour readability): One of `strong`, `weak`, `off`. Default `strong`.
-- `showRoomIcon` (Room icons): One of `always`, `sometimes`, `collapsed`, `never`. Default `always`.
-- `showEncryptionStatusIcon` (Show encryption status icon): `true` or `false`. Default `true`.
-- `voiceParticipantPlacement` (Voice room participants): One of `both`, `below`, `inline`. Default `both`.
-- `showRoomBanners` (Room banners above the list): `true` or `false`. Default `true`.
-- `bannerFit` (Banner size): One of `fixed`, `image`. Default `fixed`.
-- `showDmTopics` (Show topics in direct messages): `true` or `false`. Default `true`.
-- `messagePreviews` (Message previews): One of `off`, `direct`, `rooms`, `all`. Default `off`.
-- `subspaceHierarchyLimit` (Subspace nesting depth): One of `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`. Default `3`.
-- `showHome` (Show Home with all rooms): `true` or `false`. Default `false`.
-- `restoreLastRoom` (Restore last viewed room): `true` or `false`. Default `true`.
-- `showUnreadCounts` (Show counts on quiet rooms): `true` or `false`. Default `false`.
-- `badgeCountDMsOnly` (Show counts on quiet direct messages): `true` or `false`. Default `true`.
-- `showEasterEggs` (Show :3 instead of 1k+ on huge counts): `true` or `false`. Default `true`.
-- `showPingCounts` (Show counts on mentions): `true` or `false`. Default `true`.
-- `showUnreadDots` (Show dots on rooms with unread messages but no mention): `true` or `false`. Default `true`.
-- `uniformIcons` (Fill transparent room icons): `true` or `false`. Default `false`.
-- `tintRoomIcons` (Theme vector room icons): `true` or `false`. Default `false`.
-- `showBridgeBadges` (Show the bridged network on room icons): `true` or `false`. Default `true`.
-- `showSpaceEvents` (Show today’s events in spaces): `true` or `false`. Default `true`.
-- `showActiveThreadsInSidebar` (Show recent threads in the sidebar): `true` or `false`. Default `true`.
+- `hour24Clock` (24-hour clock): `true` or `false`. Default `false`.
+- `dateFormat` (Date format): One of `auto`, `dmy`, `mdy`, `ymd`. Default `auto`.
+- `timeZone` (Time zone): An IANA time zone name or `auto`. Default `auto`.
+- `weekStart` (First day of the calendar week): One of `sunday`, `monday`, `saturday`. Default `sunday`.
 
 ## Timeline
 
@@ -54,22 +26,6 @@ accepts the same settings except those marked deployment only.
 - `avatarsInMessageHeaders` (Display avatars in message headers): `true` or `false`. Default `true`.
 - `messageSpacing` (Message spacing): One of `none`, `compact`, `cozy`, `roomy`. Default `cozy`.
 - `timelineEmoteSize` (Emote size): One of `default`, `20`, `24`, `32`, `48`, `64`. Default `default`.
-- `searchIndexLimit` (Search index size): One of `128`, `256`, `512`, `1024`, `2048`, `4096`. Default `512`. Deployment only.
-- `searchCrawlPause` (Crawl request interval): One of `1`, `2`, `3`, `5`, `10`, `30`. Default `3`. Deployment only.
-- `searchTricklePause` (Slow-crawl request interval): One of `5`, `10`, `30`, `60`. Default `10`. Deployment only.
-- `searchFlushInterval` (Index save interval): One of `20`, `60`, `120`, `300`. Default `60`. Deployment only.
-- `searchBatchSize` (Events per crawl request): One of `25`, `50`, `100`. Default `50`. Deployment only.
-- `searchBaseEvents` (Events before slow indexing): One of `5000`, `10000`, `20000`, `50000`. Default `20000`. Deployment only.
-- `searchMaxEvents` (Session crawl cap): One of `50000`, `100000`, `200000`, `500000`. Default `50000`. Deployment only.
-- `searchCrawler` (Index message history): `true` or `false`. Default `true`. Deployment only.
-- `searchUnmeteredOnly` (Only transfer search history on unmetered networks): `true` or `false`. Default `true`. Deployment only.
-- `searchSharing` (Share the search index between devices): `true` or `false`. Default `true`. Deployment only.
-- `serverSearch` (Search on the server): `true` or `false`. Default `true`. Deployment only.
-- `showSearch` (Show search in the sidebar): `true` or `false`. Default `false`.
-- `hour24Clock` (24-hour clock): `true` or `false`. Default `false`.
-- `dateFormat` (Date format): One of `auto`, `dmy`, `mdy`, `ymd`. Default `auto`.
-- `timeZone` (Time zone): An IANA time zone name or `auto`. Default `auto`.
-- `weekStart` (First day of the calendar week): One of `sunday`, `monday`, `saturday`. Default `sunday`.
 - `hideMembershipEvents` (Hide joins and leaves): `true` or `false`. Default `false`.
 - `hideProfileChanges` (Hide name and avatar changes): `true` or `false`. Default `true`.
 - `hideTopicChanges` (Hide topic changes): `true` or `false`. Default `false`.
@@ -97,12 +53,71 @@ accepts the same settings except those marked deployment only.
 - `pronounPillLimit` (Pronoun pills per message): One of `1`, `2`, `3`, `all`. Default `3`.
 - `pronounPillLength` (Pronoun pill length): One of `12`, `16`, `24`, `all`. Default `all`.
 
+## Appearance
+
+- `theme` (Light or dark): One of `system`, `dark`, `light`. Default `system`.
+- `deploymentTheme` (Use this server’s theme): `true` or `false`. Default `true`.
+- `saturation` (Saturation): Number from 0 to 2. Default `1`. Deployment only.
+- `showEncryptionStatusIcon` (Show encryption status icon): `true` or `false`. Default `true`.
+
+## Accessibility
+
+- `underlineLinks` (Always underline links): `true` or `false`. Default `true`.
+- `renderRoomColors` (Use room colours instead of profile colours): `true` or `false`. Default `true`.
+- `renderProfileColors` (Show profile name colours): `true` or `false`. Default `true`.
+- `reducedMotion` (Reduce motion): `true` or `false`. The default depends on the platform.
+- `pageZoom` (Interface scale): Number from 0.75 to 1.5. Default `1`.
+- `textScale` (Text size): Number from 0.75 to 1.5. Default `1`.
+- `highContrast` (Increase contrast): `true` or `false`. Default `false`.
+- `alwaysShowAltText` (Always show image descriptions): `true` or `false`. Default `false`.
+- `nameColorCorrection` (Improve name colour readability): One of `strong`, `weak`, `off`. Default `strong`.
+- `autoplayGifs` (Autoplay animated images): `true` or `false`. Default `true`.
+- `pauseAnimationsWhenInactive` (Pause animations when the window is inactive): `true` or `false`. Default `false`.
+- `autoplayStickers` (Autoplay stickers and emoji): `true` or `false`. Default `true`.
+
 ## Emoji & stickers
 
 - `twitterEmoji` (Twitter emoji): `true` or `false`. Default `true`.
 - `pixelatedImages` (Pixelated image scaling): One of `always`, `smart`, `never`. Default `never`.
 - `gifProvider` (GIF search provider): One of `default`, `klipy`, `tenor`, `giphy`. Default `default`. Deployment only.
 - `reuploadGifs` (Upload picked GIFs to your homeserver): `true` or `false`. Default `false`.
+
+## Sidebar
+
+- `showRoomIcon` (Room icons): One of `always`, `sometimes`, `collapsed`, `never`. Default `always`.
+- `voiceParticipantPlacement` (Voice room participants): One of `both`, `below`, `inline`. Default `both`.
+- `showRoomBanners` (Room banners above the list): `true` or `false`. Default `true`.
+- `bannerFit` (Banner size): One of `fixed`, `image`. Default `fixed`.
+- `showDmTopics` (Show topics in direct messages): `true` or `false`. Default `true`.
+- `messagePreviews` (Message previews): One of `off`, `direct`, `rooms`, `all`. Default `off`.
+- `subspaceHierarchyLimit` (Subspace nesting depth): One of `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`. Default `3`.
+- `showHome` (Show Home with all rooms): `true` or `false`. Default `false`.
+- `restoreLastRoom` (Restore last viewed room): `true` or `false`. Default `true`.
+- `showUnreadCounts` (Show counts on quiet rooms): `true` or `false`. Default `false`.
+- `badgeCountDMsOnly` (Show counts on quiet direct messages): `true` or `false`. Default `true`.
+- `showEasterEggs` (Show :3 instead of 1k+ on huge counts): `true` or `false`. Default `true`.
+- `showPingCounts` (Show counts on mentions): `true` or `false`. Default `true`.
+- `showUnreadDots` (Show dots on rooms with unread messages but no mention): `true` or `false`. Default `true`.
+- `uniformIcons` (Fill transparent room icons): `true` or `false`. Default `false`.
+- `tintRoomIcons` (Theme vector room icons): `true` or `false`. Default `false`.
+- `showBridgeBadges` (Show the bridged network on room icons): `true` or `false`. Default `true`.
+- `showSpaceEvents` (Show today’s events in spaces): `true` or `false`. Default `true`.
+- `showActiveThreadsInSidebar` (Show recent threads in the sidebar): `true` or `false`. Default `true`.
+
+## Search
+
+- `searchIndexLimit` (Search index size): One of `128`, `256`, `512`, `1024`, `2048`, `4096`. Default `512`. Deployment only.
+- `searchCrawlPause` (Crawl request interval): One of `1`, `2`, `3`, `5`, `10`, `30`. Default `3`. Deployment only.
+- `searchTricklePause` (Slow-crawl request interval): One of `5`, `10`, `30`, `60`. Default `10`. Deployment only.
+- `searchFlushInterval` (Index save interval): One of `20`, `60`, `120`, `300`. Default `60`. Deployment only.
+- `searchBatchSize` (Events per crawl request): One of `25`, `50`, `100`. Default `50`. Deployment only.
+- `searchBaseEvents` (Events before slow indexing): One of `5000`, `10000`, `20000`, `50000`. Default `20000`. Deployment only.
+- `searchMaxEvents` (Session crawl cap): One of `50000`, `100000`, `200000`, `500000`. Default `50000`. Deployment only.
+- `searchCrawler` (Index message history): `true` or `false`. Default `true`. Deployment only.
+- `searchUnmeteredOnly` (Only transfer search history on unmetered networks): `true` or `false`. Default `true`. Deployment only.
+- `searchSharing` (Share the search index between devices): `true` or `false`. Default `true`. Deployment only.
+- `serverSearch` (Search on the server): `true` or `false`. Default `true`. Deployment only.
+- `showSearch` (Show search in the sidebar): `true` or `false`. Default `false`.
 
 ## Developer
 
@@ -170,9 +185,6 @@ accepts the same settings except those marked deployment only.
 ## Media
 
 - `mediaAutoLoad` (Load media automatically): One of `on`, `private`, `off`. Default `on`.
-- `autoplayGifs` (Autoplay animated images): `true` or `false`. Default `true`.
-- `pauseAnimationsWhenInactive` (Pause animations when the window is inactive): `true` or `false`. Default `false`.
-- `autoplayStickers` (Autoplay stickers and emoji): `true` or `false`. Default `true`.
 - `urlPreviews` (Server-side embeds): `true` or `false`. Default `false`.
 - `themeFileCards` (Show install cards for theme files): `true` or `false`. Default `true`.
 - `encryptedUrlPreviews` (Server-side embeds in encrypted rooms): `true` or `false`. Default `false`. Deployment only.

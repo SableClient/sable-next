@@ -3,10 +3,10 @@
     "added": [
       "deploymentTheme",
       "saturation",
-      "showActiveThreadsInSidebar",
       "showEncryptionStatusIcon",
       "matrixLinkSelector",
-      "matrixLinkCustom"
+      "matrixLinkCustom",
+      "showActiveThreadsInSidebar"
     ],
     "changed": []
   },

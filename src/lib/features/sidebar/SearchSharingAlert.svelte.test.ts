@@ -54,7 +54,7 @@ test('a failed transfer paused on a metered network says why and offers the sett
   ).toBeInTheDocument();
   await userEvent.setup().click(screen.getByRole('button', { name: 'Settings' }));
   expect(goto).toHaveBeenCalledWith(
-    expect.stringContaining('settings/timeline?focus=search-unmetered-only'),
+    expect.stringContaining('settings/search?focus=search-unmetered-only'),
     expect.anything()
   );
 });

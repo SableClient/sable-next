@@ -35,22 +35,20 @@ export const settingsNavGroups: SettingsNavGroup[] = [
   {
     id: 'user',
     label: 'settings.navGroups.user',
-    sections: [
-      SETTINGS_ACCOUNT_SECTION,
-      SETTINGS_EMOTES_SECTION,
-      SETTINGS_DEVICES_SECTION,
-      'privacy',
-      'personas',
-    ],
+    sections: [SETTINGS_ACCOUNT_SECTION, SETTINGS_DEVICES_SECTION, 'privacy', 'personas'],
   },
   {
     id: 'interface',
     label: 'settings.navGroups.interface',
     sections: [
       'appearance',
+      'accessibility',
+      'language',
+      'sidebar',
       'composer',
       ...(supportsKeyboardShortcuts() ? ['keyboard'] : []),
       'media',
+      SETTINGS_EMOTES_SECTION,
       'timeline',
       'desktop',
     ],
@@ -58,7 +56,7 @@ export const settingsNavGroups: SettingsNavGroup[] = [
   {
     id: 'behavior',
     label: 'settings.navGroups.behavior',
-    sections: ['notifications', 'calls', 'sounds', 'developer'],
+    sections: ['notifications', 'calls', 'search', 'developer'],
   },
   { id: 'about', sections: ['about'] },
 ];

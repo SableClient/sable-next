@@ -17,9 +17,9 @@ test.each([
 });
 
 test.each([
-  ['accessibility', 'appearance'],
+  ['sounds', 'notifications'],
   ['sync', 'account'],
-  ['time', 'timeline'],
+  ['time', 'language'],
 ])('a link to the merged %s page opens %s', (legacy, section) => {
   expect(parseSettingsLink(`${APP}/settings/${legacy}`, APP)).toEqual({ section });
 });
@@ -74,6 +74,13 @@ test.each([
   'sable-app://app:1234/settings/appearance?moe.sable.client.action=settings',
 ])('rejects %s', (href) => {
   expect(parseSettingsLink(href, APP)).toBeNull();
+});
+
+test('a heading that moved to another category opens there', () => {
+  expect(parseSettingsLink(`${APP}/settings/timeline?focus=message-search`, APP)).toEqual({
+    section: 'search',
+    focus: 'message-search',
+  });
 });
 
 test('a focus id that is not a setting is kept for the heading it may name', () => {

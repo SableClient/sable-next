@@ -33,8 +33,8 @@ function storedTextScale(): number | undefined {
 }
 
 test('a size setting takes a typed percentage and clamps it', async () => {
-  const category = settingsCategories.find((entry) => entry.id === 'appearance');
-  if (!category) throw new Error('the appearance category is missing');
+  const category = settingsCategories.find((entry) => entry.id === 'accessibility');
+  if (!category) throw new Error('the accessibility category is missing');
   const screen = await render(SettingsCategorySections, { category });
   const field = screen.getByRole('spinbutton', { name: 'Text size in percent' });
 
@@ -77,8 +77,8 @@ test('the emoticon conversion setting is off by default and persists its choice'
 
 test('mobile: a dropdown opens as a sheet of choices', async () => {
   await page.viewport(412, 915);
-  const category = settingsCategories.find((entry) => entry.id === 'appearance');
-  if (!category) throw new Error('the appearance category is missing');
+  const category = settingsCategories.find((entry) => entry.id === 'sidebar');
+  if (!category) throw new Error('the sidebar category is missing');
   const screen = await render(SettingsCategorySections, { category });
 
   await userEvent.click(screen.getByRole('button', { name: 'Room icons' }));
@@ -105,8 +105,8 @@ test('profile change propagation is disabled when the homeserver lacks MSC4466',
 });
 
 test('a setting locked by the deployment is disabled with a hint', async () => {
-  const category = settingsCategories.find((entry) => entry.id === 'appearance');
-  if (!category) throw new Error('the appearance category is missing');
+  const category = settingsCategories.find((entry) => entry.id === 'accessibility');
+  if (!category) throw new Error('the accessibility category is missing');
   applyDeploymentLocks({ textScale: 1.2 });
   const screen = await render(SettingsCategorySections, { category });
 

@@ -127,7 +127,7 @@
   );
 
   function openMeteredSetting(event: MouseEvent): void {
-    followSettingsLink(event, 'timeline', settingFocusId('searchUnmeteredOnly'), true);
+    followSettingsLink(event, 'search', settingFocusId('searchUnmeteredOnly'), true);
   }
 </script>
 

@@ -24,7 +24,7 @@ test('restores the last room on startup', async ({ page }) => {
 test('disabling restoration opens the room list', async ({ page }) => {
   await page.goto(roomPath);
   await expect(page.getByRole('heading', { name: 'General', exact: true })).toBeVisible();
-  await page.goto('/settings/appearance');
+  await page.goto('/settings/sidebar');
   const setting = page.getByRole('switch', { name: 'Restore last viewed room', exact: true });
   await expect(setting).toBeChecked();
   await setting.click();
