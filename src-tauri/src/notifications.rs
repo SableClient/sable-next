@@ -99,11 +99,24 @@ fn test_view(sequence: u32) -> NotificationView {
     }
 }
 
+#[cfg(target_os = "ios")]
+fn forget_extension_cooldown(user_id: &str, room_ids: &[String]) {
+    let forgotten = crate::ios::shared_store_dir().and_then(|root| {
+        display::forget_extension_cooldown(&root.join("alert-cooldown.json"), user_id, room_ids)
+            .map_err(|error| error.to_string())
+    });
+    if let Err(error) = forgotten {
+        log::debug!("could not clear the notification extension's alert times: {error}");
+    }
+}
+
 pub(crate) async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_ids: &[String]) {
     #[cfg(not(target_os = "android"))]
     for room_id in room_ids {
         display::forget(user_id, room_id);
     }
+    #[cfg(target_os = "ios")]
+    forget_extension_cooldown(user_id, room_ids);
     if room_ids.is_empty() {
         return;
     }
@@ -123,6 +136,8 @@ pub(crate) async fn dismiss_read<R: Runtime>(
     for room_id in room_ids {
         display::forget(user_id, room_id);
     }
+    #[cfg(target_os = "ios")]
+    forget_extension_cooldown(user_id, room_ids);
     let ids: Vec<i32> = room_ids
         .iter()
         .map(|room_id| room_notification_id(user_id, room_id))

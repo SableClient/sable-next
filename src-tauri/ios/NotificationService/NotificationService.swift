@@ -243,6 +243,7 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             return
         }
         let room = read["room_id"] as? String
+        forgetCooldown(user: user, rooms: room.map { [$0] })
         UNUserNotificationCenter.current().getDeliveredNotifications { [weak self] delivered in
             let identifiers = delivered.filter { notification in
                 let parts = notification.request.content.threadIdentifier
@@ -258,6 +259,7 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
 
     private func clearReadRooms(_ rooms: [String], user: String) {
         guard !rooms.isEmpty else { return }
+        forgetCooldown(user: user, rooms: rooms)
         UNUserNotificationCenter.current().getDeliveredNotifications { delivered in
             let roomSet = Set(rooms)
             let identifiers = delivered.filter { notification in
@@ -269,6 +271,13 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
                 UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiers)
             }
         }
+    }
+
+    private func forgetCooldown(user: String, rooms: [String]?) {
+        lock.lock()
+        let root = policyRoot
+        lock.unlock()
+        if let root { AlertCooldown.forget(root: root, user: user, rooms: rooms) }
     }
 
     private func suppress(badge: Int? = nil) {
@@ -439,7 +448,8 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             ? Self.conversationThread(updated.userInfo) : updated.threadIdentifier
         let priorCooling = alertedAt.map { now >= $0 && now - $0 < Self.notifyOnceWindow } ?? false
         let cooling: Bool
-        if enabled, !activeElsewhere, duplicates.isEmpty, updated.categoryIdentifier != Self.inviteCategory,
+        if enabled, !important, !activeElsewhere, duplicates.isEmpty,
+           updated.categoryIdentifier != Self.inviteCategory,
            let root, let thread {
             cooling = AlertCooldown.record(
                 root: root, thread: thread, now: now, window: Self.notifyOnceWindow

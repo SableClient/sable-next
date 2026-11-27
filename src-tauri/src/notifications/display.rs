@@ -101,6 +101,41 @@ pub(super) fn forget(user_id: &str, room_id: &str) {
     }
 }
 
+/// The iOS notification extension keeps its own one-alert-per-room times in this file, so a
+/// room read in the app is removed from it too.
+#[cfg(any(target_os = "ios", test))]
+pub(super) fn forget_extension_cooldown(
+    path: &std::path::Path,
+    user_id: &str,
+    room_ids: &[String],
+) -> std::io::Result<()> {
+    use std::io::{Read, Seek, Write};
+
+    let mut file = match std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    file.lock()?;
+    let mut json = String::new();
+    file.read_to_string(&mut json)?;
+    let mut alerted: HashMap<String, f64> = serde_json::from_str(&json).unwrap_or_default();
+    let before = alerted.len();
+    for room_id in room_ids {
+        alerted.remove(&conversation_key(user_id, room_id));
+    }
+    if alerted.len() == before {
+        return Ok(());
+    }
+    file.set_len(0)?;
+    file.rewind()?;
+    file.write_all(&serde_json::to_vec(&alerted)?)
+}
+
 fn cooling(view: &NotificationView, now: Instant) -> bool {
     if view.mention || view.noisy != Some(false) {
         return false;
@@ -348,6 +383,28 @@ mod tests {
             start + NOTIFY_ONCE_WINDOW + NOTIFY_ONCE_WINDOW / 2
         ));
         forget(quiet.user_id.as_str(), quiet.room_id.as_str());
+    }
+
+    #[test]
+    fn a_read_room_leaves_the_extension_cooldown() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let path = dir.path().join("alert-cooldown.json");
+        let rooms = ["!read:example.org".to_owned()];
+        super::forget_extension_cooldown(&path, "@me:example.org", &rooms)
+            .expect("a missing file is nothing to forget");
+        assert!(!path.exists());
+
+        std::fs::write(
+            &path,
+            r#"{"@me:example.org\u0000!read:example.org":1000.5,"@me:example.org\u0000!kept:example.org":1001,"@other:example.org\u0000!read:example.org":1002}"#,
+        )
+        .expect("a cooldown file");
+        super::forget_extension_cooldown(&path, "@me:example.org", &rooms).expect("forgotten");
+        let left: std::collections::HashMap<String, f64> =
+            serde_json::from_slice(&std::fs::read(&path).expect("the file")).expect("json");
+        assert_eq!(left.len(), 2);
+        assert!(left.contains_key("@me:example.org\0!kept:example.org"));
+        assert!(left.contains_key("@other:example.org\0!read:example.org"));
     }
 
     #[test]

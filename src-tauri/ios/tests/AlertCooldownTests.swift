@@ -17,6 +17,17 @@ struct AlertCooldownTests {
         precondition(record("user\0room", 900) == false)
         precondition(AlertCooldown.record(root: root.appendingPathComponent("missing").path, thread: "r", now: 1000, window: 300) == nil)
 
+        precondition(record("user\0read", 1400) == false)
+        precondition(record("user\0kept", 1400) == false)
+        precondition(record("other\0read", 1400) == false)
+        AlertCooldown.forget(root: root.path, user: "user", rooms: ["read"])
+        precondition(record("user\0read", 1401) == false)
+        precondition(record("user\0kept", 1401) == true)
+        precondition(record("other\0read", 1401) == true)
+        AlertCooldown.forget(root: root.path, user: "user", rooms: nil)
+        precondition(record("user\0kept", 1402) == false)
+        precondition(record("other\0read", 1402) == true)
+
         let lock = NSLock()
         var results: [Bool] = []
         DispatchQueue.concurrentPerform(iterations: 32) { _ in
