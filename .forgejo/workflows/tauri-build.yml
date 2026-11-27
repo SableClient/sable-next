@@ -972,7 +972,7 @@ jobs:
       - name: Attach AltStore source to release
         run: node scripts/ci/forgejo-release.mjs upload altstore-source.json
   publish-latest:
-    name: Refresh latest tag
+    name: Refresh latest channel metadata
     needs: [setup-release, altstore, obtainium]
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
     runs-on: ubuntu-latest
@@ -985,7 +985,6 @@ jobs:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - name: Upload manifests to latest
         run: |
@@ -999,11 +998,6 @@ jobs:
             --tag "$TAG" --pattern "sable-$VERSION-x64.msi" --dir .
           mv "sable-$VERSION-x64.exe" sable-windows-x86_64-setup.exe
           mv "sable-$VERSION-x64.msi" sable-windows-x86_64.msi
-
-          git tag -f latest "$SHA"
-          git push --force \
-            "https://oauth2:${FORGEJO_TOKEN}@git.sable.moe/${FORGEJO_REPOSITORY}.git" \
-            refs/tags/latest
 
           node scripts/ci/forgejo-release.mjs ensure \
             --tag latest \
