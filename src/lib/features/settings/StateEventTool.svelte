@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
+
   import { useCoreClient } from '#lib/core/context.js';
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { parseJsonObject } from '#lib/json-object.js';
@@ -7,7 +9,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
-  import TextArea from '#lib/ui/primitives/TextArea.svelte';
+  import CodeTextArea from '#lib/ui/primitives/CodeTextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import '#lib/ui/primitives/settings-row.css';
 
@@ -65,62 +67,107 @@
   }
 </script>
 
-<form class="state-event settings-form" onsubmit={send}>
-  <p class="hint">{i18n.t('settings.stateEventDescription')}</p>
+<details class="settings-form disclosure">
+  <summary>
+    <CaretRightIcon class="caret" aria-hidden="true" />
+    {i18n.t('settings.stateEventOpen')}
+  </summary>
+  <form class="state-event" onsubmit={send}>
+    <p class="hint">{i18n.t('settings.stateEventDescription')}</p>
 
-  <FormField fieldId="state-event-room" label={i18n.t('settings.stateEventRoom')}>
-    <Select
-      id="state-event-room"
-      bind:value={roomId}
-      items={[{ value: '', label: '' }, ...rooms]}
-    />
-  </FormField>
+    <FormField fieldId="state-event-room" label={i18n.t('settings.stateEventRoom')}>
+      <Select
+        id="state-event-room"
+        bind:value={roomId}
+        items={rooms}
+        placeholder={i18n.t('settings.stateEventRoomPlaceholder')}
+      />
+    </FormField>
 
-  <FormField fieldId="state-event-type" label={i18n.t('settings.stateEventType')}>
-    <TextInput
-      id="state-event-type"
-      bind:value={eventType}
-      autocomplete="off"
-      spellcheck={false}
-      placeholder="m.room.topic"
-    />
-  </FormField>
+    <FormField fieldId="state-event-type" label={i18n.t('settings.stateEventType')}>
+      <TextInput
+        id="state-event-type"
+        bind:value={eventType}
+        autocomplete="off"
+        spellcheck={false}
+        placeholder="m.room.topic"
+      />
+    </FormField>
 
-  <FormField fieldId="state-event-key" label={i18n.t('settings.stateEventStateKey')}>
-    <TextInput id="state-event-key" bind:value={stateKey} autocomplete="off" spellcheck={false} />
-  </FormField>
+    <FormField fieldId="state-event-key" label={i18n.t('settings.stateEventStateKey')}>
+      <TextInput id="state-event-key" bind:value={stateKey} autocomplete="off" spellcheck={false} />
+    </FormField>
 
-  <FormField fieldId="state-event-content" label={i18n.t('settings.stateEventContent')}>
-    <TextArea
-      id="state-event-content"
-      bind:value={content}
-      spellcheck={false}
-      error={error === 'json'}
-      class="state-event-content"
-    />
-  </FormField>
+    <FormField fieldId="state-event-content" label={i18n.t('settings.stateEventContent')}>
+      <CodeTextArea
+        id="state-event-content"
+        language="json"
+        rows={12}
+        bind:value={content}
+        error={error === 'json'}
+      />
+    </FormField>
 
-  {#if error === 'json'}
-    <Alert variant="critical" role="alert"
-      >{i18n.t('settings.developerAccountDataInvalidJson')}</Alert
-    >
-  {:else if error === 'failed'}
-    <Alert variant="critical" role="alert">{i18n.t('common.stateEventRejected')}</Alert>
-  {:else if sent}
-    <Alert variant="success" role="status">{i18n.t('settings.stateEventSent')}</Alert>
-  {/if}
+    {#if error === 'json'}
+      <Alert variant="critical" role="alert"
+        >{i18n.t('settings.developerAccountDataInvalidJson')}</Alert
+      >
+    {:else if error === 'failed'}
+      <Alert variant="critical" role="alert">{i18n.t('common.stateEventRejected')}</Alert>
+    {:else if sent}
+      <Alert variant="success" role="status">{i18n.t('settings.stateEventSent')}</Alert>
+    {/if}
 
-  <div class="actions">
-    <Button type="submit" variant="primary" disabled={!canSend} loading={sending}>
-      {i18n.t('settings.stateEventSend')}
-    </Button>
-  </div>
-</form>
+    <div class="actions">
+      <Button type="submit" variant="primary" disabled={!canSend} loading={sending}>
+        {i18n.t('settings.stateEventSend')}
+      </Button>
+    </div>
+  </form>
+</details>
 
 <style>
+  .disclosure {
+    display: grid;
+  }
+
+  summary {
+    align-items: center;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    font-weight: var(--font-weight-medium);
+    gap: var(--space-200);
+    list-style: none;
+    padding: var(--space-200) 0;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary:hover {
+    color: var(--primary-main);
+  }
+
+  summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--space-050);
+  }
+
+  summary :global(.caret) {
+    flex: none;
+    transition: transform var(--duration-fast) ease-out;
+  }
+
+  .disclosure[open] summary :global(.caret) {
+    transform: rotate(90deg);
+  }
+
   .state-event {
     display: grid;
     gap: var(--space-400);
+    padding-top: var(--space-300);
   }
 
   .hint {
@@ -133,11 +180,5 @@
   .actions {
     display: flex;
     justify-content: flex-end;
-  }
-
-  :global(.state-event-content) {
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-small);
-    font-variant-ligatures: none;
   }
 </style>

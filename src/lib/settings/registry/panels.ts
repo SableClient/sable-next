@@ -353,31 +353,17 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
   ],
   developer: [
     {
-      id: 'developer-access-token',
-      section: 'developer-options',
-      supported: developerTools,
-      targets: targets([['access-token', 'settings.developerAccessTokenTitle']]),
-    },
-    {
-      id: 'developer-sync-diagnostics',
-      section: 'developer-sync-diagnostics',
+      id: 'developer-status',
+      section: 'developer-status',
       supported: developerTools,
       targets: targets([
-        ['developer-sync-diagnostics', 'settings.developerSyncTitle'],
+        ['access-token', 'settings.developerAccessTokenTitle'],
         ['sync-state', 'settings.developerSyncState'],
         ['sync-core-status', 'settings.developerSyncCoreStatus'],
         ['sync-rooms', 'settings.developerSyncRooms'],
         ['sync-account', 'settings.developerSyncAccount'],
         ['sync-revision', 'settings.developerSyncRevision'],
         ['sync-unresponsive', 'settings.developerSyncUnresponsive'],
-      ]),
-    },
-    {
-      id: 'developer-server-features',
-      section: 'developer-server-features',
-      supported: developerTools,
-      targets: targets([
-        ['developer-server-features', 'settings.developerServerFeaturesTitle'],
         ['server-feature-org.matrix.simplified_msc3575', 'settings.serverFeatureSlidingSync'],
         ['server-feature-org.matrix.msc4140', 'settings.callCompatDelayed'],
         ['server-feature-org.matrix.msc4354', 'settings.callCompatSticky'],
@@ -385,6 +371,11 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
           'server-feature-computer.gingershaped.msc4466',
           'settings.serverFeatureProfilePropagation',
         ],
+        ['sentry-configured', 'settings.developerSentryConfigured'],
+        ['sentry-environment', 'settings.developerSentryEnvironment'],
+        ['sentry-reporting', 'settings.developerSentryReporting'],
+        ['sentry-replay', 'settings.developerSentryReplay'],
+        ['sentry-activity', 'settings.developerSentryActivity'],
       ]),
     },
     {
@@ -431,14 +422,7 @@ export const settingsPanels: Record<string, SettingsPanelDefinition[]> = {
       id: 'developer-sentry',
       section: 'developer-sentry',
       supported: developerTools,
-      targets: targets([
-        ['developer-sentry', 'settings.developerSentryTitle'],
-        ['sentry-configured', 'settings.developerSentryConfigured'],
-        ['sentry-environment', 'settings.developerSentryEnvironment'],
-        ['sentry-reporting', 'settings.developerSentryReporting'],
-        ['sentry-replay', 'settings.developerSentryReplay'],
-        ['sentry-activity', 'settings.developerSentryActivity'],
-      ]),
+      targets: targets([['developer-sentry', 'settings.developerSentryTitle']]),
     },
     {
       id: 'state-event',

@@ -6,6 +6,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+  useRoomList: () => ({ rooms: [] }),
+}));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 

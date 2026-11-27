@@ -62,5 +62,5 @@
 {#if standalone}
   <standalone.component />
 {:else if category}
-  <SettingsCategoryView {category} />
+  <SettingsCategoryView {category} {focus} />
 {/if}

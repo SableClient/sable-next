@@ -33,7 +33,7 @@ import SettingsFile from '#lib/features/settings/SettingsFile.svelte';
 import SettingsSyncStatus from '#lib/features/settings/SettingsSyncStatus.svelte';
 import SyncEncryption from '#lib/features/settings/SyncEncryption.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
-import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
+import DeveloperStatus from '#lib/features/settings/DeveloperStatus.svelte';
 import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
 import DeveloperPushRules from '#lib/features/settings/DeveloperPushRules.svelte';
 import DeveloperDebugLogs from '#lib/features/settings/DeveloperDebugLogs.svelte';
@@ -43,8 +43,6 @@ import DeveloperSearchMetrics from '#lib/features/settings/DeveloperSearchMetric
 import SearchSharingStatus from '#lib/features/settings/SearchSharingStatus.svelte';
 import DeveloperSentry from '#lib/features/settings/DeveloperSentry.svelte';
 import PresenceSharingSettings from '#lib/features/settings/PresenceSharingSettings.svelte';
-import DeveloperServerFeatures from '#lib/features/settings/DeveloperServerFeatures.svelte';
-import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagnostics.svelte';
 import SoundVolumeSettings from '../call/SoundVolumeSettings.svelte';
 
 export interface CategoryPanel extends SettingsPanelDefinition {
@@ -82,9 +80,7 @@ export const panelComponents: Partial<Record<string, Component>> = {
   'settings-sync-status': SettingsSyncStatus,
   'sync-encryption': SyncEncryption,
   'settings-file': SettingsFile,
-  'developer-access-token': DeveloperAccessToken,
-  'developer-sync-diagnostics': DeveloperSyncDiagnostics,
-  'developer-server-features': DeveloperServerFeatures,
+  'developer-status': DeveloperStatus,
   'developer-account-data': DeveloperAccountData,
   'developer-push-rules': DeveloperPushRules,
   'developer-notifications': DeveloperNotifications,

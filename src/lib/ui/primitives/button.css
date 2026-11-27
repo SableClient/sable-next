@@ -38,6 +38,13 @@
   --button-default-height: var(--control-height-medium);
 }
 
+.btn-field:not(.icon-button) {
+  --button-default-height: var(--control-height-400);
+
+  border-radius: var(--radius-inner);
+  font-size: max(var(--font-size-label), var(--font-size-input-min));
+}
+
 .btn-large:not(.icon-button) {
   --button-default-height: var(--control-height-large);
 

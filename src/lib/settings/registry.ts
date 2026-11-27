@@ -72,8 +72,9 @@ export interface SettingsTargetDefinition {
   description?: string;
   /** Left out entirely where the platform has nothing for it to show. */
   supported?: SettingsGate;
-  shownWhen?: { key: SelectPreference; value: string };
+  shownWhen?: { key: SelectPreference; value: string } | { key: BooleanPreference; value: boolean };
   terms?: readonly string[];
+  section?: string;
 }
 
 interface BaseSetting extends SettingsTargetDefinition {
@@ -123,6 +124,7 @@ export type SettingType = SettingDefinition['type'];
 export interface SettingsSectionDefinition {
   id: string;
   name: string;
+  tab?: string;
 }
 
 export interface SettingsCategory {
@@ -131,6 +133,8 @@ export interface SettingsCategory {
   description?: string;
   icon: Component;
   sections: SettingsSectionDefinition[];
+  /** A section without a tab goes on the first one. */
+  tabs?: readonly { id: string; name: string }[];
   items: SettingDefinition[];
   targets?: readonly SettingsTargetDefinition[];
 }
@@ -332,6 +336,7 @@ export const settingsCategories: SettingsCategory[] = categories.map((category) 
     targets: panels.flatMap((panel) =>
       (panel.targets ?? []).map((target) => ({
         icon: category.icon,
+        section: panel.section,
         ...target,
         supported: allOf(panel.supported, target.supported),
       }))

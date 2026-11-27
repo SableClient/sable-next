@@ -1,13 +1,15 @@
 <script lang="ts">
   import { copyText } from '#lib/platform/clipboard.js';
-  import { formatTime } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
+  import SearchField from '#lib/ui/primitives/SearchField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import {
     clearDebugLogs,
+    DEBUG_LOG_CATEGORIES,
     debugLog,
     exportDebugLogs,
     setDebugLogging,
@@ -19,28 +21,31 @@
   import { scrollHint } from '#lib/ui/scroll-hint.js';
   import { reportSave } from '#lib/ui/download.js';
 
-  const categories: DebugLogCategory[] = [
-    'sync',
-    'network',
-    'notification',
-    'message',
-    'media',
-    'call',
-    'ui',
-    'timeline',
-    'error',
-    'general',
-  ];
   const levels: (DebugLogLevel | 'all')[] = ['all', 'debug', 'info', 'warn', 'error'];
   let level = $state<DebugLogLevel | 'all'>('all');
   let category = $state<DebugLogCategory | 'all'>('all');
-  let filtered = $derived(
-    debugLog.entries.filter(
+  let query = $state('');
+  let filtered = $derived.by(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    return debugLog.entries.filter(
       (entry) =>
         (level === 'all' || entry.level === level) &&
-        (category === 'all' || entry.category === category)
-    )
-  );
+        (category === 'all' || entry.category === category) &&
+        (!needle ||
+          entry.message.toLocaleLowerCase().includes(needle) ||
+          entry.namespace.toLocaleLowerCase().includes(needle))
+    );
+  });
+  const SHOWN = 500;
+  let shown = $derived(filtered.slice(-SHOWN).reverse());
+
+  const clock = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+    hourCycle: 'h23',
+  });
 
   async function download(entries = filtered): Promise<void> {
     reportSave(await exportDiagnosticsBundle(entries));
@@ -67,54 +72,83 @@
   </ul>
 
   <div class="settings-form logs-body">
-    <div class="filters">
-      <Select
-        aria-label={i18n.t('settings.developerLogsLevel')}
-        value={level}
-        items={levels.map((value) => ({ value, label: value }))}
-        onValueChange={(value) => (level = value as DebugLogLevel | 'all')}
-      />
-      <Select
-        aria-label={i18n.t('settings.developerLogsCategory')}
-        value={category}
-        items={[
-          { value: 'all', label: 'all' },
-          ...categories.map((value) => ({ value, label: value })),
-        ]}
-        onValueChange={(value) => (category = value as DebugLogCategory | 'all')}
-      />
-    </div>
-
-    <div class="actions">
-      <Button variant="ghost" size="small" onclick={clearDebugLogs}>{i18n.t('common.clear')}</Button
-      >
-      <Button variant="secondary" size="small" onclick={() => void copy()}
-        >{i18n.t('settings.developerLogsCopy')}</Button
-      >
-      <Button variant="secondary" size="small" onclick={() => void download()}
-        >{i18n.t('settings.developerLogsExport')}</Button
-      >
-    </div>
-
-    {#if filtered.length === 0}
-      <p class="empty-text">{i18n.t('settings.developerLogsEmpty')}</p>
-    {:else}
-      <div class="entries" aria-live="polite" {@attach scrollHint}>
-        {#each filtered.slice(-200).reverse() as entry (entry.id)}
-          <details class={`entry level-${entry.level}`}>
-            <summary>
-              <span>{entry.level.toUpperCase()}</span>
-              <span>{entry.category}</span>
-              <time datetime={new Date(entry.timestamp).toISOString()}
-                >{formatTime(entry.timestamp)}</time
-              >
-              <span>{entry.namespace}</span>
-            </summary>
-            <p>{entry.message}</p>
-            {#if entry.data}<pre>{JSON.stringify(entry.data, null, 2)}</pre>{/if}
-          </details>
-        {/each}
+    <div class="toolbar">
+      <div class="search">
+        <SearchField bind:value={query} label={i18n.t('settings.developerLogsSearch')} />
       </div>
+      <FormField fieldId="debug-logs-level" label={i18n.t('settings.developerLogsLevel')}>
+        <Select
+          id="debug-logs-level"
+          value={level}
+          items={levels.map((value) => ({
+            value,
+            label: i18n.t(`settings.developerLogLevels.${value}`),
+          }))}
+          onValueChange={(value) => (level = value as DebugLogLevel | 'all')}
+        />
+      </FormField>
+      <FormField fieldId="debug-logs-category" label={i18n.t('settings.developerLogsCategory')}>
+        <Select
+          id="debug-logs-category"
+          value={category}
+          items={[
+            { value: 'all', label: i18n.t('settings.developerLogCategories.all') },
+            ...DEBUG_LOG_CATEGORIES.map((value) => ({
+              value,
+              label: i18n.t(`settings.developerLogCategories.${value}`),
+            })),
+          ]}
+          onValueChange={(value) => (category = value as DebugLogCategory | 'all')}
+        />
+      </FormField>
+    </div>
+
+    <div class="summary-bar">
+      <p class="count">
+        {i18n.t('settings.developerLogsShowing', {
+          shown: shown.length,
+          total: debugLog.entries.length,
+        })}
+      </p>
+      <div class="actions">
+        <Button variant="ghost" size="small" onclick={clearDebugLogs}>
+          {i18n.t('common.clear')}
+        </Button>
+        <Button variant="secondary" size="small" onclick={() => void copy()}>
+          {i18n.t('settings.developerLogsCopy')}
+        </Button>
+        <Button variant="secondary" size="small" onclick={() => void download()}>
+          {i18n.t('settings.developerLogsExport')}
+        </Button>
+      </div>
+    </div>
+
+    {#if shown.length === 0}
+      <p class="empty-text">
+        {i18n.t(debugLog.enabled ? 'settings.developerLogsEmpty' : 'settings.developerLogsOff')}
+      </p>
+    {:else}
+      <ol class="console" {@attach scrollHint}>
+        {#each shown as entry (entry.id)}
+          <li class={`level-${entry.level}`}>
+            <details>
+              <summary>
+                <time datetime={new Date(entry.timestamp).toISOString()}>
+                  {clock.format(entry.timestamp)}
+                </time>
+                <span class="level">{entry.level}</span>
+                <span class="category">{entry.category}</span>
+                <span class="message">{entry.message}</span>
+              </summary>
+              <div class="detail">
+                <p class="namespace">{entry.namespace}</p>
+                <p class="full">{entry.message}</p>
+                {#if entry.data}<pre>{JSON.stringify(entry.data, null, 2)}</pre>{/if}
+              </div>
+            </details>
+          </li>
+        {/each}
+      </ol>
     {/if}
   </div>
 </div>
@@ -124,31 +158,9 @@
     display: grid;
   }
 
-  .logs-body,
-  .entries {
+  .logs-body {
     display: grid;
     gap: var(--space-300);
-  }
-
-  .filters,
-  .actions {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-300);
-  }
-
-  p {
-    color: var(--surface-var-on-container);
-    margin: 0;
-  }
-
-  .filters > :global(*) {
-    min-width: 9rem;
-  }
-
-  .actions {
-    justify-content: flex-end;
   }
 
   .settings {
@@ -157,52 +169,164 @@
     padding: 0;
   }
 
-  .entries {
-    max-height: 32rem;
-    overflow: auto;
+  .toolbar {
+    align-items: end;
+    display: grid;
+    gap: var(--space-300);
+    grid-template-columns: minmax(12rem, 1fr) minmax(8rem, 10rem) minmax(8rem, 12rem);
   }
 
-  .entry {
+  .search {
+    align-self: end;
+  }
+
+  @media (width < 40rem) {
+    .toolbar {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .search {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .summary-bar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-300);
+    justify-content: space-between;
+  }
+
+  .count {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+  }
+
+  .empty-text {
+    color: var(--surface-var-on-container);
+    margin: 0;
+  }
+
+  .console {
     background: var(--bg-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     color: var(--bg-on-container);
-    padding: var(--space-200) var(--space-300);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-small);
+    font-variant-ligatures: none;
+    font-variant-numeric: tabular-nums;
+    list-style: none;
+    margin: 0;
+    max-height: 36rem;
+    overflow: auto;
+    padding: 0;
+  }
+
+  .console li + li {
+    border-top: var(--border-width) solid var(--bg-container-line);
   }
 
   summary {
+    align-items: baseline;
     cursor: pointer;
     display: grid;
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-small);
-    font-variant-ligatures: none;
-    gap: var(--space-200);
-    grid-template-columns: auto auto auto 1fr;
+    gap: var(--space-300);
+    grid-template-columns: auto 3.5rem 6rem minmax(0, 1fr);
+    list-style: none;
+    padding: var(--space-150) var(--space-300);
   }
 
-  summary span:first-child {
-    font-weight: var(--font-weight-bold);
+  summary::-webkit-details-marker {
+    display: none;
   }
 
-  .level-error summary span:first-child {
+  summary:hover {
+    background: var(--bg-container-hover);
+  }
+
+  summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  time,
+  .category,
+  .namespace {
+    color: var(--surface-var-on-container);
+  }
+
+  .level {
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+  }
+
+  .message {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .level-error .level,
+  .level-error .message {
     color: var(--crit-main);
   }
 
-  .level-warn summary span:first-child {
+  .level-warn .level {
     color: var(--warn-main);
   }
 
-  .entry p,
+  .level-debug .level {
+    color: var(--surface-var-on-container);
+  }
+
+  .category {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  details[open] .message {
+    visibility: hidden;
+  }
+
+  .detail {
+    display: grid;
+    gap: var(--space-200);
+    padding: 0 var(--space-300) var(--space-300);
+  }
+
+  .detail p,
   pre {
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-small);
-    font-variant-ligatures: none;
-    margin: var(--space-200) 0 0;
+    margin: 0;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
   }
 
   pre {
-    max-height: 12rem;
+    background: var(--surface-container);
+    border-radius: var(--radius-inner);
+    max-height: 16rem;
     overflow: auto;
+    padding: var(--space-200) var(--space-300);
+  }
+
+  @media (width < 40rem) {
+    summary {
+      grid-template-columns: auto 3rem minmax(0, 1fr);
+    }
+
+    .category {
+      display: none;
+    }
   }
 </style>

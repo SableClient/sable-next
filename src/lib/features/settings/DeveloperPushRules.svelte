@@ -2,15 +2,17 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { settingsChanges } from '#lib/features/notifications/notifications.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
+  import CopyValue from '#lib/ui/primitives/CopyValue.svelte';
+  import ExplorerShell, { type ExplorerGroup } from '#lib/ui/primitives/ExplorerShell.svelte';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import Select from '#lib/ui/primitives/Select.svelte';
-  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
-  import TextArea from '#lib/ui/primitives/TextArea.svelte';
-  import { scrollHint } from '#lib/ui/scroll-hint.js';
+  import CodeTextArea from '#lib/ui/primitives/CodeTextArea.svelte';
 
   interface Rule {
     rule_id: string;
@@ -34,6 +36,8 @@
   };
 
   const core = useCoreClient();
+  const roomList = useRoomList();
+  let query = $state('');
   let entries = $state.raw<Entry[]>([]);
   let selected = $state<{ kind: string; ruleId: string } | null>(null);
   let actions = $state('[]');
@@ -52,6 +56,36 @@
           (entry) => entry.kind === selected?.kind && entry.rule.rule_id === selected.ruleId
         )
   );
+
+  const shown = $derived.by(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    if (!needle) return entries;
+    return entries.filter((entry) =>
+      [entry.kind, entry.rule.rule_id, roomName(entry) ?? ''].some((text) =>
+        text.toLocaleLowerCase().includes(needle)
+      )
+    );
+  });
+
+  const ruleGroups = $derived<ExplorerGroup[]>(
+    KINDS.map((kind) => ({
+      id: kind,
+      label: kind,
+      items: shown
+        .filter((entry) => entry.kind === kind)
+        .map((entry) => ({
+          id: `${entry.kind}/${entry.rule.rule_id}`,
+          label: entry.rule.rule_id,
+          hint: roomName(entry) ?? undefined,
+          muted: !entry.rule.enabled,
+        })),
+    })).filter((group) => group.items.length > 0)
+  );
+
+  function roomName(entry: Entry): string | null {
+    if (entry.kind !== 'room') return null;
+    return roomList.rooms.find((room) => room.room_id === entry.rule.rule_id)?.display_name ?? null;
+  }
 
   async function refresh(): Promise<void> {
     if (!core.session) return;
@@ -200,135 +234,127 @@
 
 <div class="settings-form push-rules">
   <p class="description">{i18n.t('settings.developerPushRulesDescription')}</p>
-  <div class="editor-actions">
-    <Button size="small" disabled={draft !== null} onclick={startDraft}>
-      {i18n.t('settings.developerPushRulesNew')}
-    </Button>
-  </div>
-  {#if !loaded}
-    <ul class="rule-list" aria-busy="true" aria-label={i18n.t('settings.developerPushRulesTitle')}>
-      {#each { length: 6 }, index (index)}
-        <li><Skeleton class="rule-loading" /></li>
-      {/each}
-    </ul>
-  {:else if entries.length === 0}
-    <p class="empty-text">{i18n.t('settings.developerPushRulesEmpty')}</p>
-  {:else}
-    <ul class="rule-list" {@attach scrollHint}>
-      {#each entries as entry (`${entry.kind}/${entry.rule.rule_id}`)}
-        {@const active = selected?.kind === entry.kind && selected.ruleId === entry.rule.rule_id}
-        <li>
-          <Button
-            variant={active ? 'primary' : 'ghost'}
-            size="small"
-            class={['choice', !entry.rule.enabled && 'disabled-rule']}
-            aria-pressed={active}
-            block
-            onclick={() => open(entry)}
-          >
-            <span class="kind">{entry.kind}</span>
-            {entry.rule.rule_id}
-          </Button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-
-  {#if draft}
-    <form class="editor" onsubmit={(event) => void create(event)}>
-      <Select
-        aria-label={i18n.t('settings.developerPushRulesKind')}
-        value={draft.kind}
-        items={Object.keys(NEW_RULE_TEMPLATES).map((kind) => ({ value: kind, label: kind }))}
-        onValueChange={(kind) => {
-          draft = { kind, rule: template(kind) };
-        }}
-      />
-      <FormField
-        fieldId="developer-push-rule-new"
-        label={i18n.t('settings.developerPushRulesRule')}
-      >
-        <TextArea
-          id="developer-push-rule-new"
-          bind:value={draft.rule}
-          error={error === 'json'}
-          spellcheck={false}
-          class="push-rule-json"
+  <ExplorerShell
+    label={i18n.t('settings.developerPushRulesTitle')}
+    groups={ruleGroups}
+    selected={draft ? null : selected ? `${selected.kind}/${selected.ruleId}` : undefined}
+    bind:query
+    filterLabel={i18n.t('settings.developerPushRulesFilter')}
+    empty={i18n.t('settings.developerPushRulesEmpty')}
+    noMatches={i18n.t('common.noMatches')}
+    placeholder={i18n.t('settings.developerPushRulesPick')}
+    loading={!loaded}
+    onSelect={(id) => {
+      const entry = entries.find((item) => `${item.kind}/${item.rule.rule_id}` === id);
+      if (entry) open(entry);
+    }}
+    onBack={() => {
+      draft = null;
+      selected = null;
+    }}
+  >
+    {#snippet toolbar()}
+      <Button size="field" variant="secondary" disabled={draft !== null} onclick={startDraft}>
+        <PlusIcon aria-hidden="true" />
+        {i18n.t('settings.developerPushRulesNew')}
+      </Button>
+    {/snippet}
+    {#snippet head()}
+      {#if draft}
+        <Select
+          aria-label={i18n.t('settings.developerPushRulesKind')}
+          value={draft.kind}
+          items={Object.keys(NEW_RULE_TEMPLATES).map((kind) => ({ value: kind, label: kind }))}
+          onValueChange={(kind) => {
+            draft = { kind, rule: template(kind) };
+          }}
         />
-      </FormField>
-      {#if error === 'json' && problem !== null}
-        <Alert variant="critical">{i18n.t(`settings.${problem}`)}</Alert>
-      {:else if error === 'failed'}
-        <Alert variant="critical">{i18n.t('settings.developerPushRulesFailed')}</Alert>
-      {/if}
-      <div class="editor-actions">
-        <Button variant="ghost" size="small" onclick={() => (draft = null)}>
-          {i18n.t('common.cancel')}
-        </Button>
-        <Button type="submit" variant="primary" size="small" loading={busy}>
-          {i18n.t('settings.developerPushRulesCreate')}
-        </Button>
-      </div>
-    </form>
-  {:else if current}
-    <form class="editor" onsubmit={saveActions}>
-      <div class="enabled">
-        <span>{i18n.t('settings.developerPushRulesEnabled')}</span>
-        <Switch
-          checked={current.rule.enabled}
-          disabled={busy}
-          label={i18n.t('settings.developerPushRulesEnabled')}
-          onCheckedChange={setEnabled}
-        />
-      </div>
-      <FormField fieldId="developer-push-rule" label={i18n.t('settings.developerPushRulesRule')}>
-        <TextArea
-          id="developer-push-rule"
-          value={JSON.stringify(current.rule, null, 2)}
-          readonly
-          spellcheck={false}
-          class="push-rule-json"
-        />
-      </FormField>
-      <FormField
-        fieldId="developer-push-rule-actions"
-        label={i18n.t('settings.developerPushRulesActions')}
-      >
-        <TextArea
-          id="developer-push-rule-actions"
-          bind:value={actions}
-          error={error === 'json'}
-          spellcheck={false}
-          class="push-rule-json"
-        />
-      </FormField>
-      {#if error === 'json'}
-        <Alert variant="critical">{i18n.t('settings.developerPushRulesInvalidActions')}</Alert>
-      {:else if error === 'failed'}
-        <Alert variant="critical">{i18n.t('settings.developerPushRulesFailed')}</Alert>
-      {:else if saved}
-        <Alert variant="success">{i18n.t('settings.developerPushRulesSaved')}</Alert>
-      {/if}
-      <div class="editor-actions">
-        {#if !current.rule.default}
-          <Button
-            variant="danger"
-            size="small"
+      {:else if current}
+        <h4 class="rule-head"><CopyValue value={current.rule.rule_id} mono={false} /></h4>
+        <span class="kind">{current.kind}</span>
+        <div class="enabled">
+          <Switch
+            checked={current.rule.enabled}
             disabled={busy}
-            onclick={() => (confirmingDelete = true)}
-          >
-            {i18n.t('settings.developerPushRulesDelete')}
-          </Button>
+            label={i18n.t('settings.developerPushRulesEnabled')}
+            onCheckedChange={setEnabled}
+          />
+        </div>
+      {/if}
+    {/snippet}
+    {#if draft}
+      <form class="editor" onsubmit={(event) => void create(event)}>
+        <FormField
+          fieldId="developer-push-rule-new"
+          label={i18n.t('settings.developerPushRulesRule')}
+        >
+          <CodeTextArea
+            id="developer-push-rule-new"
+            language="json"
+            rows={12}
+            bind:value={draft.rule}
+            error={error === 'json'}
+          />
+        </FormField>
+        {#if error === 'json' && problem !== null}
+          <Alert variant="critical">{i18n.t(`settings.${problem}`)}</Alert>
+        {:else if error === 'failed'}
+          <Alert variant="critical">{i18n.t('settings.developerPushRulesFailed')}</Alert>
         {/if}
-        <Button variant="ghost" size="small" onclick={() => (selected = null)}>
-          {i18n.t('common.close')}
-        </Button>
-        <Button type="submit" variant="primary" size="small" loading={busy}>
-          {i18n.t('common.save')}
-        </Button>
-      </div>
-    </form>
-  {/if}
+        <div class="editor-actions">
+          <Button type="submit" variant="primary" size="small" loading={busy}>
+            {i18n.t('settings.developerPushRulesCreate')}
+          </Button>
+        </div>
+      </form>
+    {:else if current}
+      <form class="editor" onsubmit={saveActions}>
+        <FormField fieldId="developer-push-rule" label={i18n.t('settings.developerPushRulesRule')}>
+          <CodeTextArea
+            id="developer-push-rule"
+            language="json"
+            rows={10}
+            value={JSON.stringify(current.rule, null, 2)}
+            readonly
+          />
+        </FormField>
+        <FormField
+          fieldId="developer-push-rule-actions"
+          label={i18n.t('settings.developerPushRulesActions')}
+        >
+          <CodeTextArea
+            id="developer-push-rule-actions"
+            language="json"
+            rows={5}
+            bind:value={actions}
+            error={error === 'json'}
+          />
+        </FormField>
+        {#if error === 'json'}
+          <Alert variant="critical">{i18n.t('settings.developerPushRulesInvalidActions')}</Alert>
+        {:else if error === 'failed'}
+          <Alert variant="critical">{i18n.t('settings.developerPushRulesFailed')}</Alert>
+        {:else if saved}
+          <Alert variant="success">{i18n.t('settings.developerPushRulesSaved')}</Alert>
+        {/if}
+        <div class="editor-actions">
+          {#if !current.rule.default}
+            <Button
+              variant="danger"
+              size="small"
+              disabled={busy}
+              onclick={() => (confirmingDelete = true)}
+            >
+              {i18n.t('settings.developerPushRulesDelete')}
+            </Button>
+          {/if}
+          <Button type="submit" variant="primary" size="small" loading={busy}>
+            {i18n.t('common.save')}
+          </Button>
+        </div>
+      </form>
+    {/if}
+  </ExplorerShell>
 </div>
 
 <ConfirmDialog
@@ -352,41 +378,20 @@
     margin: 0;
   }
 
-  .rule-list {
-    display: grid;
-    gap: var(--space-200);
-    list-style: none;
+  .rule-head {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-medium);
     margin: 0;
-    max-height: 18rem;
-    overflow: auto;
-    padding: 0;
+    min-width: 0;
   }
 
   .kind {
     color: var(--surface-var-on-container);
-    font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
-    margin-inline-end: var(--space-200);
-  }
-
-  .rule-list :global(.rule-loading) {
-    height: 2rem;
-  }
-
-  :global(.disabled-rule) {
-    text-decoration: line-through;
   }
 
   .enabled {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  :global(.push-rule-json) {
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-small);
-    font-variant-ligatures: none;
+    margin-inline-start: auto;
   }
 
   .editor-actions {

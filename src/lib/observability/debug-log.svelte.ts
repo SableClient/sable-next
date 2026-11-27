@@ -5,17 +5,19 @@ import { readJson, readText, writeJson, writeText } from '#lib/platform/local-js
 import { sanitizePayload, scrubMatrixIds } from './scrubbers.js';
 
 export type DebugLogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type DebugLogCategory =
-  | 'sync'
-  | 'network'
-  | 'notification'
-  | 'message'
-  | 'media'
-  | 'call'
-  | 'ui'
-  | 'timeline'
-  | 'error'
-  | 'general';
+export const DEBUG_LOG_CATEGORIES = [
+  'sync',
+  'network',
+  'notification',
+  'message',
+  'media',
+  'call',
+  'ui',
+  'timeline',
+  'error',
+  'general',
+] as const;
+export type DebugLogCategory = (typeof DEBUG_LOG_CATEGORIES)[number];
 
 export type DebugLogEntry = {
   id: number;

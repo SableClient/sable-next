@@ -2,7 +2,7 @@ import type { Snippet } from 'svelte';
 import type { ClassValue, HTMLButtonAttributes } from 'svelte/elements';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'subtle' | 'ghost' | 'danger' | 'success';
-export type ButtonSize = 'small' | 'medium' | 'large' | 'icon';
+export type ButtonSize = 'small' | 'medium' | 'large' | 'field' | 'icon';
 export type IconButtonSize = 'small' | 'medium' | 'large';
 
 export type ButtonProps = Omit<HTMLButtonAttributes, 'class' | 'children'> & {

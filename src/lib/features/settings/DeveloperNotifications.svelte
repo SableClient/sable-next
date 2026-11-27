@@ -95,11 +95,22 @@
       {#if outcomes.length === 0}
         <Alert variant="info">{i18n.t('settings.developerPushOutcomesEmpty')}</Alert>
       {:else}
-        <ul class="outcomes">
-          {#each outcomes as [outcome, count] (outcome)}
-            <li class={{ last: outcome === diagnostics.lastOutcome }}>{outcome}: {count}</li>
-          {/each}
-        </ul>
+        <table class="outcomes">
+          <thead>
+            <tr>
+              <th scope="col">{i18n.t('settings.developerPushOutcome')}</th>
+              <th scope="col">{i18n.t('settings.developerPushOutcomeCount')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each outcomes as [outcome, count] (outcome)}
+              <tr class={{ last: outcome === diagnostics.lastOutcome }}>
+                <td>{outcome}</td>
+                <td>{count}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
       {/if}
     {/if}
     {#if failed}
@@ -114,16 +125,35 @@
   }
 
   .outcomes {
-    display: grid;
-    font-family: var(--font-family-mono);
-    font-variant-ligatures: none;
-    gap: var(--space-100);
-    list-style: none;
-    margin: 0;
-    padding: var(--space-200) 0 0;
+    border-collapse: collapse;
+    width: 100%;
   }
 
-  .outcomes .last {
+  th,
+  td {
+    border-top: var(--border-width) solid var(--surface-container-line);
+    padding: var(--space-200);
+    text-align: start;
+  }
+
+  thead th {
+    border-top: 0;
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+  }
+
+  td {
+    font-family: var(--font-family-mono);
+    font-variant-ligatures: none;
+  }
+
+  td + td,
+  th + th {
+    text-align: end;
+  }
+
+  .last td {
     font-weight: var(--font-weight-bold);
   }
 </style>

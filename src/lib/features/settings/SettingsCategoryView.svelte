@@ -8,9 +8,10 @@
 
   interface Props {
     category: SettingsCategory;
+    focus?: string | null;
   }
 
-  let { category }: Props = $props();
+  let { category, focus = null }: Props = $props();
   const isComposer = $derived(category.id === 'composer');
   const isTimeline = $derived(category.id === 'timeline');
   const docked = $derived(isComposer || isTimeline);
@@ -29,6 +30,7 @@
       <div class="settings-with-preview-scroll">
         <SettingsCategorySections
           {category}
+          {focus}
           onRangeDraft={(key, value) => {
             if (key === 'textScale') draftTextScale = value;
           }}
@@ -46,7 +48,7 @@
       </div>
     </div>
   {:else}
-    <SettingsCategorySections {category} />
+    <SettingsCategorySections {category} {focus} />
   {/if}
 </AppPageShell>
 

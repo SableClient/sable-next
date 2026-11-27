@@ -115,3 +115,44 @@ test('a setting locked by the deployment is disabled with a hint', async () => {
     .toBeDisabled();
   await expect.element(screen.getByText('Managed by your organization').first()).toBeVisible();
 });
+
+test('a category with tabs shows one tab at a time and opens the tab of a focused row', async () => {
+  const developer = settingsCategories.find((entry) => entry.id === 'developer');
+  if (!developer) throw new Error('the developer category is missing');
+  const items = developer.items.filter(
+    (item) => item.key === 'developerTools' || item.key === 'showTranslationStrings'
+  );
+  const category = {
+    ...developer,
+    tabs: [
+      { id: 'first', name: 'settings.developerTabOverview' },
+      { id: 'second', name: 'settings.developerTabLogs' },
+    ],
+    sections: [
+      { id: 'one', name: 'settings.developerStatusTitle' },
+      { id: 'two', name: 'settings.developerLogsTitle', tab: 'second' },
+    ],
+    items: items.map((item) => ({
+      ...item,
+      gatedBy: undefined,
+      section: item.key === 'developerTools' ? 'one' : 'two',
+    })),
+    targets: [],
+  };
+  const screen = await render(SettingsCategorySections, {
+    category,
+    focus: 'show-translation-strings',
+  });
+
+  await expect
+    .element(screen.getByRole('tab', { name: 'Logs' }))
+    .toHaveAttribute('aria-selected', 'true');
+  await expect.element(screen.getByRole('switch', { name: /translation/i })).toBeVisible();
+  expect(screen.getByRole('switch', { name: 'Enable developer tools' }).query()).toBeNull();
+
+  await userEvent.click(screen.getByRole('tab', { name: 'Overview' }));
+  await expect
+    .element(screen.getByRole('switch', { name: 'Enable developer tools' }))
+    .toBeVisible();
+  expect(screen.getByRole('switch', { name: /translation/i }).query()).toBeNull();
+});

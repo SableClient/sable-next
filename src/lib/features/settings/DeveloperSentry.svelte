@@ -1,113 +1,107 @@
 <script lang="ts">
+  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
+
   import { i18n } from '#lib/i18n.js';
-  import Switch from '#lib/ui/primitives/Switch.svelte';
-  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
-  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import {
+    DEBUG_LOG_CATEGORIES,
     debugLog,
     setDebugCategoryEnabled,
-    type DebugLogCategory,
   } from '#lib/observability/debug-log.svelte.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
-  import '#lib/ui/primitives/settings-row.css';
 
-  const categories: DebugLogCategory[] = [
-    'sync',
-    'network',
-    'notification',
-    'message',
-    'media',
-    'call',
-    'ui',
-    'timeline',
-    'error',
-    'general',
-  ];
-  let errors = $derived(debugLog.entries.filter((entry) => entry.level === 'error').length);
-  let warnings = $derived(debugLog.entries.filter((entry) => entry.level === 'warn').length);
-  let configured = $derived(Boolean(import.meta.env.VITE_SENTRY_DSN));
+  let kept = $derived(
+    DEBUG_LOG_CATEGORIES.filter((category) => !debugLog.disabledCategories.has(category)).length
+  );
 </script>
 
-<div class="sentry">
-  <ul class="settings">
-    <SettingsRow id="sentry-configured" title={i18n.t('settings.developerSentryConfigured')}>
-      <StatusBadge
-        label={configured
-          ? i18n.t('settings.developerSentryConfiguredYes')
-          : i18n.t('settings.developerSentryConfiguredNo')}
-        variant={configured ? 'success' : 'warning'}
-      />
-    </SettingsRow>
-    <SettingsRow id="sentry-environment" title={i18n.t('settings.developerSentryEnvironment')}>
-      <code>{import.meta.env.MODE}</code>
-    </SettingsRow>
-    <SettingsRow id="sentry-reporting" title={i18n.t('settings.developerSentryReporting')}>
-      <code>
-        {preferences.errorReporting
-          ? i18n.t('settings.developerYes')
-          : i18n.t('settings.developerNo')}
-      </code>
-    </SettingsRow>
-    <SettingsRow id="sentry-replay" title={i18n.t('settings.developerSentryReplay')}>
-      <code>
-        {preferences.sessionReplay
-          ? i18n.t('settings.developerYes')
-          : i18n.t('settings.developerNo')}
-      </code>
-    </SettingsRow>
-    <SettingsRow id="sentry-activity" title={i18n.t('settings.developerSentryActivity')}>
-      <code>
-        {errors}
-        {i18n.t('settings.developerSentryErrors')}, {warnings}
-        {i18n.t('settings.developerSentryWarnings')}
-      </code>
-    </SettingsRow>
-  </ul>
-  <div class="settings-form">
-    <p>{i18n.t('settings.developerSentryDescription')}</p>
-  </div>
-  <ul class="categories">
-    {#each categories as category (category)}
-      <SettingsRow title={`${category} breadcrumbs`}>
-        <Switch
-          label={`${category} breadcrumbs`}
+<details class="settings-form breadcrumbs">
+  <summary>
+    <CaretRightIcon class="caret" aria-hidden="true" />
+    {i18n.t('settings.developerBreadcrumbsSummary', {
+      count: kept,
+      total: DEBUG_LOG_CATEGORIES.length,
+    })}
+  </summary>
+  <p>{i18n.t('settings.developerSentryDescription')}</p>
+  <fieldset>
+    <legend class="screen-reader-only">{i18n.t('settings.developerSentryTitle')}</legend>
+    {#each DEBUG_LOG_CATEGORIES as category (category)}
+      <label>
+        <input
+          type="checkbox"
           checked={!debugLog.disabledCategories.has(category)}
-          onCheckedChange={(enabled) => setDebugCategoryEnabled(category, enabled)}
+          onchange={(event) => setDebugCategoryEnabled(category, event.currentTarget.checked)}
         />
-      </SettingsRow>
+        {i18n.t(`settings.developerLogCategories.${category}`)}
+      </label>
     {/each}
-  </ul>
-</div>
+  </fieldset>
+</details>
 
 <style>
-  .settings,
-  .categories {
+  .breadcrumbs {
     display: grid;
     gap: var(--space-300);
   }
 
-  .settings {
+  summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-weight: var(--font-weight-medium);
+    gap: var(--space-200);
     list-style: none;
-    margin: 0;
-    padding: 0;
+    padding: var(--space-200) 0;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary:hover {
+    color: var(--primary-main);
+  }
+
+  summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--space-050);
+  }
+
+  summary :global(.caret) {
+    flex: none;
+    transition: transform var(--duration-fast) ease-out;
+  }
+
+  .breadcrumbs[open] summary :global(.caret) {
+    transform: rotate(90deg);
   }
 
   p {
     color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
     margin: 0;
   }
 
-  code {
-    font-family: var(--font-family-mono);
-    font-variant-ligatures: none;
-    text-align: end;
+  fieldset {
+    border: 0;
+    display: grid;
+    gap: var(--space-200) var(--space-400);
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    margin: 0;
+    padding: 0;
   }
 
-  .categories {
-    border-top: var(--border-width) solid var(--surface-container-line);
-    list-style: none;
+  label {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: var(--space-200);
+    min-height: var(--control-height-300);
+  }
+
+  input {
+    accent-color: var(--primary-main);
+    block-size: 1.125rem;
+    inline-size: 1.125rem;
     margin: 0;
-    padding-inline-start: 0;
-    padding-top: var(--space-300);
   }
 </style>

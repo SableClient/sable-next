@@ -35,7 +35,12 @@ export class OutlineTracker {
     const observer = new MutationObserver(() => {
       this.#collect();
     });
-    observer.observe(scroller, { childList: true, subtree: true, characterData: true });
+    observer.observe(scroller, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributeFilter: ['hidden'],
+    });
 
     const onScroll = (): void => {
       this.#scheduleSpy();
@@ -84,7 +89,9 @@ export class OutlineTracker {
 
   #headings(): HTMLElement[] {
     return this.#scroller
-      ? [...this.#scroller.querySelectorAll<HTMLElement>(OUTLINE_HEADING_SELECTOR)]
+      ? [...this.#scroller.querySelectorAll<HTMLElement>(OUTLINE_HEADING_SELECTOR)].filter(
+          (heading) => !heading.closest('[hidden]')
+        )
       : [];
   }
 

@@ -14,16 +14,25 @@ export const developerCategory: SettingsCategory = {
   id: 'developer',
   name: 'settings.developerTitle',
   icon: CodeIcon,
+  tabs: [
+    { id: 'overview', name: 'settings.developerTabOverview' },
+    { id: 'data', name: 'settings.developerTabData' },
+    { id: 'notifications', name: 'settings.developerTabNotifications' },
+    { id: 'logs', name: 'settings.developerTabLogs' },
+  ],
   sections: [
+    { id: 'developer-status', name: 'settings.developerStatusTitle' },
     { id: 'developer-options', name: 'common.developerTools' },
-    { id: 'developer-sync-diagnostics', name: 'settings.developerSyncTitle' },
-    { id: 'developer-server-features', name: 'settings.developerServerFeaturesTitle' },
-    { id: 'developer-account-data', name: 'settings.developerAccountDataTitle' },
-    { id: 'developer-push-rules', name: 'settings.developerPushRulesTitle' },
-    { id: 'developer-notifications', name: 'settings.developerNotificationsTitle' },
-    { id: 'developer-debug-logs', name: 'settings.developerLogsTitle' },
-    { id: 'developer-sentry', name: 'settings.developerSentryTitle' },
-    { id: 'settings-state-event', name: 'settings.stateEventTitle' },
+    { id: 'developer-account-data', name: 'settings.developerAccountDataTitle', tab: 'data' },
+    { id: 'developer-push-rules', name: 'settings.developerPushRulesTitle', tab: 'data' },
+    { id: 'settings-state-event', name: 'settings.stateEventTitle', tab: 'data' },
+    {
+      id: 'developer-notifications',
+      name: 'settings.developerNotificationsTitle',
+      tab: 'notifications',
+    },
+    { id: 'developer-debug-logs', name: 'settings.developerLogsTitle', tab: 'logs' },
+    { id: 'developer-sentry', name: 'settings.developerSentryTitle', tab: 'logs' },
   ],
   items: [
     {
@@ -41,6 +50,7 @@ export const developerCategory: SettingsCategory = {
       description: 'settings.coreLogLevelHint',
       type: 'select',
       gatedBy: 'developerTools',
+      requiresReload: true,
       options: [
         { value: 'default', label: 'settings.coreLogLevelDefault' },
         { value: 'debug', label: 'settings.coreLogLevelDebug' },
@@ -84,7 +94,7 @@ export const developerCategory: SettingsCategory = {
       icon: PencilSimpleIcon,
       name: 'settings.hiddenEventEdits',
       type: 'boolean',
-      gatedBy: 'showHiddenEvents',
+      shownWhen: { key: 'showHiddenEvents', value: true },
     },
     {
       key: 'hiddenEventReactions',
@@ -92,7 +102,7 @@ export const developerCategory: SettingsCategory = {
       icon: SmileyIcon,
       name: 'settings.hiddenEventReactions',
       type: 'boolean',
-      gatedBy: 'showHiddenEvents',
+      shownWhen: { key: 'showHiddenEvents', value: true },
     },
     {
       key: 'hiddenEventRedactions',
@@ -100,7 +110,7 @@ export const developerCategory: SettingsCategory = {
       icon: TrashIcon,
       name: 'settings.hiddenEventRedactions',
       type: 'boolean',
-      gatedBy: 'showHiddenEvents',
+      shownWhen: { key: 'showHiddenEvents', value: true },
     },
     {
       key: 'hiddenEventOther',
@@ -108,7 +118,7 @@ export const developerCategory: SettingsCategory = {
       icon: DotsThreeIcon,
       name: 'settings.hiddenEventOther',
       type: 'boolean',
-      gatedBy: 'showHiddenEvents',
+      shownWhen: { key: 'showHiddenEvents', value: true },
     },
     {
       key: 'showTranslationStrings',

@@ -17,8 +17,15 @@
     settingShown,
     settingsCategories,
     settingsContext,
+    settingsTargets,
   } from '#lib/settings/registry.js';
-  import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
+  import type {
+    SettingDefinition,
+    SettingsCategory,
+    SettingsSectionDefinition,
+  } from '#lib/settings/registry.js';
+  import { SvelteSet } from 'svelte/reactivity';
+  import type { CategoryPanel } from './category-panels.js';
   import {
     isLockedPreference,
     preferences,
@@ -27,13 +34,15 @@
   import { PREFERENCE_RANGES } from '#lib/settings/definitions.js';
   import type { Preferences } from '#lib/settings/definitions.js';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { rovingFocus } from '#lib/ui/roving-focus.js';
 
   interface Props {
     category: SettingsCategory;
+    focus?: string | null;
     onRangeDraft?: (key: string, value: number | null) => void;
   }
 
-  let { category, onRangeDraft }: Props = $props();
+  let { category, focus = null, onRangeDraft }: Props = $props();
 
   const core = useCoreClient();
   const context = $derived(settingsContext(core));
@@ -64,6 +73,33 @@
       }))
       .filter(({ rows, panels }) => rows.length > 0 || panels.length > 0)
   );
+  const tabs = $derived(
+    (category.tabs ?? []).filter((tab) => sections.some((entry) => tabOf(entry.section) === tab.id))
+  );
+  let chosenTab = $derived(focusedTab(focus));
+  const activeTab = $derived(tabs.find((tab) => tab.id === chosenTab)?.id ?? tabs[0]?.id ?? null);
+  /** A visited tab stays mounted so its panels keep what they loaded. */
+  const visited = new SvelteSet<string>();
+
+  function selectTab(id: string): void {
+    if (activeTab !== null) visited.add(activeTab);
+    visited.add(id);
+    chosenTab = id;
+  }
+
+  function tabOf(section: { tab?: string }): string | undefined {
+    return section.tab ?? category.tabs?.[0]?.id;
+  }
+
+  function focusedTab(id: string | null): string | null {
+    if (id === null || !category.tabs) return null;
+    const sectionId =
+      settingsTargets(category).find(
+        (target) => (target.focusId ?? settingFocusId(target.key)) === id
+      )?.section ?? id;
+    const section = category.sections.find((entry) => entry.id === sectionId);
+    return section ? (tabOf(section) ?? null) : null;
+  }
   const loosePanels = $derived(panels.filter((panel) => panel.section === undefined));
 
   /** A gate this platform never renders would disable its dependants forever. */
@@ -107,6 +143,26 @@
   /** Sentry reads its consent once, at boot. */
   let reloadPending = $state(false);
 </script>
+
+{#snippet sectionBlock({
+  section,
+  rows,
+  panels: sectionPanels,
+}: {
+  section: SettingsSectionDefinition;
+  rows: SettingDefinition[];
+  panels: CategoryPanel[];
+})}
+  <SettingsSection title={i18n.t(section.name)} headingId={section.id}>
+    {#each sectionPanels.filter((panel) => panel.start) as panel (panel.component)}
+      <panel.component />
+    {/each}
+    {#if rows.length > 0}{@render settingRows(rows)}{/if}
+    {#each sectionPanels.filter((panel) => !panel.start) as panel (panel.component)}
+      <panel.component />
+    {/each}
+  </SettingsSection>
+{/snippet}
 
 {#snippet settingRows(rows: SettingDefinition[])}
   <ul class="settings settings-rows">
@@ -152,6 +208,7 @@
               if (setting.setValue) setting.setValue(value);
               else setPreference(key, value as Preferences[typeof key]);
               setting.onChange?.(value);
+              if (setting.requiresReload) reloadPending = true;
             }}
           />
         {:else if setting.type === 'range'}
@@ -243,17 +300,51 @@
     </Alert>
   {/if}
 
-  {#each sections as { section, rows, panels: sectionPanels } (section.id)}
-    <SettingsSection title={i18n.t(section.name)} headingId={section.id}>
-      {#each sectionPanels.filter((panel) => panel.start) as panel (panel.component)}
-        <panel.component />
+  {#if tabs.length > 1}
+    <div
+      class="tabs"
+      role="tablist"
+      aria-label={i18n.t(category.name)}
+      {@attach rovingFocus({ selector: '[role="tab"]' })}
+    >
+      {#each tabs as tab (tab.id)}
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          aria-selected={tab.id === activeTab}
+          id={`settings-tab-${tab.id}`}
+          aria-controls={`settings-tabpanel-${tab.id}`}
+          onfocus={() => selectTab(tab.id)}
+          onclick={() => selectTab(tab.id)}
+        >
+          {i18n.t(tab.name)}
+        </button>
       {/each}
-      {#if rows.length > 0}{@render settingRows(rows)}{/if}
-      {#each sectionPanels.filter((panel) => !panel.start) as panel (panel.component)}
-        <panel.component />
-      {/each}
-    </SettingsSection>
-  {/each}
+    </div>
+  {/if}
+
+  {#if tabs.length > 1}
+    {#each tabs as tab (tab.id)}
+      {#if tab.id === activeTab || visited.has(tab.id)}
+        <div
+          class="tab-panel"
+          role="tabpanel"
+          id={`settings-tabpanel-${tab.id}`}
+          aria-labelledby={`settings-tab-${tab.id}`}
+          hidden={tab.id !== activeTab}
+        >
+          {#each sections.filter((entry) => tabOf(entry.section) === tab.id) as entry (entry.section.id)}
+            {@render sectionBlock(entry)}
+          {/each}
+        </div>
+      {/if}
+    {/each}
+  {:else}
+    {#each sections as entry (entry.section.id)}
+      {@render sectionBlock(entry)}
+    {/each}
+  {/if}
 
   {#each loosePanels as panel (panel.component)}
     <section class="settings-card"><panel.component /></section>
@@ -261,6 +352,43 @@
 </div>
 
 <style>
+  .tabs {
+    border-bottom: var(--border-width) solid var(--surface-var-container-line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-100);
+  }
+
+  .tab {
+    background: none;
+    border: 0;
+    border-bottom: var(--border-width-600) solid transparent;
+    color: var(--surface-var-on-container);
+    cursor: pointer;
+    font: inherit;
+    font-weight: var(--font-weight-medium);
+    padding: var(--space-200) var(--space-300);
+  }
+
+  .tab[aria-selected='true'] {
+    border-bottom-color: var(--primary-main);
+    color: var(--surface-on-container);
+  }
+
+  .tab:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  .tab-panel {
+    display: grid;
+    gap: var(--space-300);
+  }
+
+  .tab-panel[hidden] {
+    display: none;
+  }
+
   .settings-stack {
     display: grid;
     gap: var(--space-300);

@@ -5,13 +5,14 @@
     RoomListItemView,
   } from '#src/generated/protocol';
 
+  import { untrack } from 'svelte';
+
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { parseJsonObject } from '#lib/json-object.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
-  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
 
   import { canSendState } from './permission-groups';
@@ -21,8 +22,10 @@
   import RoomDeveloperEvent from './RoomDeveloperEvent.svelte';
 
   import '#lib/ui/primitives/settings-row.css';
-  import TextArea from '#lib/ui/primitives/TextArea.svelte';
-  import SearchField from '#lib/ui/primitives/SearchField.svelte';
+  import CodeTextArea from '#lib/ui/primitives/CodeTextArea.svelte';
+  import CopyValue from '#lib/ui/primitives/CopyValue.svelte';
+  import ExplorerShell, { type ExplorerGroup } from '#lib/ui/primitives/ExplorerShell.svelte';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
@@ -45,8 +48,7 @@
   let browsing = $state(false);
   let browseFailed = $state(false);
   let typeFilter = $state('');
-  let openType = $state<string | null>(null);
-  let editorRequest = $state(0);
+  let picked = $state<string | null | undefined>(undefined);
 
   let roomId = $derived(room?.room_id ?? null);
   let canEditState = $derived(
@@ -62,11 +64,32 @@
     }
     return Object.entries(byType).sort(([left], [right]) => left.localeCompare(right));
   });
-  let shownTypes = $derived.by(() => {
+  let stateGroups = $derived.by((): ExplorerGroup[] => {
     const query = typeFilter.trim().toLocaleLowerCase();
-    return query
-      ? stateTypes.filter(([type]) => type.toLocaleLowerCase().includes(query))
-      : stateTypes;
+    return stateTypes
+      .filter(
+        ([type, keys]) =>
+          !query ||
+          type.toLocaleLowerCase().includes(query) ||
+          keys.some((key) => key.toLocaleLowerCase().includes(query))
+      )
+      .map(([type, keys]) => ({
+        id: type,
+        label: type,
+        items: [...keys].sort().map((key) => ({
+          id: stateId(type, key),
+          label: key === '' ? i18n.t('room.devBrowserEmptyKey') : key,
+          title: key,
+        })),
+      }));
+  });
+
+  function stateId(type: string, key: string): string {
+    return JSON.stringify([type, key]);
+  }
+
+  $effect(() => {
+    if (roomId) untrack(() => void browse());
   });
 
   async function browse(): Promise<void> {
@@ -86,26 +109,21 @@
   }
 
   function edit(type: string, key: string): void {
+    picked = type === '' ? null : stateId(type, key);
     eventType = type;
     stateKey = key;
     content = '{}';
     outcome = null;
     sent = false;
-    editorRequest += 1;
     if (type !== '') void load();
-  }
-
-  function revealEditor(node: HTMLElement): void {
-    if (editorRequest === 0) return;
-    node.scrollIntoView({ block: 'start' });
-    node.querySelector('input')?.focus({ preventScroll: true });
   }
 
   async function load(): Promise<void> {
     const target = roomId;
     const type = eventType.trim();
-    if (!target || type === '' || loading) return;
+    if (!target || type === '') return;
 
+    const request = picked;
     loading = true;
     outcome = null;
     sent = false;
@@ -115,6 +133,7 @@
         event_type: type,
         state_key: stateKey,
       });
+      if (picked !== request) return;
       if (existing === null || existing === undefined) {
         outcome = 'missing';
         content = '{}';
@@ -122,16 +141,17 @@
       }
       content = JSON.stringify(existing, null, 2);
     } catch (error) {
+      if (picked !== request) return;
       console.warn('[sable room] state event unreadable', error);
       outcome = 'failed';
     } finally {
-      loading = false;
+      if (picked === request) loading = false;
     }
   }
 
   async function send(): Promise<void> {
     const target = roomId;
-    if (!target || !canSend || sending) return;
+    if (!target || !canSend || sending || loading) return;
 
     const parsed = parseJsonObject(content);
     if (!parsed) {
@@ -151,6 +171,10 @@
         content: parsed,
       });
       sent = true;
+      if (picked === null) {
+        picked = stateId(eventType.trim(), stateKey);
+        void browse();
+      }
     } catch (error) {
       console.warn('[sable room] state event rejected', error);
       outcome = 'failed';
@@ -173,138 +197,100 @@
       title={i18n.t('room.devBrowserTitle')}
       description={i18n.t('room.devBrowserDescription')}
     >
-      {#if browseFailed}
-        <div class="settings-form">
-          <Alert variant="critical" role="alert">{i18n.t('common.stateEventRejected')}</Alert>
-        </div>
-      {/if}
-      {#if stateTypes.length > 0}
-        <div class="settings-form">
-          <SearchField bind:value={typeFilter} label={i18n.t('room.devBrowserFilter')} />
-        </div>
-        <ul class="settings-rows">
-          {#each shownTypes as [type, keys] (type)}
-            <SettingsRow
-              title={type}
-              description={i18n.t('room.devBrowserCount', { count: keys.length })}
-            >
-              <Button
-                size="small"
-                variant="secondary"
-                aria-expanded={openType === type}
-                onclick={() => {
-                  openType = openType === type ? null : type;
-                }}
-              >
-                {openType === type ? i18n.t('room.devBrowserHide') : i18n.t('room.devBrowserShow')}
-              </Button>
-            </SettingsRow>
-            {#if openType === type}
-              <li class="settings-form">
-                <ul class="state-keys">
-                  {#each keys as key (key)}
-                    <li>
-                      <button
-                        type="button"
-                        class="state-key"
-                        onclick={() => {
-                          edit(type, key);
-                        }}
-                      >
-                        {key === '' ? i18n.t('room.devBrowserEmptyKey') : key}
-                      </button>
-                    </li>
-                  {/each}
-                </ul>
-              </li>
-            {/if}
-          {/each}
-        </ul>
-      {/if}
       <div class="settings-form">
-        <div class="actions">
-          <Button variant="secondary" loading={browsing} onclick={() => void browse()}>
-            {stateTypes.length > 0 ? i18n.t('common.reload') : i18n.t('room.devBrowserLoad')}
-          </Button>
-          <Button
-            variant="secondary"
-            onclick={() => {
-              edit('', '');
-            }}
-          >
-            {i18n.t('room.devBrowserNew')}
-          </Button>
-        </div>
-      </div>
-    </SettingsSection>
-  {/if}
-  <SettingsSection
-    headingId="room-developer-state"
-    title={i18n.t('room.devStateTitle')}
-    description={i18n.t('room.devStateDescription')}
-  >
-    <form
-      class="settings-form"
-      onsubmit={(event) => {
-        event.preventDefault();
-      }}
-      {@attach revealEditor}
-    >
-      <FormField fieldId="room-dev-type" label={i18n.t('room.devEventType')}>
-        <TextInput
-          id="room-dev-type"
-          bind:value={eventType}
-          placeholder="m.room.topic"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </FormField>
-
-      <FormField fieldId="room-dev-key" label={i18n.t('room.devStateKey')}>
-        <TextInput id="room-dev-key" bind:value={stateKey} autocomplete="off" spellcheck="false" />
-      </FormField>
-
-      <FormField fieldId="room-dev-content" label={i18n.t('room.devContent')}>
-        <TextArea id="room-dev-content" bind:value={content} rows={10} spellcheck="false" />
-      </FormField>
-
-      {#if outcome === 'json'}
-        <Alert variant="critical" role="alert">{i18n.t('room.devInvalidJson')}</Alert>
-      {:else if outcome === 'failed'}
-        <Alert variant="critical" role="alert">{i18n.t('common.stateEventRejected')}</Alert>
-      {:else if outcome === 'missing'}
-        <Alert variant="info" role="status">{i18n.t('room.devMissing')}</Alert>
-      {:else if sent}
-        <Alert variant="success" role="status">{i18n.t('room.devSent')}</Alert>
-      {/if}
-
-      <div class="actions">
-        <Button
-          type="button"
-          variant="secondary"
-          {loading}
-          disabled={eventType.trim() === ''}
-          onclick={() => {
-            void load();
+        {#if browseFailed}
+          <Alert variant="critical" role="alert">{i18n.t('common.stateEventRejected')}</Alert>
+        {/if}
+        <ExplorerShell
+          label={i18n.t('room.devBrowserTitle')}
+          groups={stateGroups}
+          selected={picked}
+          bind:query={typeFilter}
+          filterLabel={i18n.t('room.devBrowserFilter')}
+          empty={i18n.t('room.devBrowserEmpty')}
+          loading={browsing}
+          detailLoading={loading}
+          noMatches={i18n.t('common.noMatches')}
+          placeholder={i18n.t('room.devBrowserPick')}
+          onSelect={(id) => {
+            const [type, key] = JSON.parse(id) as [string, string];
+            edit(type, key);
           }}
+          onBack={() => (picked = undefined)}
         >
-          {i18n.t('room.devLoad')}
-        </Button>
-        {#if canEditState}
-          <Button
-            type="button"
-            loading={sending}
-            disabled={eventType.trim() === ''}
-            onclick={() => {
+          {#snippet toolbar()}
+            <Button size="field" variant="ghost" loading={browsing} onclick={() => void browse()}>
+              {i18n.t('common.reload')}
+            </Button>
+            <Button size="field" variant="secondary" onclick={() => edit('', '')}>
+              <PlusIcon aria-hidden="true" />
+              {i18n.t('room.devBrowserNew')}
+            </Button>
+          {/snippet}
+          {#snippet head()}
+            {#if picked === null}
+              <FormField fieldId="room-dev-type" label={i18n.t('room.devEventType')}>
+                <TextInput
+                  id="room-dev-type"
+                  bind:value={eventType}
+                  placeholder="m.room.topic"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </FormField>
+              <FormField fieldId="room-dev-key" label={i18n.t('room.devStateKey')}>
+                <TextInput
+                  id="room-dev-key"
+                  bind:value={stateKey}
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </FormField>
+            {:else}
+              <h4 class="state-head"><CopyValue value={eventType} mono={false} /></h4>
+              {#if stateKey !== ''}<span class="state-key"
+                  ><CopyValue value={stateKey} mono={false} /></span
+                >{/if}
+            {/if}
+          {/snippet}
+          <form
+            class="state-editor"
+            onsubmit={(event) => {
+              event.preventDefault();
               void send();
             }}
           >
-            {i18n.t('room.devSend')}
-          </Button>
-        {/if}
+            <CodeTextArea
+              id="room-dev-content"
+              aria-label={i18n.t('room.devContent')}
+              language="json"
+              rows={20}
+              bind:value={content}
+              disabled={loading}
+              readonly={!canEditState}
+              error={outcome === 'json'}
+            />
+            {#if outcome === 'json'}
+              <Alert variant="critical" role="alert">{i18n.t('room.devInvalidJson')}</Alert>
+            {:else if outcome === 'failed'}
+              <Alert variant="critical" role="alert">{i18n.t('common.stateEventRejected')}</Alert>
+            {:else if outcome === 'missing'}
+              <Alert variant="info" role="status">{i18n.t('room.devMissing')}</Alert>
+            {:else if sent}
+              <Alert variant="success" role="status">{i18n.t('room.devSent')}</Alert>
+            {/if}
+            {#if canEditState}
+              <div class="actions">
+                <Button type="submit" size="small" loading={sending} disabled={!canSend || loading}>
+                  {i18n.t('room.devSend')}
+                </Button>
+              </div>
+            {/if}
+          </form>
+        </ExplorerShell>
       </div>
-    </form>
-  </SettingsSection>
+    </SettingsSection>
+  {/if}
   {#if roomId}
     <RoomDeveloperEvent {roomId} {levels} ownPowerLevel={permissions?.own_power_level ?? 0} />
     <RoomDeveloperAccountData {roomId} />
@@ -324,36 +310,21 @@
     justify-content: flex-end;
   }
 
-  .state-keys {
+  .state-editor {
     display: grid;
-    gap: var(--space-100);
-    list-style: none;
+    gap: var(--space-300);
+  }
+
+  .state-head {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-medium);
     margin: 0;
-    padding: 0;
+    min-width: 0;
   }
 
   .state-key {
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: var(--primary-main);
-    cursor: pointer;
-    font: inherit;
-    font-family: var(--font-family-mono);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    font-variant-ligatures: none;
-    overflow-wrap: anywhere;
-    padding: var(--space-100) var(--space-200);
-    text-align: start;
-    width: 100%;
-  }
-
-  .state-key:hover {
-    background: var(--surface-var-container-hover);
-  }
-
-  .state-key:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: calc(var(--focus-ring-width) * -1);
+    min-width: 0;
   }
 </style>
