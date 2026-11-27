@@ -7,6 +7,7 @@ import { countNotifications, notifications } from '#lib/features/inbox/inbox.js'
 
 import { RoomList, hasDirectRoom, roomListOptions, roomPathId } from './room-list.svelte.js';
 import { withCounts } from './summary-fixtures.js';
+import { roomView } from '#lib/test-support/room-views.js';
 import { badgeView, sectionsUpdate, sectionView } from '#lib/test-support/room-sections.js';
 
 afterEach(() => {
@@ -239,15 +240,11 @@ test('stops a user typing once their message arrives in the room list', async ()
 });
 
 test('paints the persisted room list before the subscription answers', async () => {
-  const room = withCounts({
+  const room = roomView({
     room_id: '!persisted:example.org',
     name: 'Persisted',
-    unread: 0,
-    notifying: 0,
-    highlight: 0,
-    marked_unread: false,
     display_name: 'Persisted',
-  } as RoomListItemView);
+  });
   const home = sectionView('home', { rooms: [room.room_id] });
   stubLocalStorage().set(
     'sable.room-list.v2.acct',
@@ -341,10 +338,7 @@ test('a snapshot from a build before preview emotes paints nothing', () => {
 });
 
 test('is not settled on a painted snapshot', async () => {
-  const room = withCounts({
-    room_id: '!room:example.org',
-    display_name: '!room:example.org',
-  } as RoomListItemView);
+  const room = roomView({ room_id: '!room:example.org', display_name: '!room:example.org' });
   stubLocalStorage().set('sable.room-list.v2.acct', snapshotOf([room]));
   let resolveSubscription: (value: {
     subscription: number;
@@ -377,14 +371,8 @@ test('is not settled on a painted snapshot', async () => {
 });
 
 test('a diff after an empty first answer replaces the painted snapshot rather than joining it', async () => {
-  const first = withCounts({
-    room_id: '!first:example.org',
-    display_name: '!first:example.org',
-  } as RoomListItemView);
-  const second = withCounts({
-    room_id: '!second:example.org',
-    display_name: '!second:example.org',
-  } as RoomListItemView);
+  const first = roomView({ room_id: '!first:example.org', display_name: '!first:example.org' });
+  const second = roomView({ room_id: '!second:example.org', display_name: '!second:example.org' });
   stubLocalStorage().set('sable.room-list.v2.acct', snapshotOf([first, second]));
   const eventListeners: ((event: unknown) => void)[] = [];
   const core = {

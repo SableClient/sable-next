@@ -21,11 +21,12 @@ function storage(): Storage | null {
 }
 
 /**
- * A snapshot from a build before the core resolved counts, or listed preview
- * emotes, paints nothing.
+ * A snapshot from a build before the core resolved counts, listed preview
+ * emotes or group members paints nothing.
  */
 function isCurrentSummary(room: unknown): boolean {
-  if (typeof room !== 'object' || room === null || !('counts' in room)) return false;
+  if (typeof room !== 'object' || room === null) return false;
+  if (!('counts' in room) || !('group_members' in room)) return false;
   const latest = (room as { latest_event?: unknown }).latest_event;
   return typeof latest !== 'object' || latest === null || 'emotes' in latest;
 }
