@@ -446,17 +446,19 @@
       title={i18n.t('settings.chatBackground')}
       description={i18n.t('room.chatBackgroundHint')}
     >
-      <ChatBackgroundPicker
-        id="room-chat-background"
-        image={background.image}
-        color={background.color}
-        onImage={(image) => {
-          saveBackground({ ...background, image });
-        }}
-        onColor={(color) => {
-          saveBackground({ ...background, color });
-        }}
-      />
+      <div class="settings-form">
+        <ChatBackgroundPicker
+          id="room-chat-background"
+          image={background.image}
+          color={background.color}
+          onImage={(image) => {
+            saveBackground({ ...background, image });
+          }}
+          onColor={(color) => {
+            saveBackground({ ...background, color });
+          }}
+        />
+      </div>
     </SettingsSection>
   {/if}
 
