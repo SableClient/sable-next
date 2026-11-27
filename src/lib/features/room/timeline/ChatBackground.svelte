@@ -56,6 +56,29 @@
 {/if}
 
 <style>
+  :global(:is(.timeline-stage, .chat-column):has(> .chat-background)) {
+    --message-hover-container: color-mix(in srgb, var(--surface-container-hover) 55%, transparent);
+    --message-hover-backdrop: blur(12px);
+    --composer-container: color-mix(in srgb, var(--surface-var-container) 70%, transparent);
+    --composer-backdrop: blur(16px);
+    --timeline-overlay-container: color-mix(in srgb, var(--surface-container) 60%, transparent);
+    --timeline-overlay-backdrop: blur(12px);
+    --timeline-foot-background: transparent;
+  }
+
+  :global(.chat-column:has(> .chat-background)) {
+    --composer-overlap: calc(var(--composer-height, 0%) - var(--composer-tuck, 0%));
+  }
+
+  @supports not (color: color-mix(in srgb, black, white)) {
+    :global(:is(.timeline-stage, .chat-column):has(> .chat-background)) {
+      --message-hover-container: var(--surface-container-hover);
+      --composer-container: var(--surface-var-container);
+      --timeline-overlay-container: var(--surface-container);
+      --timeline-foot-background: var(--surface-container);
+    }
+  }
+
   .chat-background {
     background-position: center;
     background-size: cover;

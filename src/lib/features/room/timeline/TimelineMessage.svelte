@@ -897,7 +897,8 @@
   @media (hover: hover) and (pointer: fine) {
     .message:hover,
     .message.menu-open {
-      background-color: var(--surface-container-hover);
+      backdrop-filter: var(--message-hover-backdrop, none);
+      background-color: var(--message-hover-container, var(--surface-container-hover));
     }
 
     .message:hover :global(.message-actions) {

@@ -74,6 +74,7 @@
   import RoomRulesDialog from './RoomRulesDialog.svelte';
   import { RoomRules, provideRoomRulesOpener } from './room-rules.svelte.js';
   import RoomReadReceipts from './timeline/RoomReadReceipts.svelte';
+  import ChatBackground from './timeline/ChatBackground.svelte';
   import TimelineList from './timeline/TimelineList.svelte';
   import type { TimelineCallbacks } from './timeline/timeline-row.svelte.js';
   import { tagForLevel } from './settings/power-level-tags.js';
@@ -928,85 +929,89 @@
 {/snippet}
 
 {#snippet chat()}
-  {#key resolvedRoomId}
-    <TimelineList
-      bind:this={timelineList}
-      replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
-      editEventId={conversation.context?.kind === 'edit' ? conversation.context.eventId : null}
-      inlineEditor={conversation.inlineEdit ? inlineEditor : undefined}
-      {timeline}
-      active={panels.threadRootId === null || threadInPanel}
-      focusEventId={timelineEventId}
-      {landingEventId}
-      onLanded={landed}
-      onReturnedToLatest={returnedToLatest}
-      onRequestHistory={requestHistory}
-      onRequestFuture={requestFuture}
-      onRead={readActions.markRead}
-      onFullyRead={readActions.setFullyRead}
-      hasUnread={resolvedRoom === undefined || roomHasUnread}
-      mentionEventIds={unreadMentions.ids}
-      onLoadReadMarker={readActions.loadReadMarker}
-      onRequestUnread={requestUnread}
-      onResumeLive={resumeLive}
-      onMarkRead={readActions.markAllRead}
-      callbacks={timelineCallbacks}
-      roomId={resolvedRoomId}
-      members={memberLoader.members}
-      onJumpToEvent={jumpToEvent}
-      onReturnToPosition={savedPosition !== null ? returnToPosition : undefined}
-      onJumpToLive={jumpToLive}
-      readOnly={!canPost}
-      canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
-      canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
-      canPin={roomSession.permissions?.can_pin ?? false}
-      encrypted={resolvedRoom?.encrypted ?? null}
-      currentUserId={core.session?.user_id ?? null}
-      scrollLocked={memberProfile.open || receiptsOpen}
-      {typingUsers}
-      footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
-      bind:nearLatest={timelineAtBottom}
-      timelineStart={roomSession.predecessor ? predecessorNotice : undefined}
+  <div class="chat-column">
+    {#key resolvedRoomId}
+      <ChatBackground roomId={resolvedRoomId} />
+      <TimelineList
+        bind:this={timelineList}
+        background={false}
+        replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
+        editEventId={conversation.context?.kind === 'edit' ? conversation.context.eventId : null}
+        inlineEditor={conversation.inlineEdit ? inlineEditor : undefined}
+        {timeline}
+        active={panels.threadRootId === null || threadInPanel}
+        focusEventId={timelineEventId}
+        {landingEventId}
+        onLanded={landed}
+        onReturnedToLatest={returnedToLatest}
+        onRequestHistory={requestHistory}
+        onRequestFuture={requestFuture}
+        onRead={readActions.markRead}
+        onFullyRead={readActions.setFullyRead}
+        hasUnread={resolvedRoom === undefined || roomHasUnread}
+        mentionEventIds={unreadMentions.ids}
+        onLoadReadMarker={readActions.loadReadMarker}
+        onRequestUnread={requestUnread}
+        onResumeLive={resumeLive}
+        onMarkRead={readActions.markAllRead}
+        callbacks={timelineCallbacks}
+        roomId={resolvedRoomId}
+        members={memberLoader.members}
+        onJumpToEvent={jumpToEvent}
+        onReturnToPosition={savedPosition !== null ? returnToPosition : undefined}
+        onJumpToLive={jumpToLive}
+        readOnly={!canPost}
+        canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
+        canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
+        canPin={roomSession.permissions?.can_pin ?? false}
+        encrypted={resolvedRoom?.encrypted ?? null}
+        currentUserId={core.session?.user_id ?? null}
+        scrollLocked={memberProfile.open || receiptsOpen}
+        {typingUsers}
+        footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
+        bind:nearLatest={timelineAtBottom}
+        timelineStart={roomSession.predecessor ? predecessorNotice : undefined}
+      >
+        {#snippet footTrailing()}
+          {#if showReceiptFooter}
+            <RoomReadReceipts
+              bind:open={receiptsOpen}
+              readers={latestReadBy}
+              timestamps={latestReceiptItem?.read_timestamps}
+              members={receiptMembers}
+              visible={timelineAtBottom}
+              onMemberProfile={openProfile}
+            />
+          {/if}
+        {/snippet}
+      </TimelineList>
+    {/key}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="composer-dock"
+      onfocusin={(event) => timelineList?.composerFocused(event)}
+      onkeydown={(event) => timelineList?.composerKeydown(event)}
+      {@attach publishComposerClearance}
     >
-      {#snippet footTrailing()}
-        {#if showReceiptFooter}
-          <RoomReadReceipts
-            bind:open={receiptsOpen}
-            readers={latestReadBy}
-            timestamps={latestReceiptItem?.read_timestamps}
-            members={receiptMembers}
-            visible={timelineAtBottom}
-            onMemberProfile={openProfile}
-          />
-        {/if}
-      {/snippet}
-    </TimelineList>
-  {/key}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="composer-dock"
-    onfocusin={(event) => timelineList?.composerFocused(event)}
-    onkeydown={(event) => timelineList?.composerKeydown(event)}
-    {@attach publishComposerClearance}
-  >
-    <RoomComposerArea
-      bind:composer
-      {conversation}
-      roomId={resolvedRoomId}
-      {roomName}
-      room={resolvedRoom}
-      members={memberLoader.members}
-      {roomSession}
-      {tombstoneJoin}
-      {rules}
-      tombstoned={isTombstoned}
-      mounted={composerMounted}
-      {canPost}
-      {canReact}
-      onReplyStep={(direction) =>
-        conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
-      onJumpToContext={jumpToEvent}
-    />
+      <RoomComposerArea
+        bind:composer
+        {conversation}
+        roomId={resolvedRoomId}
+        {roomName}
+        room={resolvedRoom}
+        members={memberLoader.members}
+        {roomSession}
+        {tombstoneJoin}
+        {rules}
+        tombstoned={isTombstoned}
+        mounted={composerMounted}
+        {canPost}
+        {canReact}
+        onReplyStep={(direction) =>
+          conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
+        onJumpToContext={jumpToEvent}
+      />
+    </div>
   </div>
 {/snippet}
 
@@ -1271,12 +1276,33 @@
     visibility: hidden;
   }
 
+  .chat-column {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    isolation: isolate;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+  }
+
   .composer-dock {
     flex: 0 0 auto;
     padding-bottom: max(var(--space-200), var(--edge-inset-bottom));
   }
 
+  .chat-column:has(> :global(.chat-background)) > .composer-dock {
+    inset-block-end: 0;
+    inset-inline: 0;
+    position: absolute;
+    z-index: 2;
+  }
+
   @media (--app-layout) {
+    .chat-column {
+      --composer-tuck: var(--space-300);
+    }
+
     .room-view {
       container-type: inline-size;
       display: grid;
@@ -1315,7 +1341,7 @@
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      margin-block-start: calc(-1 * var(--space-300));
+      margin-block-start: calc(-1 * var(--composer-tuck));
       min-height: var(--sidebar-footer-height);
       padding-block: var(--space-300);
     }

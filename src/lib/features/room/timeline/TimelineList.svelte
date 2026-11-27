@@ -119,6 +119,7 @@
     onMarkRead?: () => Promise<void>;
     currentUserId?: string | null;
     roomId?: string;
+    background?: boolean;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string, origin?: string | null) => void;
     onJumpToLive?: () => void;
@@ -162,6 +163,7 @@
     callbacks = {},
     currentUserId,
     roomId,
+    background = true,
     members = [],
     onJumpToEvent,
     onJumpToLive,
@@ -1383,7 +1385,7 @@
   {/if}
 
   <div class="timeline-stage">
-    <ChatBackground {roomId} />
+    {#if background}<ChatBackground {roomId} />{/if}
     {#if historyLoadingVisible}
       <div
         class="timeline-loading history-loading"
@@ -1660,7 +1662,7 @@
   }
 
   .future-loading {
-    inset-block-end: var(--space-200);
+    inset-block-end: calc(var(--space-200) + var(--composer-overlap, 0%));
     /* stylelint-disable-next-line csstools/use-logical -- centred, so the same in both directions */
     left: 50%;
     transform: translateX(-50%);
@@ -1719,7 +1721,7 @@
   }
 
   .window-rows {
-    padding-block-end: var(--timeline-foot-height);
+    padding-block-end: calc(var(--timeline-foot-height) + var(--composer-overlap, 0%));
   }
 
   @media (width >= 30rem) {
@@ -1752,7 +1754,8 @@
   }
 
   .unread-float {
-    background: var(--surface-container);
+    backdrop-filter: var(--timeline-overlay-backdrop, none);
+    background: var(--timeline-overlay-container, var(--surface-container));
     inset-block-start: 0;
     inset-inline: 0 var(--timeline-scrollbar-size);
     position: absolute;
@@ -1797,15 +1800,15 @@
   }
 
   .timeline-foot {
-    align-items: center;
-    background: var(--surface-container);
+    align-items: end;
+    background: var(--timeline-foot-background, var(--surface-container));
     display: flex;
     gap: var(--space-200);
     height: var(--timeline-foot-height);
-    inset-block-end: 0;
+    inset-block-end: var(--composer-overlap, 0%);
     inset-inline: 0 var(--timeline-scrollbar-size);
     justify-content: space-between;
-    padding: 0 var(--page-gutter);
+    padding: 0 var(--page-gutter) var(--space-050);
     position: absolute;
     z-index: 1;
   }
@@ -1817,7 +1820,7 @@
   .timeline-jumps {
     align-items: center;
     inset-inline: 0;
-    bottom: calc(var(--timeline-foot-height) + var(--space-200));
+    bottom: calc(var(--timeline-foot-height) + var(--space-200) + var(--composer-overlap, 0%));
     display: flex;
     gap: var(--space-200);
     margin-inline: auto;
