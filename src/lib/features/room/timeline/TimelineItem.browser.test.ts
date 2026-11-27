@@ -442,6 +442,7 @@ for (const [name, width] of [
         sender: null,
         content_valid: null,
         room_id: '!random:example.test',
+        room_name: null,
         event_id: '$original',
         timestamp: null,
       },
