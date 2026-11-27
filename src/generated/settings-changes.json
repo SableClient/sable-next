@@ -1,5 +1,5 @@
 {
-  "upcoming": {
+  "v26.11.5": {
     "added": [
       "deploymentTheme",
       "saturation",
@@ -13,12 +13,6 @@
   "v26.11.4": {
     "added": [
       "hideSentBeforeJoined"
-    ],
-    "changed": []
-  },
-  "v26.11.3": {
-    "added": [
-      "bannerFit"
     ],
     "changed": []
   }
