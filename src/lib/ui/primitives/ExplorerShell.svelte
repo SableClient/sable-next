@@ -103,29 +103,31 @@
       {:else if groups.length === 0}
         <p class="note">{query.trim() ? noMatches : empty}</p>
       {:else}
-        <div class="list" role="group" aria-label={label} {@attach scrollHint}>
-          {#each groups as group (group.id)}
-            <section>
-              <h4 class="group">{group.label}</h4>
-              <ul>
-                {#each group.items as item (item.id)}
-                  <li>
-                    <button
-                      type="button"
-                      class={['item', { muted: item.muted }]}
-                      title={item.title ?? item.label}
-                      data-explorer-item={item.id}
-                      aria-pressed={selected === item.id}
-                      onclick={() => onSelect(item.id)}
-                    >
-                      <span class="item-label">{item.label}</span>
-                      {#if item.hint}<span class="item-hint">{item.hint}</span>{/if}
-                    </button>
-                  </li>
-                {/each}
-              </ul>
-            </section>
-          {/each}
+        <div class="list-frame">
+          <div class="list" role="group" aria-label={label} {@attach scrollHint}>
+            {#each groups as group (group.id)}
+              <section>
+                <h4 class="group">{group.label}</h4>
+                <ul>
+                  {#each group.items as item (item.id)}
+                    <li>
+                      <button
+                        type="button"
+                        class={['item', { muted: item.muted }]}
+                        title={item.title ?? item.label}
+                        data-explorer-item={item.id}
+                        aria-pressed={selected === item.id}
+                        onclick={() => onSelect(item.id)}
+                      >
+                        <span class="item-label">{item.label}</span>
+                        {#if item.hint}<span class="item-hint">{item.hint}</span>{/if}
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {/each}
+          </div>
         </div>
       {/if}
     </div>
@@ -178,9 +180,14 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .list {
+  .list-frame {
     border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-inner);
+    overflow: hidden;
+    padding: var(--space-100);
+  }
+
+  .list {
     max-height: 32rem;
     overflow: auto;
   }
