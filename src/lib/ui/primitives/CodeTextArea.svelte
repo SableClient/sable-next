@@ -93,6 +93,11 @@
     scrollbar-gutter: stable;
   }
 
+  /* The user agent gives code its own monospace, which would wrap differently from the textarea. */
+  .layer code {
+    font: inherit;
+  }
+
   .input {
     background: transparent;
     border: 0;
