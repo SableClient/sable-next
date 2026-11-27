@@ -23,6 +23,7 @@ import { type TimelineLayout } from '#lib/settings/definitions.js';
 import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
 import { useRoomCosmetics, type SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 import { matrixLinkDestination, parseMatrixLink, type MatrixLink } from '#lib/rooms/matrix-link.js';
+import { useRoomList } from '#lib/rooms/room-list.svelte.js';
 
 import { useSenderColors } from '../members/members.js';
 import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
@@ -124,6 +125,7 @@ export class TimelineRow {
   readonly press: LongPress;
   readonly #doubleTap: DoubleTap;
   readonly #roomCosmetics = useRoomCosmetics();
+  readonly #roomList = useRoomList();
   readonly #senderRoles = hasSenderRoles() ? useSenderRoles() : null;
   readonly #senderColors = useSenderColors();
   readonly #options: () => TimelineRowOptions;
@@ -146,6 +148,7 @@ export class TimelineRow {
         pinnedEvents: usePinnedEvents(),
         bookmarks: useBookmarks(),
         dialogs: this.dialogs,
+        isDirect: (roomId) => this.#roomList.byId(roomId)?.is_direct ?? false,
       }
     );
     this.swipe = new MessageSwipe({

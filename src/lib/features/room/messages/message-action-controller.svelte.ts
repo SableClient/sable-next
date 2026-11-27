@@ -65,6 +65,7 @@ interface MessageActionDeps {
   pinnedEvents: Pick<PinnedEvents, 'has' | 'toggle'>;
   bookmarks: Pick<Bookmarks, 'has' | 'toggle'>;
   dialogs: Pick<MessageDialogs, 'open'>;
+  isDirect: (roomId: string) => boolean;
 }
 
 const SAVE_FEEDBACK_DELAY_MS = 300;
@@ -99,7 +100,7 @@ export class MessageActionExecutor {
       onOpenThread,
       onCopyLink,
     } = this.context();
-    const { core, personaStore, pinnedEvents, bookmarks, dialogs } = this.deps;
+    const { core, personaStore, pinnedEvents, bookmarks, dialogs, isDirect } = this.deps;
     const stealable = emoteCandidates(item.content);
     const pinned = pinnedEvents.has(item.event_id);
     const bookmarked = bookmarks.has(roomId, item.event_id);
@@ -112,7 +113,7 @@ export class MessageActionExecutor {
       canViewRedacted:
         item.content.kind === 'redacted' &&
         ((canRedactOthers && item.redacted_on_ban === true) ||
-          ((canRedactOthers || preferences.developerTools) &&
+          (((canRedactOthers && !isDirect(roomId)) || preferences.developerTools) &&
             serverFeatures(core).includes(MSC2815))),
       canToggleReaction: onToggleReaction !== undefined,
       canMarkUnread: onMarkUnread !== undefined,

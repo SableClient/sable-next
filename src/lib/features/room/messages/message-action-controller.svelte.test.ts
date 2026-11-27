@@ -91,6 +91,7 @@ function fixture() {
     pinnedEvents: { has: vi.fn(() => false), toggle: vi.fn(async () => {}) },
     bookmarks: { has: vi.fn(() => false), toggle: vi.fn(async () => {}) },
     dialogs: { open: vi.fn() },
+    isDirect: vi.fn(() => false),
   };
   return {
     context,
@@ -175,6 +176,18 @@ test('copying message text writes to clipboard and shows confirmation toast', as
   await Promise.resolve();
   expect(writeClipboard).toHaveBeenCalledWith('hello');
   expect(toasts.items.at(-1)?.message).toBe('Copied');
+});
+
+test('a direct chat does not offer deleted content to the people in it', () => {
+  const { context, deps, executor } = fixture();
+  context.item.is_own = false;
+  context.item.content = { kind: 'redacted', reason: null, redacted_by: null };
+  context.canRedactOthers = true;
+  features.list = ['fi.mau.msc2815'];
+  expect(executor.actions.onViewRedacted).toBeDefined();
+  deps.isDirect.mockReturnValue(true);
+  expect(executor.actions.onViewRedacted).toBeUndefined();
+  features.list = [];
 });
 
 test('developer tools offer deleted content without the redact level when the server supports it', () => {
