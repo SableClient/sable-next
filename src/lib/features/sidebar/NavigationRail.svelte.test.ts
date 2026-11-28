@@ -54,7 +54,8 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { setBridgedSpace } from '#lib/rooms/bridged-spaces.svelte.js';
 import { withCounts } from '#lib/rooms/summary-fixtures.js';
 import { roomUnread } from '#lib/rooms/unread.js';
-import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
+import { switchSpace } from './rail-destinations.js';
+import { saveSpacePath, savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 import { findOrJoinState } from '#lib/ui/find-or-join-state.svelte.js';
 import { reads as mediaImageReads } from './media-image-reads.test-support.js';
 
@@ -978,4 +979,93 @@ test('a space marked as bridged carries the network of its rooms', async () => {
 
   expect(within(tab('Alpha')).getByRole('img', { name: 'nav.bridgedFrom:Discord' })).toBeVisible();
   expect(within(tab('Beta')).queryByRole('img', { name: /bridgedFrom/ })).toBeNull();
+});
+
+function stepTo(offset: 1 | -1): string | null {
+  goto.mockClear();
+  switchSpace(offset);
+  return goto.mock.calls[0]?.[0] ?? null;
+}
+
+test('the desktop rail steps from Home through the tabs to each space, folders included', async () => {
+  setPreference('showHome', true);
+  saveSpacePath('!b:example.org', '/space/!b%3Aexample.org/!room%3Aexample.org');
+  const props = {
+    spaces: [
+      space('!a:example.org', 'Alpha'),
+      space('!b:example.org', 'Beta'),
+      space('!c:example.org', 'Gamma'),
+    ],
+    directRooms: [
+      { ...space('!dm:example.org', 'Dee'), room_kind: null, is_direct: true },
+    ] satisfies RoomListItemView[],
+    layout: [
+      { kind: 'space', room_id: '!c:example.org' },
+      {
+        kind: 'folder',
+        id: 'f',
+        name: null,
+        icon: null,
+        content: ['!a:example.org', '!b:example.org'],
+      },
+    ] satisfies RailProps['layout'],
+    openFolders: new Set<string>(),
+  };
+  const rail = renderRail({ ...props, pathname: '/home' });
+  await tick();
+
+  const steps: Array<[string, string | null, string | null]> = [];
+  for (const pathname of [
+    '/home',
+    '/rooms',
+    '/direct',
+    '/space/!c%3Aexample.org/lobby',
+    '/space/!a%3Aexample.org/lobby',
+    '/space/!b%3Aexample.org/!room%3Aexample.org',
+  ]) {
+    await rail.rerender({ ...props, pathname });
+    steps.push([pathname, stepTo(-1), stepTo(1)]);
+  }
+
+  expect(steps).toEqual([
+    ['/home', '/space/!b%3Aexample.org/!room%3Aexample.org', '/rooms'],
+    ['/rooms', '/home', '/direct'],
+    ['/direct', '/rooms', '/space/!c%3Aexample.org/lobby'],
+    ['/space/!c%3Aexample.org/lobby', '/direct', '/space/!a%3Aexample.org/lobby'],
+    [
+      '/space/!a%3Aexample.org/lobby',
+      '/space/!c%3Aexample.org/lobby',
+      '/space/!b%3Aexample.org/!room%3Aexample.org',
+    ],
+    ['/space/!b%3Aexample.org/!room%3Aexample.org', '/space/!a%3Aexample.org/lobby', '/home'],
+  ]);
+});
+
+test('switching space from a page outside the rail starts at either end', async () => {
+  renderRail({ spaces: [space('!a:example.org', 'Alpha')], pathname: '/settings' });
+  await tick();
+
+  expect(stepTo(1)).toBe('/rooms');
+  expect(stepTo(-1)).toBe('/space/!a%3Aexample.org/lobby');
+});
+
+test('the mobile rail offers no spaces to switch between', async () => {
+  renderRail({ spaces: [space('!a:example.org', 'Alpha')], pathname: '/rooms', mobile: true });
+  await tick();
+
+  expect(stepTo(1)).toBeNull();
+});
+
+test('switching space from a room pushes history like clicking a desktop rail tab', async () => {
+  visit('/space/!a%3Aexample.org/!room%3Aexample.org');
+  renderRail({
+    spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+    pathname: '/space/!a%3Aexample.org/!room%3Aexample.org',
+  });
+  await tick();
+  goto.mockClear();
+
+  switchSpace(1);
+
+  expect(goto.mock.calls).toEqual([['/space/!b%3Aexample.org/lobby']]);
 });

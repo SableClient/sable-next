@@ -171,6 +171,7 @@
   import { unreadRoomAtOffset, unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
   import { markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
   import { hasUnread } from '#lib/rooms/unread.js';
+  import { switchSpace } from '#lib/features/sidebar/rail-destinations.js';
   import { roomAtOffset, visibleRoomSection } from '#lib/features/sidebar/visible-rooms.svelte.js';
   import { playSound, type NotificationSound } from '#lib/features/notifications/sound.js';
   import MediaViewerHost from '#lib/ui/media/MediaViewerHost.svelte';
@@ -1246,6 +1247,12 @@
         'navigation.nextRoom': () => {
           const target = roomAtOffset(openRoomId, 1);
           if (target) jumpToRoom(target, true);
+        },
+        'navigation.previousSpace': () => {
+          switchSpace(-1);
+        },
+        'navigation.nextSpace': () => {
+          switchSpace(1);
         },
         'room.markRead': () => {
           const room = roomList.byId(openRoomId);

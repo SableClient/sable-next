@@ -9,6 +9,8 @@ export type ShortcutId =
   | 'navigation.openRoomSearch'
   | 'navigation.previousRoom'
   | 'navigation.nextRoom'
+  | 'navigation.previousSpace'
+  | 'navigation.nextSpace'
   | 'navigation.nextUnread'
   | 'navigation.cycleNextUnread'
   | 'navigation.cyclePreviousUnread'
@@ -124,6 +126,20 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.nextRoom',
     category: 'navigation',
     binding: 'alt+down',
+    allowInEditable: true,
+  },
+  {
+    id: 'navigation.previousSpace',
+    labelKey: 'shortcuts.previousDestination',
+    category: 'navigation',
+    binding: 'ctrl+alt+up',
+    allowInEditable: true,
+  },
+  {
+    id: 'navigation.nextSpace',
+    labelKey: 'shortcuts.nextDestination',
+    category: 'navigation',
+    binding: 'ctrl+alt+down',
     allowInEditable: true,
   },
   {

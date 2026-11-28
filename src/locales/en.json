@@ -4413,6 +4413,8 @@
     "openSettings": "Open settings",
     "previousRoom": "Previous room",
     "nextRoom": "Next room",
+    "previousDestination": "Previous sidebar destination",
+    "nextDestination": "Next sidebar destination",
     "markRead": "Mark this room as read",
     "markAllRead": "Mark every room as read",
     "closeRoom": "Close the open chat",

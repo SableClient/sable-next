@@ -31,6 +31,61 @@ test.each([
   expect(handler).toHaveBeenCalledOnce();
 });
 
+test.each([
+  ['ArrowUp', 'navigation.previousSpace'],
+  ['ArrowDown', 'navigation.nextSpace'],
+] as const)('ctrl+alt+%s switches sidebar destination from inside the composer', (key, id) => {
+  const handler = vi.fn();
+  const room = vi.fn();
+  const reply = vi.fn();
+  cleanup = registerGlobalShortcuts({
+    [id]: handler,
+    'navigation.previousRoom': room,
+    'navigation.nextRoom': room,
+    'room.replyOlder': reply,
+    'room.replyNewer': reply,
+  });
+
+  pressInEditor(key, { ctrlKey: true, altKey: true });
+
+  expect(handler).toHaveBeenCalledOnce();
+  expect(room).not.toHaveBeenCalled();
+  expect(reply).not.toHaveBeenCalled();
+});
+
+test.each([
+  { altKey: true },
+  { ctrlKey: true },
+  { ctrlKey: true, altKey: true, shiftKey: true },
+  { metaKey: true, altKey: true },
+])('other modifiers on the arrows do not switch sidebar destination (%o)', (init) => {
+  const handler = vi.fn();
+  cleanup = registerGlobalShortcuts({
+    'navigation.previousSpace': handler,
+    'navigation.nextSpace': handler,
+  });
+
+  for (const key of ['ArrowUp', 'ArrowDown']) {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, ...init }));
+  }
+
+  expect(handler).not.toHaveBeenCalled();
+});
+
+test('switching sidebar destination does nothing while a dialog is open', () => {
+  const handler = vi.fn();
+  cleanup = registerGlobalShortcuts({ 'navigation.nextSpace': handler });
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  document.body.append(dialog);
+
+  dialog.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'ArrowDown', ctrlKey: true, altKey: true, bubbles: true })
+  );
+
+  expect(handler).not.toHaveBeenCalled();
+});
+
 test('a shortcut not allowed in editable fields stays out of the composer', () => {
   const handler = vi.fn();
   cleanup = registerGlobalShortcuts({ 'navigation.nextUnread': handler });

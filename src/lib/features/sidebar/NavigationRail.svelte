@@ -34,6 +34,7 @@
     isJoinedRoomPath,
     spaceNavigationHref,
   } from './space-paths.js';
+  import { provideRail } from './rail-destinations.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
@@ -479,6 +480,21 @@
     const landing = !mobile && inside && pathname !== item.href;
     return landing ? item.href : (item.navigateHref ?? item.href);
   }
+
+  // Spaces in a collapsed folder stay reachable; the folder tile shows as current while one is open.
+  function railDestinations() {
+    const spaceIds = entries.flatMap((entry) =>
+      entry.kind === 'space' ? [entry.room_id] : entry.content
+    );
+    return [...items.filter((item) => item.section !== undefined), ...spaceItems(spaceIds)].map(
+      (item) => ({ href: item.navigateHref ?? item.href, active: isActive(item) })
+    );
+  }
+
+  $effect(() => {
+    // A desktop rail tab is a plain link, so this follows the same history as clicking it.
+    if (!mobile) return provideRail({ destinations: railDestinations, navigate: navigateTo });
+  });
 
   function navigate(item: RailItem, event: MouseEvent): void {
     const href = item.navigateHref ?? item.href;
