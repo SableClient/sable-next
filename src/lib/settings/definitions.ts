@@ -472,6 +472,7 @@ const SETTINGS = {
 
   systemNotifications: toggle(true, { device: true }),
   inAppBanners: toggle(isNativeMobile(), { device: true }),
+  syncOnPush: toggle(false, { device: true }),
   badgeDefaultDirect: choice<BadgeNotificationMode>(['all', 'mentions', 'quiet'], 'all', {
     account: true,
   }),

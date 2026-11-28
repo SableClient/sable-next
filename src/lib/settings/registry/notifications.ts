@@ -7,6 +7,7 @@ import ChatTeardropDotsIcon from 'phosphor-svelte/lib/ChatTeardropDotsIcon';
 import DevicesIcon from 'phosphor-svelte/lib/DevicesIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
+import ArrowsClockwiseIcon from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import { presentsInApp, pushPlatform } from '#lib/platform/notifications.js';
 import { PUSH_INACTIVE_TIMEOUTS } from '../definitions';
@@ -94,6 +95,15 @@ export const notificationsCategory: SettingsCategory = {
       description: 'settings.richPushPayloadsHint',
       type: 'boolean',
       supported: () => pushPlatform() !== 'ios',
+    },
+    {
+      key: 'syncOnPush',
+      section: 'alerts',
+      icon: ArrowsClockwiseIcon,
+      name: 'settings.syncOnPush',
+      description: 'settings.syncOnPushHint',
+      type: 'boolean',
+      supported: () => pushPlatform() === 'android',
     },
     {
       key: 'notificationSounds',

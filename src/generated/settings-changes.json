@@ -1,4 +1,10 @@
 {
+  "upcoming": {
+    "added": [
+      "syncOnPush"
+    ],
+    "changed": []
+  },
   "v26.11.5": {
     "added": [
       "deploymentTheme",

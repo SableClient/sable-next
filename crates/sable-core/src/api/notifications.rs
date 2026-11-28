@@ -505,6 +505,7 @@ pub struct SetOptionsParams {
     pub sounds: bool,
     pub notify_once: bool,
     pub in_app_banners: bool,
+    pub sync_on_push: bool,
 }
 
 impl Handler for SetOptionsParams {
@@ -522,6 +523,8 @@ impl Handler for SetOptionsParams {
         core.settings.notify_once.store(self.notify_once, Ordering::Relaxed);
         core.settings.in_app_banners
             .store(self.in_app_banners, Ordering::Relaxed);
+        core.settings.sync_on_push
+            .store(self.sync_on_push, Ordering::Relaxed);
 
         std::future::ready(Ok(()))
     }

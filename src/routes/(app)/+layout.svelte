@@ -555,6 +555,7 @@
         sounds: preferences.notificationSounds,
         notify_once: preferences.notifyOnce,
         in_app_banners: preferences.inAppBanners,
+        sync_on_push: preferences.syncOnPush,
       })
       .catch((error: unknown) => {
         console.warn('[sable notifications] notification settings not applied', error);

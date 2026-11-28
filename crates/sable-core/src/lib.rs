@@ -59,6 +59,7 @@ pub mod profiles;
 pub mod protocol;
 pub mod push_check;
 pub mod push_rules;
+mod push_sync;
 mod qr_login;
 mod reaction_history;
 mod reactions;

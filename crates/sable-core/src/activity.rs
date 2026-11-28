@@ -36,6 +36,7 @@ pub(crate) struct Activity {
     stores_open: watch::Sender<bool>,
     /// Held for reading by short store reads, so closing the stores waits for them to finish.
     stores: RwLock<()>,
+    pub(crate) push_sync: crate::push_sync::PushSyncGate,
 }
 
 impl Activity {
@@ -54,6 +55,7 @@ impl Activity {
             reopen_failures: std::sync::atomic::AtomicU32::new(0),
             stores_open: watch::Sender::new(true),
             stores: RwLock::new(()),
+            push_sync: crate::push_sync::PushSyncGate::default(),
         }
     }
 
@@ -476,7 +478,8 @@ impl Core {
             Some(session) => !session.state().calls.lock().await.is_empty(),
             None => false,
         };
-        let should_sync = active || in_call;
+        let present = active || in_call;
+        let should_sync = present || self.activity.push_sync.held();
         #[cfg(not(target_family = "wasm"))]
         if self.activity.closes_stores()
             && should_sync
@@ -497,14 +500,19 @@ impl Core {
         };
         let sync_service = signed_in.sync_service();
         if should_sync {
-            signed_in
-                .set_sync_presence(signed_in.cached_sync_presence().await)
-                .await;
+            if present {
+                signed_in
+                    .set_sync_presence(signed_in.cached_sync_presence().await)
+                    .await;
+            }
             self.activity.start_sync(supervised, &sync_service).await;
             if !self.sync_paused() && !self.activity.network_available() {
                 self.emit(crate::protocol::CoreEvent::SyncStatus(
                     self.shown_sync_status(sync_service.state().get()),
                 ));
+            }
+            if !present {
+                return;
             }
             let session = signed_in.clone();
             *signed_in.state().foreground_work.lock() = Some(

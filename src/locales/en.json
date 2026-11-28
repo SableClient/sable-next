@@ -2859,6 +2859,8 @@
     "systemNotifications": "System alerts",
     "inAppBanners": "In-app banners",
     "inAppBannersHint": "While {{appName}} is open, mentions and direct messages appear as a banner instead of a system alert.",
+    "syncOnPush": "Sync on notification",
+    "syncOnPushHint": "When a notification arrives in the background, sync for a few seconds so the conversation is ready when you open it. Uses a little more battery.",
     "notificationSounds": "Play notification sounds",
     "notificationSoundVolume": "Sound volume",
     "notifyOnce": "One alert per room",

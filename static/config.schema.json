@@ -1313,6 +1313,11 @@
           "type": "boolean",
           "default": false
         },
+        "syncOnPush": {
+          "title": "Sync on notification",
+          "type": "boolean",
+          "default": false
+        },
         "badgeDefaultDirect": {
           "enum": [
             "all",
@@ -2864,6 +2869,11 @@
         },
         "inAppBanners": {
           "title": "In-app banners",
+          "type": "boolean",
+          "default": false
+        },
+        "syncOnPush": {
+          "title": "Sync on notification",
           "type": "boolean",
           "default": false
         },

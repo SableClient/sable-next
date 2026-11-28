@@ -33,7 +33,18 @@ class PushRenderWorker(context: Context, parameters: WorkerParameters) : Worker(
         }
         if (!isStopped) PushNotifier.showFromPush(applicationContext, payload, inputData.getString("revision"))
         file.delete()
+        syncOnPush(payload)
         return Result.success()
+    }
+
+    private fun syncOnPush(payload: String) {
+        val notification = MatrixPushPayload.parse(payload) ?: return
+        val policy = PushPolicy(applicationContext)
+        val userId = notification.optString("user_id").ifEmpty { policy.soleAccount().orEmpty() }
+        val roomId = notification.optString("room_id")
+        val deviceId = policy.deviceIdFor(userId) ?: return
+        if (roomId.isEmpty() || isStopped) return
+        PushPayloadDecryptor.syncOnPush(applicationContext, userId, deviceId, roomId)
     }
 
     companion object {
