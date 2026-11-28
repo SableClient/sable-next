@@ -320,6 +320,27 @@ test('picking a quick reaction from the context menu closes it', async () => {
   expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
 });
 
+test('reacts from a quick reaction in the hover toolbar', async () => {
+  const onToggleReaction = vi.fn();
+  render(TimelineItemHarness, {
+    props: { core, item: { item: item(false), collapsed: false, onToggleReaction } },
+  });
+  await tick();
+
+  await hover(document.querySelector('.message'));
+  await tick();
+  const quick = document.querySelectorAll('.message-actions .quick-reaction');
+  expect(quick).toHaveLength(3);
+  const hitTest = vi.spyOn(document, 'elementFromPoint').mockReturnValue(quick[0]);
+  try {
+    await press(quick[0]);
+  } finally {
+    hitTest.mockRestore();
+  }
+
+  expect(onToggleReaction).toHaveBeenCalledOnce();
+});
+
 test('copies a message link when it is right-clicked', async () => {
   const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
   const linked = item(false);

@@ -17,10 +17,19 @@
     onAdd?: () => void;
     roomId?: string;
     roomy?: boolean;
+    toolbar?: boolean;
     divider?: boolean;
   }
 
-  let { count, onReact, onAdd, roomId, roomy = false, divider = true }: Props = $props();
+  let {
+    count,
+    onReact,
+    onAdd,
+    roomId,
+    roomy = false,
+    toolbar = false,
+    divider = true,
+  }: Props = $props();
   const core = useCoreClient();
   const history = useRecentReactions(core);
   const packs = new RoomPacks(core, () => roomId);
@@ -28,7 +37,11 @@
 </script>
 
 {#if recents.length > 0 || onAdd}
-  <div class={['quick-strip', { roomy }]} role="group" aria-label={i18n.t('timeline.addReaction')}>
+  <div
+    class={['quick-strip', { roomy, toolbar }]}
+    role="group"
+    aria-label={i18n.t('timeline.addReaction')}
+  >
     {#each recents as emoji (emoji)}
       {@const label = reactionEmoteLabel(emoji, packs.current, i18n.t('timeline.customEmote'))}
       <button
@@ -140,6 +153,21 @@
   .quick-strip.roomy .quick-reaction :global(.quick-reaction-image) {
     height: 1.5rem;
     width: calc(1.5rem * var(--media-ratio));
+  }
+
+  .quick-strip.toolbar {
+    display: contents;
+  }
+
+  .quick-strip.toolbar .quick-reaction {
+    background: transparent;
+    border-radius: var(--radius-inner);
+    height: 1.5rem;
+    min-width: 1.5rem;
+  }
+
+  .quick-strip.toolbar .quick-reaction:hover {
+    background: var(--surface-var-container-hover);
   }
 
   .quick-line {

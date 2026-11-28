@@ -11,6 +11,7 @@
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
+  import MessageQuickReactions from './MessageQuickReactions.svelte';
   import ReactionPicker from './ReactionPicker.svelte';
   import { messageMenuRows, type MessageActions } from './message-menu-items';
 
@@ -27,6 +28,7 @@
 
 <div class="message-actions">
   {#if actions.onReact}
+    <MessageQuickReactions toolbar count={3} onReact={actions.onReact} divider={false} {roomId} />
     <ReactionPicker
       label={i18n.t('timeline.addReaction')}
       {roomId}
