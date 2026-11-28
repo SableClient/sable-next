@@ -82,7 +82,7 @@
   }
 
   h2 {
-    color: var(--sec-main);
+    color: var(--surface-on-container);
     font-size: var(--font-size-label);
     font-weight: var(--font-weight-medium);
     letter-spacing: 0;
