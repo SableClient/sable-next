@@ -6,7 +6,10 @@
   import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
   import { on } from 'svelte/events';
 
+  import { useCoreClient } from '#lib/core/context.js';
+  import { useRecentReactions } from '#lib/emoji/recents.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import { quickReactions } from '#lib/model/model.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
@@ -39,18 +42,15 @@
   let inlineRows = $derived(rows.filter((row) => row.key !== 'reply' && row.key !== 'edit'));
 
   // Swapping the buttons would unmount an open menu, move a picker's anchor or drop
-  // keyboard focus, so the form in place then is kept until those end.
+  // keyboard focus, so the current form is kept until those end.
   let popupOpen = $state(false);
   let focusInside = $state(false);
   let kept = $state<boolean | null>(null);
   let expanded = $derived(kept ?? (preferences.expandedMessageActions || (engaged && shiftHeld())));
 
   function hold(change: () => void): void {
-    const was = popupOpen || focusInside;
-    const current = expanded;
     change();
-    if (!(popupOpen || focusInside)) kept = null;
-    else if (!was) kept = current;
+    kept = popupOpen || focusInside ? expanded : null;
   }
 
   function trackPopup(forward?: (open: boolean) => void) {
@@ -74,18 +74,21 @@
     };
   }
 
-  // Matches `--button-height` on `.message-action-button`; every toolbar button is square.
-  const BUTTON_REM = 1.5;
   const QUICK_REACTIONS = 3;
 
-  // Room for the inline buttons and the cost of each, in px; unlimited until measured.
+  const recentReactions = useRecentReactions(useCoreClient());
+  let quickCount = $derived(
+    actions.onReact && preferences.messageActionReactions
+      ? quickReactions(recentReactions.current, QUICK_REACTIONS).length
+      : 0
+  );
+
+  // In px; the room is unlimited until measured.
   let room = $state(Infinity);
   let buttonCost = $state(0);
   let dividerCost = $state(0);
   let leadCount = $derived(
-    (actions.onReact ? QUICK_REACTIONS + 1 : 0) +
-      (actions.onReply ? 1 : 0) +
-      (actions.onEdit ? 1 : 0)
+    quickCount + (actions.onReact ? 1 : 0) + (actions.onReply ? 1 : 0) + (actions.onEdit ? 1 : 0)
   );
 
   let inlineCount = $derived.by(() => {
@@ -109,14 +112,15 @@
     const observer = new ResizeObserver(() => {
       if (container.clientWidth === 0) return;
       const style = getComputedStyle(node);
-      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const gap = parseFloat(style.columnGap) || 0;
-      const border = parseFloat(style.borderInlineStartWidth) || 0;
-      const frame = ((parseFloat(style.paddingInlineStart) || 0) + border) * 2;
+      const gap = parseFloat(style.columnGap);
+      const border = parseFloat(style.borderInlineStartWidth);
+      const frame = (parseFloat(style.paddingInlineStart) + border) * 2;
       // Mirror the end inset at the start so the toolbar never meets the row's far edge.
-      const inset = (parseFloat(style.insetInlineEnd) || 0) * 2;
+      const inset = parseFloat(style.insetInlineEnd) * 2;
       room = container.clientWidth - inset - frame + gap;
-      buttonCost = BUTTON_REM * rem + gap;
+      // Every toolbar button shares the size of the first one.
+      const button = node.querySelector('.message-action-button');
+      buttonCost = (button ? parseFloat(getComputedStyle(button).inlineSize) : 0) + gap;
       dividerCost = border + gap;
     });
     observer.observe(container);
@@ -126,7 +130,15 @@
 
 <div class="message-actions" {@attach measure} {@attach trackFocus}>
   {#if actions.onReact}
-    <MessageQuickReactions toolbar count={3} onReact={actions.onReact} divider={false} {roomId} />
+    {#if preferences.messageActionReactions}
+      <MessageQuickReactions
+        toolbar
+        count={QUICK_REACTIONS}
+        onReact={actions.onReact}
+        divider={false}
+        {roomId}
+      />
+    {/if}
     <ReactionPicker
       label={i18n.t('timeline.addReaction')}
       {roomId}

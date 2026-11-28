@@ -2,7 +2,8 @@
   "upcoming": {
     "added": [
       "syncOnPush",
-      "expandedMessageActions"
+      "expandedMessageActions",
+      "messageActionReactions"
     ],
     "changed": []
   },

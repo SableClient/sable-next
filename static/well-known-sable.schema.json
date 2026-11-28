@@ -577,6 +577,11 @@
           "type": "boolean",
           "default": false
         },
+        "messageActionReactions": {
+          "title": "Show recent reactions in the hover toolbar",
+          "type": "boolean",
+          "default": true
+        },
         "doubleTapReaction": {
           "type": "string",
           "default": "❤️"
@@ -1469,6 +1474,11 @@
           "title": "Show all message actions",
           "type": "boolean",
           "default": false
+        },
+        "messageActionReactions": {
+          "title": "Show recent reactions in the hover toolbar",
+          "type": "boolean",
+          "default": true
         },
         "doubleTapReaction": {
           "type": "string",

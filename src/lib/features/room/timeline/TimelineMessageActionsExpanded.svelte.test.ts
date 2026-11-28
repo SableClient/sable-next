@@ -29,8 +29,9 @@ import { withRowFields } from './row-fixtures.js';
 
 afterEach(async () => {
   await user.keyboard('{/Shift}');
-  window.dispatchEvent(new Event('blur'));
   setPreference('expandedMessageActions', false);
+  setPreference('messageActionReactions', true);
+  core.rpc.messages.frequentReactions.mockResolvedValue([]);
   resetTimelineItemTest();
 });
 
@@ -176,4 +177,19 @@ test('Shift typed into a text field leaves the toolbar alone', async () => {
   await fireEvent.keyDown(document.body, { key: 'Shift', shiftKey: true, isComposing: true });
   await tick();
   expect(receipts()).not.toBeInTheDocument();
+});
+
+test('the toolbar can leave out recent reactions but keeps the reaction picker', async () => {
+  core.rpc.messages.frequentReactions.mockResolvedValue(['👍']);
+  const quickReaction = () => document.querySelector('.message-actions .quick-reaction');
+  await renderHovered({ onToggleReaction: vi.fn() });
+  await vi.waitFor(() => {
+    expect(quickReaction()).toBeInTheDocument();
+  });
+
+  setPreference('messageActionReactions', false);
+  await tick();
+
+  expect(quickReaction()).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Add reaction' })).toBeInTheDocument();
 });

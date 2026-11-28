@@ -369,6 +369,7 @@ const SETTINGS = {
   showRoleTooltip: toggle(false, { account: true }),
   hideMessageShields: toggle(false, { account: true }),
   expandedMessageActions: toggle(false, { account: true, device: true }),
+  messageActionReactions: toggle(true, { account: true, device: true }),
   doubleTapReaction: text('❤️', { account: true }),
   hideTypingIndicators: toggle(false, { account: true }),
   memberSort: choice<MemberSort>(['name-asc', 'name-desc', 'newest', 'oldest'], 'name-asc', {

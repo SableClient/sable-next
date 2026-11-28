@@ -195,6 +195,15 @@ export const timelineCategory: SettingsCategory = {
       supported: supportsKeyboardShortcuts,
     },
     {
+      key: 'messageActionReactions',
+      section: 'messages',
+      icon: SmileyIcon,
+      name: 'settings.messageActionReactions',
+      description: 'settings.messageActionReactionsHint',
+      type: 'boolean',
+      supported: supportsKeyboardShortcuts,
+    },
+    {
       key: 'messageSwipeAction',
       section: 'messages',
       icon: HandSwipeLeftIcon,

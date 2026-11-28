@@ -46,6 +46,7 @@ accepts the same settings except those marked deployment only.
 - `showRoleTooltip` (Show role name on hover): `true` or `false`. Default `false`.
 - `hideMessageShields` (Hide minor security warnings): `true` or `false`. Default `false`.
 - `expandedMessageActions` (Show all message actions): `true` or `false`. Default `false`.
+- `messageActionReactions` (Show recent reactions in the hover toolbar): `true` or `false`. Default `true`.
 - `hideTypingIndicators` (Hide typing indicators): `true` or `false`. Default `false`.
 - `groupMembersByPresence` (Group members by presence): `true` or `false`. Default `true`.
 - `filterPronounsByLanguage` (Match pronouns to interface language): `true` or `false`. Default `true`.

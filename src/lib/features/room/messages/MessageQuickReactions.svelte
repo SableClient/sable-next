@@ -8,6 +8,7 @@
   import { useRecentReactions } from '#lib/emoji/recents.svelte.js';
   import { quickReactions } from '#lib/model/model.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { isCustomReaction, reactionEmoteLabel } from './reaction-emote-label.js';
 
@@ -43,29 +44,46 @@
     aria-label={i18n.t('timeline.addReaction')}
   >
     {#each recents as emoji (emoji)}
-      {@const label = reactionEmoteLabel(emoji, packs.current, i18n.t('timeline.customEmote'))}
-      <button
-        type="button"
-        class="quick-reaction"
-        aria-label={isCustomReaction(emoji) ? label : (shortcodeFor(emoji) ?? emoji)}
-        onclick={() => {
-          onReact(emoji);
-        }}
-      >
-        {#if isCustomReaction(emoji)}
-          <MediaImage
-            class="quick-reaction-image"
-            source={emoji}
-            alt={label}
-            width={64}
-            height={64}
-            original
-            emoticon
-          />
-        {:else}
-          {emoji}
-        {/if}
-      </button>
+      {@const custom = isCustomReaction(emoji)}
+      {@const label = custom
+        ? reactionEmoteLabel(emoji, packs.current, i18n.t('timeline.customEmote'))
+        : (shortcodeFor(emoji) ?? emoji)}
+      {#snippet reaction(props: Record<string, unknown>)}
+        <button
+          {...props}
+          type="button"
+          class="quick-reaction"
+          aria-label={label}
+          onclick={() => {
+            onReact(emoji);
+          }}
+        >
+          <span class="quick-reaction-glyph">
+            {#if custom}
+              <MediaImage
+                class="quick-reaction-image"
+                source={emoji}
+                alt={label}
+                width={64}
+                height={64}
+                original
+                emoticon
+              />
+            {:else}
+              {emoji}
+            {/if}
+          </span>
+        </button>
+      {/snippet}
+      {#if toolbar}
+        <Tooltip {label}>
+          {#snippet trigger({ props })}
+            {@render reaction(props)}
+          {/snippet}
+        </Tooltip>
+      {:else}
+        {@render reaction({})}
+      {/if}
     {/each}
     {#if onAdd}
       <button
@@ -168,6 +186,21 @@
 
   .quick-strip.toolbar .quick-reaction:hover {
     background: var(--surface-var-container-hover);
+  }
+
+  .quick-reaction-glyph {
+    display: inline-block;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .quick-strip.toolbar .quick-reaction-glyph {
+      transition: scale var(--motion-fast) var(--motion-easing-standard);
+    }
+
+    .quick-strip.toolbar .quick-reaction:hover .quick-reaction-glyph,
+    .quick-strip.toolbar .quick-reaction:focus-visible .quick-reaction-glyph {
+      scale: 1.2;
+    }
   }
 
   .quick-line {

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { untrack, type ComponentProps } from 'svelte';
 
+  import { useCoreClient } from '#lib/core/context.js';
+  import { provideRecentReactions, RecentReactions } from '#lib/emoji/recents.svelte.js';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import { provideRoomCosmetics, type RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 
@@ -40,6 +42,7 @@
   const senderRoles = untrack(() => roles);
   if (senderRoles) provideSenderRoles((userId) => senderRoles[userId] ?? null);
 
+  provideRecentReactions(new RecentReactions(useCoreClient()));
   providePinnedEvents(new PinnedEvents(untrack(() => core)));
   provideBookmarks(new Bookmarks(untrack(() => core)));
   const dialogs = provideMessageDialogs(new MessageDialogs());

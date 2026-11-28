@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ImagePackView } from '#src/generated/protocol';
@@ -9,6 +10,7 @@ vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
 import { RecentReactions } from '#lib/emoji/recents.svelte.js';
+import { renderWithTooltips } from '#lib/test-support/render-with-tooltips.js';
 
 import MessageQuickReactionsHarness from './MessageQuickReactionsHarness.test.svelte';
 
@@ -80,4 +82,21 @@ test('shows the shared history on the first frame instead of the defaults', asyn
 
   expect(container.querySelector('.quick-reaction')).toHaveTextContent('🐈');
   stop();
+});
+
+test('a toolbar reaction names its emote in a tooltip', async () => {
+  core.rpc.messages.frequentReactions.mockResolvedValue(['mxc://example.org/neocat']);
+  core.rpc.packs.list.mockResolvedValue({ packs, complete: true });
+
+  renderWithTooltips(MessageQuickReactionsHarness, {
+    count: 1,
+    toolbar: true,
+    onReact: vi.fn(),
+    roomId: '!room:example.org',
+  });
+
+  await userEvent.hover(await screen.findByRole('button', { name: ':neocat:' }));
+  await vi.waitFor(() => {
+    expect(document.querySelector('.tooltip')).toHaveTextContent(':neocat:');
+  });
 });
