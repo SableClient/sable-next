@@ -5,6 +5,8 @@
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
+  import { mockImage } from '../../../../../.storybook/mock-media';
+
   import YoutubeLinkPreview from './YoutubeLinkPreview.svelte';
 
   const preview: UrlPreviewView = {
@@ -12,10 +14,10 @@
     title: 'Shipping the search crawl fix',
     description: 'How the indexer keeps results steady while older history is still loading.',
     site_name: 'YouTube',
-    image: 'https://youtube.com/example.png',
+    image: mockImage(1280, 720),
     image_mime: null,
-    image_width: 160,
-    image_height: 90,
+    image_width: 1280,
+    image_height: 720,
     video: null,
     theme_color: null,
     card: null,

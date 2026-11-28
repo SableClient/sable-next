@@ -6,6 +6,8 @@
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
+  import { mockImage } from '../../../../../.storybook/mock-media';
+
   import LinkPreviewCard from './LinkPreviewCard.svelte';
 
   const bundled: UrlPreviewView = {
@@ -54,9 +56,9 @@
     bundled: {
       ...bundled,
       card: 'summary_large_image',
-      image: 'hi',
-      image_width: 160,
-      image_height: 90,
+      image: mockImage(1600, 900),
+      image_width: 1600,
+      image_height: 900,
     },
   }}
 />
@@ -66,9 +68,9 @@
     bundled: {
       ...bundled,
       card: 'summary_large_image',
-      image: 'hi',
-      image_width: 320,
-      image_height: 90,
+      image: mockImage(3200, 900),
+      image_width: 3200,
+      image_height: 900,
     },
   }}
 />
@@ -78,9 +80,9 @@
     bundled: {
       ...bundled,
       card: 'summary_large_image',
-      image: 'hi',
-      image_width: 90,
-      image_height: 160,
+      image: mockImage(900, 1600),
+      image_width: 900,
+      image_height: 1600,
     },
   }}
 />
@@ -88,6 +90,12 @@
 <Story
   name="Summary Small Image"
   args={{
-    bundled: { ...bundled, card: 'summary', image: 'hi', image_width: 90, image_height: 160 },
+    bundled: {
+      ...bundled,
+      card: 'summary',
+      image: mockImage(900, 1600),
+      image_width: 900,
+      image_height: 1600,
+    },
   }}
 />

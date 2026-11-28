@@ -4,6 +4,7 @@
 
   import type { CoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
+  import { provideRecentReactions, RecentReactions } from '#lib/emoji/recents.svelte.ts';
   import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.ts';
   import { provideSenderRoles } from '#lib/features/room/members/sender-roles.ts';
   import {
@@ -29,6 +30,7 @@
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.ts';
 
   import { untrack } from 'svelte';
+  import { mockImageBytes } from './mock-media';
   import { mockRpc as generatedRpc, type RpcOverrides } from './mock-rpc';
 
   let { children, rpc = {} }: { children: Snippet; rpc?: RpcOverrides } = $props();
@@ -40,30 +42,20 @@
     return bytes;
   };
 
-  const mockFetchMedia = async (source: string, width: number, height: number) => {
-    if (source.includes('placehold.co')) {
-      return getRemoteMedia(source);
-    }
-    if (!!width && width > 0 && !!height && height > 0) {
-      return getRemoteMedia(`https://placehold.co/${width}x${height}.png`);
-    }
-    if (source.includes('wav') && source.includes('metadata')) {
-      return getRemoteMedia('https://copse.f0rest.net/junk/outgoing_call_metadata.webm');
-    }
-    if (source.includes('wav')) {
-      return getRemoteMedia('https://copse.f0rest.net/junk/outgoing_call.webm');
-    }
-    if (source.includes('flac')) {
-      return getRemoteMedia('https://copse.f0rest.net/junk/find%20it.flac');
-    }
-    if (source.includes('mp4')) {
-      return getRemoteMedia('https://copse.f0rest.net/junk/Big_Buck_Bunny_4K.webm');
-    }
-    if (source.includes('json')) {
-      return getRemoteMedia('https://copse.f0rest.net/junk/example.json');
-    }
+  const REMOTE_MEDIA: [(source: string) => boolean, string][] = [
+    [(s) => s.includes('wav') && s.includes('metadata'), 'outgoing_call_metadata.webm'],
+    [(s) => s.includes('wav'), 'outgoing_call.webm'],
+    [(s) => s.includes('flac'), 'find%20it.flac'],
+    [(s) => s.includes('mp4'), 'Big_Buck_Bunny_4K.webm'],
+    [(s) => s.includes('json'), 'example.json'],
+  ];
 
-    return getRemoteMedia(`https://placehold.co/1600x900.png`);
+  // A sized request is a thumbnail, which is always an image.
+  const mockFetchMedia = async (source: string, width: number, height: number) => {
+    const remote = width > 0 && height > 0 ? undefined : REMOTE_MEDIA.find(([is]) => is(source));
+    return remote
+      ? getRemoteMedia(`https://copse.f0rest.net/junk/${remote[1]}`)
+      : mockImageBytes(source, width, height);
   };
 
   const noop = () => {};
@@ -71,7 +63,7 @@
   const mockCore = {
     ...mockRpc,
     onProfileChanged: () => noop,
-    subscribeEvents: noop,
+    subscribeEvents: () => noop,
     cachedUserProfile: noop,
     media: {
       fetchMedia: mockFetchMedia,
@@ -80,6 +72,7 @@
 
   provideCoreClient(mockCore);
 
+  provideRecentReactions(new RecentReactions(mockCore));
   provideRoomCosmetics({ ...mockRpc, for: noop } as unknown as RoomCosmetics);
   provideSenderRoles(() => null);
   providePinnedEvents(new PinnedEvents(mockRpc as unknown as PinnedEventCommands));

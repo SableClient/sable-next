@@ -5,11 +5,17 @@
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
+  import {
+    IMAGE_SIZES,
+    mockImage,
+    mockImages,
+    type ImageSize,
+  } from '../../../../../.storybook/mock-media';
+
   import PostLinkPreview from './PostLinkPreview.svelte';
 
   const url = 'https://social.example/alice/post/f00b4r';
-  const imageUrl = 'https://placehold.co/800x600';
-  const imageSized = (width: number, height: number) => `https://placehold.co/${width}x${height}`;
+  const imageUrl = mockImage(800, 600);
 
   const post: PostView = {
     url,
@@ -64,6 +70,19 @@
     alt: null,
   });
 
+  const images = (sizes: ImageSize[]) =>
+    mockImages(sizes).map((image) => media('image', image.source, image.width, image.height));
+
+  const X_SIZES = [IMAGE_SIZES.wide, IMAGE_SIZES.square, IMAGE_SIZES.tall];
+  const xPost = (sizes: ImageSize[]): UrlPreviewView => ({
+    ...preview,
+    url: 'https://x.com/alice/status/1861234567890123456',
+    site_name: 'X',
+    post: { ...post, text: `A post with ${String(sizes.length)} images.`, media: images(sizes) },
+  });
+  const xPostWith = (count: number) =>
+    xPost(Array.from({ length: count }, (_, index) => X_SIZES[index % X_SIZES.length]));
+
   const previewWith = (obj: Partial<PostView>) => {
     return {
       ...preview,
@@ -104,7 +123,7 @@
   name="With tall image"
   args={{
     preview: previewWith({
-      media: [media('image', imageSized(100, 400), 100, 400)],
+      media: [media('image', mockImage(100, 400), 100, 400)],
     }),
   }}
 />
@@ -113,7 +132,7 @@
   name="With wide image"
   args={{
     preview: previewWith({
-      media: [media('image', imageSized(400, 100), 400, 100)],
+      media: [media('image', mockImage(400, 100), 400, 100)],
     }),
   }}
 />
@@ -122,7 +141,7 @@
   name="With square image"
   args={{
     preview: previewWith({
-      media: [media('image', imageSized(200, 200), 200, 200)],
+      media: [media('image', mockImage(200, 200), 200, 200)],
     }),
   }}
 />
@@ -159,33 +178,32 @@
   }}
 />
 
+<Story name="X post, 1 image" args={{ preview: xPostWith(1) }} />
+
+<Story name="X post, 2 images" args={{ preview: xPostWith(2) }} />
+
+<Story name="X post, 3 images" args={{ preview: xPostWith(3) }} />
+
+<Story name="X post, 4 images" args={{ preview: xPostWith(4) }} />
+
+<Story name="X post, 6 images" args={{ preview: xPostWith(6) }} />
+
+<Story name="X post, 8 images" args={{ preview: xPostWith(8) }} />
+
+<Story name="X post, 10 images" args={{ preview: xPostWith(10) }} />
+
+<Story name="X post, 20 images" args={{ preview: xPostWith(20) }} />
+
 <Story
-  name="With 20 images"
+  name="X post, narrow tall slices"
   args={{
-    preview: previewWith({
-      media: [
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-        media('image', imageUrl),
-      ],
-    }),
+    preview: xPost([
+      { width: 120, height: 1600 },
+      { width: 180, height: 1600 },
+      { width: 240, height: 1400 },
+      { width: 90, height: 1200 },
+      { width: 300, height: 1800 },
+    ]),
   }}
 />
 
