@@ -22,14 +22,23 @@ const RENDER_TIMEOUT: Duration = Duration::from_secs(20);
 const OPTIONAL_TIMEOUT: Duration = Duration::from_secs(3);
 const FINISH_RESERVE: Duration = Duration::from_secs(1);
 
-async fn optional_work<T: Default>(deadline: Instant, operation: impl Future<Output = T>) -> T {
+async fn optional_work<T: Default, F: Future<Output = T>>(
+    deadline: Instant,
+    operation: impl FnOnce(Instant) -> F,
+) -> T {
     let now = Instant::now();
     if deadline <= now {
         return T::default();
     }
-    tokio::time::timeout_at(deadline.min(now + OPTIONAL_TIMEOUT), operation)
+    let deadline = deadline.min(now + OPTIONAL_TIMEOUT);
+    tokio::time::timeout_at(deadline, operation(deadline))
         .await
         .unwrap_or_default()
+}
+
+/// The session's answer when it knows the room, else whether the push named the room.
+fn group(direct: Option<bool>, room_name: &str) -> bool {
+    direct.map_or(!room_name.is_empty(), |direct| !direct)
 }
 
 #[derive(Deserialize)]
@@ -187,6 +196,8 @@ struct ContentPushOut {
     active_elsewhere: bool,
     group: bool,
     sender_avatar: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sender_avatar_issue: Option<&'static str>,
     room_avatar: Option<String>,
     image: Option<PushImage>,
     members: Option<u64>,
@@ -565,7 +576,7 @@ async fn open_session(
     let read_rooms = match session.as_ref() {
         Some(session) if settings.clear_on_read => {
             stage.set("read_rooms");
-            optional_work(optional_deadline, session.read_rooms(&reconcile))
+            optional_work(optional_deadline, |_| session.read_rooms(&reconcile))
                 .await
                 .unwrap_or_default()
         }
@@ -677,15 +688,15 @@ impl Alert<'_> {
         match (sender_id, session) {
             (Some(sender), Some(session)) if !invite => {
                 self.stage.set("media");
-                optional_work(
-                    self.optional_deadline,
+                optional_work(self.optional_deadline, |deadline| {
                     Box::pin(session.media(
                         Some(sender),
                         self.target.sender_display_name.as_deref(),
                         self.target.sender_avatar_url.as_deref(),
                         content,
-                    )),
-                )
+                        deadline,
+                    ))
+                })
                 .await
             }
             _ => PushMedia::default(),
@@ -775,7 +786,10 @@ impl Alert<'_> {
         let active_elsewhere = match &session {
             Some(session) if !invite && current.quiet_when_active_elsewhere => {
                 self.stage.set("active_elsewhere");
-                optional_work(self.optional_deadline, Box::pin(session.active_elsewhere())).await
+                optional_work(self.optional_deadline, |_| {
+                    Box::pin(session.active_elsewhere())
+                })
+                .await
             }
             _ => false,
         };
@@ -818,8 +832,9 @@ impl Alert<'_> {
             highlight: highlighted(self.notification) || self.target.mention == Some(true),
             invite: message.invite,
             active_elsewhere,
-            group: !room_name.is_empty(),
+            group: group(media.direct, &room_name),
             sender_avatar: media.sender,
+            sender_avatar_issue: media.sender_avatar_issue,
             room_avatar: media.room,
             image: media.image,
             members,
@@ -1197,14 +1212,21 @@ mod tests {
         rendered.map(|rendered| serde_json::to_value(rendered).unwrap())
     }
 
+    #[test]
+    fn a_known_room_is_a_group_unless_direct_whatever_its_name() {
+        assert!(group(Some(false), ""));
+        assert!(!group(Some(true), "Lounge"));
+        assert!(group(None, "Lounge"));
+        assert!(!group(None, ""));
+    }
+
     #[tokio::test]
     async fn optional_work_times_out() {
         let media: PushMedia = tokio::time::timeout(
             Duration::from_secs(1),
-            optional_work(
-                Instant::now() + Duration::from_millis(20),
-                std::future::pending(),
-            ),
+            optional_work(Instant::now() + Duration::from_millis(20), |_| {
+                std::future::pending()
+            }),
         )
         .await
         .unwrap();
@@ -1215,7 +1237,7 @@ mod tests {
     #[tokio::test]
     async fn optional_work_skips_expired_deadlines() {
         let mut started = false;
-        let media = optional_work(Instant::now(), async {
+        let media = optional_work(Instant::now(), |_| async {
             started = true;
             PushMedia::default()
         })
@@ -1965,6 +1987,7 @@ mod tests {
                 active_elsewhere: true,
                 group: false,
                 sender_avatar: Some("mxc://a".to_owned()),
+                sender_avatar_issue: None,
                 room_avatar: None,
                 image: None,
                 members: Some(3),

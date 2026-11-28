@@ -159,7 +159,9 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
                 let interaction = INInteraction(intent: intent, response: nil)
                 interaction.direction = .incoming
                 interaction.donate { [weak self] error in
-                    if error == nil {
+                    if let error {
+                        Self.log.error("intent donation failed: \(error.localizedDescription, privacy: .public)")
+                    } else {
                         self?.lock.lock()
                         self?.communication = intent
                         self?.lock.unlock()
@@ -174,11 +176,16 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
         guard let name = (rendered["sender"] as? String).flatMap({ $0.isEmpty ? nil : $0 }),
               let text = rendered["text"] as? String else { return nil }
         let id = (rendered["sender_id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? name
+        let avatar = image(rendered["sender_avatar"])
+        let reason = rendered["sender_avatar_issue"] as? String ?? "media unavailable"
+        if avatar == nil, reason != "no_url" {
+            log.info("no sender avatar: \(reason, privacy: .public)")
+        }
         let sender = INPerson(
             personHandle: INPersonHandle(value: id, type: .unknown),
             nameComponents: nil,
             displayName: name,
-            image: image(rendered["sender_avatar"]),
+            image: avatar,
             contactIdentifier: nil,
             customIdentifier: id
         )
@@ -195,7 +202,8 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             sender: sender,
             attachments: nil
         )
-        if group != nil, let room = image(rendered["room_avatar"]) {
+        // iOS draws a group's picture over the sender's, so it stands in only for a missing one.
+        if group != nil, avatar == nil, let room = image(rendered["room_avatar"]) {
             intent.setImage(room, forParameterNamed: \.speakableGroupName)
         }
         // Without recipients, iOS shows a group as a one-to-one conversation.
@@ -471,7 +479,14 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
         if !duplicates.isEmpty {
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: duplicates)
         }
-        handler(intent.flatMap { try? updated.updating(from: $0) } ?? updated)
+        handler(intent.flatMap { intent in
+            do {
+                return try updated.updating(from: intent)
+            } catch {
+                Self.log.error("communication style failed: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
+        } ?? updated)
     }
 
     override func serviceExtensionTimeWillExpire() {

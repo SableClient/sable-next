@@ -13,7 +13,10 @@ pub(super) const PUSH_IMAGE_HEIGHT: u32 = 600;
 #[cfg(not(target_family = "wasm"))]
 const PUSH_ENCRYPTED_IMAGE_MAX_BYTES: u64 = 1024 * 1024;
 #[cfg(not(target_family = "wasm"))]
-const PUSH_MEDIA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+pub const PUSH_MEDIA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+/// Left before `PushSession::media`'s deadline to assemble what was fetched.
+#[cfg(not(target_family = "wasm"))]
+pub(super) const PUSH_MEDIA_RESERVE: std::time::Duration = std::time::Duration::from_millis(200);
 #[cfg(not(target_family = "wasm"))]
 const PUSH_MEDIA_MAX_AGE: std::time::Duration = std::time::Duration::from_hours(7 * 24);
 
@@ -42,6 +45,12 @@ pub struct PushMedia {
     pub own_name: Option<String>,
     pub own_avatar: Option<String>,
     pub room_name: Option<String>,
+    /// A one-to-one `m.direct` chat, which the platforms show as a conversation with one person;
+    /// `None` without a sender or when the room is unknown.
+    pub direct: Option<bool>,
+    /// Why `sender` is missing, for push diagnostics.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender_avatar_issue: Option<&'static str>,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -141,12 +150,42 @@ pub(super) async fn cached_push_media(
     source: Option<ruma::events::room::MediaSource>,
     bounds: Option<(u32, u32)>,
 ) -> Option<(String, &'static str)> {
+    let deadline = tokio::time::Instant::now() + PUSH_MEDIA_TIMEOUT;
+    fetch_push_media(client, directory, source?, bounds, deadline)
+        .await
+        .ok()
+}
+
+/// Why a picture is missing, for push diagnostics: `timeout`, `fetch_failed`,
+/// `not_an_image` or `not_saved`.
+#[cfg(not(target_family = "wasm"))]
+pub(super) async fn fetch_push_media(
+    client: &Client,
+    directory: &std::path::Path,
+    source: ruma::events::room::MediaSource,
+    bounds: Option<(u32, u32)>,
+    deadline: tokio::time::Instant,
+) -> Result<(String, &'static str), &'static str> {
+    tokio::time::timeout_at(
+        deadline,
+        fetch_push_media_now(client, directory, source, bounds),
+    )
+    .await
+    .map_err(|_| "timeout")?
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn fetch_push_media_now(
+    client: &Client,
+    directory: &std::path::Path,
+    source: ruma::events::room::MediaSource,
+    bounds: Option<(u32, u32)>,
+) -> Result<(String, &'static str), &'static str> {
     use base64::Engine as _;
     use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
     use matrix_sdk::ruma::events::room::MediaSource;
     use sha2::{Digest, Sha256};
 
-    let source = source?;
     let format = match (&source, bounds) {
         (MediaSource::Plain(_), Some((width, height))) => {
             MediaFormat::Thumbnail(MediaThumbnailSettings::new(width.into(), height.into()))
@@ -164,25 +203,27 @@ pub(super) async fn cached_push_media(
     let path = directory.join(
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(key.as_bytes())),
     );
+    let path_str = path.to_str().ok_or("not_saved")?.to_owned();
     if let Ok(mut file) = tokio::fs::File::open(&path).await {
         let mut head = [0; 12];
         let read = tokio::io::AsyncReadExt::read(&mut file, &mut head)
             .await
-            .ok()?;
-        return Some((
-            path.to_str()?.to_owned(),
-            image_mimetype(head.get(..read)?)?,
-        ));
+            .map_err(|_| "not_saved")?;
+        let mimetype = head.get(..read).and_then(image_mimetype);
+        return mimetype
+            .map(|mimetype| (path_str, mimetype))
+            .ok_or("not_an_image");
     }
     let request = MediaRequestParameters { source, format };
-    let bytes = tokio::time::timeout(
-        PUSH_MEDIA_TIMEOUT,
-        client.media().get_media_content(&request, false),
-    )
-    .await
-    .ok()?
-    .ok()?;
-    let mimetype = image_mimetype(&bytes)?;
+    let bytes = client
+        .media()
+        .get_media_content(&request, false)
+        .await
+        .map_err(|error| {
+            tracing::info!("push media download failed: {error}");
+            "fetch_failed"
+        })?;
+    let mimetype = image_mimetype(&bytes).ok_or("not_an_image")?;
     let directory = directory.to_owned();
     let destination = path.clone();
     tokio::task::spawn_blocking(move || {
@@ -190,9 +231,10 @@ pub(super) async fn cached_push_media(
         crate::store::write_atomic(&destination, &bytes)
     })
     .await
-    .ok()?
-    .ok()?;
-    Some((path.to_str()?.to_owned(), mimetype))
+    .ok()
+    .and_then(Result::ok)
+    .ok_or("not_saved")?;
+    Ok((path_str, mimetype))
 }
 
 /// Only formats both platforms decode in a notification.

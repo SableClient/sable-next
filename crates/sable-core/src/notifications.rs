@@ -19,7 +19,7 @@ pub(crate) use device_activity::set_device_activity;
 #[cfg(not(target_family = "wasm"))]
 pub(crate) use media::clear_push_media;
 #[cfg(not(target_family = "wasm"))]
-pub use media::{PushImage, PushMedia};
+pub use media::{PUSH_MEDIA_TIMEOUT, PushImage, PushMedia};
 pub use media::{push_preview, push_preview_parts, push_sender_name};
 #[cfg(not(target_family = "wasm"))]
 pub use push_cache::evict as evict_push_cache;

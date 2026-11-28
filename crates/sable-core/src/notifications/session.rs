@@ -13,8 +13,9 @@ use super::cold::{
 };
 use super::device_activity::DEVICE_ACTIVITY_EVENT;
 use super::media::{
-    PUSH_AVATAR_SIZE, PUSH_IMAGE_HEIGHT, PUSH_IMAGE_WIDTH, PUSH_MEDIA_DIRECTORY, PushImage,
-    PushMedia, cached_push_media, message_image, prune_push_media, push_sender_name,
+    PUSH_AVATAR_SIZE, PUSH_IMAGE_HEIGHT, PUSH_IMAGE_WIDTH, PUSH_MEDIA_DIRECTORY,
+    PUSH_MEDIA_RESERVE, PUSH_MEDIA_TIMEOUT, PushImage, PushMedia, cached_push_media,
+    fetch_push_media, message_image, prune_push_media, push_sender_name,
 };
 use super::push_cache;
 use super::view::fetch_push_event_with;
@@ -364,14 +365,17 @@ impl PushSession {
     /// `sender` asks for the avatars, `content` for the message's image and per-message
     /// profile; leave out the content when the notification may not show the message.
     /// `payload_avatar` is the sender avatar the SDK resolved with the pushed event, which
-    /// this store may have no member for.
+    /// this store may have no member for. Pictures not fetched before `deadline` are omitted;
+    /// the avatars are fetched before the message's image.
     pub async fn media(
         &self,
         sender: Option<&str>,
         payload_name: Option<&str>,
         payload_avatar: Option<&str>,
         content: Option<&serde_json::Value>,
+        deadline: tokio::time::Instant,
     ) -> PushMedia {
+        let deadline = deadline.checked_sub(PUSH_MEDIA_RESERVE).unwrap_or(deadline);
         let sender_name = self.sender_name(sender, payload_name, content).await;
         let client = self.host.client();
         let Some(room) = client.get_room(&self.room_id) else {
@@ -384,21 +388,8 @@ impl PushSession {
         let profile_avatar = profile
             .as_ref()
             .and_then(|profile| profile.avatar_url.as_deref());
-        let sender_url = match (profile_avatar, payload_avatar, sender) {
-            (Some(url), _, _) | (None, Some(url), Some(_)) => {
-                crate::media::mxc_only(url).map(ruma::OwnedMxcUri::from)
-            }
-            (None, None, Some(sender)) => match ruma::UserId::parse(sender) {
-                Ok(sender) => room
-                    .get_member_no_sync(&sender)
-                    .await
-                    .ok()
-                    .flatten()
-                    .and_then(|member| member.avatar_url().map(ToOwned::to_owned)),
-                Err(_) => None,
-            },
-            (None, _, None) => None,
-        };
+        let sender_url =
+            sender_avatar_url(client, &room, sender, payload_avatar, profile_avatar).await;
         let room_url = match sender {
             Some(_) => crate::view::room_avatar_url(&room)
                 .await
@@ -426,6 +417,12 @@ impl PushSession {
                 .or_else(|| room.cached_display_name().map(|name| name.to_string())),
             None => None,
         };
+        let direct = match sender {
+            Some(_) => {
+                Some(room.is_direct().await.unwrap_or(false) && crate::view::is_one_to_one(&room))
+            }
+            None => None,
+        };
         let image = match content {
             Some(content) if crate::account_documents::shows_media_previews(&room).await => {
                 message_image(content)
@@ -434,35 +431,33 @@ impl PushSession {
         };
         let directory = self.store_dir.join(PUSH_MEDIA_DIRECTORY);
         prune_push_media(&directory).await;
+        let fetch = |source: Option<ruma::events::room::MediaSource>, bounds| {
+            let directory = &directory;
+            async move {
+                fetch_push_media(client, directory, source.ok_or("no_url")?, bounds, deadline).await
+            }
+        };
         let avatar = |url: Option<ruma::OwnedMxcUri>| {
-            let source = url.map(ruma::events::room::MediaSource::Plain);
-            cached_push_media(
-                client,
-                &directory,
-                source,
+            fetch(
+                url.map(ruma::events::room::MediaSource::Plain),
                 Some((PUSH_AVATAR_SIZE, PUSH_AVATAR_SIZE)),
             )
         };
-        let (sender, room, own_avatar, image) = futures_util::join!(
-            avatar(sender_url),
-            avatar(room_url),
-            avatar(own_url),
-            cached_push_media(
-                client,
-                &directory,
-                image,
-                Some((PUSH_IMAGE_WIDTH, PUSH_IMAGE_HEIGHT))
-            ),
-        );
+        let (sender, room, own_avatar) =
+            futures_util::join!(avatar(sender_url), avatar(room_url), avatar(own_url));
+        let image = fetch(image, Some((PUSH_IMAGE_WIDTH, PUSH_IMAGE_HEIGHT))).await;
+        let (room, own_avatar, image) = (room.ok(), own_avatar.ok(), image.ok());
         PushMedia {
             sender_name,
-            sender: sender.map(|(path, _)| path),
+            sender_avatar_issue: sender.as_ref().err().copied(),
+            sender: sender.ok().map(|(path, _)| path),
             sender_profile: profile.and_then(|profile| profile.id.or(profile.display_name)),
             room: room.map(|(path, _)| path),
             image: image.map(|(path, mimetype)| PushImage { path, mimetype }),
             own_name,
             own_avatar: own_avatar.map(|(path, _)| path),
             room_name,
+            direct,
         }
     }
 
@@ -617,11 +612,47 @@ pub async fn cold_push_media(
     content: Option<&serde_json::Value>,
 ) -> PushMedia {
     match PushSession::cached(&cold_push_store_dir(data_dir), user_id, device_id, room_id).await {
-        Some(session) => session.media(sender, payload_name, None, content).await,
+        Some(session) => {
+            let deadline = tokio::time::Instant::now() + PUSH_MEDIA_TIMEOUT;
+            session
+                .media(sender, payload_name, None, content, deadline)
+                .await
+        }
         None => PushMedia {
             sender_name: push_sender_name(sender, payload_name, content),
             ..PushMedia::default()
         },
+    }
+}
+
+/// Per-message profile, then the nickname override (a cleared one means none), then the avatar
+/// resolved with the push, then the sender's member avatar.
+async fn sender_avatar_url(
+    client: &matrix_sdk::Client,
+    room: &matrix_sdk::Room,
+    sender: Option<&str>,
+    payload_avatar: Option<&str>,
+    profile_avatar: Option<&str>,
+) -> Option<ruma::OwnedMxcUri> {
+    let nickname_avatar = match (profile_avatar, sender) {
+        (None, Some(sender)) => crate::profile_overrides::notification_avatar(client, sender).await,
+        _ => None,
+    };
+    match (profile_avatar, nickname_avatar, payload_avatar, sender) {
+        (Some(url), _, _, _) | (None, None, Some(url), Some(_)) => {
+            crate::media::mxc_only(url).map(ruma::OwnedMxcUri::from)
+        }
+        (None, Some(url), _, _) => url.map(ruma::OwnedMxcUri::from),
+        (None, None, None, Some(sender)) => match ruma::UserId::parse(sender) {
+            Ok(sender) => room
+                .get_member_no_sync(&sender)
+                .await
+                .ok()
+                .flatten()
+                .and_then(|member| member.avatar_url().map(ToOwned::to_owned)),
+            Err(_) => None,
+        },
+        (None, None, _, None) => None,
     }
 }
 

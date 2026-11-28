@@ -145,6 +145,8 @@ impl Nicknames {
             notification.room_name = self
                 .name(sender, Some(&notification.room_name))
                 .unwrap_or_default();
+            notification.room_avatar_url =
+                self.avatar(sender, notification.room_avatar_url.as_deref());
         }
     }
 
@@ -361,6 +363,49 @@ mod tests {
         assert_eq!(
             names.name(user_id!("@eve:x"), Some("Eve")).as_deref(),
             Some("Eve")
+        );
+    }
+
+    #[test]
+    fn a_notification_takes_the_nickname_avatar_and_a_direct_chat_too() {
+        let names = nicknames(&[
+            ("@bob:x", OverrideTextView::Unset, set("mxc://x/nick")),
+            ("@ann:x", OverrideTextView::Unset, OverrideTextView::Cleared),
+        ]);
+        let notification = |sender: &str, is_direct| {
+            let mut view = NotificationView {
+                user_id: user_id!("@me:x").to_owned(),
+                room_id: matrix_sdk::ruma::room_id!("!r:x").to_owned(),
+                event_id: None,
+                room_name: "Room".to_owned(),
+                room_avatar_url: Some("mxc://x/room".to_owned()),
+                is_direct,
+                encrypted: false,
+                sender: OwnedUserId::try_from(sender).unwrap(),
+                sender_name: None,
+                sender_avatar_url: Some("mxc://x/real".to_owned()),
+                body: String::new(),
+                emotes: Vec::new(),
+                mention: false,
+                noisy: None,
+            };
+            names.apply_notification(&mut view);
+            (view.sender_avatar_url, view.room_avatar_url)
+        };
+        let url = |url: &str| Some(url.to_owned());
+
+        assert_eq!(
+            notification("@bob:x", false),
+            (url("mxc://x/nick"), url("mxc://x/room"))
+        );
+        assert_eq!(
+            notification("@bob:x", true),
+            (url("mxc://x/nick"), url("mxc://x/nick"))
+        );
+        assert_eq!(notification("@ann:x", true), (None, None));
+        assert_eq!(
+            notification("@eve:x", true),
+            (url("mxc://x/real"), url("mxc://x/room"))
         );
     }
 

@@ -44,6 +44,7 @@ object PushNotifier {
     private const val DIRECT_FLAG = "moe.sable.direct"
     private const val SENDER_NAME_KEY = "moe.sable.sender_name"
     private const val SENDER_AVATAR_KEY = "moe.sable.sender_avatar"
+    private const val SENDER_AVATAR_ISSUE_KEY = "moe.sable.sender_avatar_issue"
     private const val SENDER_PROFILE_KEY = "moe.sable.sender_profile"
     private const val ROOM_AVATAR_KEY = "moe.sable.room_avatar"
     private const val OWN_AVATAR_KEY = "moe.sable.own_avatar"
@@ -333,6 +334,7 @@ object PushNotifier {
             listOf(
                 "sender_name" to SENDER_NAME_KEY,
                 "sender" to SENDER_AVATAR_KEY,
+                "sender_avatar_issue" to SENDER_AVATAR_ISSUE_KEY,
                 "sender_profile" to SENDER_PROFILE_KEY,
                 "room" to ROOM_AVATAR_KEY,
                 "own_avatar" to OWN_AVATAR_KEY,
@@ -343,6 +345,7 @@ object PushNotifier {
         for ((field, key) in fields) {
             if (!media.isNull(field)) notification.put(key, media.getString(field))
         }
+        if (!isInvite(notification) && !media.isNull("direct")) notification.put(DIRECT_FLAG, media.getBoolean("direct"))
         media.optJSONObject("image")?.let {
             notification.put(IMAGE_KEY, it.getString("path"))
             notification.put(IMAGE_TYPE_KEY, it.getString("mimetype"))
@@ -532,7 +535,7 @@ object PushNotifier {
 
         var repeat = false
 
-        val direct = roomName.isEmpty() || notification.optBoolean(DIRECT_FLAG)
+        val direct = if (notification.has(DIRECT_FLAG)) notification.optBoolean(DIRECT_FLAG) else roomName.isEmpty()
         if (isInvite) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
         } else {
@@ -576,7 +579,13 @@ object PushNotifier {
         val intent = buildPushIntent(context, notifId, roomId, actionEventId, userId)
         builder.setContentIntent(PendingIntent.getActivity(context, notifId, intent, flags))
         if (!isInvite) {
-            val icon = avatar(notification, ROOM_AVATAR_KEY) ?: avatar(notification, SENDER_AVATAR_KEY)
+            // A 1:1 chat is its sender, nickname and per-message profile included; a group keeps
+            // its own picture for the conversation and the sender for each message's person.
+            val icon = if (direct) {
+                avatar(notification, SENDER_AVATAR_KEY)
+            } else {
+                avatar(notification, ROOM_AVATAR_KEY) ?: avatar(notification, SENDER_AVATAR_KEY)
+            }
             icon?.let { builder.setLargeIcon(it) }
             val person = person(sender.ifEmpty { UNKNOWN_SENDER }, notification).build()
             if (userId.isNotEmpty()) {
@@ -606,6 +615,8 @@ object PushNotifier {
                 "noisy=${isNoisy(notification)}",
                 "notifyOnce=${state.notifyOnce}",
                 "alertedAgoMs=${alertedAt?.let { now - it }}",
+                "senderAvatar=${if (notification.has(SENDER_AVATAR_KEY)) "shown" else
+                    notification.optString(SENDER_AVATAR_ISSUE_KEY).ifEmpty { "unresolved" }}",
             ),
         )
     }

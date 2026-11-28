@@ -428,7 +428,7 @@ export class NotificationCenter {
 }
 
 async function avatar(core: CoreClient, view: NotificationView): Promise<string> {
-  const source = view.room_avatar_url ?? view.sender_avatar_url;
+  const source = view.sender_avatar_url ?? view.room_avatar_url;
   if (source === null) return fallbackIcon();
 
   return loadMediaUrl(core, source, AVATAR_SIZE, AVATAR_SIZE).catch((error: unknown) => {

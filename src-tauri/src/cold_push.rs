@@ -5,7 +5,7 @@ use std::time::Duration;
 use jni::objects::{JClass, JString};
 use jni::{Env, EnvUnowned};
 use sable_core::Core;
-use sable_core::notifications::{ColdPush, settle_refreshes};
+use sable_core::notifications::{ColdPush, PUSH_MEDIA_TIMEOUT, settle_refreshes};
 use sable_core::protocol::PushFetchView;
 
 pub(crate) static CORE: OnceLock<Arc<Core>> = OnceLock::new();
@@ -350,7 +350,9 @@ pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativePus
             ),
             ..Default::default()
         };
-        let media = args.run(Duration::from_secs(5), fallback, async {
+        let limit = PUSH_MEDIA_TIMEOUT;
+        let deadline = tokio::time::Instant::now() + limit;
+        let media = args.run(limit, fallback, async {
             match args.session().await {
                 Some(session) => {
                     session
@@ -359,6 +361,7 @@ pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativePus
                             Some(&payload_name),
                             payload_avatar,
                             content.as_ref(),
+                            deadline,
                         )
                         .await
                 }

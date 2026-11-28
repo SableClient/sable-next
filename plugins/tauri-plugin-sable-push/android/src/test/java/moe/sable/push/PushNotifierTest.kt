@@ -560,6 +560,15 @@ class PushNotifierTest {
     }
 
     @Test
+    fun show_aChatTheSessionKnowsIsNotDirectIsAGroupWithoutAName() {
+        PushNotifier.show(context, warmNotification("!group:example.org", "\$one", "hi")
+            .put("room_name", "").put("moe.sable.direct", false))
+        val style = androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+            conversations().single().notification)!!
+        assertTrue(style.isGroupConversation)
+    }
+
+    @Test
     fun show_aLineWithoutADisplayNameIsNeverTheReader() {
         val named = warmNotification("!room:example.org", "\$one", "hi")
         named.remove("sender_display_name")

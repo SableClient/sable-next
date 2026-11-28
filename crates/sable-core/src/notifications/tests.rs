@@ -1413,6 +1413,45 @@ async fn a_direct_chat_is_named_after_the_other_person() {
 }
 
 #[tokio::test]
+async fn only_a_one_to_one_direct_chat_is_direct() {
+    let factory = matrix_sdk_test::event_factory::EventFactory::new()
+        .room(room_id!("!cold:example.org"))
+        .sender(user_id!("@sender:example.org"));
+    let alice = user_id!("@alice:example.org");
+    let sender = user_id!("@sender:example.org");
+    let guest = user_id!("@guest:example.org");
+    for (name, members, marked, expected) in [
+        ("direct-one-to-one", vec![alice, sender], true, true),
+        ("direct-grown", vec![alice, sender, guest], true, false),
+        ("unmarked-pair", vec![alice, sender], false, false),
+    ] {
+        let room = JoinedRoomBuilder::new(room_id!("!cold:example.org"))
+            .add_state_bulk(members.iter().map(|member| factory.member(*member).into()))
+            .set_joined_members_count(u32::try_from(members.len()).unwrap());
+        let fixture = ColdFixture::new(name, room, None).await;
+        if marked {
+            fixture
+                .server
+                .mock_sync()
+                .ok_and_run(fixture.client.as_ref().unwrap(), |builder| {
+                    builder.add_global_account_data(
+                        factory
+                            .direct()
+                            .add_user(sender.to_owned(), room_id!("!cold:example.org")),
+                    );
+                })
+                .await;
+        }
+        mount_thumbnails(&fixture, 0..).await;
+
+        let media = media(&fixture, None).await;
+
+        assert_eq!(media.direct, Some(expected), "{name}");
+        remove_data_dir(&fixture.data_dir).await;
+    }
+}
+
+#[tokio::test]
 async fn a_group_is_named_as_in_the_room_list() {
     let fixture = ColdFixture::new("media-group-name", media_room(None), None).await;
     mount_thumbnails(&fixture, 0..=2).await;
@@ -1649,6 +1688,7 @@ async fn push_sender_names_without_a_room() {
             Some("\u{200b}\u{2800}"),
             None,
             None,
+            soon(),
         )
         .await;
     assert_eq!(media.sender_name, "@bob:example.org");
@@ -1682,6 +1722,7 @@ async fn one_push_session_fetches_the_event_and_its_media() {
             event.sender_display_name.as_deref(),
             event.sender_avatar_url.as_deref(),
             Some(&event.content),
+            soon(),
         )
         .await;
     assert_eq!(
@@ -1705,6 +1746,7 @@ async fn a_push_sender_takes_the_avatar_resolved_with_the_event() {
             Some("Ghost"),
             Some("mxc://example.org/cat"),
             None,
+            soon(),
         )
         .await;
     assert_eq!(
@@ -1712,7 +1754,7 @@ async fn a_push_sender_takes_the_avatar_resolved_with_the_event() {
         thumbnails["cat"]
     );
     let member = session
-        .media(Some("@sender:example.org"), None, None, None)
+        .media(Some("@sender:example.org"), None, None, None, soon())
         .await;
     assert_eq!(
         std::fs::read(member.sender.unwrap()).unwrap(),
@@ -1721,6 +1763,196 @@ async fn a_push_sender_takes_the_avatar_resolved_with_the_event() {
 
     drop(session);
     remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_nickname_avatar_wins_over_the_senders_own() {
+    let fixture = ColdFixture::new("nickname-avatar", media_room(None), None).await;
+    let thumbnails = mount_thumbnails(&fixture, 0..=2).await;
+    let client = fixture.client.as_ref().unwrap();
+    for (content, expected) in [
+        (
+            json!({"@sender:example.org": {"avatar_url": "mxc://example.org/cat"}}),
+            Some("cat"),
+        ),
+        (json!({"@sender:example.org": {"avatar_url": null}}), None),
+        (
+            json!({"@sender:example.org": {"avatar_url": {
+                "url": "mxc://example.org/secret", "v": "v2", "iv": "iv",
+                "hashes": {"sha256": "hash"}, "key": {"k": "key"},
+            }}}),
+            Some("face"),
+        ),
+    ] {
+        fixture
+            .server
+            .mock_sync()
+            .ok_and_run(client, |builder| {
+                builder.add_global_account_data(
+                    Raw::new(&json!({"type": "m.profile_overrides", "content": content}))
+                        .unwrap()
+                        .cast_unchecked::<ruma::events::AnyGlobalAccountDataEvent>(),
+                );
+            })
+            .await;
+        let session = session(&fixture).await;
+
+        let media = session
+            .media(
+                Some("@sender:example.org"),
+                None,
+                Some("mxc://example.org/face"),
+                None,
+                soon(),
+            )
+            .await;
+
+        assert_eq!(
+            media.sender.map(|path| std::fs::read(path).unwrap()),
+            expected.map(|name| thumbnails[name].clone())
+        );
+        assert_eq!(
+            media.sender_avatar_issue,
+            expected.is_none().then_some("no_url")
+        );
+        drop(session);
+    }
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn slow_room_and_message_pictures_keep_the_sender_avatar_and_room_name() {
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    let fixture = ColdFixture::new("slow-room-avatar", media_room(None), None).await;
+    for (media, delay) in [("face", 0), ("me", 0), ("lounge", 30), ("cat", 30)] {
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v1/media/thumbnail/example.org/{media}"
+            )))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(b"\x89PNG\r\n\x1a\n".as_slice())
+                    .set_delay(std::time::Duration::from_secs(delay)),
+            )
+            .mount(fixture.server.server())
+            .await;
+    }
+    let session = session(&fixture).await;
+
+    let content = json!({"msgtype": "m.image", "body": "cat.png", "url": "mxc://example.org/cat"});
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+
+    let media = tokio::time::timeout_at(
+        deadline,
+        session.media(
+            Some("@sender:example.org"),
+            None,
+            None,
+            Some(&content),
+            deadline,
+        ),
+    )
+    .await
+    .expect("the downloads must give up before the caller's deadline");
+
+    assert!(media.sender.is_some());
+    assert!(media.sender_avatar_issue.is_none());
+    assert!(media.room.is_none());
+    assert!(media.image.is_none());
+    assert!(media.room_name.is_some());
+
+    drop(session);
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_spent_push_budget_skips_the_downloads() {
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    let fixture = ColdFixture::new("spent-budget", media_room(None), None).await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/thumbnail/example.org/face"))
+        .respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(30)))
+        .mount(fixture.server.server())
+        .await;
+    let session = session(&fixture).await;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(100);
+
+    let media = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        session.media(Some("@sender:example.org"), None, None, None, deadline),
+    )
+    .await
+    .expect("time spent before the media step counts against it");
+
+    assert!(media.sender.is_none());
+    assert_eq!(media.sender_avatar_issue, Some("timeout"));
+
+    drop(session);
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+#[tokio::test]
+async fn a_missing_sender_avatar_says_why() {
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    let fixture = ColdFixture::new("avatar-issue", media_room(None), None).await;
+    mount_thumbnails(&fixture, 0..).await;
+    for (media, response) in [
+        ("broken", ResponseTemplate::new(500)),
+        (
+            "text",
+            ResponseTemplate::new(200).set_body_string("not a picture"),
+        ),
+    ] {
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v1/media/thumbnail/example.org/{media}"
+            )))
+            .respond_with(response)
+            .mount(fixture.server.server())
+            .await;
+    }
+    let session = session(&fixture).await;
+
+    for (avatar, issue) in [
+        (None, "no_url"),
+        (Some("mxc://example.org/broken"), "fetch_failed"),
+        (Some("mxc://example.org/text"), "not_an_image"),
+    ] {
+        let media = session
+            .media(
+                Some("@ghost:example.org"),
+                Some("Ghost"),
+                avatar,
+                None,
+                soon(),
+            )
+            .await;
+        assert!(media.sender.is_none());
+        assert_eq!(media.sender_avatar_issue, Some(issue));
+        assert_eq!(
+            serde_json::to_value(&media).unwrap()["sender_avatar_issue"],
+            issue
+        );
+    }
+
+    drop(session);
+    remove_data_dir(&fixture.data_dir).await;
+}
+
+fn soon() -> tokio::time::Instant {
+    tokio::time::Instant::now() + std::time::Duration::from_secs(5)
 }
 
 async fn session(fixture: &ColdFixture) -> super::PushSession {

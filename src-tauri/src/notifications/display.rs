@@ -173,9 +173,10 @@ fn collapsed(lines: &[Line]) -> String {
         .join("\n")
 }
 
+/// A notifier shows one picture, so it is whoever wrote, with the room's in their absence.
 fn avatar_source(view: &NotificationView) -> Option<&str> {
     let room = view.room_avatar_url.as_deref().filter(|_| !view.is_direct);
-    room.or(view.sender_avatar_url.as_deref())
+    view.sender_avatar_url.as_deref().or(room)
 }
 
 /// Desktop notifiers only show a local image, so the thumbnail is kept in the cache folder.
@@ -320,24 +321,18 @@ mod tests {
     }
 
     #[test]
-    fn a_room_shows_its_picture_and_a_dm_its_sender() {
-        let pictured = |is_direct, room: Option<&str>| NotificationView {
+    fn a_notification_shows_its_sender_and_a_room_stands_in_for_a_bare_one() {
+        let pictured = |is_direct, room: Option<&str>, sender: Option<&str>| NotificationView {
             room_avatar_url: room.map(str::to_owned),
-            sender_avatar_url: Some("mxc://example.org/ada".to_owned()),
+            sender_avatar_url: sender.map(str::to_owned),
             ..view(is_direct)
         };
-        assert_eq!(
-            avatar_source(&pictured(false, Some("mxc://example.org/room"))),
-            Some("mxc://example.org/room")
-        );
-        assert_eq!(
-            avatar_source(&pictured(false, None)),
-            Some("mxc://example.org/ada")
-        );
-        assert_eq!(
-            avatar_source(&pictured(true, Some("mxc://example.org/room"))),
-            Some("mxc://example.org/ada")
-        );
+        let room = Some("mxc://example.org/room");
+        let ada = Some("mxc://example.org/ada");
+        assert_eq!(avatar_source(&pictured(false, room, ada)), ada);
+        assert_eq!(avatar_source(&pictured(false, room, None)), room);
+        assert_eq!(avatar_source(&pictured(true, room, ada)), ada);
+        assert_eq!(avatar_source(&pictured(true, room, None)), None);
     }
 
     #[test]

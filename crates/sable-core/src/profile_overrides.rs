@@ -176,6 +176,30 @@ pub(crate) async fn notification_name(client: &matrix_sdk::Client, sender: &str)
     }
 }
 
+/// The avatar a nickname gives `sender`: `Some(None)` when it hides theirs. An encrypted
+/// picture is left to the real one, since nothing bounds its download in a push process.
+#[cfg(not(target_family = "wasm"))]
+pub(crate) async fn notification_avatar(
+    client: &matrix_sdk::Client,
+    sender: &str,
+) -> Option<Option<String>> {
+    let stored = stored_overrides(
+        client,
+        false,
+        crate::sealed_account_data::cached_key(client),
+    )
+    .await
+    .ok()?;
+    let entry = overrides(stored.content.as_ref())
+        .into_iter()
+        .find(|entry| entry.user_id == sender)?;
+    match entry.avatar {
+        OverrideTextView::Set { value } => crate::media::mxc_only(&value).map(Some),
+        OverrideTextView::Cleared => Some(None),
+        OverrideTextView::Unset => None,
+    }
+}
+
 pub(crate) struct OverrideEdit {
     pub(crate) display_name: FieldEdit,
     pub(crate) avatar: AvatarEditView,
