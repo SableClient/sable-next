@@ -901,6 +901,25 @@ test('a bare event link names the room and quotes the message, with an icon', as
   });
 });
 
+test.each([
+  ['flags', '🇫🇷', 15],
+  ['ZWJ families', '👩\u200d👩\u200d👧\u200d👦', 5],
+])('an event link quote never splits %s before its ellipsis', async (_, emoji, kept) => {
+  roomList.rooms = [{ room_id: '!room:example.org', canonical_alias: null, name: 'Design' }];
+  timeline.eventItems.mockResolvedValue([
+    { content: { kind: 'message', body: `ship it ${emoji.repeat(20)}`, html: null } },
+  ]);
+  const url = 'https://matrix.to/#/!room:example.org/$event';
+  render(FormattedBody, {
+    props: { html: `<a href="${url}">${url}</a>` },
+  });
+
+  const anchor = link();
+  await vi.waitFor(() => {
+    expect(anchor.textContent).toBe(`#Design: ship it ${emoji.repeat(kept)}…`);
+  });
+});
+
 test('inline images wait behind a prompt where the media preview setting says so (MSC4278)', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
   mediaPreviewSettings.global = { media_previews: 'off' };

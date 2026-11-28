@@ -3,6 +3,7 @@
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 
+  import { truncateGraphemes } from '#lib/graphemes.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -36,7 +37,9 @@
   let previewHtml = $state<string | null>(null);
 
   let preview = $derived(
-    text === null ? '' : text.split('\n', PREVIEW_LINES).join('\n').slice(0, PREVIEW_CHARS)
+    text === null
+      ? ''
+      : truncateGraphemes(text.split('\n', PREVIEW_LINES).join('\n'), PREVIEW_CHARS)
   );
   let truncated = $derived(text !== null && preview.length < text.length);
   let numberable = $derived.by(() => {

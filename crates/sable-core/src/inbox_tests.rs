@@ -1397,6 +1397,30 @@ fn previews_are_truncated_on_characters() {
     assert!(short.ends_with('…'));
 }
 
+#[test]
+fn previews_are_truncated_on_whole_grapheme_clusters() {
+    let lead = "a".repeat(super::PREVIEW_LIMIT - 1);
+
+    assert_eq!(preview(format!("{lead}🇫🇷🇫🇷")), format!("{lead}…"));
+}
+
+#[test]
+fn an_emote_past_a_cluster_the_preview_drops_is_dropped() {
+    let emote = |alt: &str, offset| PreviewEmote {
+        alt: alt.to_owned(),
+        source: "mxc://x/e".to_owned(),
+        offset,
+    };
+    let lead = "a".repeat(super::PREVIEW_LIMIT - 1);
+    let body = format!("{lead}👍🏽b");
+    let at = u32::try_from(lead.len()).unwrap();
+
+    assert_eq!(
+        super::preview_with_emotes(body, vec![emote("a", 0), emote("👍🏽", at)]),
+        (format!("{lead}…"), vec![emote("a", 0)])
+    );
+}
+
 #[tokio::test]
 async fn logging_out_while_suspended_with_unsaved_notifications_finishes() {
     let server = MatrixMockServer::new().await;
@@ -1429,13 +1453,14 @@ fn a_truncated_preview_keeps_only_the_emotes_still_whole() {
         offset,
     };
     let limit = u32::try_from(super::PREVIEW_LIMIT).unwrap();
-    let text = preview(format!("{} tf tf", "a".repeat(super::PREVIEW_LIMIT - 5)));
+    let body = format!("{} tf tf", "a".repeat(super::PREVIEW_LIMIT - 5));
+    let (text, emotes) = super::preview_with_emotes(body, vec![tf(limit - 4), tf(limit - 1)]);
     assert!(text.ends_with(" tf t…"));
+    assert_eq!(emotes, [tf(limit - 4)]);
     assert_eq!(
-        super::preview_emotes(&text, vec![tf(limit - 4), tf(limit - 1)]),
-        [tf(limit - 4)]
+        super::preview_with_emotes("hi tf".to_owned(), vec![tf(3)]),
+        ("hi tf".to_owned(), vec![tf(3)])
     );
-    assert_eq!(super::preview_emotes("hi tf", vec![tf(3)]), [tf(3)]);
 }
 
 #[test]

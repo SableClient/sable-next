@@ -5,7 +5,7 @@ use matrix_sdk::ruma::OwnedUserId;
 use matrix_sdk::ruma::api::client::profile::{AvatarUrl, DisplayName};
 
 use sable_model::non_blank::NonBlank;
-use sable_model::truncate::truncate_graphemes;
+use sable_model::truncate::{truncate_graphemes, truncate_graphemes_to_chars};
 use serde::Deserialize as _;
 use serde_with::serde_as;
 
@@ -212,7 +212,8 @@ pub(crate) fn pronoun_sets(value: Option<&serde_json::Value>) -> Vec<PronounView
                 .filter_map(|set| {
                     let set = PronounSet::deserialize(set).ok()?;
                     Some(PronounView {
-                        summary: set.summary?.chars().take(MAX_SUMMARY_CHARS).collect(),
+                        summary: truncate_graphemes_to_chars(&set.summary?, MAX_SUMMARY_CHARS)
+                            .to_owned(),
                         language: set.language.map(|language| language.to_lowercase()),
                     })
                 })

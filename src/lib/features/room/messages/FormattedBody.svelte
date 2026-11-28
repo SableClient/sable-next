@@ -7,6 +7,7 @@
   import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { truncateGraphemes } from '#lib/graphemes.js';
   import { i18n } from '#lib/i18n.js';
   import { isPlainClick } from '#lib/ui/plain-click.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -432,7 +433,7 @@
     if (!anchor.isConnected || room === null) return;
     const short =
       snippet.length > EVENT_SNIPPET_LENGTH
-        ? `${snippet.slice(0, EVENT_SNIPPET_LENGTH - 1)}…`
+        ? `${truncateGraphemes(snippet, EVENT_SNIPPET_LENGTH - 1)}…`
         : snippet;
     label.textContent = short ? `${room}: ${short}` : room;
   }

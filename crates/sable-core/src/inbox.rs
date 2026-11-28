@@ -1,4 +1,5 @@
 use sable_model::text::visible_name;
+use sable_model::truncate::truncate_graphemes_to_chars;
 
 use crate::api::notifications::InboxFilter;
 use hashlink::LinkedHashSet;
@@ -174,17 +175,21 @@ fn merge(
 }
 
 pub(crate) fn preview(body: String) -> String {
-    if body.chars().count() <= PREVIEW_LIMIT {
-        body
-    } else {
-        format!("{}…", body.chars().take(PREVIEW_LIMIT).collect::<String>())
-    }
+    preview_with_emotes(body, Vec::new()).0
 }
 
-/// The emotes still whole once `preview` truncates the text.
-pub(crate) fn preview_emotes(preview: &str, emotes: Vec<PreviewEmote>) -> Vec<PreviewEmote> {
-    let kept: String = preview.chars().take(PREVIEW_LIMIT).collect();
-    sable_model::html::emotes_within(emotes, &kept)
+/// `body` cut to `PREVIEW_LIMIT`, and the emotes still whole in the kept text.
+pub(crate) fn preview_with_emotes(
+    body: String,
+    emotes: Vec<PreviewEmote>,
+) -> (String, Vec<PreviewEmote>) {
+    let kept = truncate_graphemes_to_chars(&body, PREVIEW_LIMIT);
+    let emotes = sable_model::html::emotes_within(emotes, kept);
+    if kept.len() == body.len() {
+        (body, emotes)
+    } else {
+        (format!("{kept}…"), emotes)
+    }
 }
 
 struct RoomReadState {
@@ -607,7 +612,7 @@ impl Core {
         ) {
             return None;
         }
-        Some(preview(preview::describe(event)))
+        Some(preview::describe(event))
     }
 
     async fn inbox_entry(
@@ -660,11 +665,13 @@ impl Core {
                     .map(ToOwned::to_owned)
             });
         let encrypted = crate::rooms::room_maybe_encrypted(room);
-        let body = self.inbox_body(&event, encrypted);
-        let emotes = body
-            .as_deref()
-            .map(|body| preview_emotes(body, preview::emotes(&event)))
-            .unwrap_or_default();
+        let (body, emotes) = self.inbox_body(&event, encrypted).map_or_else(
+            || (None, Vec::new()),
+            |body| {
+                let (body, emotes) = preview_with_emotes(body, preview::emotes(&event));
+                (Some(body), emotes)
+            },
+        );
         Some(InboxUpdate::Notifies(Entry {
             room_id: room.room_id().to_owned(),
             event_id: event.event_id().to_owned(),

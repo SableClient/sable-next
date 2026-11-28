@@ -1,6 +1,7 @@
 import { stringify } from 'safe-stable-stringify';
 import { base64ToUint8Array, uint8ArrayToHex } from 'uint8array-extras';
 
+import { truncateGraphemes } from '#lib/graphemes.js';
 import { isRecord } from '#lib/guards.js';
 
 export interface Award {
@@ -135,7 +136,11 @@ export async function badgeFor(
         continue;
       }
     }
-    best = { label: award.signed.content.body.trim().slice(0, MAX_LABEL_CHARS), tier, expiresAt };
+    best = {
+      label: truncateGraphemes(award.signed.content.body.trim(), MAX_LABEL_CHARS),
+      tier,
+      expiresAt,
+    };
   }
   return best && best.label ? best : null;
 }
