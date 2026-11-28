@@ -74,6 +74,8 @@
   );
   let deleteOpen = $state(false);
   let sheetOpen = $state(false);
+  let hovered = $state(false);
+  let focused = $state(false);
 
   let displayName = $derived(sender.name);
   let summary = $derived(replyPreviewBody(thread.item.content).replace(/\s+/g, ' ').trim());
@@ -150,6 +152,11 @@
     onpointerup={rowPress.end}
     onpointercancel={rowPress.end}
     oncontextmenu={openContextMenu}
+    onpointerenter={(event) => (hovered = event.pointerType !== 'touch')}
+    onpointerleave={() => (hovered = false)}
+    onfocusin={() => (focused = true)}
+    onfocusout={(event) =>
+      (focused = event.currentTarget.contains(event.relatedTarget as Node | null))}
   >
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div
@@ -243,7 +250,7 @@
         </div>
       {/if}
     </div>
-    <MessageActions {...actions} />
+    <MessageActions {...actions} engaged={hovered || focused} />
   </article>
 </li>
 

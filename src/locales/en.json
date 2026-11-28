@@ -2731,6 +2731,8 @@
     "showRoleTooltip": "Show role name on hover",
     "hideMessageShields": "Hide minor security warnings",
     "hideMessageShieldsHint": "Red warnings stay visible.",
+    "expandedMessageActions": "Show all message actions",
+    "expandedMessageActionsHint": "Puts every action in the hover toolbar. Without this, hold Shift over a message.",
     "doubleTapReaction": "Double tap reaction",
     "matrixLinkHandler": "Open matrix: links in Sable",
     "matrixLinkHandlerHint": "Your browser asks to confirm.",

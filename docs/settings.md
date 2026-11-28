@@ -45,6 +45,7 @@ accepts the same settings except those marked deployment only.
 - `showAllTimestamps` (Show the time on every message): `true` or `false`. Default `false`.
 - `showRoleTooltip` (Show role name on hover): `true` or `false`. Default `false`.
 - `hideMessageShields` (Hide minor security warnings): `true` or `false`. Default `false`.
+- `expandedMessageActions` (Show all message actions): `true` or `false`. Default `false`.
 - `hideTypingIndicators` (Hide typing indicators): `true` or `false`. Default `false`.
 - `groupMembersByPresence` (Group members by presence): `true` or `false`. Default `true`.
 - `filterPronounsByLanguage` (Match pronouns to interface language): `true` or `false`. Default `true`.

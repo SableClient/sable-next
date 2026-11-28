@@ -572,6 +572,11 @@
           "type": "boolean",
           "default": false
         },
+        "expandedMessageActions": {
+          "title": "Show all message actions",
+          "type": "boolean",
+          "default": false
+        },
         "doubleTapReaction": {
           "type": "string",
           "default": "❤️"
@@ -1457,6 +1462,11 @@
         },
         "hideMessageShields": {
           "title": "Hide minor security warnings",
+          "type": "boolean",
+          "default": false
+        },
+        "expandedMessageActions": {
+          "title": "Show all message actions",
           "type": "boolean",
           "default": false
         },

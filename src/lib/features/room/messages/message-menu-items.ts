@@ -5,6 +5,9 @@ import CheckSquareIcon from 'phosphor-svelte/lib/CheckSquareIcon';
 import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
 import DownloadIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
+import FileArrowDownIcon from 'phosphor-svelte/lib/FileArrowDownIcon';
+import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
+import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 import FavoriteIcon from 'phosphor-svelte/lib/HeartIcon';
 import ForwardIcon from 'phosphor-svelte/lib/ShareFatIcon';
 import GavelIcon from 'phosphor-svelte/lib/GavelIcon';
@@ -18,6 +21,7 @@ import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
 import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 import MarkUnreadIcon from 'phosphor-svelte/lib/CircleDashedIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LinkBreakIcon from 'phosphor-svelte/lib/LinkBreakIcon';
 import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
@@ -122,7 +126,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
     rows.push({
       key: 'href',
       label: 'timeline.copyLink',
-      icon: LinkIcon,
+      icon: GlobeIcon,
       run: actions.onCopyHref,
     });
   }
@@ -138,7 +142,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
     rows.push({
       key: 'matrix-link',
       label: 'timeline.copyMatrixLink',
-      icon: LinkIcon,
+      icon: LinkSimpleIcon,
       run: actions.onCopyMatrixLink,
     });
   }
@@ -195,7 +199,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
     rows.push({
       key: 'save-to-photos',
       label: 'viewer.saveToPhotos',
-      icon: DownloadIcon,
+      icon: ImageIcon,
       run: actions.onSaveToPhotos,
     });
   }
@@ -219,7 +223,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
     rows.push({
       key: 'download-emotes',
       label: actions.stealCount === 1 ? 'emotes.downloadOne' : 'emotes.downloadMany',
-      icon: DownloadIcon,
+      icon: FileArrowDownIcon,
       run: actions.onDownloadEmotes,
     });
   }

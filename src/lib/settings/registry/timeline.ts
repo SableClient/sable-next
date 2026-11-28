@@ -20,7 +20,7 @@ import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
-import { supportsTouch } from '#lib/platform/os.js';
+import { supportsKeyboardShortcuts, supportsTouch } from '#lib/platform/os.js';
 import type { SettingsCategory } from '../registry';
 
 export const timelineCategory: SettingsCategory = {
@@ -184,6 +184,15 @@ export const timelineCategory: SettingsCategory = {
       name: 'settings.hideMessageShields',
       description: 'settings.hideMessageShieldsHint',
       type: 'boolean',
+    },
+    {
+      key: 'expandedMessageActions',
+      section: 'messages',
+      icon: DotsThreeIcon,
+      name: 'settings.expandedMessageActions',
+      description: 'settings.expandedMessageActionsHint',
+      type: 'boolean',
+      supported: supportsKeyboardShortcuts,
     },
     {
       key: 'messageSwipeAction',

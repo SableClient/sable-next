@@ -318,3 +318,25 @@ test('thread actions follow a live change to the host callbacks', async () => {
   canPin.on = true;
   expect(await pinItem()).not.toBeNull();
 });
+
+test('Shift expands only the hovered card toolbar', async () => {
+  const user = userEvent.setup();
+  render(ForumThreadItemHarness, {
+    thread,
+    onOpen: vi.fn(),
+    canDelete: false,
+    onDelete: vi.fn(),
+    roomId: '!forum:example.org',
+    onCopyLink: vi.fn(),
+  });
+  const copyLink = () => screen.queryByRole('button', { name: 'Copy matrix link' });
+
+  await user.keyboard('{Shift>}');
+  expect(copyLink()).not.toBeInTheDocument();
+
+  await user.hover(card());
+  expect(copyLink()).toBeInTheDocument();
+
+  await user.unhover(card());
+  expect(copyLink()).not.toBeInTheDocument();
+});
