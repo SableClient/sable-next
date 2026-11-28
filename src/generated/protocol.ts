@@ -1120,6 +1120,8 @@ export type PresenceView = "online" | "offline" | "unavailable" | "busy";
 export type PreviewEmote = {
 	alt: string,
 	source: string,
+	/**  Where `alt` starts in the preview text, in UTF-16 code units (a JS string index). */
+	offset: number,
 };
 
 export type PrimitiveType = "string" | "integer" | "boolean" | "user_id" | "server_name" | "room_alias" | "room_id" | "event_id";

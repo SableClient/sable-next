@@ -1,7 +1,8 @@
 use sable_model::text::visible_name;
 
 use crate::api::notifications::InboxFilter;
-use std::collections::{BTreeMap, HashMap};
+use hashlink::LinkedHashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::Ordering;
 
 use crate::tasks::JoinHandleExt;
@@ -10,6 +11,7 @@ use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::executor::spawn;
 use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::events::receipt::{ReceiptThread, ReceiptType};
+use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
 use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::serde::Raw;
@@ -46,7 +48,7 @@ pub(crate) struct Entry {
     sender: OwnedUserId,
     sender_name: Option<String>,
     body: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "sable_model::html::placed_emotes")]
     emotes: Vec<PreviewEmote>,
     highlight: bool,
     is_direct: bool,
@@ -101,14 +103,59 @@ impl UnreadScan {
     }
 }
 
-fn merge(entries: &mut Vec<Entry>, fresh: Vec<Entry>) -> usize {
+pub(crate) enum InboxUpdate {
+    Notifies(Entry),
+    /// Decrypted and not notifying, such as a redaction, reaction or edit, so its undecryptable
+    /// placeholder goes.
+    Silent(OwnedEventId),
+    /// Deleted, so its entry goes whatever it showed.
+    Redacted(OwnedEventId),
+}
+
+/// `dropped` keeps the removed entries and every deletion, so a stale copy fetched before the
+/// change cannot bring them back.
+fn merge(
+    entries: &mut Vec<Entry>,
+    updates: Vec<InboxUpdate>,
+    dropped: &mut LinkedHashSet<OwnedEventId>,
+) -> usize {
+    let mut fresh = Vec::new();
+    let mut silent = HashSet::new();
+    let mut redacted = HashSet::new();
+    for update in updates {
+        match update {
+            InboxUpdate::Notifies(entry) => fresh.push(entry),
+            InboxUpdate::Silent(event_id) => {
+                silent.insert(event_id);
+            }
+            InboxUpdate::Redacted(event_id) => {
+                dropped.insert(event_id.clone());
+                redacted.insert(event_id);
+            }
+        }
+    }
+    let before = entries.len();
+    entries.retain(|entry| {
+        let gone = redacted.contains(&entry.event_id)
+            || entry.undecryptable && silent.contains(&entry.event_id);
+        if gone {
+            dropped.insert(entry.event_id.clone());
+        }
+        !gone
+    });
+    while dropped.len() > MAX_ENTRIES {
+        dropped.pop_front();
+    }
+    let mut changed = before - entries.len();
     let mut known: HashMap<OwnedEventId, usize> = entries
         .iter()
         .enumerate()
         .map(|(at, entry)| (entry.event_id.clone(), at))
         .collect();
-    let mut changed = 0;
     for entry in fresh {
+        if dropped.contains(&entry.event_id) {
+            continue;
+        }
         let at = known.get(&entry.event_id).copied();
         if let Some(stored) = at.and_then(|at| entries.get_mut(at)) {
             if stored.undecryptable && !entry.undecryptable {
@@ -132,6 +179,12 @@ pub(crate) fn preview(body: String) -> String {
     } else {
         format!("{}…", body.chars().take(PREVIEW_LIMIT).collect::<String>())
     }
+}
+
+/// The emotes still whole once `preview` truncates the text.
+pub(crate) fn preview_emotes(preview: &str, emotes: Vec<PreviewEmote>) -> Vec<PreviewEmote> {
+    let kept: String = preview.chars().take(PREVIEW_LIMIT).collect();
+    sable_model::html::emotes_within(emotes, &kept)
 }
 
 struct RoomReadState {
@@ -194,6 +247,7 @@ pub(crate) struct Inbox {
 struct InboxCache {
     stored: Option<Stored>,
     revision: u64,
+    dropped: LinkedHashSet<OwnedEventId>,
 }
 
 impl InboxCache {
@@ -562,16 +616,37 @@ impl Core {
         raw: &Raw<AnySyncTimelineEvent>,
         actions: &[Action],
     ) -> Option<Entry> {
-        if crate::calls::is_call_event_type(raw) || crate::calls::is_call_membership_event_type(raw)
-        {
-            return None;
+        match self.inbox_update(room, raw, actions).await? {
+            InboxUpdate::Notifies(entry) => Some(entry),
+            InboxUpdate::Silent(_) | InboxUpdate::Redacted(_) => None,
         }
+    }
+
+    /// `None` when the copy says nothing about the entry: it does not parse, or it is still
+    /// encrypted and does not notify.
+    async fn inbox_update(
+        &self,
+        room: &Room,
+        raw: &Raw<AnySyncTimelineEvent>,
+        actions: &[Action],
+    ) -> Option<InboxUpdate> {
         let event = raw.deserialize().ok()?;
-        if !(notifications::notifies(actions) || is_dm_message(&event) && dm_notifies(room).await) {
-            return None;
+        let redacted = match &event {
+            AnySyncTimelineEvent::MessageLike(event) => event.is_redacted(),
+            AnySyncTimelineEvent::State(event) => event.is_redacted(),
+        };
+        // A deleted event no longer has anything to show, encrypted or not.
+        if redacted {
+            return Some(InboxUpdate::Redacted(event.event_id().to_owned()));
         }
-        if event.sender() == room.own_user_id() {
-            return None;
+        if crate::calls::is_call_event_type(raw)
+            || crate::calls::is_call_membership_event_type(raw)
+            || !(notifications::notifies(actions)
+                || is_dm_message(&event) && dm_notifies(room).await)
+            || event.sender() == room.own_user_id()
+        {
+            return (!notifications::raw_is_encrypted(raw))
+                .then(|| InboxUpdate::Silent(event.event_id().to_owned()));
         }
         let sender_name = room
             .get_member_no_sync(event.sender())
@@ -586,12 +661,11 @@ impl Core {
             });
         let encrypted = crate::rooms::room_maybe_encrypted(room);
         let body = self.inbox_body(&event, encrypted);
-        let emotes = if body.is_some() {
-            preview::emotes(&event)
-        } else {
-            Vec::new()
-        };
-        Some(Entry {
+        let emotes = body
+            .as_deref()
+            .map(|body| preview_emotes(body, preview::emotes(&event)))
+            .unwrap_or_default();
+        Some(InboxUpdate::Notifies(Entry {
             room_id: room.room_id().to_owned(),
             event_id: event.event_id().to_owned(),
             ts: u64::from(event.origin_server_ts().get()),
@@ -605,7 +679,7 @@ impl Core {
             undecryptable: notifications::raw_is_encrypted(raw),
             thread_root: extract_thread_root(raw),
             reply: is_reply(raw),
-        })
+        }))
     }
 }
 
@@ -644,21 +718,51 @@ impl SignedIn {
 
     async fn record_inbox(
         &self,
-        fresh: Vec<Entry>,
+        updates: Vec<InboxUpdate>,
         cursors: BTreeMap<OwnedRoomId, Option<String>>,
         unread_scans: BTreeMap<OwnedRoomId, UnreadScan>,
     ) -> Result<usize, RpcError> {
-        if fresh.is_empty() && cursors.is_empty() && unread_scans.is_empty() {
+        if updates.is_empty() && cursors.is_empty() && unread_scans.is_empty() {
             return Ok(0);
         }
         let mut inbox = self.loaded_inbox().await?;
-        let stored = inbox.stored();
-        let added = merge(&mut stored.entries, fresh);
+        let InboxCache {
+            stored,
+            revision,
+            dropped,
+        } = &mut *inbox;
+        let stored = stored.get_or_insert_default();
+        let changed = merge(&mut stored.entries, updates, dropped);
+        if changed == 0 && cursors.is_empty() && unread_scans.is_empty() {
+            return Ok(0);
+        }
         stored.cursors.extend(cursors);
         stored.unread_scans.extend(unread_scans);
-        inbox.revision += 1;
+        *revision += 1;
         self.state().inbox.changed.notify_one();
-        Ok(added)
+        Ok(changed)
+    }
+
+    /// A redaction arrives as its own event naming the one it deletes, which leaves the inbox.
+    pub(crate) fn watch_inbox_redactions(&self, generation: u64) {
+        let client = self.client();
+        let handle = client.add_event_handler({
+            let session = self.clone();
+            move |event: SyncRoomRedactionEvent, room: Room| {
+                let session = session.clone();
+                async move {
+                    let SyncRoomRedactionEvent::Original(event) = event else {
+                        return;
+                    };
+                    let rules = room.clone_info().room_version_rules_or_default();
+                    let redacts = event.redacts(&rules.redaction).to_owned();
+                    session
+                        .record_live_update(InboxUpdate::Redacted(redacts), generation)
+                        .await;
+                }
+            }
+        });
+        self.track_session_handler(client, handle);
     }
 
     async fn stored_inbox(&self) -> Result<Stored, RpcError> {
@@ -702,11 +806,15 @@ impl SignedIn {
         actions: &[Action],
         generation: u64,
     ) {
-        let Some(entry) = self.core().inbox_entry(room, raw, actions).await else {
-            return;
-        };
+        if let Some(entry) = self.core().inbox_entry(room, raw, actions).await {
+            self.record_live_update(InboxUpdate::Notifies(entry), generation)
+                .await;
+        }
+    }
+
+    async fn record_live_update(&self, update: InboxUpdate, generation: u64) {
         match self
-            .record_inbox(vec![entry], BTreeMap::new(), BTreeMap::new())
+            .record_inbox(vec![update], BTreeMap::new(), BTreeMap::new())
             .await
         {
             Ok(changed) if changed > 0 => {
@@ -728,20 +836,26 @@ impl SignedIn {
         let Some(event_id) = event.event_id() else {
             return;
         };
-        let undecryptable = {
-            self.loaded_inbox().await.is_ok_and(|mut inbox| {
-                inbox
-                    .stored()
-                    .entries
-                    .iter()
-                    .any(|entry| entry.event_id == event_id && entry.undecryptable)
-            })
+        let undecryptable = match self.loaded_inbox().await {
+            Ok(mut inbox) => inbox
+                .stored()
+                .entries
+                .iter()
+                .any(|entry| entry.event_id == event_id && entry.undecryptable),
+            Err(error) => {
+                warn!(
+                    ?error,
+                    "loading the inbox to refresh a decrypted entry failed"
+                );
+                return;
+            }
         };
         if !undecryptable {
             return;
         }
-        self.record_live_inbox(room, event.raw(), actions, generation)
-            .await;
+        if let Some(update) = self.core().inbox_update(room, event.raw(), actions).await {
+            self.record_live_update(update, generation).await;
+        }
     }
 
     pub(crate) async fn inbox_notifications(
@@ -862,7 +976,7 @@ impl SignedIn {
             backfill_candidates(self.core(), client, &stored, include_read, room_id).await?;
         drop(stored);
 
-        let mut fresh = Vec::new();
+        let mut updates = Vec::new();
         let mut cursors = BTreeMap::new();
         let mut unread_scans = BTreeMap::new();
         let mut pages = 0;
@@ -906,10 +1020,13 @@ impl SignedIn {
                         event.push_actions().unwrap_or_default().to_vec(),
                     )
                     .await;
-                    if let Some(entry) = self.core().inbox_entry(&room, event.raw(), &actions).await
+                    if let Some(update) =
+                        self.core().inbox_update(&room, event.raw(), &actions).await
                     {
-                        fresh.push(entry);
-                        scan.found = scan.found.saturating_add(1);
+                        if matches!(update, InboxUpdate::Notifies(_)) {
+                            scan.found = scan.found.saturating_add(1);
+                        }
+                        updates.push(update);
                     }
                 }
                 let exhausted = messages.end.is_none() || messages.chunk.is_empty();
@@ -933,7 +1050,7 @@ impl SignedIn {
             }
         }
 
-        let added = self.record_inbox(fresh, cursors, unread_scans).await?;
+        let added = self.record_inbox(updates, cursors, unread_scans).await?;
         if added > 0 {
             self.core().emit(CoreEvent::InboxChanged);
         }

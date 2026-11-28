@@ -60,7 +60,7 @@ test('an encrypted room keeps its content back until it is allowed', () => {
 });
 
 test('custom emotes show only with the content and never in the sender name', () => {
-  const blob = { alt: ':blob:', source: 'mxc://example.org/blob' };
+  const blob = { alt: ':blob:', source: 'mxc://example.org/blob', offset: 3 };
   const emoted = view({ sender_name: ':blob:', body: 'hi :blob:', emotes: [blob] });
 
   expect(bodySegments(emoted)).toEqual([':blob:: ', 'hi ', blob]);

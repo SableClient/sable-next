@@ -99,7 +99,7 @@ test.each([
           sender: '@bob:example.org',
           sender_name: 'Bob',
           body: 'hi :blob:',
-          emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+          emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob', offset: 3 }],
           highlight: false,
           is_direct: false,
           encrypted: false,

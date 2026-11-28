@@ -70,9 +70,15 @@ pub fn push_sender_name(
 /// The notification text of a message's content, without a per-message profile's fallback prefix.
 #[must_use]
 pub fn push_preview(content: &serde_json::Value) -> Option<String> {
-    use crate::matrix_html::{
-        preview_body, strip_profile_fallback_body, strip_profile_fallback_html,
-    };
+    push_preview_parts(content).map(|(text, _)| text)
+}
+
+/// `push_preview`'s text and the emotes placed in it.
+#[must_use]
+pub fn push_preview_parts(
+    content: &serde_json::Value,
+) -> Option<(String, Vec<crate::matrix_html::PreviewEmote>)> {
+    use crate::matrix_html::{preview, strip_profile_fallback_body, strip_profile_fallback_html};
 
     let body = content.get("body")?.as_str()?;
     let fallback = crate::view::per_message_profile(Some(content))
@@ -86,7 +92,7 @@ pub fn push_preview(content: &serde_json::Value) -> Option<String> {
         .and_then(|_| content.get("formatted_body")?.as_str())
         .filter(|formatted| !formatted.trim().is_empty())
         .map(|formatted| strip_profile_fallback_html(formatted, fallback.as_deref()));
-    Some(preview_body(&body, formatted.as_deref()))
+    Some(preview(&body, formatted.as_deref()))
 }
 
 #[cfg(not(target_family = "wasm"))]

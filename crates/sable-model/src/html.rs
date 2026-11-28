@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
-use ruma_html::{Html, ListBehavior, NodeData, NodeRef, SanitizerConfig};
-use serde::{Deserialize, Serialize};
+use ruma_html::{ElementData, Html, ListBehavior, NodeData, NodeRef, SanitizerConfig};
+use serde::{Deserialize, Deserializer, Serialize};
 
 static PREVIEW_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
     SanitizerConfig::compat()
@@ -85,27 +85,28 @@ const SPOILER_PLACEHOLDER: &str = "[Spoiler]";
 
 #[must_use]
 pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
+    preview(body, formatted).0
+}
+
+/// `preview_body`'s text and the emotes placed in it.
+#[must_use]
+pub fn preview(body: &str, formatted: Option<&str>) -> (String, Vec<PreviewEmote>) {
     let Some(formatted) = formatted else {
-        return body.to_owned();
+        return (body.to_owned(), Vec::new());
     };
     if nests_too_deeply(formatted) {
-        return if formatted.contains(SPOILER_ATTRIBUTE) {
-            SPOILER_PLACEHOLDER.to_owned()
+        let text = if formatted.contains(SPOILER_ATTRIBUTE) {
+            SPOILER_PLACEHOLDER
         } else {
-            body.to_owned()
+            body
         };
+        return (text.to_owned(), Vec::new());
     }
-    let html = Html::parse(formatted);
-    html.sanitize_with(&PREVIEW_POLICY);
-    let mut text = String::new();
-    for node in html.children() {
-        push_preview_text(&node, &mut text);
-    }
-    let text = text.trim_end_matches('\n');
+    let (text, emotes) = preview_parts(formatted);
     if text.is_empty() {
-        body.to_owned()
+        (body.to_owned(), Vec::new())
     } else {
-        text.to_owned()
+        (text, emotes)
     }
 }
 
@@ -114,6 +115,47 @@ pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
 pub struct PreviewEmote {
     pub alt: String,
     pub source: String,
+    /// Where `alt` starts in the preview text, in UTF-16 code units (a JS string index).
+    pub offset: u32,
+}
+
+/// Reads stored emotes, leaving out any stored before emotes had an offset.
+///
+/// # Errors
+///
+/// When the value is not a list of emotes.
+pub fn placed_emotes<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<PreviewEmote>, D::Error> {
+    #[derive(Deserialize)]
+    struct Stored {
+        alt: String,
+        source: String,
+        offset: Option<u32>,
+    }
+    Ok(Vec::<Stored>::deserialize(deserializer)?
+        .into_iter()
+        .filter_map(|stored| {
+            Some(PreviewEmote {
+                offset: stored.offset?,
+                alt: stored.alt,
+                source: stored.source,
+            })
+        })
+        .collect())
+}
+
+/// The emotes whose `alt` ends within `text`.
+#[must_use]
+pub fn emotes_within(mut emotes: Vec<PreviewEmote>, text: &str) -> Vec<PreviewEmote> {
+    let kept = text.encode_utf16().count();
+    emotes.retain(|emote| {
+        usize::try_from(emote.offset)
+            .ok()
+            .and_then(|offset| offset.checked_add(emote.alt.encode_utf16().count()))
+            .is_some_and(|end| end <= kept)
+    });
+    emotes
 }
 
 /// The emotes `preview_body` turned into their `alt` text, in order.
@@ -122,19 +164,25 @@ pub fn preview_emotes(formatted: Option<&str>) -> Vec<PreviewEmote> {
     let Some(formatted) = formatted.filter(|formatted| !nests_too_deeply(formatted)) else {
         return Vec::new();
     };
-    let html = Html::parse(formatted);
-    html.sanitize_with(&PREVIEW_POLICY);
-    let mut emotes = Vec::new();
-    for node in html.children() {
-        push_preview_emotes(&node, &mut emotes);
-    }
-    emotes
+    preview_parts(formatted).1
 }
 
-fn push_preview_emotes(node: &NodeRef, out: &mut Vec<PreviewEmote>) {
-    let NodeData::Element(element) = node.data() else {
-        return;
-    };
+/// The preview text of sanitised `formatted` and the emotes placed in it.
+fn preview_parts(formatted: &str) -> (String, Vec<PreviewEmote>) {
+    let html = Html::parse(formatted);
+    html.sanitize_with(&PREVIEW_POLICY);
+    let mut text = String::new();
+    let mut emotes = Vec::new();
+    for node in html.children() {
+        push_preview_text(&node, &mut text, &mut emotes);
+    }
+    let kept = text.trim_end_matches('\n').len();
+    text.truncate(kept);
+    let emotes = emotes_within(emotes, &text);
+    (text, emotes)
+}
+
+fn emote(element: &ElementData) -> Option<(String, String)> {
     let attrs = element.attrs.borrow();
     let attr = |name: &str| {
         attrs
@@ -142,28 +190,12 @@ fn push_preview_emotes(node: &NodeRef, out: &mut Vec<PreviewEmote>) {
             .find(|attribute| &*attribute.name.local == name)
             .map(|attribute| &*attribute.value)
     };
-    if attr(SPOILER_ATTRIBUTE).is_some() {
-        return;
-    }
-    if &*element.name.local == "img" {
-        if attr("data-mx-emoticon").is_some()
-            && let (Some(alt), Some(source)) = (attr("alt"), attr("src"))
-            && !alt.is_empty()
-            && source.starts_with("mxc://")
-        {
-            out.push(PreviewEmote {
-                alt: alt.to_owned(),
-                source: source.to_owned(),
-            });
-        }
-        return;
-    }
-    for child in node.children() {
-        push_preview_emotes(&child, out);
-    }
+    attr("data-mx-emoticon")?;
+    let (alt, source) = (attr("alt")?, attr("src")?);
+    (!alt.is_empty() && source.starts_with("mxc://")).then(|| (alt.to_owned(), source.to_owned()))
 }
 
-fn push_preview_text(node: &NodeRef, out: &mut String) {
+fn push_preview_text(node: &NodeRef, out: &mut String, emotes: &mut Vec<PreviewEmote>) {
     match node.data() {
         NodeData::Text(text) => out.push_str(&text.borrow()),
         NodeData::Element(element) => {
@@ -181,6 +213,13 @@ fn push_preview_text(node: &NodeRef, out: &mut String) {
                 return;
             }
             if &*element.name.local == "img" {
+                if let Some((alt, source)) = emote(element) {
+                    emotes.push(PreviewEmote {
+                        offset: u32::try_from(out.encode_utf16().count()).unwrap_or(u32::MAX),
+                        alt,
+                        source,
+                    });
+                }
                 if let Some(alt) = element
                     .attrs
                     .borrow()
@@ -211,7 +250,7 @@ fn push_preview_text(node: &NodeRef, out: &mut String) {
                 out.push('\n');
             }
             for child in node.children() {
-                push_preview_text(&child, out);
+                push_preview_text(&child, out, emotes);
             }
             if block && !out.is_empty() && !out.ends_with('\n') {
                 out.push('\n');
@@ -220,3 +259,7 @@ fn push_preview_text(node: &NodeRef, out: &mut String) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+#[path = "html_tests.rs"]
+mod tests;

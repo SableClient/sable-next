@@ -567,6 +567,7 @@ async fn a_message_notification_lists_its_custom_emotes() {
         [crate::protocol::PreviewEmote {
             alt: ":blob:".to_owned(),
             source: "mxc://example.org/blob".to_owned(),
+            offset: 3,
         }]
     );
     session.state().session_tasks.lock().clear();

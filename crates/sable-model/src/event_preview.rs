@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use serde_with::{DefaultOnError, NoneAsEmptyString, serde_as};
 
-use crate::html::{PreviewEmote, preview_emotes};
+use crate::html::{PreviewEmote, preview};
 
 pub const VERIFICATION_REQUEST_MSGTYPE: &str = "m.key.verification.request";
 
@@ -141,11 +141,12 @@ pub fn event_preview(source: &Value) -> Option<EventPreview> {
             .formatted_body
             .as_deref()
             .filter(|_| content.format.as_deref() == Some("org.matrix.custom.html"));
+        let (body, emotes) = preview(&body, formatted);
         return Some(EventPreview {
             sender,
             body: Some(body),
             fallback: None,
-            emotes: preview_emotes(formatted),
+            emotes,
         });
     }
     stand_in(ReplyFallbackView::Event { event_type })
@@ -236,6 +237,64 @@ mod tests {
         );
         assert!(event_preview(&json!({"type": 3})).is_none());
         assert_eq!(reaction_key(&json!("nope")), None);
+    }
+
+    #[test]
+    fn a_formatted_body_reads_as_its_preview_text_with_emotes_placed_in_it() {
+        let preview = read(&json!({
+            "type": "m.room.message",
+            "content": {
+                "body": "outfit :tf:",
+                "format": "org.matrix.custom.html",
+                "formatted_body": "outfit <img data-mx-emoticon src=\"mxc://x/tf\" alt=\"tf\">"
+            }
+        }));
+        assert_eq!(preview.body.as_deref(), Some("outfit tf"));
+        assert_eq!(
+            preview.emotes,
+            [PreviewEmote {
+                alt: "tf".to_owned(),
+                source: "mxc://x/tf".to_owned(),
+                offset: 7,
+            }]
+        );
+    }
+
+    #[test]
+    fn a_spoiler_hides_its_emotes_and_shifts_the_ones_after_it() {
+        let preview = read(&json!({
+            "type": "m.room.message",
+            "content": {
+                "body": "||:a:|| :tf:",
+                "format": "org.matrix.custom.html",
+                "formatted_body": "<span data-mx-spoiler><img data-mx-emoticon src=\"mxc://x/a\" alt=\"a\"></span> <img data-mx-emoticon src=\"mxc://x/tf\" alt=\"tf\">"
+            }
+        }));
+        assert_eq!(preview.body.as_deref(), Some("[Spoiler] tf"));
+        assert_eq!(
+            preview.emotes,
+            [PreviewEmote {
+                alt: "tf".to_owned(),
+                source: "mxc://x/tf".to_owned(),
+                offset: 10,
+            }]
+        );
+    }
+
+    /// The UI takes the profile name off the front and shifts the offsets by as much.
+    #[test]
+    fn a_profile_fallback_stays_in_the_text_its_emotes_are_placed_in() {
+        let preview = read(&json!({
+            "type": "m.room.message",
+            "content": {
+                "body": "Cat: hi :tf:",
+                "format": "org.matrix.custom.html",
+                "formatted_body": "<strong data-mx-profile-fallback>Cat: </strong>hi <img data-mx-emoticon src=\"mxc://x/tf\" alt=\"tf\">",
+                "com.beeper.per_message_profile": {"displayname": "Cat", "has_fallback": true}
+            }
+        }));
+        assert_eq!(preview.body.as_deref(), Some("Cat: hi tf"));
+        assert_eq!(preview.emotes[0].offset, 8);
     }
 
     #[test]

@@ -340,7 +340,7 @@ fn embedded_reply_preview(event: &EmbeddedEvent) -> Preview {
             _ => false,
         });
         let selected = nested.unwrap_or(content);
-        let (mut body, fallback, emotes) = forwarded_content_preview(selected)?;
+        let (mut body, fallback, mut emotes) = forwarded_content_preview(selected)?;
         if nested.is_some()
             && selected.get("msgtype").and_then(serde_json::Value::as_str) == Some("m.emote")
         {
@@ -349,10 +349,15 @@ fn embedded_reply_preview(event: &EmbeddedEvent) -> Preview {
                 .and_then(serde_json::Value::as_str)
                 .and_then(|sender| ruma::UserId::parse(sender).ok());
             if let Some(body) = &mut body {
-                *body = format!(
-                    "{} {body}",
+                let prefix = format!(
+                    "{} ",
                     actor.as_deref().map_or("Sender", |sender| sender.as_str())
                 );
+                let shift = u32::try_from(prefix.encode_utf16().count()).unwrap_or(u32::MAX);
+                for emote in &mut emotes {
+                    emote.offset = emote.offset.saturating_add(shift);
+                }
+                body.insert_str(0, &prefix);
             }
         }
         Some((body, fallback, emotes))
@@ -460,6 +465,33 @@ mod tests {
     }
 
     #[test]
+    fn an_embedded_forwarded_emote_places_its_emotes_after_the_actor() {
+        let event = embedded_forward(&json!({
+            "msgtype": "m.text", "body": "fallback",
+            "org.matrix.msc4553.forwarded": {
+                "sender": "@caf\u{e9}\u{1f389}:example.org",
+                "content": { "msgtype": "m.emote", "body": "waves :tf:",
+                    "format": "org.matrix.custom.html",
+                    "formatted_body": "waves <img data-mx-emoticon src=\"mxc://x/tf\" alt=\"tf\">" }
+            }
+        }));
+        let (body, _, emotes) = embedded_reply_preview(&event);
+        assert_eq!(
+            body.as_deref(),
+            Some("@caf\u{e9}\u{1f389}:example.org waves tf")
+        );
+        assert_eq!(
+            emotes,
+            [PreviewEmote {
+                alt: "tf".to_owned(),
+                source: "mxc://x/tf".to_owned(),
+                // "@café" is 5 units, the emoji 2, ":example.org " 13, "waves " 6.
+                offset: 26,
+            }]
+        );
+    }
+
+    #[test]
     fn redacted_embedded_forwards_do_not_display_original_content() {
         let mut event = embedded_forward(&json!({
             "msgtype": "m.text", "body": "fallback",
@@ -548,6 +580,7 @@ mod tests {
             [PreviewEmote {
                 alt: ":blob:".to_owned(),
                 source: "mxc://example.org/blob".to_owned(),
+                offset: 3,
             }]
         );
     }

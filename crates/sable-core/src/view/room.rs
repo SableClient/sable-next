@@ -350,18 +350,38 @@ fn message_preview(msgtype: &MessageType, content: Option<&serde_json::Value>) -
         ),
         MessageType::File(file) => Preview::labelled(LatestEventKind::File, file.caption()),
         MessageType::Location(_) => Preview::labelled(LatestEventKind::Location, None),
-        other => Preview {
-            emotes: crate::preview::message_emotes(other),
-            ..Preview::text(
-                &content
-                    .and_then(crate::notifications::push_preview)
-                    .map_or_else(
-                        || authored_body(other.body(), content),
-                        |text| authored_body(&text, None),
-                    ),
-            )
-        },
+        other => {
+            let (body, emotes) = content
+                .and_then(crate::notifications::push_preview_parts)
+                .map_or_else(
+                    || (authored_body(other.body(), content), Vec::new()),
+                    |(text, emotes)| {
+                        let body = authored_body(&text, None);
+                        let emotes = shown_emotes(&text, &body, emotes);
+                        (body, emotes)
+                    },
+                );
+            Preview {
+                emotes,
+                ..Preview::text(&body)
+            }
+        }
     }
+}
+
+/// Moves `emotes` from `text` into `shown`, the end of it that `authored_body` keeps.
+fn shown_emotes(text: &str, shown: &str, emotes: Vec<PreviewEmote>) -> Vec<PreviewEmote> {
+    let Some(cut) = text.strip_suffix(shown) else {
+        return Vec::new();
+    };
+    let cut = u32::try_from(cut.encode_utf16().count()).unwrap_or(u32::MAX);
+    emotes
+        .into_iter()
+        .filter_map(|mut emote| {
+            emote.offset = emote.offset.checked_sub(cut)?;
+            Some(emote)
+        })
+        .collect()
 }
 
 /// Cached, so this costs one deserialization and no request.
@@ -1106,8 +1126,41 @@ mod tests {
             [PreviewEmote {
                 alt: "love".to_owned(),
                 source: "mxc://example.org/love".to_owned(),
+                offset: 3,
             }]
         );
+    }
+
+    #[test]
+    fn a_plain_reply_fallback_left_in_the_text_moves_the_emotes_with_it() {
+        let content = serde_json::json!({
+            "msgtype": "m.text",
+            "body": "> <@a:x> q\n\nhi :tf:",
+            "format": "org.matrix.custom.html",
+            "formatted_body": "&gt; &lt;@a:x&gt; q<br>hi <img data-mx-emoticon src=\"mxc://x/tf\" alt=\"tf\">"
+        });
+        let message: RoomMessageEventContent = serde_json::from_value(content.clone()).unwrap();
+        let preview = message_preview(&message.msgtype, Some(&content));
+        assert_eq!(preview.body, "hi tf");
+        assert_eq!(
+            preview.emotes,
+            [PreviewEmote {
+                alt: "tf".to_owned(),
+                source: "mxc://x/tf".to_owned(),
+                offset: 3,
+            }]
+        );
+    }
+
+    #[test]
+    fn emotes_move_only_into_an_end_of_their_text() {
+        let tf = |offset| PreviewEmote {
+            alt: "tf".to_owned(),
+            source: "mxc://x/tf".to_owned(),
+            offset,
+        };
+        assert_eq!(shown_emotes("é tf tf", "tf", vec![tf(2), tf(5)]), [tf(0)]);
+        assert_eq!(shown_emotes("tf here", "here tf", vec![tf(0)]), []);
     }
 
     #[test]
@@ -1126,6 +1179,7 @@ mod tests {
             [PreviewEmote {
                 alt: ":blob:".to_owned(),
                 source: "mxc://example.org/blob".to_owned(),
+                offset: 3,
             }]
         );
 

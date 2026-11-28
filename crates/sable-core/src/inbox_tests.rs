@@ -1,8 +1,10 @@
 use std::{collections::BTreeMap, sync::Arc};
 
+use hashlink::LinkedHashSet;
 use matrix_sdk::ruma::{OwnedEventId, owned_room_id, owned_user_id, push::Action, serde::Raw};
 use matrix_sdk::{
     Client, Room,
+    deserialized_responses::TimelineEvent,
     ruma::{
         event_id,
         events::AnySyncTimelineEvent,
@@ -20,12 +22,27 @@ use wiremock::{
 };
 
 use super::{
-    Entry, InboxScope, MAX_ENTRIES, PreviewEmote, RoomReadState, UnreadScan, is_reply, is_unread,
-    merge, preview,
+    Entry, InboxScope, InboxUpdate, MAX_ENTRIES, PreviewEmote, RoomReadState, UnreadScan, is_reply,
+    is_unread, merge, preview,
 };
-use crate::{Core, api::notifications::InboxFilter, session::Session, store::MemorySessionStore};
+use crate::{
+    Core, CoreEvent, api::notifications::InboxFilter, session::Session, store::MemorySessionStore,
+};
 
 async fn setup(server: &MatrixMockServer, notified: u64) -> (Arc<Core>, Client, Room) {
+    let (core, client, room, _events) = setup_with_events(server, notified).await;
+    (core, client, room)
+}
+
+async fn setup_with_events(
+    server: &MatrixMockServer,
+    notified: u64,
+) -> (
+    Arc<Core>,
+    Client,
+    Room,
+    tokio::sync::mpsc::UnboundedReceiver<CoreEvent>,
+) {
     let client = server.client_builder().build().await;
     let room_id = room_id!("!room:example.org");
     let factory = EventFactory::new().room(room_id).sender(User::Alice);
@@ -42,7 +59,7 @@ async fn setup(server: &MatrixMockServer, notified: u64) -> (Arc<Core>, Client, 
                 ),
         )
         .await;
-    let (core, _) = Core::new("inbox", Box::new(MemorySessionStore::default()));
+    let (core, events) = Core::new("inbox", Box::new(MemorySessionStore::default()));
     crate::test_support::set_session(
         &core,
         Some(Session {
@@ -54,7 +71,16 @@ async fn setup(server: &MatrixMockServer, notified: u64) -> (Arc<Core>, Client, 
             state: Arc::default(),
         }),
     );
-    (core, client, room)
+    (core, client, room, events)
+}
+
+fn notifying(entries: Vec<Entry>) -> Vec<InboxUpdate> {
+    entries.into_iter().map(InboxUpdate::Notifies).collect()
+}
+
+fn announced_inbox_change(mut events: tokio::sync::mpsc::UnboundedReceiver<CoreEvent>) -> bool {
+    std::iter::from_fn(|| events.try_recv().ok())
+        .any(|event| matches!(event, CoreEvent::InboxChanged))
 }
 
 fn message(event_id: &str, ts: u64, user: Option<&ruma::UserId>) -> serde_json::Value {
@@ -87,7 +113,11 @@ async fn recorded_notifications_reach_the_store_only_on_flush() {
     let session = core.signed_in().unwrap();
     for (event, ts) in [("first", 100), ("second", 200)] {
         session
-            .record_inbox(vec![entry(event, ts)], BTreeMap::new(), BTreeMap::new())
+            .record_inbox(
+                notifying(vec![entry(event, ts)]),
+                BTreeMap::new(),
+                BTreeMap::new(),
+            )
             .await
             .unwrap();
     }
@@ -107,7 +137,11 @@ async fn suspending_with_unsaved_notifications_saves_them_and_lets_sync_resume()
     let (core, client, _room) = setup(&server, 1).await;
     let session = core.signed_in().unwrap();
     session
-        .record_inbox(vec![entry("first", 100)], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(
+            notifying(vec![entry("first", 100)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
         .await
         .unwrap();
 
@@ -128,7 +162,11 @@ async fn suspending_during_the_first_inbox_load_does_not_deadlock() {
     let (core, _client, _room) = setup(&server, 1).await;
     let session = core.signed_in().unwrap();
     let closing = core.activity.closing_stores().await;
-    let record = session.record_inbox(vec![entry("first", 100)], BTreeMap::new(), BTreeMap::new());
+    let record = session.record_inbox(
+        notifying(vec![entry("first", 100)]),
+        BTreeMap::new(),
+        BTreeMap::new(),
+    );
     tokio::pin!(record);
     assert!(futures_util::poll!(record.as_mut()).is_pending());
 
@@ -149,7 +187,11 @@ async fn the_inbox_can_be_limited_to_one_room() {
     let (core, _client, room) = setup(&server, 1).await;
     let session = core.signed_in().unwrap();
     session
-        .record_inbox(vec![entry("here", 200)], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(
+            notifying(vec![entry("here", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
         .await
         .unwrap();
 
@@ -190,7 +232,7 @@ async fn the_inbox_can_be_searched_by_sender() {
     let session = core.signed_in().unwrap();
     session
         .record_inbox(
-            vec![entry("from-alice", 200)],
+            notifying(vec![entry("from-alice", 200)]),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -221,7 +263,11 @@ async fn highlights_keep_inbox_notifications_unread() {
     let (core, client, room) = setup(&server, 1).await;
     let session = core.signed_in().unwrap();
     session
-        .record_inbox(vec![entry("unread", 200)], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(
+            notifying(vec![entry("unread", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
         .await
         .unwrap();
     server
@@ -250,12 +296,13 @@ async fn a_stored_encrypted_preview_is_hidden_once_the_setting_is_off() {
         emotes: vec![PreviewEmote {
             alt: ":blob:".to_owned(),
             source: "mxc://example.org/blob".to_owned(),
+            offset: 0,
         }],
         encrypted: true,
         ..entry("secret", 200)
     };
     session
-        .record_inbox(vec![stored], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(notifying(vec![stored]), BTreeMap::new(), BTreeMap::new())
         .await
         .unwrap();
     core.settings
@@ -289,7 +336,11 @@ async fn direct_filter_uses_current_room_status() {
     let (core, client, room) = setup(&server, 1).await;
     let session = core.signed_in().unwrap();
     session
-        .record_inbox(vec![entry("unread", 200)], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(
+            notifying(vec![entry("unread", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
         .await
         .unwrap();
     let factory = EventFactory::new().room(room.room_id()).sender(User::Alice);
@@ -358,11 +409,11 @@ async fn a_thread_receipt_marks_its_replies_read_and_threads_filter_them() {
     };
     session
         .record_inbox(
-            vec![
+            notifying(vec![
                 in_thread("seen", 200),
                 in_thread("new", 300),
                 entry("main", 100),
-            ],
+            ]),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -418,7 +469,7 @@ async fn a_room_receipt_reads_thread_replies_in_a_room_without_notifications() {
     };
     session
         .record_inbox(
-            vec![in_thread("seen", 200), in_thread("new", 300)],
+            notifying(vec![in_thread("seen", 200), in_thread("new", 300)]),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -469,11 +520,11 @@ async fn a_mention_after_the_receipt_stays_unread_when_the_server_clears_its_cou
     };
     session
         .record_inbox(
-            vec![
+            notifying(vec![
                 mention("seen", 100),
                 mention("ping", 200),
                 entry("after", 300),
-            ],
+            ]),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -544,7 +595,11 @@ async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
         .mount(server.server())
         .await;
     session
-        .record_inbox(vec![entry("unread", 200)], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(
+            notifying(vec![entry("unread", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
         .await
         .unwrap();
 
@@ -622,7 +677,7 @@ async fn an_unfetchable_receipt_event_falls_back_to_the_receipt_time() {
         .await;
     session
         .record_inbox(
-            vec![entry("old", 100), entry("new", 200)],
+            notifying(vec![entry("old", 100), entry("new", 200)]),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -802,7 +857,11 @@ async fn a_cached_notification_does_not_stop_backfill_before_a_missing_one() {
     let (core, client, _) = setup(&server, 2).await;
     let session = core.signed_in().unwrap();
     session
-        .record_inbox(vec![entry("known", 200)], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(
+            notifying(vec![entry("known", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
         .await
         .unwrap();
     for (from, end, id, ts) in [
@@ -902,7 +961,11 @@ fn only_real_replies_count_as_replies() {
 fn merge_skips_known_events_and_keeps_newest_first() {
     let mut entries = vec![entry("a", 10), entry("b", 30)];
 
-    let added = merge(&mut entries, vec![entry("a", 10), entry("c", 20)]);
+    let added = merge(
+        &mut entries,
+        notifying(vec![entry("a", 10), entry("c", 20)]),
+        &mut LinkedHashSet::new(),
+    );
 
     assert_eq!(added, 1);
     let order: Vec<u64> = entries.iter().map(|entry| entry.ts).collect();
@@ -918,15 +981,381 @@ fn merge_replaces_an_undecryptable_entry_with_its_decrypted_version() {
     decrypted.body = Some("hello".to_owned());
     let mut entries = vec![stale];
 
-    let changed = merge(&mut entries, vec![decrypted.clone()]);
+    let changed = merge(
+        &mut entries,
+        notifying(vec![decrypted.clone()]),
+        &mut LinkedHashSet::new(),
+    );
 
     assert_eq!(changed, 1);
     assert_eq!(entries, vec![decrypted.clone()]);
 
     let mut still_encrypted = entry("a", 10);
     still_encrypted.undecryptable = true;
-    assert_eq!(merge(&mut entries, vec![still_encrypted]), 0);
+    assert_eq!(
+        merge(
+            &mut entries,
+            notifying(vec![still_encrypted]),
+            &mut LinkedHashSet::new()
+        ),
+        0
+    );
     assert_eq!(entries, vec![decrypted]);
+}
+
+fn placeholder(event: &str, ts: u64) -> Entry {
+    Entry {
+        undecryptable: true,
+        ..entry(event, ts)
+    }
+}
+
+fn redaction() -> serde_json::Value {
+    json!({"type": "m.room.redaction", "event_id": "$deleted", "redacts": "$message",
+           "room_id": "!room:example.org", "sender": User::Alice, "origin_server_ts": 200,
+           "content": {"redacts": "$message"}})
+}
+
+#[tokio::test]
+async fn a_decrypted_event_that_no_longer_notifies_leaves_the_inbox() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, room, events) = setup_with_events(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![placeholder("deleted", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    let revision = session.state().inbox.cache.lock().await.revision;
+    let redaction =
+        TimelineEvent::from_plaintext(Raw::from_json_string(redaction().to_string()).unwrap());
+
+    session
+        .refresh_undecryptable_inbox_entry(&room, &redaction, &[], core.lifecycle.current())
+        .await;
+
+    assert_eq!(session.stored_inbox().await.unwrap().entries, []);
+    assert!(session.state().inbox.cache.lock().await.revision > revision);
+    assert!(announced_inbox_change(events));
+}
+
+#[tokio::test]
+async fn a_decrypted_event_that_still_notifies_replaces_its_placeholder() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, room, events) = setup_with_events(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![placeholder("message", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    let decrypted = TimelineEvent::from_plaintext(
+        Raw::from_json_string(message("$message", 200, None).to_string()).unwrap(),
+    );
+
+    session
+        .refresh_undecryptable_inbox_entry(
+            &room,
+            &decrypted,
+            &[Action::Notify],
+            core.lifecycle.current(),
+        )
+        .await;
+
+    let entries = session.stored_inbox().await.unwrap().entries;
+    assert_eq!(entries.len(), 1);
+    assert!(!entries[0].undecryptable);
+    assert!(announced_inbox_change(events));
+}
+
+fn encrypted(event_id: &str, ts: u64) -> serde_json::Value {
+    json!({"type": "m.room.encrypted", "event_id": event_id, "room_id": "!room:example.org",
+           "sender": User::Alice, "origin_server_ts": ts,
+           "content": {"algorithm": "m.megolm.v1.aes-sha2", "ciphertext": "AwgAEnAC", "sender_key": "SENDERKEY",
+                       "device_id": "DEVICE", "session_id": "SESSION"}})
+}
+
+async fn backfill_one(server: &MatrixMockServer, event: serde_json::Value) {
+    Mock::given(method("GET"))
+        .and(path_regex("/messages$"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"start": "p0", "chunk": [event], "state": []})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+}
+
+#[tokio::test]
+async fn a_backfilled_decrypted_copy_that_no_longer_notifies_removes_its_placeholder() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![placeholder("deleted", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    backfill_one(&server, redaction()).await;
+
+    assert_eq!(
+        session.backfill_inbox(false, None).await.unwrap(),
+        (1, false)
+    );
+    assert_eq!(session.stored_inbox().await.unwrap().entries, []);
+}
+
+#[tokio::test]
+async fn a_backfilled_copy_that_is_still_undecryptable_keeps_its_placeholder() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![placeholder("message", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    backfill_one(&server, encrypted("$message", 200)).await;
+
+    session.backfill_inbox(false, None).await.unwrap();
+
+    assert_eq!(
+        session.stored_inbox().await.unwrap().entries,
+        [placeholder("message", 200)]
+    );
+}
+
+#[tokio::test]
+async fn a_backfilled_deleted_encrypted_copy_removes_its_placeholder() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![placeholder("message", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    let mut deleted = encrypted("$message", 200);
+    deleted["content"] = json!({});
+    deleted["unsigned"] = json!({"redacted_because": {
+        "type": "m.room.redaction", "event_id": "$deletion", "redacts": "$message",
+        "sender": User::Alice, "origin_server_ts": 300, "content": {"redacts": "$message"}
+    }});
+    backfill_one(&server, deleted).await;
+
+    session.backfill_inbox(false, None).await.unwrap();
+
+    assert_eq!(session.stored_inbox().await.unwrap().entries, []);
+}
+
+#[tokio::test]
+async fn a_copy_that_is_still_encrypted_or_does_not_parse_says_nothing_about_its_entry() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, room) = setup(&server, 1).await;
+    let still_encrypted =
+        Raw::<AnySyncTimelineEvent>::from_json_string(encrypted("$message", 200).to_string())
+            .unwrap();
+    let mut malformed = message("$message", 200, None);
+    malformed["origin_server_ts"] = json!("yesterday");
+    let malformed = Raw::from_json_string(malformed.to_string()).unwrap();
+
+    assert!(
+        core.inbox_update(&room, &still_encrypted, &[])
+            .await
+            .is_none()
+    );
+    assert!(core.inbox_update(&room, &malformed, &[]).await.is_none());
+}
+
+#[tokio::test]
+async fn a_decrypted_event_that_does_not_parse_keeps_its_placeholder() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![placeholder("message", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    let mut malformed = message("$message", 200, None);
+    malformed["origin_server_ts"] = json!("yesterday");
+    let malformed =
+        TimelineEvent::from_plaintext(Raw::from_json_string(malformed.to_string()).unwrap());
+
+    session
+        .refresh_undecryptable_inbox_entry(&room, &malformed, &[], core.lifecycle.current())
+        .await;
+
+    assert_eq!(
+        session.stored_inbox().await.unwrap().entries,
+        [placeholder("message", 200)]
+    );
+}
+
+#[test]
+fn a_stale_undecryptable_copy_does_not_bring_back_a_silenced_placeholder() {
+    let mut entries = vec![placeholder("a", 10)];
+    let mut dropped = LinkedHashSet::new();
+
+    let changed = merge(
+        &mut entries,
+        vec![InboxUpdate::Silent(event_id!("$a").to_owned())],
+        &mut dropped,
+    );
+    assert_eq!(changed, 1);
+    assert_eq!(entries, []);
+
+    assert_eq!(
+        merge(
+            &mut entries,
+            notifying(vec![placeholder("a", 10)]),
+            &mut dropped
+        ),
+        0
+    );
+    assert_eq!(entries, []);
+}
+
+#[test]
+fn a_silent_copy_leaves_a_decrypted_entry_alone() {
+    let mut entries = vec![entry("a", 10)];
+
+    let changed = merge(
+        &mut entries,
+        vec![InboxUpdate::Silent(event_id!("$a").to_owned())],
+        &mut LinkedHashSet::new(),
+    );
+
+    assert_eq!(changed, 0);
+    assert_eq!(entries, vec![entry("a", 10)]);
+}
+
+#[tokio::test]
+async fn a_backfilled_redacted_copy_removes_a_decrypted_entry() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![entry("message", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    backfill_one(
+        &server,
+        json!({"type": "m.room.message", "event_id": "$message", "room_id": "!room:example.org",
+               "sender": User::Alice, "origin_server_ts": 200, "content": {},
+               "unsigned": {"redacted_because": {"type": "m.room.redaction", "event_id": "$redaction",
+                   "sender": User::Alice, "origin_server_ts": 300, "redacts": "$message",
+                   "content": {"redacts": "$message"}}}}),
+    )
+    .await;
+
+    assert_eq!(
+        session.backfill_inbox(false, None).await.unwrap(),
+        (1, false)
+    );
+    assert_eq!(session.stored_inbox().await.unwrap().entries, []);
+}
+
+#[tokio::test]
+async fn a_live_redaction_removes_the_entry_it_deletes() {
+    let server = MatrixMockServer::new().await;
+    let (core, client, room, events) = setup_with_events(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            notifying(vec![entry("message", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+    session.watch_inbox_redactions(core.lifecycle.current());
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room.room_id()).add_timeline_event(
+                Raw::new(
+                    &json!({"type": "m.room.redaction", "event_id": "$redaction",
+                    "sender": User::Alice, "origin_server_ts": 300, "redacts": "$message",
+                    "content": {"redacts": "$message"}}),
+                )
+                .unwrap()
+                .cast_unchecked(),
+            ),
+        )
+        .await;
+
+    assert_eq!(session.stored_inbox().await.unwrap().entries, []);
+    assert!(announced_inbox_change(events));
+}
+
+#[test]
+fn a_redacted_copy_removes_a_decrypted_entry_for_good() {
+    let mut entries = vec![entry("a", 10)];
+    let mut dropped = LinkedHashSet::new();
+
+    let changed = merge(
+        &mut entries,
+        vec![InboxUpdate::Redacted(event_id!("$a").to_owned())],
+        &mut dropped,
+    );
+    assert_eq!(changed, 1);
+    assert_eq!(
+        merge(&mut entries, notifying(vec![entry("a", 10)]), &mut dropped),
+        0
+    );
+    assert_eq!(entries, []);
+}
+
+#[tokio::test]
+async fn a_deletion_recorded_first_keeps_a_later_copy_of_its_event_out() {
+    let server = MatrixMockServer::new().await;
+    let (core, _client, _room) = setup(&server, 1).await;
+    let session = core.signed_in().unwrap();
+    session
+        .record_inbox(
+            vec![InboxUpdate::Redacted(event_id!("$message").to_owned())],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+    let added = session
+        .record_inbox(
+            notifying(vec![entry("message", 200)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(added, 0);
+    assert_eq!(session.stored_inbox().await.unwrap().entries, []);
 }
 
 #[test]
@@ -935,7 +1364,11 @@ fn merge_drops_the_oldest_past_the_cap() {
         .map(|index| entry(&format!("e{index}"), index + 1))
         .collect();
 
-    merge(&mut entries, vec![entry("newest", u64::MAX)]);
+    merge(
+        &mut entries,
+        notifying(vec![entry("newest", u64::MAX)]),
+        &mut LinkedHashSet::new(),
+    );
 
     assert_eq!(entries.len(), MAX_ENTRIES);
     assert_eq!(entries.first().map(|entry| entry.ts), Some(u64::MAX));
@@ -970,7 +1403,11 @@ async fn logging_out_while_suspended_with_unsaved_notifications_finishes() {
     let (core, _client, _room) = setup(&server, 1).await;
     let session = core.signed_in().unwrap();
     session
-        .record_inbox(vec![entry("first", 100)], BTreeMap::new(), BTreeMap::new())
+        .record_inbox(
+            notifying(vec![entry("first", 100)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
         .await
         .unwrap();
     *core.accounts.lock().await = Some(crate::session::AccountRegistry::empty());
@@ -982,4 +1419,42 @@ async fn logging_out_while_suspended_with_unsaved_notifications_finishes() {
         .await
         .expect("a logout while the stores are closed must not wait for them")
         .unwrap();
+}
+
+#[test]
+fn a_truncated_preview_keeps_only_the_emotes_still_whole() {
+    let tf = |offset| PreviewEmote {
+        alt: "tf".to_owned(),
+        source: "mxc://x/tf".to_owned(),
+        offset,
+    };
+    let limit = u32::try_from(super::PREVIEW_LIMIT).unwrap();
+    let text = preview(format!("{} tf tf", "a".repeat(super::PREVIEW_LIMIT - 5)));
+    assert!(text.ends_with(" tf t…"));
+    assert_eq!(
+        super::preview_emotes(&text, vec![tf(limit - 4), tf(limit - 1)]),
+        [tf(limit - 4)]
+    );
+    assert_eq!(super::preview_emotes("hi tf", vec![tf(3)]), [tf(3)]);
+}
+
+#[test]
+fn a_stored_entry_drops_emotes_from_before_offsets() {
+    let mut stored = serde_json::to_value(Entry {
+        emotes: vec![PreviewEmote {
+            alt: ":blob:".to_owned(),
+            source: "mxc://example.org/blob".to_owned(),
+            offset: 3,
+        }],
+        ..entry("e", 1)
+    })
+    .unwrap();
+    let placed: Entry = serde_json::from_value(stored.clone()).unwrap();
+    assert_eq!(placed.emotes.len(), 1);
+    stored["emotes"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("offset");
+    let legacy: Entry = serde_json::from_value(stored).unwrap();
+    assert_eq!(legacy.emotes, Vec::new());
 }

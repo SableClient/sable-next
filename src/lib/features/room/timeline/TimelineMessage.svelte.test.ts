@@ -389,7 +389,7 @@ test('a custom emote in a thread summary shows as its image', async () => {
             current_user_participated: null,
             latest_body: 'hi :blob:',
             latest_fallback: null,
-            latest_emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+            latest_emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob', offset: 3 }],
           },
         },
         collapsed: false,

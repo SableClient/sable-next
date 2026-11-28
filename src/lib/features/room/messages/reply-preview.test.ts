@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
-import type { TimelineItemContentView } from '#src/generated/protocol';
+import type { PerMessageProfileView, TimelineItemContentView } from '#src/generated/protocol';
+import { stripReplyFallback } from '#lib/features/room/members/members.js';
 import { previewSegments, replyPreviewBody } from '#lib/features/room/messages/reply-preview.js';
 import { markdownToContent } from '#lib/model/model.js';
 
@@ -180,9 +181,51 @@ test('an uncaptioned gallery is quoted by its file names', () => {
   ).toBe('memo.ogg, notes.pdf');
 });
 
-test('a preview splits at each emote in order and leaves missing ones as text', () => {
-  const a = { alt: ':a:', source: 'mxc://x/a' };
-  const b = { alt: ':b:', source: 'mxc://x/b' };
-  expect(previewSegments(':a: then :a: and :b:', [a, a, b])).toEqual([a, ' then ', a, ' and ', b]);
-  expect(previewSegments('no emotes here', [b])).toEqual(['no emotes here']);
+test('a preview splits at each emote offset and leaves misplaced ones as text', () => {
+  const a = (offset: number) => ({ alt: ':a:', source: 'mxc://x/a', offset });
+  const b = (offset: number) => ({ alt: ':b:', source: 'mxc://x/b', offset });
+  expect(previewSegments(':a: then :a: and :b:', [a(0), a(9), b(17)])).toEqual([
+    a(0),
+    ' then ',
+    a(9),
+    ' and ',
+    b(17),
+  ]);
+  expect(previewSegments('no emotes here', [b(0)])).toEqual(['no emotes here']);
+});
+
+test('a preview places an emote where it was sent, not inside an earlier word', () => {
+  const tf = (offset: number) => ({ alt: 'tf', source: 'mxc://x/tf', offset });
+  const ac = { alt: 'ac', source: 'mxc://x/ac', offset: 13 };
+  expect(previewSegments('i have a dirty maid outfit tf', [tf(27)])).toEqual([
+    'i have a dirty maid outfit ',
+    tf(27),
+  ]);
+  expect(previewSegments('tf is this tf', [tf(11)])).toEqual(['tf is this ', tf(11)]);
+  expect(previewSegments('bbbbbacbbbbb ac', [ac])).toEqual(['bbbbbacbbbbb ', ac]);
+});
+
+test('emote offsets are UTF-16 units, as JS strings index', () => {
+  const tf = { alt: 'tf', source: 'mxc://x/tf', offset: 8 };
+  expect(previewSegments('café 🎉 tf', [tf])).toEqual(['café 🎉 ', tf]);
+});
+
+test('an emote cut off by truncation stays as text', () => {
+  const tf = (offset: number) => ({ alt: 'tf', source: 'mxc://x/tf', offset });
+  expect(previewSegments('a tf b t…', [tf(2), tf(7)])).toEqual(['a ', tf(2), ' b t…']);
+  expect(previewSegments('a tf', [tf(2), tf(9)])).toEqual(['a ', tf(2)]);
+});
+
+test('an emote shifts with the text cut off the front of the preview', () => {
+  const tf = (offset: number) => ({ alt: 'tf', source: 'mxc://x/tf', offset });
+  expect(previewSegments('hi tf', [tf(2), tf(8)], 5)).toEqual(['hi ', tf(8)]);
+});
+
+test("a persona name cut off a reply moves the core's emote offsets with it", () => {
+  // The core reads "<strong data-mx-profile-fallback>Cat: </strong>hi <img alt=tf>" as below.
+  const full = 'Cat: hi tf';
+  const tf = { alt: 'tf', source: 'mxc://x/tf', offset: 8 };
+  const persona = { display_name: 'Cat', has_fallback: true } as PerMessageProfileView;
+  const text = stripReplyFallback(full, persona);
+  expect(previewSegments(text, [tf], full.length - text.length)).toEqual(['hi ', tf]);
 });

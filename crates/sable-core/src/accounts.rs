@@ -1537,6 +1537,7 @@ impl Core {
         signed_in.watch_send_queue();
         signed_in.watch_presence(generation);
         signed_in.watch_inbox_persist();
+        signed_in.watch_inbox_redactions(generation);
         signed_in.prefetch_call_well_known();
         let store_id = signed_in
             .core()

@@ -201,7 +201,13 @@ pub async fn notification(
     match related_notification(&notifications, client, room_id, event_id).await {
         Ok(NotificationStatus::Event(item)) if item.actions.as_deref().is_some_and(notifies) => {
             let content = event_content(&item);
-            let mut view = view(client.user_id()?.to_owned(), room_id, event_id, *item);
+            let mut view = view(
+                client.user_id()?.to_owned(),
+                room_id,
+                event_id,
+                *item,
+                content.as_ref(),
+            );
             if let Some(room) = client.get_room(room_id) {
                 apply_direct(&room, &mut view).await;
             }
@@ -233,6 +239,7 @@ pub(crate) async fn foreground_notification(
                 room.room_id(),
                 event_id,
                 *item,
+                content.as_ref(),
             );
             apply_direct(room, &mut view).await;
             nicknames.apply_notification(&mut view);
@@ -257,9 +264,6 @@ fn apply_per_message_profile(view: &mut NotificationView, content: Option<&serde
         return;
     };
     if let Some(name) = profile.display_name {
-        if profile.has_fallback {
-            view.body = crate::matrix_html::strip_profile_fallback_body(&view.body, Some(&name));
-        }
         if view.is_direct {
             view.room_name.clone_from(&name);
         }
@@ -359,7 +363,12 @@ fn view(
     room_id: &RoomId,
     event_id: &EventId,
     item: NotificationItem,
+    content: Option<&serde_json::Value>,
 ) -> NotificationView {
+    let (body, emotes) = match &item.event {
+        NotificationEvent::Invite(_) => ("invited you".to_owned(), Vec::new()),
+        NotificationEvent::Timeline(event) => preview::describe_authored(event.as_ref(), content),
+    };
     NotificationView {
         user_id,
         room_id: room_id.to_owned(),
@@ -371,20 +380,10 @@ fn view(
         sender: item.event.sender().to_owned(),
         sender_name: item.sender_display_name.and_then(visible_name),
         sender_avatar_url: item.sender_avatar_url,
-        body: body(&item.event),
-        emotes: match &item.event {
-            NotificationEvent::Invite(_) => Vec::new(),
-            NotificationEvent::Timeline(event) => preview::emotes(event.as_ref()),
-        },
+        body,
+        emotes,
         mention: item.has_mention.unwrap_or(false),
         noisy: item.is_noisy,
-    }
-}
-
-fn body(event: &NotificationEvent) -> String {
-    match event {
-        NotificationEvent::Invite(_) => "invited you".to_owned(),
-        NotificationEvent::Timeline(event) => preview::describe(event.as_ref()),
     }
 }
 

@@ -1463,7 +1463,7 @@ test('a custom emote in a message preview shows as its image', async () => {
       room_id: '!r:example.org',
       name: 'Room',
       latest_event: latest('hi :blob:', 1, {
-        emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+        emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob', offset: 3 }],
       }),
     }),
   ];
@@ -1495,7 +1495,7 @@ test.each([
         join_rule: joinRule,
         media_previews: roomLevel,
         latest_event: latest('hi :blob:', 1, {
-          emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob' }],
+          emotes: [{ alt: ':blob:', source: 'mxc://example.org/blob', offset: 3 }],
         }),
       }),
     ];

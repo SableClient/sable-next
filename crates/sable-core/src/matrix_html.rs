@@ -17,7 +17,7 @@ pub use sable_model::html::link_scheme_allowed;
 use sable_model::html::nests_too_deeply;
 use sable_model::jumbo;
 
-pub use sable_model::html::{PreviewEmote, preview_body, preview_emotes};
+pub use sable_model::html::{PreviewEmote, preview, preview_body, preview_emotes};
 
 const ALLOWED_TAGS: [&str; 41] = [
     "a",

@@ -35,16 +35,20 @@ function previewText(body: string, html: string | null): string {
   return text.replace(/\n+$/, '') || body;
 }
 
-/** Splits a preview at each emote's `alt` text, which the core wrote in the same order. */
+/**
+ * Splits a preview at each emote's `offset`, less the `cut` units taken off the front of the core's
+ * text. An emote whose `alt` is no longer at its place, such as one cut by truncation, stays as text.
+ */
 export function previewSegments(
   text: string,
-  emotes: readonly PreviewEmote[]
+  emotes: readonly PreviewEmote[],
+  cut = 0
 ): (string | PreviewEmote)[] {
   const segments: (string | PreviewEmote)[] = [];
   let cursor = 0;
   for (const emote of emotes) {
-    const at = text.indexOf(emote.alt, cursor);
-    if (at === -1) continue;
+    const at = emote.offset - cut;
+    if (at < cursor || !text.startsWith(emote.alt, at)) continue;
     if (at > cursor) segments.push(text.slice(cursor, at));
     segments.push(emote);
     cursor = at + emote.alt.length;

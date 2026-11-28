@@ -21,14 +21,21 @@ function storage(): Storage | null {
 }
 
 /**
- * A snapshot from a build before the core resolved counts, listed preview
- * emotes or group members paints nothing.
+ * A snapshot from a build before the core resolved counts, placed preview
+ * emotes or listed group members paints nothing.
  */
 function isCurrentSummary(room: unknown): boolean {
   if (typeof room !== 'object' || room === null) return false;
   if (!('counts' in room) || !('group_members' in room)) return false;
   const latest = (room as { latest_event?: unknown }).latest_event;
-  return typeof latest !== 'object' || latest === null || 'emotes' in latest;
+  if (typeof latest !== 'object' || latest === null) return true;
+  const { emotes } = latest as { emotes?: unknown };
+  return (
+    Array.isArray(emotes) &&
+    emotes.every(
+      (emote: unknown) => typeof emote === 'object' && emote !== null && 'offset' in emote
+    )
+  );
 }
 
 function isSnapshot(value: unknown): value is RoomListSnapshot {

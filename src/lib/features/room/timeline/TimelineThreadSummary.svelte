@@ -83,14 +83,10 @@
   let unreadState = $derived(
     unread ?? (rootId && roomId ? sidebar?.unreadState(roomId, rootId) : undefined)
   );
-  let latest = $derived(
-    summary
-      ? stripReplyFallback(
-          fallbackText(summary.latest_body, summary.latest_fallback, i18n.t),
-          persona
-        )
-      : ''
+  let latestFull = $derived(
+    summary ? fallbackText(summary.latest_body, summary.latest_fallback, i18n.t) : ''
   );
+  let latest = $derived(stripReplyFallback(latestFull, persona));
   let latestSender = $derived(summary?.latest_sender ?? null);
   let latestTimestamp = $derived(summary?.latest_timestamp ?? null);
   const latestProfile = new UserProfile(core, () => (preview ? null : latestSender));
@@ -216,7 +212,11 @@
         <span class="thread-latest"
           ><bdi
             ><PreviewSegments
-              segments={previewSegments(latest, roomMedia?.hidden ? [] : summary.latest_emotes)}
+              segments={previewSegments(
+                latest,
+                roomMedia?.hidden ? [] : summary.latest_emotes,
+                latestFull.length - latest.length
+              )}
             /></bdi
           ></span
         >

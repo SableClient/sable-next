@@ -78,6 +78,30 @@ pub(crate) fn message_emotes(msgtype: &MessageType) -> Vec<PreviewEmote> {
     preview_emotes(formatted(msgtype))
 }
 
+/// `describe`'s text and the emotes placed in it. A message's text leaves out the name a
+/// per-message profile put in front of it, as `push_preview` does.
+pub(crate) fn describe_authored(
+    event: &AnySyncTimelineEvent,
+    content: Option<&serde_json::Value>,
+) -> (String, Vec<PreviewEmote>) {
+    if let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(message)) = event
+        && let Some(original) = message.as_original()
+        && !matches!(
+            original.content.msgtype,
+            MessageType::Image(_)
+                | MessageType::Video(_)
+                | MessageType::Audio(_)
+                | MessageType::File(_)
+                | MessageType::Gallery(_)
+                | MessageType::VerificationRequest(_)
+        )
+        && let Some(parts) = content.and_then(crate::notifications::push_preview_parts)
+    {
+        return parts;
+    }
+    (describe(event), emotes(event))
+}
+
 fn formatted(msgtype: &MessageType) -> Option<&str> {
     match msgtype {
         MessageType::Text(content) => content.formatted.as_ref(),
@@ -107,7 +131,10 @@ mod tests {
     use matrix_sdk::ruma::serde::Raw;
     use serde_json::json;
 
-    use super::{MAX_REACTION_BYTES, describe, describe_message, describe_reaction, emotes};
+    use super::{
+        MAX_REACTION_BYTES, describe, describe_authored, describe_message, describe_reaction,
+        emotes,
+    };
     use crate::matrix_html::PreviewEmote;
 
     fn message(content: serde_json::Value) -> RoomMessageEventContent {
@@ -162,10 +189,40 @@ mod tests {
             [PreviewEmote {
                 alt: ":blob:".to_owned(),
                 source: "mxc://example.org/blob".to_owned(),
+                offset: 3,
             }]
         );
         let image = json!({"msgtype": "m.image", "body": ":blob:", "url": "mxc://example.org/cat"});
         assert_eq!(emotes(&event("m.room.message", &image)), []);
+    }
+
+    #[test]
+    fn a_profile_fallback_is_left_out_of_the_text_its_emotes_are_placed_in() {
+        let content = json!({
+            "msgtype": "m.text",
+            "body": "Cat: hi :blob:",
+            "format": "org.matrix.custom.html",
+            "formatted_body": "<strong data-mx-profile-fallback>Cat: </strong>hi <img data-mx-emoticon src=\"mxc://example.org/blob\" alt=\":blob:\">",
+            "com.beeper.per_message_profile": {"displayname": "Cat", "has_fallback": true}
+        });
+        let message = event("m.room.message", &content);
+        assert_eq!(
+            describe_authored(&message, Some(&content)),
+            (
+                "hi :blob:".to_owned(),
+                vec![PreviewEmote {
+                    alt: ":blob:".to_owned(),
+                    source: "mxc://example.org/blob".to_owned(),
+                    offset: 3,
+                }]
+            )
+        );
+        let image = json!({"msgtype": "m.image", "body": "Cat: pic", "url": "mxc://example.org/cat",
+            "com.beeper.per_message_profile": {"displayname": "Cat", "has_fallback": true}});
+        assert_eq!(
+            describe_authored(&event("m.room.message", &image), Some(&image)),
+            ("sent an image".to_owned(), Vec::new())
+        );
     }
 
     #[test]
