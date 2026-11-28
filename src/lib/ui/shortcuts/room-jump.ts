@@ -26,6 +26,36 @@ export function parseJumpQuery(query: string): { kind: JumpKind | null; text: st
   return { kind, text: (kind === null ? trimmed : trimmed.slice(1)).trim() };
 }
 
+function byLatestDescendant(
+  spaces: readonly RoomListItemView[],
+  rooms: readonly RoomListItemView[]
+): RoomListItemView[] {
+  const position = new Map(rooms.map((room, index) => [room.room_id, index]));
+  const byId = new Map(rooms.map((room) => [room.room_id, room]));
+
+  function rank(spaceId: string): number {
+    const visited = new Set<string>();
+    const stack = [spaceId];
+    let best = Infinity;
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (current === undefined || visited.has(current)) continue;
+      visited.add(current);
+      best = Math.min(best, position.get(current) ?? Infinity);
+
+      for (const edge of byId.get(current)?.space_children ?? []) stack.push(edge.room_id);
+    }
+
+    return best;
+  }
+
+  const ranks = new Map(spaces.map((space) => [space.room_id, rank(space.room_id)]));
+  return spaces
+    .slice()
+    .sort((a, b) => (ranks.get(a.room_id) ?? Infinity) - (ranks.get(b.room_id) ?? Infinity));
+}
+
 export function filterRoomsByQuery(
   rooms: readonly RoomListItemView[],
   query: string,
@@ -36,6 +66,7 @@ export function filterRoomsByQuery(
   const candidates = kind === null ? joined : joined.filter((room) => jumpKind(room) === kind);
 
   if (text === '') {
+    if (kind === 'space') return byLatestDescendant(candidates, joined).slice(0, limit);
     const recents =
       kind === null ? candidates.filter((room) => room.room_kind !== 'space') : candidates;
     return recents.slice(0, limit);

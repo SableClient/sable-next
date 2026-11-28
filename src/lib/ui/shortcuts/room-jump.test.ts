@@ -217,6 +217,45 @@ test('an empty spaces query still lists spaces', () => {
   expect(filterRoomsByQuery(rooms, '*').map((r) => r.room_id)).toEqual(['!b:example.org']);
 });
 
+test('an empty spaces query lists spaces by their most recent room', () => {
+  const child = (room_id: string) => ({
+    room_id,
+    via: [],
+    order: null,
+    suggested: false,
+    origin_server_ts: 0,
+    private: false,
+  });
+  const rooms = [
+    room({ room_id: '!recent:example.org' }),
+    room({ room_id: '!old:example.org' }),
+    room({
+      room_id: '!alpha:example.org',
+      name: 'Alpha',
+      room_kind: 'space',
+      space_children: [child('!old:example.org')],
+    }),
+    room({
+      room_id: '!beta:example.org',
+      name: 'Beta',
+      room_kind: 'space',
+      space_children: [child('!sub:example.org')],
+    }),
+    room({
+      room_id: '!sub:example.org',
+      name: 'Sub',
+      room_kind: 'space',
+      space_children: [child('!recent:example.org'), child('!beta:example.org')],
+    }),
+  ];
+
+  expect(filterRoomsByQuery(rooms, '*').map((r) => r.room_id)).toEqual([
+    '!beta:example.org',
+    '!sub:example.org',
+    '!alpha:example.org',
+  ]);
+});
+
 test('parentSpaceNames names a room after the first space that lists it', () => {
   const rooms = [
     room({
