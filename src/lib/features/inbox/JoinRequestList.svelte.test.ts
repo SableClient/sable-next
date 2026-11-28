@@ -128,6 +128,22 @@ test('loads all requests with one RPC, and again only when the rooms change', as
   expect(core.rpc.members.list).not.toHaveBeenCalled();
 });
 
+test('does not reload when a new message reorders the rooms', async () => {
+  roomList.rooms = [room, space];
+  render(JoinRequestList);
+  await screen.findByText('Alice');
+
+  const latest = { event_id: '$new' } as RoomListItemView['latest_event'];
+  roomList.rooms = [{ ...space, latest_event: latest }, room];
+  await tick();
+  expect(core.rpc.members.joinRequests).toHaveBeenCalledOnce();
+
+  roomList.rooms = [{ ...space, join_rule: 'invite' }, room];
+  await vi.waitFor(() => {
+    expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(2);
+  });
+});
+
 test('loads again when someone asks to join a room', async () => {
   let emit!: (event: CoreEvent) => void;
   core.subscribeEvents.mockImplementationOnce((listener) => {

@@ -5,6 +5,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import type {
   JoinRequestRoomView,
   MemberView,
+  RoomJoinRuleView,
   RoomListItemView,
   RoomPermissionsView,
 } from '#src/generated/protocol';
@@ -38,33 +39,50 @@ export class JoinRequests {
   #dismissed = new SvelteSet<string>();
   #run = 0;
   #core: JoinRequestsCore;
-  #roomList: Pick<RoomList, 'rooms'>;
+  #roomList: Pick<RoomList, 'rooms' | 'byId'>;
   loading = $state(true);
   failed = $state(false);
   actionFailed = $state(false);
   busy = $state(false);
 
   readonly pending: JoinRequest[] = $derived.by(() => {
-    return this.#roomList.rooms
-      .flatMap((room) => {
-        const group = this.#groups.find((entry) => entry.room_id === room.room_id);
-        return group
-          ? group.members.map((member) => ({ room, member, permissions: group.permissions }))
-          : [];
+    const { rooms } = this.#roomList;
+    // Usually no groups, so look rooms up by id instead of walking the whole list.
+    return this.#groups
+      .flatMap((group) => {
+        const room = this.#roomList.byId(group.room_id);
+        if (!room) return [];
+        const order = rooms.indexOf(room);
+        return group.members.map((member) => ({
+          request: { room, member, permissions: group.permissions },
+          order,
+        }));
       })
-      .filter((request) => !this.#answered.has(joinRequestKey(request)))
-      .sort((left, right) => (right.member.member_ts ?? 0) - (left.member.member_ts ?? 0));
+      .filter(({ request }) => !this.#answered.has(joinRequestKey(request)))
+      .sort(
+        (left, right) =>
+          (right.request.member.member_ts ?? 0) - (left.request.member.member_ts ?? 0) ||
+          left.order - right.order
+      )
+      .map(({ request }) => request);
   });
 
-  constructor(core: JoinRequestsCore, roomList: Pick<RoomList, 'rooms'>) {
+  constructor(core: JoinRequestsCore, roomList: Pick<RoomList, 'rooms' | 'byId'>) {
     this.#core = core;
     this.#roomList = roomList;
-    let shape = '';
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a non-reactive snapshot, replaced wholesale
+    let joinRules: ReadonlyMap<string, RoomJoinRuleView> = new Map();
     $effect(() => {
       // Room-list updates come with most messages; only rooms and join rules decide who can knock.
-      const next = roomList.rooms.map((room) => `${room.room_id} ${room.join_rule}`).join('\n');
-      if (next === shape) return;
-      shape = next;
+      const { rooms } = roomList;
+      if (
+        rooms.length === joinRules.size &&
+        rooms.every((room) => joinRules.get(room.room_id) === room.join_rule)
+      ) {
+        return;
+      }
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity -- see above
+      joinRules = new Map(rooms.map((room) => [room.room_id, room.join_rule]));
       void this.load();
     });
     $effect(() =>
@@ -137,6 +155,9 @@ const [useShared, provideJoinRequests, hasShared] = createContext<JoinRequests>(
 
 export { provideJoinRequests };
 
-export function useJoinRequests(core: JoinRequestsCore, roomList: Pick<RoomList, 'rooms'>) {
+export function useJoinRequests(
+  core: JoinRequestsCore,
+  roomList: Pick<RoomList, 'rooms' | 'byId'>
+) {
   return hasShared() ? useShared() : new JoinRequests(core, roomList);
 }
