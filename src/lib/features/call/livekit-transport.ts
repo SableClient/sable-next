@@ -2,6 +2,7 @@ import {
   ConnectionQuality,
   ConnectionState,
   LocalAudioTrack,
+  LocalVideoTrack,
   Room as LivekitRoom,
   type ScreenShareCaptureOptions,
   type TrackPublishOptions,
@@ -105,8 +106,17 @@ export type LivekitTransportOptions = {
   createWorker?: () => Worker;
 };
 
+const fixesKeyframes = (): boolean => {
+  const platform = electronBridge()?.platform;
+  return (platform === 'linux' || platform === 'freebsd') && preferences.hardwareVideoEncode;
+};
+
 const defaultWorker = (): Worker =>
-  new Worker(new URL('livekit-client/e2ee-worker', import.meta.url), { type: 'module' });
+  fixesKeyframes()
+    ? new Worker(new URL('../../../worker/call-e2ee.worker.ts', import.meta.url), {
+        type: 'module',
+      })
+    : new Worker(new URL('livekit-client/e2ee-worker', import.meta.url), { type: 'module' });
 
 // Senders keep using their previous key for a few seconds after rotating.
 const MISSING_KEY_GRACE_MS = 10_000;
@@ -146,6 +156,16 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   routeLivekitLogs();
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
   const worker = keyProvider ? (options.createWorker ?? defaultWorker)() : undefined;
+  let videoWorker: Worker | undefined;
+  const fixSenderKeyframes = (publication: TrackPublication): void => {
+    const track = publication.track;
+    if (keyProvider || !fixesKeyframes() || !(track instanceof LocalVideoTrack)) return;
+    if (track.codec !== 'h264' || !track.sender) return;
+    videoWorker ??= new Worker(new URL('../../../worker/call-video.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+    track.sender.transform = new RTCRtpScriptTransform(videoWorker);
+  };
   const { filter: filterMicrophone, constraints: microphoneConstraints } = microphoneProcessing();
   const cameraCapture = () => ({
     ...(preferences.videoInputDevice ? { deviceId: preferences.videoInputDevice } : {}),
@@ -421,6 +441,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     .on(RoomEvent.ActiveSpeakersChanged, syncParticipants)
     .on(RoomEvent.ActiveSpeakersChanged, syncLocal)
     .on(RoomEvent.LocalTrackPublished, syncLocal)
+    .on(RoomEvent.LocalTrackPublished, fixSenderKeyframes)
     .on(RoomEvent.LocalTrackUnpublished, syncLocal)
     .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
       if (publication.source === Track.Source.Microphone)
@@ -669,6 +690,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
         await room.disconnect();
       } finally {
         worker?.terminate();
+        videoWorker?.terminate();
         keyProvider?.reset();
         publish({ connection: 'disconnected', participants: [] });
       }
