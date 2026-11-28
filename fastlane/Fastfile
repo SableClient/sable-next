@@ -26,6 +26,7 @@ platform :ios do
       is_key_content_base64: true
     )
     upload_to_app_store(
+      app_identifier: "moe.sable.app",
       app_version: options.fetch(:version),
       build_number: options.fetch(:build),
       skip_binary_upload: true,
