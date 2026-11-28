@@ -69,6 +69,7 @@ jobs:
         id: targets
         env:
           NIGHTLY: ${{ steps.meta.outputs.nightly }}
+          HAS_APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE != '' }}
         run: |
           targets='[
             {"name": "Windows x86_64", "runner": "windows-latest", "platform": "--win"},
@@ -76,7 +77,11 @@ jobs:
             {"name": "Linux aarch64", "runner": "ubuntu-24.04-arm", "platform": "--linux"}
           ]'
           if [ "$NIGHTLY" != 'true' ]; then
-            targets="$(jq '. + [{"name": "macOS x86_64", "runner": "macos-26-intel", "platform": "--mac"}]' <<< "$targets")"
+            if [ "$HAS_APPLE_CERTIFICATE" = 'true' ]; then
+              targets="$(jq '. + [{"name": "macOS x86_64", "runner": "macos-26-intel", "platform": "--mac"}]' <<< "$targets")"
+            else
+              echo '::warning::APPLE_CERTIFICATE is not set; skipping the Intel macOS bundle.'
+            fi
           fi
           echo "electron=$(jq -c . <<< "$targets")" >> "$GITHUB_OUTPUT"
       - name: Wait for release to exist
@@ -288,6 +293,8 @@ jobs:
     name: FreeBSD x86_64 (Electron)
     needs: [setup-release, build-web]
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+    # FreeBSD's package builders sometimes drop the Electron package.
+    continue-on-error: true
     runs-on: ubuntu-26.04
     timeout-minutes: 180
     permissions:

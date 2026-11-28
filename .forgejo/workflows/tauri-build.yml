@@ -1087,7 +1087,11 @@ jobs:
         run: |
           mkdir manifests
           node scripts/ci/forgejo-release.mjs download --pattern 'latest-mac*.yml' --dir manifests
-          node electron/merge-mac-manifests.mjs manifests/latest-mac.yml manifests/latest-mac-x64.yml
+          if [ -f manifests/latest-mac-x64.yml ]; then
+            node electron/merge-mac-manifests.mjs manifests/latest-mac.yml manifests/latest-mac-x64.yml
+          else
+            echo '::warning::No Intel macOS manifest; publishing the arm64 one alone.'
+          fi
           node scripts/ci/forgejo-release.mjs upload manifests/latest-mac.yml
           node scripts/ci/forgejo-release.mjs upload --tag latest manifests/latest-mac.yml
   sign-release:
@@ -1218,6 +1222,10 @@ jobs:
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
+          if [ ! -f "dmg/sable-${VERSION}-x64.dmg" ]; then
+            echo '::warning::No Intel macOS DMG; leaving the Homebrew cask on the previous version.'
+            exit 0
+          fi
           arm="$(sha256sum "dmg/sable-${VERSION}-arm64.dmg" | awk '{print $1}')"
           intel="$(sha256sum "dmg/sable-${VERSION}-x64.dmg" | awk '{print $1}')"
           export GIT_TERMINAL_PROMPT=0
