@@ -47,6 +47,7 @@ function mountHeader(props: {
   chatOpen?: boolean;
   searchOpen?: boolean;
   membersOpen?: boolean;
+  joinRequests?: boolean;
   encrypted?: boolean | null;
   publicRoom?: boolean;
   presence?: PresenceView | null;
@@ -68,6 +69,13 @@ function mountHeader(props: {
     { wrapper: TooltipProvider }
   );
 }
+
+test('the members button marks new join requests', () => {
+  mountHeader({ isVoice: false, callParticipants: [], joinRequests: true });
+
+  const button = screen.getByRole('button', { name: 'Members, new join requests' });
+  expect(button.querySelector('.request-dot')).toBeInTheDocument();
+});
 
 test('a voice room with nobody in it is marked as a voice room', () => {
   mountHeader({ isVoice: true, callParticipants: [] });

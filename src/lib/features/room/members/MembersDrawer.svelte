@@ -13,6 +13,7 @@
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
 
+  import JoinRequestsCard from './JoinRequestsCard.svelte';
   import MemberList from './MemberList.svelte';
   import MemberListControls from './MemberListControls.svelte';
 
@@ -126,6 +127,9 @@
 </aside>
 
 {#snippet controls()}
+  {#if list.roomId && list.loadMembership}
+    <JoinRequestsCard roomId={list.roomId} onAll={() => (filter = 'knock')} />
+  {/if}
   <MemberListControls bind:search bind:filter membership={!!list.loadMembership} />
 {/snippet}
 

@@ -2,6 +2,7 @@
 
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import type {
   CoreEvent,
@@ -107,7 +108,7 @@ test('approves room requests and denies space requests', async () => {
   });
 });
 
-test('loads all requests with one RPC on mount and each room-list update', async () => {
+test('loads all requests with one RPC, and again only when the rooms change', async () => {
   roomList.rooms = [room, space];
   render(JoinRequestList);
   await screen.findByText('Alice');
@@ -116,6 +117,10 @@ test('loads all requests with one RPC on mount and each room-list update', async
   expect(core.rpc.members.list).not.toHaveBeenCalled();
 
   roomList.rooms = [{ ...room }, { ...space }];
+  await tick();
+  expect(core.rpc.members.joinRequests).toHaveBeenCalledOnce();
+
+  roomList.rooms = [room];
   await vi.waitFor(() => {
     expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(2);
   });
@@ -135,7 +140,7 @@ test('loads again when someone asks to join a room', async () => {
   emit({
     type: 'members_changed',
     room_id: room.room_id,
-    member: { ...alice, membership: 'join' },
+    member: { ...alice, user_id: '@bob:example.org', membership: 'join' },
   });
   emit({ type: 'members_changed', room_id: room.room_id, member: alice });
 
@@ -227,7 +232,7 @@ test('refreshes live requests without restoring an answered request from stale s
   await userEvent.click(screen.getByRole('button', { name: 'Approve' }));
   await screen.findByText('No pending join requests.');
 
-  roomList.rooms = [{ ...room }];
+  roomList.rooms = [room, space];
   await vi.waitFor(() => {
     expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(2);
   });
@@ -237,7 +242,7 @@ test('refreshes live requests without restoring an answered request from stale s
     rooms: [{ room_id: room.room_id, members: [{ ...alice, member_ts: 2 }], permissions }],
     failed: false,
   });
-  roomList.rooms = [{ ...room }];
+  roomList.rooms = [room];
   await screen.findByText('Alice');
 });
 
@@ -257,7 +262,7 @@ test('ignores an older response after the room list changes', async () => {
   await vi.waitFor(() => {
     expect(core.rpc.members.joinRequests).toHaveBeenCalledTimes(1);
   });
-  roomList.rooms = [{ ...room }];
+  roomList.rooms = [room, space];
   await screen.findByText('Alice');
   older.resolve({ rooms: [], failed: true });
   await older.promise;

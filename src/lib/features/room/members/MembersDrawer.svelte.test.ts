@@ -13,6 +13,11 @@ vi.mock('#lib/core/context.js');
 
 const offline = new Set<string>();
 
+vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useRoomList: () => ({ rooms: [] }),
+}));
+
 vi.mock('#lib/rooms/presence.svelte.js', async () => {
   const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(
     '#lib/rooms/presence.svelte.js'

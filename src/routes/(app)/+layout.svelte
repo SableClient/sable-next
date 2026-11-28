@@ -29,6 +29,7 @@
     ThreadSidebar,
   } from '#lib/features/sidebar/thread-sidebar.svelte.js';
   import { provideRecentReactions, RecentReactions } from '#lib/emoji/recents.svelte.js';
+  import { JoinRequests, provideJoinRequests } from '#lib/rooms/join-requests.svelte.js';
   import { provideStickerHistory, StickerHistory } from '#lib/emoji/sticker-history.svelte.js';
   import { EventItems, provideEventItems } from '#lib/features/room/messages/event-items.svelte.js';
   import {
@@ -202,6 +203,7 @@
   const bookmarks = new Bookmarks(core.rpc.account);
   provideBookmarks(bookmarks);
   provideRecentReactions(new RecentReactions(core));
+  provideJoinRequests(new JoinRequests(core, roomList));
   const stickerHistory = new StickerHistory(core);
   provideStickerHistory(stickerHistory);
   provideEventItems(new EventItems(core.rpc.timeline, () => core.session?.user_id ?? null));

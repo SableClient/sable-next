@@ -41,6 +41,7 @@
   import { backToRoomList, searchInRoom, trackRoomEntry } from './room-navigation.js';
   import { isPublicRoom } from '#lib/rooms/public-room.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { useJoinRequests } from '#lib/rooms/join-requests.svelte.js';
   import { ThreadRoots } from '#lib/rooms/thread-roots.svelte.js';
   import { useThreadSidebar } from '#lib/features/sidebar/thread-sidebar.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
@@ -115,6 +116,7 @@
   trackRoomEntry();
   const personas = usePersonaStore();
   const roomList = useRoomList();
+  const joinRequests = useJoinRequests(core, roomList);
   const presenceStore = usePresenceStore();
   const timelineOwner = Symbol('room-view');
   const activeTimeline = activeRoomTimeline(core);
@@ -1040,6 +1042,7 @@
     callParticipants={resolvedRoom?.call_participants ?? []}
     members={memberLoader.members}
     membersOpen={desktop ? panels.desktopMembersOpen : panels.membersOpen}
+    joinRequests={joinRequests.unseen(resolvedRoomId).length > 0}
     searchOpen={panels.searchOpen}
     onCall={callOffered && !isVoiceRoom && !mobileThreads ? startCall : null}
     onToggleChat={isVoiceRoom ? () => (voiceChat.open = !voiceChat.open) : null}

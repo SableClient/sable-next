@@ -63,6 +63,7 @@
   import CategoryCaret from './CategoryCaret.svelte';
   import ReplacedRooms from './ReplacedRooms.svelte';
   import RoomInvites from './RoomInvites.svelte';
+  import JoinRequestsCard from '#lib/features/room/members/JoinRequestsCard.svelte';
   import RoomNavActions from './RoomNavActions.svelte';
   import RoomListHeading from './RoomListHeading.svelte';
   import RoomListMenuItems from './RoomListMenuItems.svelte';
@@ -938,6 +939,13 @@
     {/if}
 
     <RoomInvites {collapsed} {invites} />
+
+    {#if !collapsed && activeSpaceId}
+      <JoinRequestsCard
+        roomId={activeSpaceId}
+        onAll={() => navigateTo(`${resolve('/(app)/inbox')}?tab=requests`)}
+      />
+    {/if}
 
     <div
       role="tree"

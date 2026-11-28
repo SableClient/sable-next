@@ -37,6 +37,7 @@
     callParticipants: readonly string[];
     members: readonly MemberView[];
     membersOpen?: boolean;
+    joinRequests?: boolean;
     searchOpen?: boolean;
     onCall?: (() => void) | null;
     onToggleChat?: (() => void) | null;
@@ -66,6 +67,7 @@
     callParticipants,
     members,
     membersOpen = false,
+    joinRequests = false,
     searchOpen = false,
     onCall = null,
     onToggleChat = null,
@@ -221,11 +223,12 @@
     {#if !phone}
       <PanelHeaderButton
         class="members-button"
-        label={i18n.t('timeline.members')}
+        label={joinRequests ? i18n.t('room.membersWithRequests') : i18n.t('timeline.members')}
         aria-pressed={membersOpen}
         onclick={onMembers}
       >
         <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />
+        {#if joinRequests}<span class="request-dot"></span>{/if}
       </PanelHeaderButton>
     {/if}
     {@render menu?.()}
@@ -351,6 +354,17 @@
 
   :global(.back-button) {
     display: inline-flex;
+  }
+
+  .request-dot {
+    background: var(--success-main);
+    border: var(--border-width) solid var(--bg-container);
+    border-radius: var(--radii-pill);
+    height: 0.5rem;
+    inset-block-start: var(--space-100);
+    inset-inline-end: var(--space-100);
+    position: absolute;
+    width: 0.5rem;
   }
 
   :global(.back-button svg),
