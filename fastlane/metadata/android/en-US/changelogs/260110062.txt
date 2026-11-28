@@ -1,0 +1,4 @@
+- A message can be edited while it is still sending, from the hover toolbar, the context menu or a long press.
+- Hold Shift while pointing at a message to show all of its actions in the hover toolbar, or turn on "Show all message actions" to always show them.
+- The message hover toolbar shows your three most recent reactions.
+- New join requests show as a dot on the members button and as a card above the member list, with approve and deny buttons. A space shows the same card in the sidebar.

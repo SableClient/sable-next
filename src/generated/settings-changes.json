@@ -1,5 +1,5 @@
 {
-  "upcoming": {
+  "v26.11.6": {
     "added": [
       "syncOnPush",
       "expandedMessageActions",
@@ -15,12 +15,6 @@
       "matrixLinkSelector",
       "matrixLinkCustom",
       "showActiveThreadsInSidebar"
-    ],
-    "changed": []
-  },
-  "v26.11.4": {
-    "added": [
-      "hideSentBeforeJoined"
     ],
     "changed": []
   }

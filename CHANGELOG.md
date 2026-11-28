@@ -1,5 +1,31 @@
 # Sable Changelog
 
+## 26.11.6 (2026-11-28)
+
+### Features
+
+* A message can be edited while it is still sending, from the hover toolbar, the context menu or a long press.
+* Hold Shift while pointing at a message to show all of its actions in the hover toolbar, or turn on "Show all message actions" to always show them.
+* The message hover toolbar shows your three most recent reactions.
+* New join requests show as a dot on the members button and as a card above the member list, with approve and deny buttons. A space shows the same card in the sidebar.
+* Recent reactions in the message hover toolbar grow on hover and show their name in a tooltip. A setting hides them from the toolbar.
+* Ctrl+Alt+Up and Down move to the previous or next sidebar destination: Home, Rooms, Direct messages or a space.
+* Android has a "Sync on notification" setting, off by default. When a notification arrives while Sable runs in the background, it syncs for a few seconds so the conversation is ready when you open it.
+* Sync on notification also works after Android has closed Sable.
+
+### Fixes
+
+* Message previews such as linked-message quotes and notification snippets no longer cut an emoji or accented letter in half before the ellipsis.
+* Deletions, reactions and edits in encrypted rooms no longer leave a stale "Encrypted message" entry in the notifications inbox.
+* Spaces in Jump to room are listed by their most recently active room instead of by name.
+* Screen shares and cameras sent with hardware H.264 encoding on Linux no longer show a black screen to viewers.
+* Notifications show the sender's avatar in group chats, and the avatar you set for someone with a nickname.
+* Custom emotes in reply previews, thread summaries, the room list and notifications appear where they were sent.
+* Settings section headings use the main text colour so they stay readable.
+* Per-space pronouns, names, avatars and colours in a room come from the parent space the room names, so everyone in that space sees the same ones. Adding a room to a space that isn't invite-only sets it as the room's parent when you have the rights, and removing it clears that.
+* The rules section now show the icon you set for a space on this device.
+* The New and Rules actions in a space no longer pop in late and push the room list down.
+
 ## 26.11.5 (2026-11-27)
 
 ### Features
