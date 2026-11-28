@@ -2592,3 +2592,426 @@ fn only_mentions_and_direct_messages_want_a_banner() {
     assert!(!view(true, false, false).wants_banner());
     assert!(!view(false, true, true).wants_banner());
 }
+
+const SLIDING_SYNC_PATH: &str = "/_matrix/client/unstable/org.matrix.simplified_msc3575/sync";
+const SYNCED: &str = "$synced";
+
+/// The push sync's connection answers with `response`; every other connection with nothing.
+async fn mount_push_sync(server: &MatrixMockServer, response: wiremock::ResponseTemplate) {
+    use wiremock::matchers::{body_partial_json, method, path, query_param};
+    wiremock::Mock::given(method("POST"))
+        .and(path(SLIDING_SYNC_PATH))
+        .and(body_partial_json(json!({"conn_id": "push-sync"})))
+        // A push must not report the user online.
+        .and(query_param("set_presence", "offline"))
+        .respond_with(response)
+        .with_priority(2)
+        .mount(server.server())
+        .await;
+    wiremock::Mock::given(method("POST"))
+        .and(path(SLIDING_SYNC_PATH))
+        .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({"pos": "0"})))
+        .mount(server.server())
+        .await;
+}
+
+fn synced_room(timeline: &serde_json::Value) -> wiremock::ResponseTemplate {
+    wiremock::ResponseTemplate::new(200).set_body_json(json!({
+        "pos": "1",
+        "rooms": {COLD_ROOM: {"initial": true, "timeline": timeline}}
+    }))
+}
+
+fn pushed_event() -> serde_json::Value {
+    json!([{
+        "type": "m.room.message", "event_id": SYNCED, "sender": "@bob:example.org",
+        "origin_server_ts": 1, "content": {"msgtype": "m.text", "body": "hello"}
+    }])
+}
+
+fn deadline_in(seconds: u64) -> tokio::time::Instant {
+    tokio::time::Instant::now() + std::time::Duration::from_secs(seconds)
+}
+
+async fn push_sync(
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    event_id: Option<&str>,
+    deadline: tokio::time::Instant,
+) -> bool {
+    let room_id = ruma::RoomId::parse(COLD_ROOM).unwrap();
+    let event_id = event_id.map(|id| EventId::parse(id).unwrap());
+    super::cold::sync_room(
+        store_dir,
+        user_id,
+        device_id,
+        &room_id,
+        event_id.as_deref(),
+        deadline,
+    )
+    .await
+}
+
+async fn app_finds(account: &crate::session::PersistedAccount, event_id: &EventId) -> bool {
+    let client = crate::session::restore_client(&account.store_id, &account.session, true)
+        .await
+        .unwrap();
+    crate::session::restore_credentials(&client, &account.session)
+        .await
+        .unwrap();
+    let room_id = ruma::RoomId::parse(COLD_ROOM).unwrap();
+    let (room, _drop) = client.event_cache().unwrap().room(&room_id).await.unwrap();
+    room.find_event(event_id).await.unwrap().is_some()
+}
+
+fn stalled() -> wiremock::ResponseTemplate {
+    wiremock::ResponseTemplate::new(200)
+        .set_body_json(json!({"pos": "1"}))
+        .set_delay(std::time::Duration::from_secs(60))
+}
+
+/// Resolves once the push sync holds the store.
+async fn store_taken(store_id: &str) {
+    while tokio::time::timeout(
+        std::time::Duration::from_millis(10),
+        crate::session::store_lease(store_id),
+    )
+    .await
+    .is_ok()
+    {
+        tokio::task::yield_now().await;
+    }
+}
+
+#[tokio::test]
+async fn a_cold_push_sync_leaves_the_pushed_event_in_the_event_cache_without_the_room_list() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, synced_room(&pushed_event())).await;
+
+    let completed = push_sync(
+        &cold_push_store_dir(data_dir.path()),
+        "@alice:example.org",
+        "A",
+        Some(SYNCED),
+        deadline_in(20),
+    )
+    .await;
+
+    assert!(completed);
+    for request in server.server().received_requests().await.unwrap() {
+        let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap_or_default();
+        if body["conn_id"] == "push-sync" {
+            assert!(
+                body["lists"]
+                    .as_object()
+                    .is_none_or(serde_json::Map::is_empty),
+                "only the pushed room is synced: {body}"
+            );
+        }
+    }
+    assert!(app_finds(&account, event_id!("$synced")).await);
+}
+
+#[tokio::test]
+async fn an_update_without_the_pushed_event_does_not_complete_a_push_sync() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    // Another message and a receipt for it, but not the pushed event.
+    let receipt_only = wiremock::ResponseTemplate::new(200).set_body_json(json!({
+        "pos": "1",
+        "rooms": {COLD_ROOM: {"initial": true, "timeline": [{
+            "type": "m.room.message", "event_id": "$other", "sender": "@bob:example.org",
+            "origin_server_ts": 1, "content": {"msgtype": "m.text", "body": "earlier"}
+        }]}},
+        "extensions": {"receipts": {"rooms": {COLD_ROOM: {"type": "m.receipt", "content": {
+            "$other": {"m.read": {"@bob:example.org": {"ts": 1}}}
+        }}}}}
+    }));
+    mount_push_sync(&server, receipt_only).await;
+
+    let completed = push_sync(
+        &cold_push_store_dir(data_dir.path()),
+        "@alice:example.org",
+        "A",
+        Some(SYNCED),
+        deadline_in(6),
+    )
+    .await;
+
+    assert!(!completed);
+    assert!(app_finds(&account, event_id!("$other")).await);
+}
+
+#[tokio::test]
+async fn a_push_without_an_event_id_completes_on_the_rooms_first_timeline_update() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, synced_room(&pushed_event())).await;
+
+    assert!(
+        push_sync(
+            &cold_push_store_dir(data_dir.path()),
+            "@alice:example.org",
+            "A",
+            None,
+            deadline_in(20),
+        )
+        .await
+    );
+}
+
+#[tokio::test]
+async fn a_push_sync_stops_and_frees_the_store_by_its_deadline() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, stalled()).await;
+    let deadline = deadline_in(8);
+
+    let completed = push_sync(
+        &cold_push_store_dir(data_dir.path()),
+        "@alice:example.org",
+        "A",
+        Some(SYNCED),
+        deadline,
+    )
+    .await;
+
+    assert!(!completed);
+    assert!(tokio::time::Instant::now() <= deadline + std::time::Duration::from_millis(500));
+    tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        crate::session::store_lease(&account.store_id),
+    )
+    .await
+    .expect("nothing holds the store once the sync returned");
+}
+
+#[tokio::test]
+async fn a_core_without_the_pushed_login_syncs_it_on_the_client_it_lends() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, synced_room(&pushed_event())).await;
+    let core = core_of(data_dir.path());
+    core.update_app_active(false).await;
+
+    let completed = push_sync(
+        &cold_push_store_dir(data_dir.path()),
+        "@alice:example.org",
+        "A",
+        Some(SYNCED),
+        deadline_in(20),
+    )
+    .await;
+
+    assert!(completed);
+}
+
+#[tokio::test]
+async fn a_starting_core_ends_a_cold_push_sync_and_finds_the_store_free() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, stalled()).await;
+    let store_dir = cold_push_store_dir(data_dir.path());
+    let sync = tokio::spawn({
+        let store_dir = store_dir.clone();
+        async move {
+            push_sync(
+                &store_dir,
+                "@alice:example.org",
+                "A",
+                Some(SYNCED),
+                deadline_in(20),
+            )
+            .await
+        }
+    });
+    store_taken(&account.store_id).await;
+
+    let _core = core_of(data_dir.path());
+
+    tokio::time::timeout(
+        crate::push_sync::STOP_WAIT + std::time::Duration::from_secs(1),
+        crate::session::store_lease(&account.store_id),
+    )
+    .await
+    .expect("the push sync gives the store up within its stop wait");
+    assert!(!sync.await.unwrap(), "an ended sync does not count");
+}
+
+#[tokio::test]
+async fn a_push_arriving_during_a_cold_push_sync_ends_it() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, stalled()).await;
+    let store_dir = cold_push_store_dir(data_dir.path());
+    let sync = tokio::spawn({
+        let store_dir = store_dir.clone();
+        async move {
+            push_sync(
+                &store_dir,
+                "@alice:example.org",
+                "A",
+                Some(SYNCED),
+                deadline_in(20),
+            )
+            .await
+        }
+    });
+    store_taken(&account.store_id).await;
+
+    let host = tokio::time::timeout(
+        crate::push_sync::STOP_WAIT + std::time::Duration::from_secs(1),
+        cold_host(&store_dir, "@alice:example.org", "A"),
+    )
+    .await
+    .expect("the push gets its turn without waiting out the sync");
+    assert!(matches!(host.as_deref(), Some(PushHost::Own(_))));
+    drop(host);
+    assert!(!sync.await.unwrap());
+}
+
+#[tokio::test]
+async fn a_cold_push_sync_saves_the_tokens_it_refreshes() {
+    use wiremock::matchers::{header, method, path};
+
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let (_data_dir, store_dir, store) =
+        seeded_cold_store(&oauth_session(&server), "cold-push-sync-refresh").await;
+    mount_oauth_refresh(&server, 1, std::time::Duration::ZERO).await;
+    wiremock::Mock::given(method("POST"))
+        .and(path(SLIDING_SYNC_PATH))
+        .and(header("authorization", "Bearer prev-access-token"))
+        .respond_with(wiremock::ResponseTemplate::new(401).set_body_json(json!({
+            "errcode": "M_UNKNOWN_TOKEN", "error": "expired"
+        })))
+        .with_priority(1)
+        .mount(server.server())
+        .await;
+    mount_push_sync(&server, synced_room(&pushed_event())).await;
+
+    let completed = push_sync(
+        &store_dir,
+        &OAUTH_USER,
+        &OAUTH_DEVICE,
+        Some(SYNCED),
+        deadline_in(20),
+    )
+    .await;
+
+    assert!(completed);
+    assert_eq!(saved_refresh_token(&store, &store_dir).await, "new-refresh");
+}
+
+#[tokio::test]
+async fn an_expired_push_sync_connection_is_reset_so_later_pushes_still_sync() {
+    use wiremock::matchers::{
+        body_partial_json, method, path, query_param, query_param_is_missing,
+    };
+
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, synced_room(&pushed_event())).await;
+    let store_dir = cold_push_store_dir(data_dir.path());
+    assert!(
+        push_sync(
+            &store_dir,
+            "@alice:example.org",
+            "A",
+            Some(SYNCED),
+            deadline_in(20)
+        )
+        .await
+    );
+
+    // The server forgets the connection whose position the first sync saved.
+    wiremock::Mock::given(method("POST"))
+        .and(path(SLIDING_SYNC_PATH))
+        .and(body_partial_json(json!({"conn_id": "push-sync"})))
+        .and(query_param("pos", "1"))
+        .respond_with(wiremock::ResponseTemplate::new(400).set_body_json(json!({
+            "errcode": "M_UNKNOWN_POS", "error": "unknown position"
+        })))
+        .with_priority(1)
+        .mount(server.server())
+        .await;
+    wiremock::Mock::given(method("POST"))
+        .and(path(SLIDING_SYNC_PATH))
+        .and(body_partial_json(json!({"conn_id": "push-sync"})))
+        .and(query_param_is_missing("pos"))
+        .respond_with(synced_room(&json!([{
+            "type": "m.room.message", "event_id": "$later", "sender": "@bob:example.org",
+            "origin_server_ts": 2, "content": {"msgtype": "m.text", "body": "later"}
+        }])))
+        .with_priority(1)
+        .mount(server.server())
+        .await;
+
+    assert!(
+        push_sync(
+            &store_dir,
+            "@alice:example.org",
+            "A",
+            Some("$later"),
+            deadline_in(20)
+        )
+        .await,
+        "the sync starts a new connection"
+    );
+    assert!(app_finds(&account, event_id!("$later")).await);
+}
+
+#[tokio::test]
+async fn a_job_waiting_for_the_lent_client_ends_its_push_sync() {
+    let data_dir = tempfile::tempdir().unwrap();
+    let server = MatrixMockServer::new().await;
+    server.mock_versions().ok().mount().await;
+    let account = saved_login(&server, data_dir.path()).await;
+    mount_push_sync(&server, stalled()).await;
+    let core = core_of(data_dir.path());
+    core.update_app_active(false).await;
+    let store_dir = cold_push_store_dir(data_dir.path());
+    let sync = tokio::spawn(async move {
+        push_sync(
+            &store_dir,
+            "@alice:example.org",
+            "A",
+            Some(SYNCED),
+            deadline_in(20),
+        )
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while !core.clients.is_lent(&account.account_id) {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the push sync borrows the core's client");
+
+    tokio::time::timeout(
+        crate::push_sync::STOP_WAIT + std::time::Duration::from_secs(1),
+        core.clients.wait_until_returned(&account.account_id),
+    )
+    .await
+    .expect("the push sync hands the client back within its stop wait");
+    assert!(!sync.await.unwrap());
+}

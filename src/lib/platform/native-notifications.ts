@@ -81,6 +81,7 @@ export interface NativeNotificationPolicy {
   privateReceipts: boolean;
   quietWhenActiveElsewhere: boolean;
   inAppBanners: boolean;
+  syncOnPush: boolean;
 }
 
 export async function setNativeNotificationPolicy(policy: NativeNotificationPolicy): Promise<void> {

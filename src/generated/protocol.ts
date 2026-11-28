@@ -3306,7 +3306,6 @@ export type Rpc = {
 	sounds: boolean,
 	notify_once: boolean,
 	in_app_banners: boolean,
-	sync_on_push: boolean,
 }) => Promise<null>;
     pushRules: (params?: Record<string, never>) => Promise<unknown>;
     setPushRuleEnabled: (params: {

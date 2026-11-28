@@ -36,7 +36,7 @@ pub(crate) struct Activity {
     stores_open: watch::Sender<bool>,
     /// Held for reading by short store reads, so closing the stores waits for them to finish.
     stores: RwLock<()>,
-    pub(crate) push_sync: crate::push_sync::PushSyncGate,
+    pub(crate) push_sync: crate::push_sync::PushSyncHold,
 }
 
 impl Activity {
@@ -55,7 +55,7 @@ impl Activity {
             reopen_failures: std::sync::atomic::AtomicU32::new(0),
             stores_open: watch::Sender::new(true),
             stores: RwLock::new(()),
-            push_sync: crate::push_sync::PushSyncGate::default(),
+            push_sync: crate::push_sync::PushSyncHold::default(),
         }
     }
 

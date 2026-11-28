@@ -83,13 +83,20 @@ internal object PushPayloadDecryptor {
         nativeFetchPush(storeDir, userId, deviceId, roomId, eventId)
     }
 
-    private external fun nativeSyncOnPush(userId: String, deviceId: String, roomId: String)
+    private external fun nativeSyncOnPush(
+        storeDir: String,
+        userId: String,
+        deviceId: String,
+        roomId: String,
+        eventId: String,
+        enabled: Boolean,
+    )
 
-    /** Runs the open app's sync for a moment, so the room is current when the notification is opened. */
-    fun syncOnPush(context: Context, userId: String, deviceId: String, roomId: String) {
+    /** Syncs for a moment, so the room is current when the notification is opened. Returns once the sync stopped. */
+    fun syncOnPush(context: Context, userId: String, deviceId: String, roomId: String, eventId: String, enabled: Boolean) {
         if (!available(context)) return
         try {
-            nativeSyncOnPush(userId, deviceId, roomId)
+            nativeSyncOnPush(context.dataDir.absolutePath, userId, deviceId, roomId, eventId, enabled)
         } catch (error: Throwable) {
             Log.i(TAG, "Sync on push unavailable: ${error.message}")
         }

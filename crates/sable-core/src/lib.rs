@@ -267,6 +267,8 @@ pub(crate) struct SessionState {
     subscriptions: parking_lot::Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscriptions: Arc<Mutex<std::collections::BTreeSet<OwnedRoomId>>>,
     warm_rooms: parking_lot::Mutex<std::collections::VecDeque<OwnedRoomId>>,
+    /// Subscribed while a push holds the backgrounded sync for it.
+    pushed_room: parking_lot::Mutex<Option<OwnedRoomId>>,
     account_data_types: parking_lot::Mutex<std::collections::BTreeSet<String>>,
     pack_cache: parking_lot::Mutex<image_packs::PackCache>,
     calendars: parking_lot::Mutex<HashMap<OwnedRoomId, calendar::RoomCalendar>>,
@@ -317,6 +319,7 @@ impl Default for SessionState {
             subscriptions: parking_lot::Mutex::new(HashMap::new()),
             room_subscriptions: Arc::new(Mutex::new(std::collections::BTreeSet::new())),
             warm_rooms: parking_lot::Mutex::new(std::collections::VecDeque::new()),
+            pushed_room: parking_lot::Mutex::new(None),
             account_data_types: parking_lot::Mutex::new(std::collections::BTreeSet::new()),
             pack_cache: parking_lot::Mutex::new(image_packs::PackCache::default()),
             calendars: parking_lot::Mutex::new(HashMap::new()),

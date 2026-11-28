@@ -208,10 +208,280 @@ pub async fn restore_push_client(
     })
 }
 
+/// The push sync's own connection, so the app's connections still receive those events live
+/// once it opens.
+const PUSH_SYNC_CONNECTION: &str = "push-sync";
+const PUSH_SYNC_TIMELINE: u32 = 20;
+/// Short, so a sync asked to stop finishes its request soon instead of being cut off mid-way.
+const PUSH_SYNC_POLL: std::time::Duration = std::time::Duration::from_secs(1);
+const PUSH_SYNC_NETWORK: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Syncs the pushed room for a moment, so it is current when the notification is opened: on the
+/// backgrounded app's own sync when the core runs this login, otherwise on a sync of that room
+/// alone. Returns once everything stopped, within [`crate::push_sync::DEADLINE`].
+pub async fn sync_on_push(
+    data_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &str,
+    event_id: Option<&str>,
+    enabled: bool,
+) {
+    use crate::push_sync::{DEADLINE, GATE};
+
+    let Ok(room_id) = ruma::OwnedRoomId::try_from(room_id) else {
+        return;
+    };
+    let event_id = event_id.and_then(|id| OwnedEventId::try_from(id).ok());
+    let login = format!("{user_id}|{device_id}");
+    if !enabled || !GATE.try_start(&login) {
+        return;
+    }
+    let deadline = tokio::time::Instant::now() + DEADLINE;
+    let store_dir = cold_push_store_dir(data_dir);
+    let (user_id, device_id) = (user_id.to_owned(), device_id.to_owned());
+    // Spawned, so the gate is released even if the caller goes away.
+    let sync = matrix_sdk::executor::spawn(async move {
+        let completed = Box::pin(sync_room(
+            &store_dir,
+            &user_id,
+            &device_id,
+            &room_id,
+            event_id.as_deref(),
+            deadline,
+        ))
+        .await;
+        GATE.finish(&login, completed);
+    });
+    let _ = sync.await;
+}
+
+pub(super) async fn sync_room(
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &RoomId,
+    event_id: Option<&ruma::EventId>,
+    deadline: tokio::time::Instant,
+) -> bool {
+    match crate::Core::owning(store_dir) {
+        Some(core) => {
+            Box::pin(core_sync(
+                &core, store_dir, user_id, device_id, room_id, event_id, deadline,
+            ))
+            .await
+        }
+        None => {
+            Box::pin(own_sync(
+                store_dir, user_id, device_id, room_id, event_id, deadline,
+            ))
+            .await
+        }
+    }
+}
+
+async fn core_sync(
+    core: &std::sync::Arc<crate::Core>,
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &RoomId,
+    event_id: Option<&ruma::EventId>,
+    deadline: tokio::time::Instant,
+) -> bool {
+    if core.activity.app_active() || !core.activity.network_available() {
+        return false;
+    }
+    if let Ok(session) = core.signed_in()
+        && is_login(session.client(), user_id, device_id)
+    {
+        return !core.activity.account_locked()
+            && core
+                .hold_sync_for_push(&session, room_id, event_id, deadline)
+                .await;
+    }
+    // Another of the core's logins: its client is lent to the push, as for rendering.
+    let mut loans_wanted = core.clients.loans_wanted();
+    let release_by = deadline - crate::push_sync::STOP_WAIT;
+    let Ok(Some(host)) = tokio::time::timeout_at(
+        release_by,
+        push_host(store_dir, user_id, device_id, RoomLoadSettings::default()),
+    )
+    .await
+    else {
+        return false;
+    };
+    let PushHost::Shared { client, .. } = &host else {
+        return false;
+    };
+    // A switch or sign-out waiting for the loan ends the sync.
+    let wanted = async move {
+        let _ = loans_wanted.changed().await;
+    };
+    lean_sync(client, room_id, event_id, deadline, wanted).await
+}
+
+/// The app opening, or another push wanting the store, ends it at any step.
+async fn own_sync(
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &RoomId,
+    event_id: Option<&ruma::EventId>,
+    deadline: tokio::time::Instant,
+) -> bool {
+    let release_by = deadline - crate::push_sync::STOP_WAIT;
+    let Ok(Some(mut turn)) = tokio::time::timeout_at(
+        release_by,
+        push_cache::sync_turn(store_dir, user_id, device_id),
+    )
+    .await
+    else {
+        return false;
+    };
+    let wanted = turn.wanted();
+    tokio::pin!(wanted);
+    let open = tokio::time::timeout_at(
+        release_by,
+        open_saved_client(
+            store_dir,
+            user_id,
+            device_id,
+            crate::session::ClientRole::PushSync,
+            RoomLoadSettings::default(),
+        ),
+    );
+    let client = tokio::select! {
+        client = open => client,
+        () = &mut wanted => return false,
+    };
+    let Ok(Some(client)) = client else {
+        return false;
+    };
+    // The client and its lease drop only once the sync stopped.
+    lean_sync(&client, room_id, event_id, deadline, wanted).await
+}
+
+/// A sync of the pushed room alone, with the keys to decrypt it: no room list. Stops by
+/// `deadline`, leaving the in-flight request at most [`crate::push_sync::STOP_WAIT`] to finish.
+async fn lean_sync(
+    client: &Client,
+    room_id: &RoomId,
+    event_id: Option<&ruma::EventId>,
+    deadline: tokio::time::Instant,
+    stop: impl Future<Output = ()>,
+) -> bool {
+    use ruma::api::client::sync::sync_events::msc4186::request;
+    use ruma::events::StateEventType;
+
+    let release_by = deadline - crate::push_sync::STOP_WAIT;
+    let mut to_device = request::ToDevice::default();
+    to_device.enabled = true;
+    let mut e2ee = request::E2EE::default();
+    e2ee.enabled = true;
+    let Ok(builder) = client.sliding_sync(PUSH_SYNC_CONNECTION) else {
+        return false;
+    };
+    let build = builder
+        .poll_timeout(PUSH_SYNC_POLL)
+        .network_timeout(PUSH_SYNC_NETWORK)
+        // Without a saved position each push sync starts a new connection, on which the SDK
+        // queries every tracked user's devices again.
+        .share_pos()
+        .with_to_device_extension(to_device)
+        .with_e2ee_extension(e2ee)
+        .build();
+    let Ok(Ok(sync)) = tokio::time::timeout_at(release_by, build).await else {
+        return false;
+    };
+    let mut subscription = request::RoomSubscription::default();
+    subscription.timeline_limit = PUSH_SYNC_TIMELINE.into();
+    subscription.required_state = [
+        (StateEventType::RoomEncryption, ""),
+        (StateEventType::RoomCreate, ""),
+        (StateEventType::RoomPowerLevels, ""),
+        (StateEventType::RoomName, ""),
+        (StateEventType::RoomAvatar, ""),
+        (StateEventType::RoomCanonicalAlias, ""),
+        (StateEventType::RoomMember, "$LAZY"),
+        (StateEventType::RoomMember, "$ME"),
+    ]
+    .into_iter()
+    .map(|(kind, key)| (kind, key.to_owned()))
+    .collect();
+    sync.add_room_subscriptions(&[room_id], Some(subscription.clone()), false);
+
+    let stopping = std::sync::atomic::AtomicBool::new(false);
+    let ended = tokio::sync::Notify::new();
+    // Never cut off mid-request: a response being handled then would still write after the
+    // client is gone.
+    let drive = async {
+        let mut retried = false;
+        while !stopping.load(std::sync::atomic::Ordering::SeqCst) {
+            match sync.sync_once().await {
+                Ok(_) => retried = false,
+                // Only the SDK's sync stream resets an expired connection; this loop must too, or
+                // every later push sync of this login would fail on the stored position.
+                Err(error)
+                    if error.client_api_error_kind()
+                        == Some(&ruma::api::error::ErrorKind::UnknownPos) =>
+                {
+                    sync.expire_session().await;
+                    sync.add_room_subscriptions(&[room_id], Some(subscription.clone()), false);
+                }
+                Err(_) if !retried => retried = true,
+                Err(_) => break,
+            }
+        }
+        ended.notify_one();
+    };
+    let wait = async {
+        let until = release_by.min(tokio::time::Instant::now() + crate::push_sync::SYNC_WAIT);
+        let arrived = tokio::select! {
+            arrived = crate::push_sync::wait_for_event(client, room_id, event_id, until) => arrived,
+            () = stop => false,
+            () = ended.notified() => false,
+        };
+        stopping.store(true, std::sync::atomic::Ordering::SeqCst);
+        arrived
+    };
+    tokio::pin!(drive, wait);
+    let mut driven = false;
+    let arrived = tokio::select! {
+        arrived = &mut wait => arrived,
+        () = &mut drive => {
+            driven = true;
+            wait.await
+        }
+    };
+    if !driven {
+        let stopped_by = deadline.min(tokio::time::Instant::now() + crate::push_sync::STOP_WAIT);
+        let _ = tokio::time::timeout_at(stopped_by, drive).await;
+    }
+    arrived
+}
+
 pub(super) async fn open_push_client(
     store_dir: &std::path::Path,
     user_id: &str,
     device_id: &str,
+    room_load: RoomLoadSettings,
+) -> Option<PushClient> {
+    open_saved_client(
+        store_dir,
+        user_id,
+        device_id,
+        crate::session::ClientRole::Notification,
+        room_load,
+    )
+    .await
+}
+
+async fn open_saved_client(
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    role: crate::session::ClientRole,
     room_load: RoomLoadSettings,
 ) -> Option<PushClient> {
     let account = saved_push_account(store_dir, user_id, device_id).await?;
@@ -221,6 +491,7 @@ pub(super) async fn open_push_client(
     let client = crate::session::restore_notification_client(
         &account.store_id,
         &account.session,
+        role,
         room_load,
         |client| install_push_session_callbacks(client, base_store, &account),
     )

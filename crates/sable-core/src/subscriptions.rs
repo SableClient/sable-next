@@ -1343,6 +1343,17 @@ impl SignedIn {
         }
     }
 
+    /// Adds the pushed room to the app's own subscriptions, or with `None` takes it out again.
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) async fn subscribe_pushed_room(&self, room_id: Option<OwnedRoomId>) {
+        let session_state = self.state();
+        *session_state.pushed_room.lock() = room_id;
+        let mut subscribed = session_state.room_subscriptions.lock().await;
+        if let Err(error) = self.sync_timeline_rooms_locked(&mut subscribed).await {
+            tracing::debug!(?error, "pushed room subscription not updated");
+        }
+    }
+
     /// The SDK drops its room subscriptions when the sync session expires.
     pub(crate) async fn resubscribe_timeline_rooms(&self) {
         let session_state = self.state();
@@ -1371,6 +1382,7 @@ impl SignedIn {
                     SubscriptionKind::Other => None,
                 })
                 .chain(session_state.warm_rooms.lock().iter().cloned())
+                .chain(session_state.pushed_room.lock().clone())
                 .collect::<std::collections::BTreeSet<_>>()
         };
         if room_ids == *subscribed {

@@ -22,6 +22,8 @@ fn close(route: Option<NotificationRoute>) {
 pub(crate) struct AccountClients {
     inner: parking_lot::Mutex<Maps>,
     loans_returned: tokio::sync::Notify,
+    /// Changes whenever a job waits for loans, so a long one, like a push sync, ends early.
+    loans_wanted: tokio::sync::watch::Sender<u64>,
 }
 
 impl AccountClients {
@@ -134,6 +136,10 @@ impl AccountClients {
     /// Before the store under a lent client is rebuilt or removed, whose Olm sessions a second
     /// client would overwrite.
     pub(crate) async fn wait_until_returned(&self, account_id: &str) {
+        if self.is_lent(account_id) {
+            self.loans_wanted
+                .send_modify(|wants| *wants = wants.wrapping_add(1));
+        }
         loop {
             let returned = self.loans_returned.notified();
             if !self.is_lent(account_id) {
@@ -141,6 +147,11 @@ impl AccountClients {
             }
             returned.await;
         }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) fn loans_wanted(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.loans_wanted.subscribe()
     }
 
     #[cfg(test)]

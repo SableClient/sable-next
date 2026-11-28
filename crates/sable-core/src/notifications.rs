@@ -13,7 +13,7 @@ mod view;
 #[cfg(not(target_family = "wasm"))]
 pub use cold::{
     ColdPush, PushClient, cold_push_store_dir, decrypt_cold_push, restore_push_client,
-    settle_refreshes,
+    settle_refreshes, sync_on_push,
 };
 pub(crate) use device_activity::set_device_activity;
 #[cfg(not(target_family = "wasm"))]

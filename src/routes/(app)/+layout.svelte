@@ -555,7 +555,6 @@
         sounds: preferences.notificationSounds,
         notify_once: preferences.notifyOnce,
         in_app_banners: preferences.inAppBanners,
-        sync_on_push: preferences.syncOnPush,
       })
       .catch((error: unknown) => {
         console.warn('[sable notifications] notification settings not applied', error);
@@ -571,6 +570,7 @@
       privateReceipts: readReceiptIsPrivate(),
       quietWhenActiveElsewhere,
       inAppBanners: preferences.inAppBanners,
+      syncOnPush: preferences.syncOnPush,
     }).catch((error: unknown) => {
       console.debug('[sable notifications] native content policy not applied', error);
     });

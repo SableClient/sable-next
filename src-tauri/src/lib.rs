@@ -344,6 +344,7 @@ struct NotificationPolicy {
     private_receipts: bool,
     quiet_when_active_elsewhere: bool,
     in_app_banners: bool,
+    sync_on_push: bool,
 }
 
 #[tauri::command]
@@ -364,6 +365,7 @@ async fn set_notification_policy(
             private_receipts,
             quiet_when_active_elsewhere,
             in_app_banners,
+            sync_on_push,
         } = policy;
         app.sable_push()
             .set_policy(tauri_plugin_sable_push::Policy {
@@ -376,6 +378,7 @@ async fn set_notification_policy(
                 private_receipts,
                 quiet_when_active_elsewhere,
                 in_app_banners,
+                sync_on_push,
             })
             .await
             .map_err(|_| RpcCode::Unavailable)?;

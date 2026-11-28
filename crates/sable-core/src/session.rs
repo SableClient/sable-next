@@ -467,23 +467,19 @@ fn persisted_server_builder(persisted: &PersistedSession) -> ClientBuilder {
 pub(crate) async fn restore_notification_client(
     store_id: &str,
     persisted: &PersistedSession,
+    role: ClientRole,
     room_load: matrix_sdk::store::RoomLoadSettings,
     before_restore: impl FnOnce(&Client),
 ) -> Result<Client, CoreError> {
-    validate_saved_crypto_store_for(store_id, persisted, ClientRole::Notification)
+    validate_saved_crypto_store_for(store_id, persisted, role)
         .await
         .map_err(|error| {
             tracing::error!(context = "notification_restore_crypto_store", "{error}");
             error
         })?;
-    let client = build_account_client(
-        persisted_server_builder(persisted),
-        store_id,
-        ClientRole::Notification,
-        true,
-    )
-    .await
-    .backend()?;
+    let client = build_account_client(persisted_server_builder(persisted), store_id, role, true)
+        .await
+        .backend()?;
     // Fetching a push must not report the user online.
     client
         .set_presence(ruma::presence::PresenceState::Offline, None, false)
@@ -644,15 +640,29 @@ pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), CoreE
 }
 
 #[derive(Clone, Copy)]
-enum ClientRole {
+pub(crate) enum ClientRole {
     Account,
     #[cfg(not(target_family = "wasm"))]
     Notification,
+    /// Syncs for a push while the app is closed, keeping the stores of a notification client.
+    #[cfg(not(target_family = "wasm"))]
+    PushSync,
 }
 
 impl ClientRole {
     const fn is_account(self) -> bool {
         matches!(self, Self::Account)
+    }
+
+    /// A client that syncs keeps the event cache the timeline reads and refreshes its own login.
+    const fn syncs(self) -> bool {
+        match self {
+            Self::Account => true,
+            #[cfg(not(target_family = "wasm"))]
+            Self::PushSync => true,
+            #[cfg(not(target_family = "wasm"))]
+            Self::Notification => false,
+        }
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -706,7 +716,7 @@ async fn native_store_config(
         .path(std::path::Path::new(store_id).join("cache"));
     // The iOS extension taking the event cache lock makes the app reset its open timelines.
     let caches = async {
-        if role.is_account() {
+        if role.syncs() {
             futures_util::try_join!(
                 matrix_sdk::SqliteEventCacheStore::open_with_config(&cache),
                 matrix_sdk::SqliteMediaStore::open_with_config(&cache),
@@ -769,7 +779,7 @@ async fn build_account_client(
     role: ClientRole,
     persistent_event_cache: bool,
 ) -> Result<Client, BuildError> {
-    let builder = if role.is_account() {
+    let builder = if role.syncs() {
         builder.handle_refresh_tokens()
     } else {
         builder
@@ -782,7 +792,7 @@ async fn build_account_client(
         )
         .with_threading_support(THREADING_SUPPORT)
         .with_encryption_settings(role.encryption_settings())
-        .with_event_cache(role.is_account());
+        .with_event_cache(role.syncs());
 
     #[cfg(not(target_family = "wasm"))]
     {

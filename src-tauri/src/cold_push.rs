@@ -225,31 +225,34 @@ pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeFet
     result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
 }
 
-/// The core's 10s wait, plus starting and stopping the sync.
-const SYNC_ON_PUSH_LIMIT: Duration = Duration::from_secs(15);
-
+/// Waits for the sync to stop, which `sable_core` bounds by its own deadline, so the worker never
+/// returns while it holds the store.
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
 pub(crate) extern "system" fn Java_moe_sable_push_PushPayloadDecryptor_nativeSyncOnPush<'frame>(
     mut unowned_env: EnvUnowned<'frame>,
     _class: JClass<'frame>,
+    store_dir: JString<'frame>,
     user_id: JString<'frame>,
     device_id: JString<'frame>,
     room_id: JString<'frame>,
+    event_id: JString<'frame>,
+    enabled: jni::sys::jboolean,
 ) {
     let result = unowned_env.with_env(|_env: &mut Env<'frame>| -> Result<_, jni::errors::Error> {
-        // A process the app hasn't started has no sync to run.
-        let Some(core) = CORE.get() else {
-            return Ok(());
-        };
-        let _ = tauri::async_runtime::block_on(tokio::time::timeout(
-            SYNC_ON_PUSH_LIMIT,
-            core.sync_on_push(
-                &user_id.to_string(),
-                &device_id.to_string(),
-                &room_id.to_string(),
+        let args = ColdArgs::new(&store_dir, &user_id, &device_id, &room_id);
+        let event_id = event_id.to_string();
+        block_on(
+            CORE.get().is_some(),
+            sable_core::notifications::sync_on_push(
+                args.store(),
+                &args.user_id,
+                &args.device_id,
+                &args.room_id,
+                Some(event_id.as_str()).filter(|id| !id.is_empty()),
+                enabled,
             ),
-        ));
+        );
         Ok(())
     });
 

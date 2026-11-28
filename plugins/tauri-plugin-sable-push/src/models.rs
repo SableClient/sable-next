@@ -37,6 +37,7 @@ pub struct Policy {
     pub private_receipts: bool,
     pub quiet_when_active_elsewhere: bool,
     pub in_app_banners: bool,
+    pub sync_on_push: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

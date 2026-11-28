@@ -68,6 +68,7 @@ class PolicyArgs {
     var privateReceipts: Boolean = false
     var quietWhenActiveElsewhere: Boolean = false
     var inAppBanners: Boolean = false
+    var syncOnPush: Boolean = false
 }
 
 @InvokeArg
@@ -172,6 +173,7 @@ class SablePushPlugin(private val activity: Activity) : Plugin(activity) {
         policy.privateReceipts = args.privateReceipts
         policy.quietWhenActiveElsewhere = args.quietWhenActiveElsewhere
         policy.inAppBanners = args.inAppBanners
+        policy.syncOnPush = args.syncOnPush
         if (hides) AppDismissals.dismissAll(activity)
         invoke.resolve()
     }

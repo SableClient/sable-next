@@ -44,7 +44,9 @@ class PushRenderWorker(context: Context, parameters: WorkerParameters) : Worker(
         val roomId = notification.optString("room_id")
         val deviceId = policy.deviceIdFor(userId) ?: return
         if (roomId.isEmpty() || isStopped) return
-        PushPayloadDecryptor.syncOnPush(applicationContext, userId, deviceId, roomId)
+        PushPayloadDecryptor.syncOnPush(
+            applicationContext, userId, deviceId, roomId, notification.optString("event_id"), policy.syncOnPush,
+        )
     }
 
     companion object {
