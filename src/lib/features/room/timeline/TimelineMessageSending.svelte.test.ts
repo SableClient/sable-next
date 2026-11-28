@@ -68,6 +68,26 @@ test('a message waiting for the server shows a sending status until it is sent',
   expect(screen.queryByRole('menuitem', { name: 'Cancel sending' })).toBeNull();
 });
 
+test('a message still sending can be edited', async () => {
+  const onEdit = vi.fn();
+  const sending: TimelineItemView = {
+    ...item(false),
+    event_id: null,
+    transaction_id: 'txn-text',
+    is_own: true,
+    send_state: { status: 'sending', progress: null },
+  };
+  render(TimelineItemHarness, {
+    props: { core, item: { item: sending, collapsed: false, onEdit, onCancelSend: vi.fn() } },
+  });
+  await tick();
+
+  await openMenu(document.querySelector('.message'));
+  await user.click(menuItem('Edit message'));
+
+  expect(onEdit).toHaveBeenCalledWith('txn-text', 'waves', 'waves', false);
+});
+
 test('shows an indeterminate upload bar until the core reports progress', async () => {
   const upload: TimelineItemView = {
     ...imageItem(),

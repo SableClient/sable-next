@@ -262,6 +262,7 @@ export class TimelineRow {
       };
     }
     return {
+      onEdit: this.actionExecutor.actions.onEdit,
       onCancelSend: () => {
         const { item, onCancelSend } = this.#options();
         if (this.pending && item.transaction_id) onCancelSend?.(item.transaction_id);

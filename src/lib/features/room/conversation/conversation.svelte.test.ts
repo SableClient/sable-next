@@ -659,6 +659,24 @@ test('editing a pending message uses its transaction ID', async () => {
   );
 });
 
+test('an edit started while sending targets the event once it is sent', async () => {
+  const pending = {
+    ...item('local-id', '@kris:example.org'),
+    event_id: null,
+    transaction_id: 'transaction-1',
+  };
+  const fixture = setup([pending], '@kris:example.org');
+  fixture.conversation.edit('transaction-1', 'typo');
+  fixture.timeline.items = [{ ...pending, event_id: '$sent', transaction_id: null }];
+  await fixture.conversation.sendMessage(ROOM, 'corrected');
+  expect(fixture.editMessage).toHaveBeenCalledWith(
+    ROOM,
+    '$sent',
+    'corrected',
+    expect.objectContaining({ transaction_id: null })
+  );
+});
+
 test('editing a file caption replaces the caption and keeps the attachment', async () => {
   const file = withRowFields({
     ...item('$file', '@kris:example.org'),
