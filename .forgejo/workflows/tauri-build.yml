@@ -666,6 +666,11 @@ jobs:
           # The runner mounts the host's zoneinfo read-only, so tzdata cannot unpack there.
           echo 'path-exclude=/usr/share/zoneinfo/*' > /etc/dpkg/dpkg.cfg.d/runner-zoneinfo
           apt-get update
+          # It also mounts the host's /etc/localtime, which tzdata's postinst cannot replace.
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata || {
+            sed -i '/localtime\.dpkg-new/d' /var/lib/dpkg/info/tzdata.postinst
+            dpkg --configure tzdata
+          }
           apt-get install -y --no-install-recommends ca-certificates clang git llvm
           git init -q /shared/workdir/SableClient/sable-next
           cd /shared/workdir/SableClient/sable-next
