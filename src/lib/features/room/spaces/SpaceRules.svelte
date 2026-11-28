@@ -77,7 +77,7 @@
       {/if}
       <Avatar
         id={space.room_id}
-        src={space.avatar_url}
+        src={space.display_avatar_url}
         openable={true}
         name={space.name ?? ''}
         size="large"
