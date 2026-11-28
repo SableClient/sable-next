@@ -5506,6 +5506,180 @@ async fn a_room_created_in_a_space_names_it_as_its_canonical_parent() {
     );
 }
 
+/// Adds `!chat` to `!space`, or removes it, and returns the body of the `m.space.parent` write to
+/// the chat, if any. The space's only member is on `space.org`, so its route differs from ours.
+async fn space_edit_writing_parent(
+    remove: bool,
+    power: i64,
+    join_rule: Option<&str>,
+    parents: &[(&str, serde_json::Value)],
+    parent_sends: u64,
+) -> Option<serde_json::Value> {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let state = |kind: &str, key: &str, content: serde_json::Value| {
+        Raw::new(&json!({
+            "type": kind, "state_key": key, "sender": "@mod:space.org",
+            "event_id": format!("${kind}{key}"), "origin_server_ts": 1, "content": content
+        }))
+        .unwrap()
+        .cast_unchecked()
+    };
+    let (space, chat) = (room_id!("!space:space.org"), room_id!("!chat:space.org"));
+    let mut space_room = JoinedRoomBuilder::new(space)
+        .add_state_event(state(
+            "m.room.create",
+            "",
+            json!({ "type": "m.space", "room_version": "11" }),
+        ))
+        .add_state_event(state(
+            "m.room.power_levels",
+            "",
+            json!({ "users": { "@mod:space.org": 100 } }),
+        ))
+        .add_state_event(state(
+            "m.room.member",
+            "@mod:space.org",
+            json!({ "membership": "join" }),
+        ));
+    if let Some(join_rule) = join_rule {
+        space_room = space_room.add_state_event(state(
+            "m.room.join_rules",
+            "",
+            json!({ "join_rule": join_rule }),
+        ));
+    }
+    server.sync_room(&client, space_room).await;
+    let mut chat_room = JoinedRoomBuilder::new(chat)
+        .add_state_event(state("m.room.create", "", json!({ "room_version": "11" })))
+        .add_state_event(state(
+            "m.room.power_levels",
+            "",
+            json!({ "state_default": 50, "users": { "@example:localhost": power } }),
+        ));
+    for (key, content) in parents {
+        chat_room = chat_room.add_state_event(state("m.space.parent", key, content.clone()));
+    }
+    server.sync_room(&client, chat_room).await;
+    Mock::given(method("GET"))
+        .and(path_regex("/members"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "chunk": [] })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{space}/state/m.space.child/{chat}"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$child" })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let parent_path = format!("/_matrix/client/v3/rooms/{chat}/state/m.space.parent/{space}");
+    Mock::given(method("PUT"))
+        .and(path(parent_path.clone()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$parent" })))
+        .expect(parent_sends)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    if remove {
+        crate::api::spaces::RemoveParams {
+            space_id: space.to_owned(),
+            room_id: chat.to_owned(),
+        }
+        .run(&core)
+        .await
+        .unwrap();
+    } else {
+        AddParams {
+            space_id: space.to_owned(),
+            room_id: chat.to_owned(),
+            suggested: None,
+        }
+        .run(&core)
+        .await
+        .unwrap();
+    }
+
+    let requests = server.server().received_requests().await.unwrap();
+    requests
+        .iter()
+        .find(|request| request.method.as_str() == "PUT" && request.url.path() == parent_path)
+        .map(|request| serde_json::from_slice(&request.body).unwrap())
+}
+
+async fn add_to_space_declaring_parent(
+    power: i64,
+    parents: &[(&str, serde_json::Value)],
+    parent_sends: u64,
+) -> Option<serde_json::Value> {
+    space_edit_writing_parent(false, power, Some("restricted"), parents, parent_sends).await
+}
+
+#[tokio::test]
+async fn adding_a_room_to_a_space_names_the_space_as_its_canonical_parent() {
+    let parent = add_to_space_declaring_parent(100, &[], 1).await.unwrap();
+
+    assert_eq!(parent, json!({ "via": ["space.org"], "canonical": true }));
+}
+
+#[tokio::test]
+async fn a_room_with_a_canonical_parent_names_another_space_as_non_canonical() {
+    let other = json!({ "via": ["example.org"], "canonical": true });
+    let parent = add_to_space_declaring_parent(100, &[("!other:example.org", other)], 1)
+        .await
+        .unwrap();
+
+    assert_eq!(parent["via"], json!(["space.org"]));
+    assert_ne!(parent["canonical"], json!(true));
+}
+
+#[tokio::test]
+async fn a_room_we_cannot_edit_is_added_without_naming_its_space() {
+    assert_eq!(add_to_space_declaring_parent(0, &[], 0).await, None);
+}
+
+#[tokio::test]
+async fn an_invalid_claim_on_the_space_is_repaired() {
+    let broken = json!({ "via": [], "canonical": true });
+    let parent = add_to_space_declaring_parent(100, &[("!space:space.org", broken)], 1)
+        .await
+        .unwrap();
+
+    assert_eq!(parent, json!({ "via": ["space.org"], "canonical": true }));
+}
+
+#[tokio::test]
+async fn an_invite_only_or_unknown_space_is_not_named_by_the_room() {
+    for join_rule in [Some("invite"), Some("private"), None] {
+        assert_eq!(
+            space_edit_writing_parent(false, 100, join_rule, &[], 0).await,
+            None,
+            "{join_rule:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn removing_a_room_from_a_space_unnames_the_space() {
+    let named = json!({ "via": ["space.org"], "canonical": true });
+    let parent = space_edit_writing_parent(true, 100, None, &[("!space:space.org", named)], 1)
+        .await
+        .unwrap();
+
+    assert_eq!(parent, json!({}));
+}
+
+#[tokio::test]
+async fn a_room_we_cannot_edit_keeps_naming_a_space_it_left() {
+    let named = json!({ "via": ["space.org"] });
+    assert_eq!(
+        space_edit_writing_parent(true, 0, None, &[("!space:space.org", named)], 0).await,
+        None
+    );
+}
+
 #[tokio::test]
 async fn an_upgraded_room_keeps_its_place_in_the_spaces_it_was_in() {
     let server = MatrixMockServer::new().await;

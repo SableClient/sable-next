@@ -431,6 +431,161 @@ async fn without_a_space_the_first_parent_is_used() {
 }
 
 #[tokio::test]
+async fn the_room_s_own_parent_wins_over_the_space_being_browsed() {
+    let server = MatrixMockServer::new().await;
+    let room_id = room_id!("!room:example.org");
+    let declared = room_id!("!declared:example.org");
+    let browsed = room_id!("!browsed:example.org");
+    let client = joined(&server, &[declared, browsed]).await;
+    reciprocal(&server, &client, declared, room_id).await;
+    reciprocal(&server, &client, browsed, room_id).await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(
+                Raw::new(&state(
+                    "m.space.parent",
+                    declared.as_str(),
+                    &json!({ "via": ["example.org"], "canonical": true }),
+                ))
+                .unwrap()
+                .cast_unchecked(),
+            ),
+        )
+        .await;
+    let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    serve_state(&server, room_id, json!([]), 1).await;
+    serve_state(
+        &server,
+        declared,
+        json!([state(COLOR_EVENT, ALICE, &json!({ "color": "#abcdef" }))]),
+        1,
+    )
+    .await;
+
+    let found = session
+        .cosmetics_for(&client.get_room(room_id).unwrap(), Some(browsed.to_owned()))
+        .await;
+
+    assert_eq!(found.space_id.as_deref(), Some(declared));
+    assert_eq!(found.users[0].color_on_dark.as_deref(), Some("#abcdef"));
+}
+
+/// The room names `!unlisting` as its canonical parent, which does not list it back though the
+/// sender may manage the space. With `browse`, `!browsed` lists the room and is the one opened.
+async fn space_inherited_beside_an_unlisting_parent(browse: bool) -> Option<OwnedRoomId> {
+    let server = MatrixMockServer::new().await;
+    let room_id = room_id!("!room:example.org");
+    let unlisting = room_id!("!unlisting:example.org");
+    let browsed = room_id!("!browsed:example.org");
+    let client = joined(&server, &[unlisting]).await;
+    if browse {
+        server.sync_joined_room(&client, browsed).await;
+        reciprocal(&server, &client, browsed, room_id).await;
+        serve_state(&server, browsed, json!([]), 1).await;
+    }
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(unlisting).add_state_bulk([
+                Raw::new(&state(
+                    "m.room.create",
+                    "",
+                    &json!({"type": "m.space", "creator": ALICE, "room_version": "10"}),
+                ))
+                .unwrap()
+                .cast_unchecked(),
+                Raw::new(&state(
+                    "m.room.member",
+                    ALICE,
+                    &json!({"membership": "join"}),
+                ))
+                .unwrap()
+                .cast_unchecked(),
+            ]),
+        )
+        .await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(
+                Raw::new(&state(
+                    "m.space.parent",
+                    unlisting.as_str(),
+                    &json!({ "via": ["example.org"], "canonical": true }),
+                ))
+                .unwrap()
+                .cast_unchecked(),
+            ),
+        )
+        .await;
+    let (core, _events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    serve_state(&server, room_id, json!([]), 1).await;
+    serve_state(&server, unlisting, json!([]), 0).await;
+
+    session
+        .cosmetics_for(
+            &client.get_room(room_id).unwrap(),
+            browse.then(|| browsed.to_owned()),
+        )
+        .await
+        .space_id
+}
+
+#[tokio::test]
+async fn a_parent_that_does_not_list_the_room_is_not_inherited_from() {
+    assert_eq!(
+        space_inherited_beside_an_unlisting_parent(true)
+            .await
+            .as_deref(),
+        Some(room_id!("!browsed:example.org"))
+    );
+    assert_eq!(
+        space_inherited_beside_an_unlisting_parent(false).await,
+        None
+    );
+}
+
+#[tokio::test]
+async fn a_space_dropping_a_viewed_room_is_announced_for_that_room() {
+    let server = MatrixMockServer::new().await;
+    let room_id = room_id!("!room:example.org");
+    let space_id = room_id!("!space:example.org");
+    let client = joined(&server, &[room_id, space_id]).await;
+    let (core, mut events) = Core::new("cosmetics", Box::new(MemorySessionStore::default()));
+    crate::test_support::sign_in(&core, &server, client.clone()).await;
+    let session = core.signed_in().unwrap();
+    session.watch_cosmetics(1);
+    serve_state(&server, room_id, json!([]), 1).await;
+    session
+        .cosmetics_for(&client.get_room(room_id).unwrap(), None)
+        .await;
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(space_id).add_timeline_event(
+                Raw::new(&state("m.space.child", room_id.as_str(), &json!({})))
+                    .unwrap()
+                    .cast_unchecked(),
+            ),
+        )
+        .await;
+
+    let announced: Vec<OwnedRoomId> = std::iter::from_fn(|| events.try_recv().ok())
+        .filter_map(|event| match event {
+            CoreEvent::RoomCosmeticsChanged { room_id } => Some(room_id),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(announced, [room_id.to_owned()]);
+}
+
+#[tokio::test]
 async fn a_synced_change_updates_the_cache_and_is_announced() {
     let server = MatrixMockServer::new().await;
     let room_id = room_id!("!room:example.org");

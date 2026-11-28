@@ -133,6 +133,7 @@ impl SessionHandler for RemoveParams {
             )
             .await
             .or_failed(session.core(), "remove_from_space")?;
+        session.clear_parent(&self.space_id, &self.room_id).await;
         Ok(())
     }
 }

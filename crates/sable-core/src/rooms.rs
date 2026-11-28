@@ -22,6 +22,7 @@ use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::member::MembershipState;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
+use matrix_sdk::ruma::events::space::parent::SpaceParentEventContent;
 use matrix_sdk::ruma::{OwnedRoomId, OwnedServerName, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::{LocalEchoContent, SendHandle};
 use matrix_sdk::{Client, EncryptionState, RoomMemberships, RoomState};
@@ -530,8 +531,102 @@ impl SignedIn {
             .send_state_event_for_key(room_id, content)
             .await
             .or_failed(self.core(), "add_to_space")?;
+        self.declare_parent(&space, room_id).await;
 
         Ok(())
+    }
+
+    /// Names the space as the room's parent, so every member inherits per-space profiles from it.
+    /// Best effort. Only a space others can join or knock on is named, as the room's state shows
+    /// its id to every member.
+    async fn declare_parent(&self, space: &Room, room_id: &RoomId) {
+        let Some(room) = self.client().get_room(room_id) else {
+            return;
+        };
+        if !matches!(
+            space.join_rule(),
+            Some(
+                JoinRule::Public
+                    | JoinRule::Restricted(_)
+                    | JoinRule::Knock
+                    | JoinRule::KnockRestricted(_)
+            )
+        ) {
+            tracing::debug!(space = %space.room_id(), "private space not set as a parent");
+            return;
+        }
+        if !self.may_name_parents(&room).await {
+            tracing::debug!(room = %room_id, "no power to set the space parent");
+            return;
+        }
+        let claims = crate::space_parents::claims(self.core(), &room)
+            .await
+            .unwrap_or_default();
+        let valid = |claim: &&crate::space_parents::ParentClaim| claim.room_id().is_some();
+        if claims
+            .iter()
+            .filter(valid)
+            .any(|claim| claim.state_key == space.room_id().as_str())
+        {
+            return;
+        }
+        let via = crate::routing::Route::cached(space)
+            .await
+            .map(crate::routing::Route::into_servers)
+            .unwrap_or_default();
+        if via.is_empty() {
+            tracing::warn!(room = %room_id, space = %space.room_id(), "space parent not set: no route");
+            return;
+        }
+        let mut parent = SpaceParentEventContent::new(via);
+        parent.canonical = !claims
+            .iter()
+            .filter(valid)
+            .any(|claim| claim.content.canonical);
+        if let Err(error) = room.send_state_event_for_key(space.room_id(), parent).await {
+            tracing::warn!(room = %room_id, space = %space.room_id(), %error, "space parent not set");
+        }
+    }
+
+    /// Best effort, like [`Self::declare_parent`].
+    pub(crate) async fn clear_parent(&self, space_id: &RoomId, room_id: &RoomId) {
+        let Some(room) = self.client().get_room(room_id) else {
+            return;
+        };
+        let claims = crate::space_parents::claims(self.core(), &room)
+            .await
+            .unwrap_or_default();
+        if !claims
+            .iter()
+            .any(|claim| claim.state_key == space_id.as_str() && !claim.content.via.is_empty())
+        {
+            return;
+        }
+        if !self.may_name_parents(&room).await {
+            tracing::debug!(room = %room_id, "no power to clear the space parent");
+            return;
+        }
+        if let Err(error) = room
+            .send_state_event_raw(
+                "m.space.parent",
+                space_id.as_str(),
+                serde_json::Value::Object(serde_json::Map::new()),
+            )
+            .await
+        {
+            tracing::warn!(room = %room_id, space = %space_id, %error, "space parent not cleared");
+        }
+    }
+
+    async fn may_name_parents(&self, room: &Room) -> bool {
+        let Some(me) = self.client().user_id() else {
+            return false;
+        };
+        room.state() == RoomState::Joined
+            && room
+                .power_levels()
+                .await
+                .is_ok_and(|levels| levels.user_can_send_state(me, StateEventType::SpaceParent))
     }
 
     async fn child_via(&self, room_id: &RoomId) -> Result<Vec<OwnedServerName>, RpcError> {

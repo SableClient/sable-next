@@ -305,6 +305,33 @@ pub(crate) async fn parents(
         .collect()
 }
 
+/// Whether the space's local state still lists the child: an `m.space.child` edge with a `via`.
+pub(crate) async fn lists_child(
+    core: &crate::Core,
+    space: &matrix_sdk::Room,
+    child: &RoomId,
+) -> bool {
+    let Ok(Some(raw)) = core
+        .with_open_stores(async || {
+            space
+                .get_state_event(StateEventType::SpaceChild, child.as_str())
+                .await
+        })
+        .await
+    else {
+        return false;
+    };
+    let raw = match raw {
+        RawAnySyncOrStrippedState::Sync(raw) => raw.json().to_owned(),
+        RawAnySyncOrStrippedState::Stripped(raw) => raw.json().to_owned(),
+    };
+    serde_json::from_str::<StateEventIn>(raw.get()).is_ok_and(|event| {
+        content_of::<ChildContentIn>(&event)
+            .via
+            .is_some_and(|via| !via.is_empty())
+    })
+}
+
 pub(crate) async fn validate(
     core: &crate::Core,
     client: &matrix_sdk::Client,

@@ -23,6 +23,7 @@ pub(crate) const MEMBER_COLOR_FIELD: &str = "eu.she-a.color";
 pub(crate) const COLOR_EVENT: &str = "moe.sable.room.cosmetics.color";
 pub(crate) const PRONOUNS_EVENT: &str = "moe.sable.room.cosmetics.pronouns";
 const SPACE_PARENT_EVENT: &str = "m.space.parent";
+const SPACE_CHILD_EVENT: &str = "m.space.child";
 const MAX_CACHED_ROOMS: usize = 16;
 
 fn is_cosmetic(event_type: &str) -> bool {
@@ -274,11 +275,41 @@ pub(crate) async fn unjoined_space_parents(
         .collect()
 }
 
+/// The room's own parent that still lists it, canonical first, so every member inherits from the
+/// same space.
+async fn declared_space_parent(
+    core: &Core,
+    client: &matrix_sdk::Client,
+    room: &matrix_sdk::Room,
+) -> Option<OwnedRoomId> {
+    let claims = crate::space_parents::claims(core, room).await?;
+    let parents = crate::space_parents::validate(core, client, room.room_id(), &claims, false)
+        .await
+        .iter()
+        .filter_map(crate::space_parents::ParentClaim::room_id)
+        .collect::<Vec<_>>();
+    for parent in parents {
+        let Some(space) = client
+            .get_room(&parent)
+            .filter(|space| space.state() == matrix_sdk::RoomState::Joined)
+        else {
+            continue;
+        };
+        if crate::space_parents::lists_child(core, &space, room.room_id()).await {
+            return Some(parent);
+        }
+    }
+    None
+}
+
 pub(crate) async fn first_space_parent(
     core: &Core,
     client: &matrix_sdk::Client,
     room: &matrix_sdk::Room,
 ) -> Option<OwnedRoomId> {
+    if let Some(space) = declared_space_parent(core, client, room).await {
+        return Some(space);
+    }
     if let Some(space) = crate::view::listing_spaces(Some(core), client, room.room_id())
         .await
         .into_iter()
@@ -286,11 +317,16 @@ pub(crate) async fn first_space_parent(
     {
         return Some(space);
     }
+    // A joined parent that lists the room was taken above, so one left here no longer lists it.
     crate::space_parents::parents(core, room)
         .await
         .into_iter()
-        .next()
         .map(|(room_id, _)| room_id)
+        .find(|parent| {
+            client
+                .get_room(parent)
+                .is_none_or(|space| space.state() != matrix_sdk::RoomState::Joined)
+        })
 }
 
 async fn stored_layer(room: &matrix_sdk::Room) -> Result<Layer, matrix_sdk::Error> {
@@ -327,10 +363,12 @@ impl SignedIn {
         space_id: Option<OwnedRoomId>,
     ) -> RoomCosmeticsView {
         let client = self.client();
-        let space_id = match space_id {
-            Some(space_id) if space_id != room.room_id() => Some(space_id),
-            Some(_) => None,
-            None => first_space_parent(self.core(), client, room).await,
+        let declared = declared_space_parent(self.core(), client, room).await;
+        let space_id = match (declared, space_id) {
+            (Some(declared), _) => Some(declared),
+            (None, Some(space_id)) if space_id != room.room_id() => Some(space_id),
+            (None, Some(_)) => None,
+            (None, None) => first_space_parent(self.core(), client, room).await,
         };
         let space = space_id
             .as_ref()
@@ -435,6 +473,17 @@ impl SignedIn {
                     let Ok(fields) = raw.deserialize_as_unchecked::<StateFields<'_>>() else {
                         return;
                     };
+                    if fields.event_type == SPACE_CHILD_EVENT {
+                        if let Some(Ok(child)) = fields.state_key.as_deref().map(RoomId::parse)
+                            && core.cosmetics_cache().contains(&child)
+                        {
+                            core.core().emit_if_current(
+                                generation,
+                                CoreEvent::RoomCosmeticsChanged { room_id: child },
+                            );
+                        }
+                        return;
+                    }
                     if !is_cosmetic(&fields.event_type) && fields.event_type != SPACE_PARENT_EVENT {
                         return;
                     }
