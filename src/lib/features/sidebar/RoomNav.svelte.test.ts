@@ -740,6 +740,28 @@ test('a space with rules offers them beneath the lobby', async () => {
   );
 });
 
+test('a space opened before shows its rules at once', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!ruled:example.org', name: 'Ruled', room_kind: 'space' }),
+  ];
+  visit('/space/!ruled:example.org', { spaceId: '!ruled:example.org' });
+  core.rpc.room_state.rules.mockResolvedValueOnce({
+    source_room_id: '!ruled:example.org',
+    html: '<p>Be kind</p>',
+    version: 1,
+    require_acceptance: false,
+    accepted: false,
+    updated_at: null,
+  });
+  await mountNav();
+  await screen.findByRole('link', { name: 'room.rulesTitle' });
+
+  cleanup();
+  core.rpc.room_state.rules.mockReturnValueOnce(new Promise(() => {}));
+  await mountNav();
+  expect(screen.getByRole('link', { name: 'room.rulesTitle' })).toBeInTheDocument();
+});
+
 test('a space you cannot add rooms to does not show a create action', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!space:example.org', name: 'Design', room_kind: 'space' }),
@@ -750,13 +772,17 @@ test('a space you cannot add rooms to does not show a create action', async () =
   expect(screen.queryByRole('button', { name: 'nav.newMenu' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'nav.findOrJoin' })).not.toBeInTheDocument();
 
-  core.rpc.members.permissions.mockResolvedValue({
-    can_invite: false,
-    can_manage_children: true,
-  } as RoomPermissionsView);
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!space:example.org',
+      name: 'Design',
+      room_kind: 'space',
+      can_manage_children: true,
+    }),
+  ];
   cleanup();
   await mountNav();
-  expect(await screen.findByRole('button', { name: 'nav.newMenu' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'nav.newMenu' })).toBeInTheDocument();
 });
 
 test('a space list header shows the space banner above it', async () => {

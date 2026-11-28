@@ -1112,6 +1112,75 @@ async fn next_room_list_diff(
 }
 
 #[tokio::test]
+async fn space_row_follows_whether_the_account_may_add_children() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let space_id = room_id!("!space:example.org");
+    let me = client.user_id().unwrap().to_string();
+    let state = |id: &str, kind: &str, key: &str, content: serde_json::Value| {
+        Raw::new(&json!({
+            "type": kind, "state_key": key, "sender": "@alice:example.org",
+            "event_id": id, "origin_server_ts": 1, "content": content
+        }))
+        .unwrap()
+        .cast_unchecked()
+    };
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(space_id).add_state_bulk([
+                state(
+                    "$create",
+                    "m.room.create",
+                    "",
+                    json!({"type": "m.space", "room_version": "10", "creator": "@alice:example.org"}),
+                ),
+                state("$member", "m.room.member", &me, json!({"membership": "join"})),
+                state(
+                    "$levels",
+                    "m.room.power_levels",
+                    "",
+                    json!({"state_default": 50}),
+                ),
+            ]),
+        )
+        .await;
+    let (core, mut events) = core_with_events(&server, client.clone()).await;
+    let SubscribeRoomListOk { subscription, .. } =
+        core.run(SubscribeRoomListParams::default()).await.unwrap();
+    let mut rows: Vec<crate::protocol::RoomListItemView> = Vec::new();
+    let space = |rows: &[crate::protocol::RoomListItemView]| {
+        rows.iter()
+            .find(|row| row.room_id == space_id)
+            .map(|row| row.can_manage_children)
+    };
+    while space(&rows).is_none() {
+        for diff in next_room_list_diff(&mut events, subscription).await {
+            crate::view::apply_diff(&mut rows, &diff);
+        }
+    }
+    assert_eq!(space(&rows), Some(false));
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(space_id).add_state_event(state(
+                "$levels-granted",
+                "m.room.power_levels",
+                "",
+                json!({"state_default": 50, "users": {me.clone(): 50}}),
+            )),
+        )
+        .await;
+    while space(&rows) != Some(true) {
+        for diff in next_room_list_diff(&mut events, subscription).await {
+            crate::view::apply_diff(&mut rows, &diff);
+        }
+    }
+    core.run(UnsubscribeParams { subscription }).await.unwrap();
+}
+
+#[tokio::test]
 async fn room_list_updates_when_a_parent_claim_is_added_and_revoked() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

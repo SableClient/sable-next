@@ -1444,6 +1444,8 @@ export type RoomListItemView = {
 	supports_knock_restricted: boolean,
 	/**  Already sorted by `order`, then the child event's age. */
 	space_children: SpaceChildEdge[],
+	/**  `false` for anything but a space. */
+	can_manage_children: boolean,
 	/**  The network a bridge relays this room from, per its `m.bridge` state. */
 	bridge: BridgeView | null,
 	/**  The room's own MSC4278 level; `null` when the account's applies. */

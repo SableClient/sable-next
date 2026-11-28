@@ -192,6 +192,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       supports_restricted: false,
       supports_knock_restricted: false,
       space_children: [],
+      can_manage_children: false,
       bridge: null,
       media_previews: null,
       unread:
@@ -253,6 +254,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       topic:
         'A topic long enough to clamp: it introduces the space, lists the rules, thanks the moderators and links the map. It repeats itself at length so the hero has something to cut: the rules again, the moderators again, the map again, and a closing paragraph that keeps going well past the three lines the hero shows before it hands the rest to the dialog.',
       room_kind: 'space',
+      can_manage_children: true,
       encrypted: false,
       unread: 0,
       notifying: 0,

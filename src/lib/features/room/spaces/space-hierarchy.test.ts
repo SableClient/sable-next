@@ -249,6 +249,7 @@ function summary(roomId: string, overrides: Partial<RoomListItemView> = {}): Roo
     supports_knock: false,
     supports_restricted: false,
     supports_knock_restricted: false,
+    can_manage_children: false,
     space_children: [],
     bridge: null,
     media_previews: null,

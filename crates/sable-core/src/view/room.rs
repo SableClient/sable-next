@@ -52,6 +52,7 @@ pub struct RoomInfo {
     pub children: Vec<SpaceChildEdge>,
     /// The last read of `children` failed, so they are the previous ones.
     pub children_stale: bool,
+    pub can_manage_children: bool,
     pub tags: Vec<RoomTag>,
     pub(crate) voice_roster: Option<crate::calls::VoiceRoomRoster>,
     pub avatar_override: Option<String>,
@@ -142,6 +143,7 @@ pub fn room_list_item<S: BuildHasher>(
         supports_restricted: info.is_some_and(|i| i.supports_restricted),
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
+        can_manage_children: info.is_some_and(|i| i.can_manage_children),
         bridge: info.and_then(|i| i.bridge.clone()),
         media_previews: info.and_then(|i| i.media_previews),
         unread,
@@ -618,6 +620,8 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
 
     let ((children, children_stale), is_direct) =
         futures_util::future::join(children, is_direct(room)).await;
+    let can_manage_children =
+        room_kind == Some(RoomKind::Space) && can_manage_children(room, previous).await;
     let (supports_knock, supports_restricted, supports_knock_restricted) =
         crate::rooms::join_rule_support(room);
     let direct_name = if room.name().is_none() {
@@ -661,6 +665,7 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         explicit_name: room.name().is_some(),
         children,
         children_stale,
+        can_manage_children,
         tags: room_tags(room),
         bridge: match previous {
             Some(previous) => previous.bridge.clone(),
@@ -681,6 +686,15 @@ async fn room_info(room: &Room, previous: Option<&RoomInfo>) -> RoomInfo {
         latest_sender,
         group_members,
     }
+}
+
+async fn can_manage_children(room: &Room, previous: Option<&RoomInfo>) -> bool {
+    let levels = match room.power_levels().await {
+        Ok(levels) => levels,
+        Err(matrix_sdk_base::Error::InsufficientData) => room.power_levels_or_default().await,
+        Err(_) => return previous.is_some_and(|info| info.can_manage_children),
+    };
+    levels.user_can_send_state(room.own_user_id(), StateEventType::SpaceChild)
 }
 
 const GROUP_MEMBERS: usize = 3;

@@ -1,7 +1,12 @@
+<script module lang="ts">
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- must not be tracked
+  const knownRules = new Map<string, boolean>();
+</script>
+
 <script lang="ts">
   import type { Component } from 'svelte';
   import { resolve } from '$app/paths';
-  import type { RoomPermissionsView, RoomListItemView } from '#src/generated/protocol';
+  import type { RoomListItemView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -34,17 +39,14 @@
   const roomList = useRoomList();
   const core = useCoreClient();
 
-  let spacePermissions = $state<RoomPermissionsView | null>(null);
   let hasSpaceRules = $state(false);
   let directSection = $derived(pathname.startsWith('/direct'));
   // Keyed on the id: a room list diff hands back a fresh object for the
-  // same space, and the permission effect below would re-run on every one.
+  // same space, and the rules effect below would re-run on every one.
   let activeSpaceId = $derived(activeSpace?.room_id ?? null);
   // Outside a space anyone may create a room; inside one it also has to land as
   // a child, which the space's own power levels govern.
-  let canCreateHere = $derived(
-    activeSpace === null || (spacePermissions?.can_manage_children ?? false)
-  );
+  let canCreateHere = $derived(activeSpace === null || activeSpace.can_manage_children);
   let createRoomHref = $derived(createRoomPath(roomList.rooms, activeSpace, true));
 
   // A space browses its own children through the lobby; the public directory is
@@ -97,34 +99,10 @@
     }
   }
 
-  // Adding a room to a space writes `m.space.child` there, so the space's own
-  // power levels decide whether creating from inside it is offered at all.
-  $effect(() => {
-    const spaceId = activeSpaceId;
-    if (!spaceId) {
-      spacePermissions = null;
-      return;
-    }
-
-    let current = true;
-    spacePermissions = null;
-    void core.rpc.members
-      .permissions({ room_id: spaceId })
-      .then((next) => {
-        if (current) spacePermissions = next;
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable nav] space permissions unavailable', error);
-      });
-    return () => {
-      current = false;
-    };
-  });
-
   // The Rules action appears only when the space actually has rules.
   $effect(() => {
     const spaceId = activeSpaceId;
-    hasSpaceRules = false;
+    hasSpaceRules = spaceId !== null && (knownRules.get(spaceId) ?? false);
     if (!spaceId) return;
 
     let current = true;
@@ -132,6 +110,7 @@
       void core.rpc.room_state
         .rules({ room_id: spaceId })
         .then((rules) => {
+          knownRules.set(spaceId, rules !== null);
           if (current) hasSpaceRules = rules !== null;
         })
         .catch((error: unknown) => {

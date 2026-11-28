@@ -995,6 +995,8 @@ pub struct RoomListItemView {
     pub supports_knock_restricted: bool,
     /// Already sorted by `order`, then the child event's age.
     pub space_children: Vec<SpaceChildEdge>,
+    /// `false` for anything but a space.
+    pub can_manage_children: bool,
     /// The network a bridge relays this room from, per its `m.bridge` state.
     pub bridge: Option<BridgeView>,
     /// The room's own MSC4278 level; `null` when the account's applies.

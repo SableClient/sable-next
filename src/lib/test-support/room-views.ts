@@ -24,6 +24,7 @@ export function roomView(overrides: Partial<RoomListItemView> = {}): RoomListIte
     supports_restricted: false,
     supports_knock_restricted: false,
     space_children: [],
+    can_manage_children: false,
     bridge: null,
     media_previews: null,
     unread: 0,

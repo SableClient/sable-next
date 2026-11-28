@@ -50,6 +50,7 @@ const rooms = ['Alpha', 'Beta'].map((name) =>
     supports_knock: false,
     supports_restricted: false,
     supports_knock_restricted: false,
+    can_manage_children: false,
     space_children: [],
     bridge: null,
     media_previews: null,

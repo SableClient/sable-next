@@ -28,6 +28,7 @@
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,
+    can_manage_children: false,
     space_children: [
       {
         room_id: '!foo',
